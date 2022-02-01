@@ -109,6 +109,7 @@ Class TypeCheckAxioms m {super : TypeCheckM m} : Type :=
     wlp (bind m1 m2) Q <-> wlp m1 (fun o => wlp (m2 o) Q);
   wlp_monotone : forall {O : Set} (P Q : O -> Prop) (m : m O),
     (forall o : O, P o -> Q o) -> wlp m P -> wlp m Q;
+    (* TODO: add wlp and wp for ret and fail *)
 
   wp {O : Type} (mv : m O) (Q : O -> Prop) : Prop;
   wp_ty_eqb : forall (t1 t2 : ty) (Q : unit -> Prop),
@@ -128,10 +129,13 @@ Arguments TypeCheckAxioms _ {super}.
 
 Check TypeCheckAxioms.
 
-
 Inductive cstr : Set :=
   | CEq (n1 n2 : ty)
   | CTrue.
+
+(* ================================================ *)
+(*                 OPTION INSTANCE                  *)
+(* ================================================ *)
 
 #[global] Instance TC_option : TypeCheckM option :=
   { bind T1 T2 m f :=
@@ -182,6 +186,7 @@ Inductive cstr : Set :=
 Qed.
 
 (* TODO: wlp_value needs to be parametrized by TcM to fix this proof *)
+(* TODO: maybe embed as part of TcA ? *)
 Lemma wlp_value : forall (G : env) (s : string) (Q : ty -> Prop),
 wlp (value s G) Q <-> forall t, value s G = Some t -> Q t.
 Proof.
@@ -189,6 +194,10 @@ Proof.
   - intro. admit. (* specialize (H t). apply H. reflexivity. *)
   - intro. (* TODO: finish proof *)
 Admitted.
+
+(* ================================================ *)
+(*              OPTION WRITER INSTANCE              *)
+(* ================================================ *)
 
 Definition writer (W A : Type) := prod W A.
 Definition option_writer (W A : Type) := option (prod W A).
@@ -198,8 +207,6 @@ Unset Printing Universes.
 Check (writer (list cstr)).
 
 Check (option_writer (list cstr)).
-
-
 
 #[global] Instance TC_writer : TypeCheckM (option_writer (list cstr)) :=
 { bind T1 T2 ma f :=
@@ -241,13 +248,15 @@ Proof.
     + destruct H. split. apply H. apply IHcs. apply H1.
 Qed.
 
-
+(* TODO: throughout, replace firstorder by intuition tactic
+         firstorder changes between coq versions and takes longer *)
 #[refine] Instance TCF_writer : TypeCheckAxioms (option_writer (list cstr)) :=
 {
   wlp [A: Type] (m : option_writer (list cstr) A) (Q : A -> Prop) :=
     match m with
     | Some (cstrs, a) => sems cstrs -> Q a
-    | None => True (* we make no distinction between failure in scope level (?) or failure in typeability *)
+    | None => True (* we make no distinction between failure in scope level
+                      and failure in typeability *)
     end ;
 
   wp [A: Type] (m : option_writer (list cstr) A) (Q : A -> Prop) :=
@@ -255,7 +264,7 @@ Qed.
     | Some (cstrs, a) => sems cstrs /\ Q a
     | None => False
     end ;
-}. Proof.
+}. Proof. (* Simplify some of these proofs *)
   * (* wlp_ty_eqb *)
     intros. destruct (assert t1 t2) eqn:?; inversion Heqy.
     destruct t1, t2; firstorder discriminate.
@@ -266,8 +275,7 @@ Qed.
     intros. destruct m1; cbn. destruct p; cbn. destruct (m2 a); cbn. destruct p; cbn.
     rewrite sems_append; firstorder. firstorder. firstorder.
   * (* wlp_monotone *)
-    intros. (* Is there a tactic like "apply H0 using H" *)
-    destruct m as [[c a]|]; intuition.
+    intros. destruct m as [[c a]|]; intuition.
   * (* wp_ty_eqb *)
     intros. destruct (assert t1 t2) eqn:?; inversion Heqy.
     destruct t1, t2; firstorder discriminate.
@@ -278,66 +286,58 @@ Qed.
     intros. destruct m1; cbn. destruct p; cbn. destruct m2; cbn. destruct p; cbn. (* firstorder sems_append *)
     rewrite sems_append; firstorder. firstorder. firstorder. (* !!! *)
   * (* wp_monotone *)
-    unfold wp. intros. (* Is there a tactic like "apply H0 using H" *)
-    destruct m; firstorder. destruct p. split. destruct H0. apply H0. apply H. apply H0.
+    intros. destruct m as [[c a]|]; intuition.
 Qed.
 
-(* bind is encoded using continuations *)
+
+(* ================================================ *)
+(*                FREE MONAD INSTANCE               *)
+(* ================================================ *)
+
+
+(* bind is encoded using continuations, essentially the
+   free monoid forms a list of asserts *)
 Inductive freeM (A : Type) : Type :=
   | ret_free  :   A -> freeM A
   | bind_assert_free :  ty -> ty -> freeM A -> freeM A
   | fail_free : freeM A.
 
-(* Fixpoint bind_assert_free *)
+(* Evaluation of the continuation-based bind of freeM *)
+Fixpoint freeM_bind [T1 T2 : Type] (m : freeM T1) (f: T1 -> freeM T2) : freeM T2 :=
+  match m with
+  | ret_free a => f a
+  | fail_free _ => fail_free T2
+  | bind_assert_free t1 t2 k =>
+      if ty_eqb t1 t2 then freeM_bind k f
+                      else fail_free T2
+  end.
 
 #[global] Instance TC_free : TypeCheckM freeM :=
-  { bind T1 T2 m f :=
-      match m with
-      | ret_free a => f a
-      | fail_free _ => fail_free T2
-      | bind_assert_free t1 t2 k =>
-          if ty_eqb t1 t2 then match k with
-                               | ret_free a => f a
-                               | fail_free _ => fail_free T2
-                               | bind_assert_free t1 t2 k' =>
-                                   fail_free T2 (* placeholder *) (* TODO *)
-                                   (* need to find a t1 \in T1 s.t. *)
-                                   (* (f t1) can be injected here *)
-                                   (* with f : T1 -> freeM T2 *)
-                               end else fail_free T2
-      end ;
-    ret T u := ret_free u ;
-    assert t1 t2 := bind_assert_free t1 t2 (ret_free tt); (* cons (t1 t2) (ret_free tt) *)
-    fail T := fail_free T;
+  { bind         := freeM_bind ;
+    ret T u      := ret_free u ;
+    assert t1 t2 := bind_assert_free t1 t2 (ret_free tt); (* equiv. cons (t1, t2) (ret_free tt) *)
+    fail T       := fail_free T;
   }.
 
-Eval compute in List.map.
+Fixpoint wlp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
+  match m with
+  | ret_free a => Q a
+  | bind_assert_free t1 t2 k => t1 = t2 ->
+      wlp_freeM k Q
+  | fail_free _ => True
+  end.
+
+Fixpoint wp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
+  match m with
+  | ret_free a => Q a
+  | bind_assert_free t1 t2 k => t1 = t2 /\
+      wlp_freeM k Q
+  | fail_free _ => False
+  end.
 
 #[refine] Instance TCF_freeM : TypeCheckAxioms freeM :=
-{
-  wlp [A: Type] (m : freeM A) (Q : A -> Prop) :=
-    match m with
-    | ret_free a => Q a
-    | bind_assert_free t1 t2 k => t1 = t2 ->
-        match k with
-        | ret_free a => Q a
-        | fail_free _ => True
-        | bind_assert_free t3 t4 k' => True (* TODO *)
-        end
-    | fail_free _ => True
-    end ;
-
-  wp [A: Type] (m : freeM A) (Q : A -> Prop) :=
-    match m with
-    | ret_free a => Q a
-    | bind_assert_free t1 t2 k =>
-        match k with
-        | ret_free a => Q a
-        | fail_free _ => False
-        | bind_assert_free t3 t4 k' => True (* TODO *)
-        end
-    | fail_free _ => False
-    end ;
+{ wlp := wlp_freeM ;
+  wp  := wp_freeM  ;
 }. Proof. (* TODO *)
   * (* wlp_ty_eqb *)
     intros. destruct (assert t1 t2) eqn:?. firstorder discriminate.
@@ -350,7 +350,7 @@ Eval compute in List.map.
     admit.
   * (* wlp_monotone *)
     intros. destruct m; firstorder.
-    destruct m; firstorder.
+    destruct m; firstorder. admit.
   * (* wp_ty_eqb *)
     admit.
   * (* wp_do *)
