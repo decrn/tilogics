@@ -266,8 +266,8 @@ Qed.
     intros. destruct m1; cbn. destruct p; cbn. destruct (m2 a); cbn. destruct p; cbn.
     rewrite sems_append; firstorder. firstorder. firstorder.
   * (* wlp_monotone *)
-    unfold wp. intros. (* Is there a tactic like "apply H0 using H" *)
-    destruct m; firstorder. destruct p. intro. apply H. apply H0. apply H1.
+    intros. (* Is there a tactic like "apply H0 using H" *)
+    destruct m as [[c a]|]; intuition.
   * (* wp_ty_eqb *)
     intros. destruct (assert t1 t2) eqn:?; inversion Heqy.
     destruct t1, t2; firstorder discriminate.
@@ -288,6 +288,8 @@ Inductive freeM (A : Type) : Type :=
   | bind_assert_free :  ty -> ty -> freeM A -> freeM A
   | fail_free : freeM A.
 
+(* Fixpoint bind_assert_free *)
+
 #[global] Instance TC_free : TypeCheckM freeM :=
   { bind T1 T2 m f :=
       match m with
@@ -305,9 +307,11 @@ Inductive freeM (A : Type) : Type :=
                                end else fail_free T2
       end ;
     ret T u := ret_free u ;
-    assert t1 t2 := bind_assert_free t1 t2 (ret_free tt);
+    assert t1 t2 := bind_assert_free t1 t2 (ret_free tt); (* cons (t1 t2) (ret_free tt) *)
     fail T := fail_free T;
   }.
+
+Eval compute in List.map.
 
 #[refine] Instance TCF_freeM : TypeCheckAxioms freeM :=
 {
@@ -405,7 +409,7 @@ Fixpoint infer {m} `{TypeCheckM m} (ctx : env) (expression : expr) : m (prod ty 
   | e_var var =>
       match (value var ctx) with
       | Some t_var => ret (t_var, expression)
-      | None => fail (assert ty_nat ty_bool) (* TODO: model explicit failure *) ;; ret (ty_nat, expression)
+      | None => fail _
       end
   end.
 
