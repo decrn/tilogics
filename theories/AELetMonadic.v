@@ -64,10 +64,10 @@ Definition env := list (string * ty).
 
 Class TypeCheckM (M : Type -> Type) : Type :=
   {
-    ret  (A   : Type) :   A -> M A ;
+    ret  {A   : Type} :   A -> M A ;
     bind {A B : Type} : M A -> (A -> M B) -> M B ;
     assert            :  ty -> ty         -> M unit ;
-    fail (A   : Type) : M A ;
+    fail {A   : Type} : M A ;
     }.
 
 (* this one breaks monad laws *)
@@ -77,7 +77,6 @@ Inductive freeM' : Type -> Type :=
   | assert_free'  :  ty -> ty         -> freeM' unit.
 
 
-Set Printing Universes.
 
 Definition option_assert_eq (a b : ty) : option unit :=
   if ty_eqb a b then Some tt else None.
@@ -99,25 +98,48 @@ Notation "' x <- ma ;; mb" :=
      the lemmas *)
 Class TypeCheckAxioms m {super : TypeCheckM m} : Type :=
   {
+
+  (* WLP / Partial correctness *)
+
   wlp {O: Type} (mv : m O) (Q : O -> Prop) : Prop;
+
   wlp_ty_eqb : forall (t1 t2 : ty) (Q : unit -> Prop),
     wlp (assert t1 t2) Q <-> (t1 = t2 -> Q tt);
-    (* TODO: write do in function of bind *)
-  wlp_do : forall {A B : Type} (m1 : m A) (m2 : m B) (Q : B -> Prop),
-       @wlp B (m1 ;; m2) Q <-> wlp m1 (fun _ => wlp m2 Q);
+
+(* wlp_do : forall {A B : Type} (m1 : m A) (m2 : m B) (Q : B -> Prop),
+    @wlp B (m1 ;; m2) Q <-> wlp m1 (fun _ => wlp m2 Q); *)
+
   wlp_bind : forall {A B : Type} (m1 : m A) (m2 : A -> m B) (Q : B -> Prop),
     wlp (bind m1 m2) Q <-> wlp m1 (fun o => wlp (m2 o) Q);
+
+  wlp_ret : forall {A : Type} (a : A) (Q : A -> Prop),
+    wlp (ret a) Q <-> wlp (ret a) (fun o => Q o) ; (* TODO: CHECK *)
+
+  wlp_fail : forall {A : Type} (Q : A -> Prop),
+    wlp (fail) Q <-> True ; (* TODO: CHECK *)
+
   wlp_monotone : forall {O : Set} (P Q : O -> Prop) (m : m O),
     (forall o : O, P o -> Q o) -> wlp m P -> wlp m Q;
-    (* TODO: add wlp and wp for ret and fail *)
+
+  (* WP / Total correctness *)
 
   wp {O : Type} (mv : m O) (Q : O -> Prop) : Prop;
+
   wp_ty_eqb : forall (t1 t2 : ty) (Q : unit -> Prop),
     wp (assert t1 t2) Q <-> t1 = t2 /\ Q tt;
-  wp_do : forall {A B : Type} (m1 : m A) (m2 : m B) (Q : B -> Prop),
-    @wp B (m1 ;; m2) Q <-> wp m1 (fun _ => wp m2 Q);
+
+(* wp_do : forall {A B : Type} (m1 : m A) (m2 : m B) (Q : B -> Prop),
+    @wp B (m1 ;; m2) Q <-> wp m1 (fun _ => wp m2 Q); *)
+
   wp_bind : forall {A B : Type} (m1 : m A) (m2 : A -> m B) (Q : B -> Prop),
     wp (bind m1 m2) Q <-> wp m1 (fun o => wp (m2 o) Q);
+
+  wp_ret : forall {A : Type} (a : A) (Q : A -> Prop),
+    wp (ret a) Q <-> wp (ret a) (fun o => Q o) ; (* TODO: CHECK *)
+
+  wp_fail : forall {A : Type} (Q : A -> Prop),
+    wp (fail) Q <-> False ; (* TODO: CHECK *)
+
   wp_monotone : forall {O : Set} (P Q : O -> Prop) (m : m O),
     (forall o : O, P o -> Q o) -> wp m P -> wp m Q;
 }.
@@ -162,13 +184,15 @@ Inductive cstr : Set :=
     end;
 }. Proof.
   * (* wlp_ty_eqb *)
-    destruct t1, t2; cbn; firstorder discriminate.
-  * (* wlp_do *)
-    destruct m1; reflexivity.
+    destruct t1, t2; cbn; intuition discriminate.
   * (* wlp_bind *)
     destruct m1; reflexivity.
+  * (* wlp_ret *)
+    intuition.
+  * (* wlp_fail *)
+    intuition.
   * (* wlp_monotone *)
-    destruct m; simpl; eauto.
+    destruct m as [|]; intuition.
   * (* wp_ty_eqb *)
     unfold wp. intros t1 t2 Q. destruct (assert t1 t2) eqn:Heq.
     - destruct u. assert (t1 = t2).
@@ -177,10 +201,12 @@ Inductive cstr : Set :=
     - assert (t1 <> t2).
       { simpl in Heq. destruct ty_eqb in Heq; congruence. }
       clear Heq. unfold not in H. firstorder.
-  * (* wp_do *)
-    destruct m1; reflexivity.
   * (* wp_bind *)
     destruct m1; reflexivity.
+  * (* wp_ret *)
+    intuition.
+  * (* wp_fail *)
+    intuition.
   * (* wp_monotone *)
     destruct m; simpl; eauto.
 Qed.
@@ -268,23 +294,31 @@ Qed.
   * (* wlp_ty_eqb *)
     intros. destruct (assert t1 t2) eqn:?; inversion Heqy.
     destruct t1, t2; firstorder discriminate.
-  * (* wlp_do *)
+   (* * (* wlp_do *)
     intros. destruct m1; cbn. destruct p; cbn. destruct m2; cbn. destruct p; cbn. (* firstorder sems_append *)
-    rewrite sems_append; firstorder. firstorder. firstorder. (* !!! *)
+      rewrite sems_append; firstorder. firstorder. firstorder. (* !!! *) *)
   * (* wlp_bind *)
     intros. destruct m1; cbn. destruct p; cbn. destruct (m2 a); cbn. destruct p; cbn.
     rewrite sems_append; firstorder. firstorder. firstorder.
+  * (* wlp_ret *)
+    intuition.
+  * (* wlp_fail *)
+    intuition.
   * (* wlp_monotone *)
     intros. destruct m as [[c a]|]; intuition.
   * (* wp_ty_eqb *)
     intros. destruct (assert t1 t2) eqn:?; inversion Heqy.
     destruct t1, t2; firstorder discriminate.
-  * (* wp_do *)
+(*  * (* wp_do *)
     intros. destruct m1; cbn. destruct p; cbn. destruct m2; cbn. destruct p; cbn. (* firstorder sems_append *)
-    rewrite sems_append; firstorder. firstorder. firstorder. (* !!! *)
+    rewrite sems_append; firstorder. firstorder. firstorder. (* !!! *) *)
   * (* wp_bind *)
     intros. destruct m1; cbn. destruct p; cbn. destruct m2; cbn. destruct p; cbn. (* firstorder sems_append *)
     rewrite sems_append; firstorder. firstorder. firstorder. (* !!! *)
+  * (* wp_ret *)
+    intuition.
+  * (* wp_fail *)
+    intuition.
   * (* wp_monotone *)
     intros. destruct m as [[c a]|]; intuition.
 Qed.
@@ -331,7 +365,7 @@ Fixpoint wp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
   match m with
   | ret_free a => Q a
   | bind_assert_free t1 t2 k => t1 = t2 /\
-      wlp_freeM k Q
+      wp_freeM k Q
   | fail_free _ => False
   end.
 
@@ -343,23 +377,32 @@ Fixpoint wp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
     intros. destruct (assert t1 t2) eqn:?. firstorder discriminate.
     - destruct y; inversion Heqy. subst. reflexivity.
     - inversion Heqy.
-  * (* wlp_do *)
-    intros. admit.
-
+  (* * (* wlp_do *)
+    intros. admit. *)
   * (* wlp_bind *)
-    admit.
+    intros. intuition.
+    - admit.
+    - unfold bind. destruct TC_free. admit.
+  * (* wlp_ret *)
+    intuition.
+  * (* wlp_fail *)
+    intuition.
   * (* wlp_monotone *)
-    intros. destruct m; firstorder.
-    destruct m; firstorder. admit.
+    intros. induction m; cbn; auto.
   * (* wp_ty_eqb *)
     admit.
-  * (* wp_do *)
-    admit.
+    (* * (* wp_do *)
+       admit. *)
   * (* wp_bind *)
     admit.
+  * (* wp_ret *)
+    intuition.
+  * (* wp_fail *)
+    intuition.
   * (* wp_monotone *)
-    intros. destruct m; firstorder.
-    destruct m; firstorder.
+    intros. induction m; cbn; auto.
+    inversion H0.
+    intuition.
 Admitted.
 
 
@@ -409,7 +452,7 @@ Fixpoint infer {m} `{TypeCheckM m} (ctx : env) (expression : expr) : m (prod ty 
   | e_var var =>
       match (value var ctx) with
       | Some t_var => ret (t_var, expression)
-      | None => fail _
+      | None => fail
       end
   end.
 
