@@ -375,13 +375,11 @@ Fixpoint wp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
 #[refine] Instance TCF_freeM : TypeCheckAxioms freeM :=
 { wlp := wlp_freeM ;
   wp  := wp_freeM  ;
-}. Proof. (* TODO *)
+}. Proof.
   * (* wlp_ty_eqb *)
     intros. destruct (assert t1 t2) eqn:?. firstorder discriminate.
     - destruct y; inversion Heqy. subst. reflexivity.
     - inversion Heqy.
-  (* * (* wlp_do *)
-    intros. admit. *)
   * (* wlp_bind *)
     split; induction m1; cbn; intuition.
   * (* wlp_ret *)
@@ -394,8 +392,6 @@ Fixpoint wp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
     split; intros.
     - inversion H. cbn in H1. auto.
     - cbn. apply H.
-    (* * (* wp_do *)
-       admit. *)
   * (* wp_bind *)
     split; induction m1; cbn; intuition.
   * (* wp_ret *)
@@ -513,8 +509,6 @@ Inductive tpb : env -> expr -> ty -> expr -> Prop :=
 
 Notation "G |-- E ; T ~> EE" := (tpb G E T EE) (at level 50).
 
-(* TODO: parametrize soundness and completeness with an instance of TypeCheckAxioms
-         and use the lemmas of that instance to make it generic *)
 Lemma infer_sound : forall {m} `{TypeCheckAxioms m} (G : env) (e : expr),
  wlp (infer G e) (fun '(t,ee) => G |-- e ; t ~> ee).
 Proof.
@@ -565,6 +559,20 @@ Proof.
   - intro. destruct (value s G) eqn:?.
     + apply wlp_ret. constructor. apply Heqo.
     + apply wlp_fail. auto.
+Restart.
+  intros. generalize dependent G. induction e; cbn [infer]; intro;
+  repeat (rewrite ?wlp_bind, ?wlp_ty_eqb, ?wlp_ret, ?wlp_fail; try destruct o;
+      try match goal with
+      | IHe : forall G, wlp (infer G ?e) _ |- wlp (infer (?p :: ?g) ?e) _ =>
+          specialize (IHe ((s,t) :: G)); revert IHe; apply wlp_monotone; intros
+      | IHe : forall G, wlp (infer G ?e) _ |- wlp (infer ?g ?e) _ =>
+          specialize (IHe G); revert IHe; apply wlp_monotone; intros
+      | |- tpb _ _ _ _ =>
+          constructor
+      | |- ?x = ?y -> _ =>
+          intro; subst
+      | |- wlp (match ?t with _ => _ end) _ => destruct t eqn:?
+      end; try reflexivity; try assumption).
 Qed.
 
 Lemma infer_complete : forall {m} `{TypeCheckAxioms m} (G : env) (e ee : expr) (t : ty),
