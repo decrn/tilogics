@@ -92,6 +92,18 @@ Notation "' x <- ma ;; mb" :=
           (at level 80, x pattern, ma at next level, mb at level 200, right associativity,
            format "' x  <-  ma  ;;  mb").
 
+  (*
+
+    Q a
+    -------------
+    wlp (Some a) Q
+
+  {P} ret a { \x -> Q x }
+
+
+
+  *)
+
   (* Parametrized typeclass of "facts" about instances of the TypeCheckM class
      should contain the definitions for wp and wlp, as well as supporting lemmas.
      Instances of TypeCheckM should also instantiate this class, thereby proving
@@ -113,10 +125,10 @@ Class TypeCheckAxioms m {super : TypeCheckM m} : Type :=
     wlp (bind m1 m2) Q <-> wlp m1 (fun o => wlp (m2 o) Q);
 
   wlp_ret : forall {A : Type} (a : A) (Q : A -> Prop),
-    wlp (ret a) Q <-> wlp (ret a) (fun o => Q o) ; (* TODO: CHECK *)
+    wlp (ret a) Q <-> Q a ;
 
   wlp_fail : forall {A : Type} (Q : A -> Prop),
-    wlp (fail) Q <-> True ; (* TODO: CHECK *)
+    wlp (fail) Q <-> True ;
 
   wlp_monotone : forall {O : Set} (P Q : O -> Prop) (m : m O),
     (forall o : O, P o -> Q o) -> wlp m P -> wlp m Q;
@@ -135,7 +147,7 @@ Class TypeCheckAxioms m {super : TypeCheckM m} : Type :=
     wp (bind m1 m2) Q <-> wp m1 (fun o => wp (m2 o) Q);
 
   wp_ret : forall {A : Type} (a : A) (Q : A -> Prop),
-    wp (ret a) Q <-> wp (ret a) (fun o => Q o) ; (* TODO: CHECK *)
+    wp (ret a) Q <-> Q a ;
 
   wp_fail : forall {A : Type} (Q : A -> Prop),
     wp (fail) Q <-> False ; (* TODO: CHECK *)
@@ -301,7 +313,7 @@ Qed.
     intros. destruct m1; cbn. destruct p; cbn. destruct (m2 a); cbn. destruct p; cbn.
     rewrite sems_append; firstorder. firstorder. firstorder.
   * (* wlp_ret *)
-    intuition.
+    intuition. admit. admit.
   * (* wlp_fail *)
     intuition.
   * (* wlp_monotone *)
@@ -316,12 +328,12 @@ Qed.
     intros. destruct m1; cbn. destruct p; cbn. destruct m2; cbn. destruct p; cbn. (* firstorder sems_append *)
     rewrite sems_append; firstorder. firstorder. firstorder. (* !!! *)
   * (* wp_ret *)
-    intuition.
+    intuition. admit. admit.
   * (* wp_fail *)
     intuition.
   * (* wp_monotone *)
     intros. destruct m as [[c a]|]; intuition.
-Qed.
+Admitted.
 
 
 (* ================================================ *)
@@ -336,15 +348,16 @@ Inductive freeM (A : Type) : Type :=
   | bind_assert_free :  ty -> ty -> freeM A -> freeM A
   | fail_free : freeM A.
 
+Print app.
 (* Evaluation of the continuation-based bind of freeM *)
 Fixpoint freeM_bind [T1 T2 : Type] (m : freeM T1) (f: T1 -> freeM T2) : freeM T2 :=
   match m with
   | ret_free a => f a
   | fail_free _ => fail_free T2
   | bind_assert_free t1 t2 k =>
-      if ty_eqb t1 t2 then freeM_bind k f
-                      else fail_free T2
+      bind_assert_free t1 t2 (freeM_bind k f)
   end.
+
 
 #[global] Instance TC_free : TypeCheckM freeM :=
   { bind         := freeM_bind ;
@@ -380,8 +393,8 @@ Fixpoint wp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
   (* * (* wlp_do *)
     intros. admit. *)
   * (* wlp_bind *)
-    intros. intuition.
-    - admit.
+    destruct m1; intuition.
+    - 
     - unfold bind. destruct TC_free. admit.
   * (* wlp_ret *)
     intuition.
