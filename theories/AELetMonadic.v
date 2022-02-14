@@ -150,7 +150,7 @@ Class TypeCheckAxioms m {super : TypeCheckM m} : Type :=
     wp (ret a) Q <-> Q a ;
 
   wp_fail : forall {A : Type} (Q : A -> Prop),
-    wp (fail) Q <-> False ; (* TODO: CHECK *)
+    wp (fail) Q <-> False ;
 
   wp_monotone : forall {O : Set} (P Q : O -> Prop) (m : m O),
     (forall o : O, P o -> Q o) -> wp m P -> wp m Q;
@@ -222,16 +222,6 @@ Inductive cstr : Set :=
   * (* wp_monotone *)
     destruct m; simpl; eauto.
 Qed.
-
-(* TODO: wlp_value needs to be parametrized by TcM to fix this proof *)
-(* TODO: maybe embed as part of TcA ? *)
-Lemma wlp_value : forall (G : env) (s : string) (Q : ty -> Prop),
-wlp (value s G) Q <-> forall t, value s G = Some t -> Q t.
-Proof.
-  unfold wlp. intros. destruct (value s G) eqn:?; split; try congruence.
-  - intro. admit. (* specialize (H t). apply H. reflexivity. *)
-  - intro. (* TODO: finish proof *)
-Admitted.
 
 (* ================================================ *)
 (*              OPTION WRITER INSTANCE              *)
@@ -313,7 +303,7 @@ Qed.
     intros. destruct m1; cbn. destruct p; cbn. destruct (m2 a); cbn. destruct p; cbn.
     rewrite sems_append; firstorder. firstorder. firstorder.
   * (* wlp_ret *)
-    intuition. admit. admit.
+    intros. destruct (ret a) eqn:Heqy; inversion Heqy. cbn. intuition.
   * (* wlp_fail *)
     intuition.
   * (* wlp_monotone *)
@@ -328,12 +318,12 @@ Qed.
     intros. destruct m1; cbn. destruct p; cbn. destruct m2; cbn. destruct p; cbn. (* firstorder sems_append *)
     rewrite sems_append; firstorder. firstorder. firstorder. (* !!! *)
   * (* wp_ret *)
-    intuition. admit. admit.
+    intros. destruct (ret a) eqn:?; inversion Heqy. cbn. intuition.
   * (* wp_fail *)
     intuition.
   * (* wp_monotone *)
     intros. destruct m as [[c a]|]; intuition.
-Admitted.
+Qed.
 
 
 (* ================================================ *)
@@ -393,9 +383,7 @@ Fixpoint wp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
   (* * (* wlp_do *)
     intros. admit. *)
   * (* wlp_bind *)
-    destruct m1; intuition.
-    - 
-    - unfold bind. destruct TC_free. admit.
+    split; induction m1; cbn; intuition.
   * (* wlp_ret *)
     intuition.
   * (* wlp_fail *)
@@ -403,11 +391,13 @@ Fixpoint wp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
   * (* wlp_monotone *)
     intros. induction m; cbn; auto.
   * (* wp_ty_eqb *)
-    admit.
+    split; intros.
+    - inversion H. cbn in H1. auto.
+    - cbn. apply H.
     (* * (* wp_do *)
        admit. *)
   * (* wp_bind *)
-    admit.
+    split; induction m1; cbn; intuition.
   * (* wp_ret *)
     intuition.
   * (* wp_fail *)
@@ -416,7 +406,7 @@ Fixpoint wp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
     intros. induction m; cbn; auto.
     inversion H0.
     intuition.
-Admitted.
+Qed.
 
 
 Fixpoint infer {m} `{TypeCheckM m} (ctx : env) (expression : expr) : m (prod ty expr) :=
@@ -478,36 +468,36 @@ Inductive tpb : env -> expr -> ty -> expr -> Prop :=
      : tpb g v_O ty_nat v_O
   | tpb_succ  (g : env) (e e' : expr)
               (H : tpb g e ty_nat e')
-      : tpb g (v_S e) ty_nat (v_S e)
+      : tpb g (v_S e) ty_nat (v_S e')
   | tpb_if (g : env) (cnd cnd' : expr)
            (coq coq' : expr) (alt alt' : expr) (t : ty)
            (HCND : tpb g cnd ty_bool cnd')
            (HCOQ : tpb g coq t coq')
            (HALT : tpb g alt t alt')
       : tpb g (e_if cnd coq alt) t
-              (e_if cnd coq alt)
+              (e_if cnd' coq' alt')
   | tpb_plus (g : env) (e1 e1' : expr) (e2 e2' : expr)
              (HL : tpb g e1 ty_nat e1')
              (HR : tpb g e2 ty_nat e2')
       : tpb g (e_plus e1 e2) ty_nat
-              (e_plus e1 e2)
+              (e_plus e1' e2')
   | tpb_lte (g : env) (e1 e1' : expr) (e2 e2' : expr)
             (HL : tpb g e1 ty_nat e1')
             (HR : tpb g e2 ty_nat e2')
       : tpb g (e_lte e1 e2) ty_bool
-              (e_lte e1 e2)
+              (e_lte e1' e2')
   | tpb_and (g : env) (e1 e1' : expr) (e2 e2' : expr)
             (HL : tpb g e1 ty_bool e1')
             (HR : tpb g e2 ty_bool e2')
       : tpb g (e_and e1 e2) ty_bool
-      (e_and e1 e2) (* TODO: replace with primes *)
+      (e_and e1' e2')
   | tpb_let (g : env) (v : string)
             (e1 e1' : expr) (e2 e2' : expr)
             (t1 : ty) (t2 : ty)
             (HE1 : tpb g e1 t1 e1')
             (HE2 : tpb ((v, t1) :: g) e2 t2 e2')
       : tpb g (e_let v e1 e2) t2
-              (e_tlet v t1 e1 e2) (* provided e1 is typeable with t1,
+              (e_tlet v t1 e1' e2') (* provided e1 is typeable with t1,
                                      we can elaborate to an annot. let *)
   | tpb_tlet (g : env) (v : string)
              (e1 e1' : expr) (e2 e2' : expr)
@@ -515,7 +505,7 @@ Inductive tpb : env -> expr -> ty -> expr -> Prop :=
              (HE1 : tpb g e1 t1 e1') (* if e1 is typeable with t1 and elaborates to e1' *)
              (HE2 : tpb ((v, t1) :: g) e2 t2 e2')
       : tpb g (e_tlet v t1 e1 e2) t2
-              (e_tlet v t1 e1 e2)
+              (e_tlet v t1 e1' e2')
   | tpb_var (g : env) (v : string) (vt : ty)
             (H : (value v g) = Some vt)
       : tpb g (e_var v) vt
@@ -530,52 +520,66 @@ Lemma infer_sound : forall {m} `{TypeCheckAxioms m} (G : env) (e : expr),
 Proof.
   intros. generalize dependent G.
   induction e; cbn [infer].
-  - apply tpb_true.
-  - apply tpb_false.
-  - apply tpb_zero.
-  - intro. apply TcM_Option.wlp_bind. specialize (IHe G). revert IHe. apply TcM_Option.wlp_monotone. intros t H.
+  - intro. apply wlp_ret. constructor.
+  - intro. apply wlp_ret. constructor.
+  - intro. apply wlp_ret. constructor.
+  - intro. apply wlp_bind. specialize (IHe G). revert IHe. apply wlp_monotone. intros t Ht.
     match goal with
-    | |- TcM_Option.wlp (match ?t with _ => _ end) _ => destruct t
+    | |- wlp (match ?t with _ => _ end) _ => destruct t
     end.
-    apply TcM_Option.wlp_bind. apply wlp_ty_eqb. intro. subst. cbn. constructor. assumption.
-  - intro. apply wlp_bind. specialize (IHe1 G). revert IHe1. apply wlp_monotone. intros t1 H1.
-    apply wlp_bind. specialize (IHe2 G). revert IHe2. apply wlp_monotone. intros t2 H2.
-    apply wlp_bind. specialize (IHe3 G). revert IHe3. apply wlp_monotone. intros t3 H3.
-    apply wlp_do. apply wlp_ty_eqb. intros ->.
-    apply wlp_do. apply wlp_ty_eqb. intros ->.
-    cbn. constructor; assumption.
-  - intro. apply wlp_bind. specialize (IHe1 G). revert IHe1. apply wlp_monotone. intros t1 H1.
-    apply wlp_bind. specialize (IHe2 G). revert IHe2. apply wlp_monotone. intros t2 H2.
-    apply wlp_do. apply wlp_ty_eqb. intros ->.
-    apply wlp_do. apply wlp_ty_eqb. intros ->.
-    cbn. constructor; assumption.
-  - intro. apply wlp_bind. specialize (IHe1 G). revert IHe1. apply wlp_monotone. intros t1 H1.
-    apply wlp_bind. specialize (IHe2 G). revert IHe2. apply wlp_monotone. intros t2 H2.
-    apply wlp_do. apply wlp_ty_eqb. intros ->.
-    apply wlp_do. apply wlp_ty_eqb. intros ->.
-    cbn. constructor; assumption.
-  - intro. apply wlp_bind. specialize (IHe1 G). revert IHe1. apply wlp_monotone. intros t1 H1.
-    apply wlp_bind. specialize (IHe2 G). revert IHe2. apply wlp_monotone. intros t2 H2.
-    apply wlp_do. apply wlp_ty_eqb. intros ->.
-    apply wlp_do. apply wlp_ty_eqb. intros ->.
-    cbn. constructor; assumption.
-  - intro. apply wlp_bind. specialize (IHe1 G). revert IHe1. apply wlp_monotone. intros t1 H1.
-    apply wlp_bind. specialize (IHe2 ((s, t1) :: G)). revert IHe2. apply wlp_monotone. intros t2 H2.
-    cbn. apply tpb_let with t1; assumption.
-  - intro. rewrite wlp_value. intros. constructor. apply H.
+    apply wlp_bind. apply wlp_ty_eqb. intro. subst. cbn. apply wlp_ret. constructor. assumption.
+  - intro.
+    apply wlp_bind. specialize (IHe1 G). revert IHe1. apply wlp_monotone. intros t1 H1. destruct t1.
+    apply wlp_bind. specialize (IHe2 G). revert IHe2. apply wlp_monotone. intros t2 H2. destruct t2.
+    apply wlp_bind. specialize (IHe3 G). revert IHe3. apply wlp_monotone. intros t3 H3. destruct t3.
+    apply wlp_bind. apply wlp_ty_eqb. intros ->.
+    apply wlp_bind. apply wlp_ty_eqb. intros ->.
+    cbn. apply wlp_ret. constructor; assumption.
+  - intro.
+    apply wlp_bind. specialize (IHe1 G). revert IHe1. apply wlp_monotone. intros t1 H1. destruct t1.
+    apply wlp_bind. specialize (IHe2 G). revert IHe2. apply wlp_monotone. intros t2 H2. destruct t2.
+    apply wlp_bind. apply wlp_ty_eqb. intros ->.
+    apply wlp_bind. apply wlp_ty_eqb. intros ->.
+    cbn. apply wlp_ret. constructor; assumption.
+  - intro.
+    apply wlp_bind. specialize (IHe1 G). revert IHe1. apply wlp_monotone. intros t1 H1. destruct t1.
+    apply wlp_bind. specialize (IHe2 G). revert IHe2. apply wlp_monotone. intros t2 H2. destruct t2.
+    apply wlp_bind. apply wlp_ty_eqb. intros ->.
+    apply wlp_bind. apply wlp_ty_eqb. intros ->.
+    cbn. apply wlp_ret. constructor; assumption.
+  - intro.
+    apply wlp_bind. specialize (IHe1 G). revert IHe1. apply wlp_monotone. intros t1 H1. destruct t1.
+    apply wlp_bind. specialize (IHe2 G). revert IHe2. apply wlp_monotone. intros t2 H2. destruct t2.
+    apply wlp_bind. apply wlp_ty_eqb. intros ->.
+    apply wlp_bind. apply wlp_ty_eqb. intros ->.
+    cbn. apply wlp_ret. constructor; assumption.
+  - intro.
+    apply wlp_bind. specialize (IHe1 G).             revert IHe1. apply wlp_monotone. intros t1 H1. destruct t1.
+    apply wlp_bind. specialize (IHe2 ((s, t) :: G)). revert IHe2. apply wlp_monotone. intros t2 H2. destruct t2.
+    cbn. apply wlp_ret. constructor; assumption.
+  - intro.
+    apply wlp_bind. specialize (IHe1 G).             revert IHe1. apply wlp_monotone. intros t1 H1. destruct t1.
+    apply wlp_bind. apply wlp_ty_eqb. intro. subst.
+    apply wlp_bind. specialize (IHe2 ((s, t) :: G)). revert IHe2. apply wlp_monotone. intros t2 H2. destruct t2.
+    apply wlp_ret. constructor; assumption.
+  - intro. destruct (value s G) eqn:?.
+    + apply wlp_ret. constructor. apply Heqo.
+    + apply wlp_fail. auto.
 Qed.
 
-Lemma infer_complete : forall {m} `{TypeCheckAxioms m} (G : env) (e : expr) (t : ty),
-  (G |-- e ; t) -> wp (infer G e) (fun t' => t = t').
+Lemma infer_complete : forall {m} `{TypeCheckAxioms m} (G : env) (e ee : expr) (t : ty),
+  (G |-- e ; t ~> ee) -> wp (infer G e) (fun '(t',ee')  => t = t' /\ ee = ee').
 Proof.
-  intros. induction H; cbn;
-  repeat (rewrite ?wp_bind, ?wp_do, ?wp_ty_eqb;
+  intros. induction H0; cbn;
+  repeat (rewrite ?wp_bind, ?wp_ty_eqb, ?wp_ret, ?wp_fail; try destruct o;
       try match goal with
       | IH : wp (infer ?g ?e) _ |- wp (infer ?g ?e) _ =>
           revert IH; apply wp_monotone; intros; subst
-      | |- ?x = ?x /\ _ =>
+      | |- ?x = ?y /\ _ =>
           split
-      end; try reflexivity). rewrite H. cbn. reflexivity.
+      | H : ?x = ?y /\ _ |- _ =>
+          destruct H; subst
+      end; try reflexivity). rewrite H0. apply wp_ret. auto.
 Qed.
 
 Definition three := (v_S (v_S (v_S v_O))).
@@ -585,10 +589,3 @@ Compute (infer nil
   (e_let "x" three
     (e_lte (e_var "x") two))).
 
-Theorem infer_does_type_reconstruction : forall (G : env) (e ee : expr) (t : ty),
-  @infer option TC_option G e = Some (t,ee) -> is_annotated ee.
-Proof.
-  intros.
-  induction e; inversion H; cbn; subst; try reflexivity.
-  * admit.
-Admitted.
