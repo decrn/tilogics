@@ -563,10 +563,8 @@ Restart.
   intros. generalize dependent G. induction e; cbn [infer]; intro;
   repeat (rewrite ?wlp_bind, ?wlp_ty_eqb, ?wlp_ret, ?wlp_fail; try destruct o;
       try match goal with
-      | IHe : forall G, wlp (infer G ?e) _ |- wlp (infer (?p :: ?g) ?e) _ =>
-          specialize (IHe ((s,t) :: G)); revert IHe; apply wlp_monotone; intros
       | IHe : forall G, wlp (infer G ?e) _ |- wlp (infer ?g ?e) _ =>
-          specialize (IHe G); revert IHe; apply wlp_monotone; intros
+          specialize (IHe g); revert IHe; apply wlp_monotone; intros
       | |- tpb _ _ _ _ =>
           constructor
       | |- ?x = ?y -> _ =>

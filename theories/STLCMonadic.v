@@ -86,21 +86,25 @@ Fixpoint gensem (ctx : list (string * ty)) (expression : expr) (type : ty) : Pro
       gensem ctx e2 t2
   | e_absu var e =>
       exists t_e t_var,
-      (* These two are fishy at best,
-         nowhere do we confirm that |- var : t_var *)
       gensem ((var, t_var) :: ctx) e t_e /\
-      type = (ty_func t2 t_e)
+      type = (ty_func t_var t_e)
   | e_abst var t_var e =>
       exists t_e,
       gensem ((var, t_var) :: ctx) e t_e /\
       type = (ty_func t_var t_e)
   end.
 
-
 Lemma ex_gensem1 :
   gensem nil (e_app (e_absu "x" (e_var "x")) v_false) ty_bool.
 Proof.
-  compute. exists ty_bool. split.
-  exists ty_bool. exists ty_bool. split; reflexivity. reflexivity.
+  compute. repeat eexists.
 Qed.
+
+Example ex_gensem2 :
+gensem nil (e_app (e_absu "x" (v_true)) (e_absu "x" (e_var "x"))) ty_bool.
+Proof.
+  compute. repeat eexists.
+  Unshelve. apply ty_bool.
+Qed.
+
 
