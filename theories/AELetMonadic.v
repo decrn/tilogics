@@ -595,3 +595,22 @@ Compute (infer nil
   (e_let "x" three
     (e_lte (e_var "x") two))).
 
+Theorem infer_elaborates : forall G e t ee,
+  G |-- e ; t ~> ee -> is_annotated ee.
+Proof.
+  induction ee; cbn; intros.
+Admitted.
+
+Theorem uniqueness_of_typing : forall G e t1 t2 ee,
+  G |-- e ; t1 ~> ee ->
+  G |-- e ; t2 ~> ee ->
+  t1 = t2.
+Proof.
+Admitted.
+
+Theorem uniqueness_of_elaboration : forall G e t ee1 ee2,
+  G |-- e ; t ~> ee1 ->
+  G |-- e ; t ~> ee2 ->
+  ee1 = ee2.
+Proof.
+Admitted.
