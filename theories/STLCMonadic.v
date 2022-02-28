@@ -107,4 +107,49 @@ Proof.
   Unshelve. apply ty_bool.
 Qed.
 
+Inductive freeM (A : Type) : Type :=
+  | ret_free : A -> freeM A
+  | fail_free : freeM A
+  | bind_assert_free : ty -> ty -> freeM A -> freeM A
+  | bind_exists_free : freeM A.
+
+Fixpoint freeM_bind [T1 T2 : Type] (m : freeM T1) (f : T1 -> freeM T2) : freeM T2 :=
+  match m with
+  | ret_free _ a => f a
+  | fail_free _ => fail_free T2
+  | bind_assert_free _ t1 t2 k =>
+      bind_assert_free _ t1 t2 (freeM_bind k f)
+  | bind_exists_free _ =>
+      bind_exists_free _
+  end.
+
+Definition magic := bind_exists_free.
+Definition assert (t1 t2 : ty) := bind_assert_free _ t1 t2 (ret_free _ tt).
+Definition ret [A : Type] (a : A) := ret_free A a.
+
+Notation "x <- ma ;; mb" :=
+        (freeM_bind ma (fun x => mb))
+          (at level 80, ma at next level, mb at level 200, right associativity).
+Notation "ma ;; mb" := (freeM_bind ma (fun _ => mb)) (at level 80, right associativity).
+Notation "' x <- ma ;; mb" :=
+        (freeM_bind ma (fun x => mb))
+          (at level 80, x pattern, ma at next level, mb at level 200, right associativity,
+           format "' x  <-  ma  ;;  mb").
+
+
+Fixpoint infer (ctx : env) (expression : expr) : freeM (prod ty expr) :=
+  match expression with
+  | e_app e1 e2 =>
+      '(t_e1, e_e1) <- infer ctx e1 ;;
+      '(t_e2, e_e2) <- infer ctx e2 ;;
+      t_magic <- magic ;;
+      (assert t_e1 (ty_func t_e2 t_magic)) ;;
+      ret (t_magic, e_app e_e1 e_e2)
+  | _ => ret (ty_bool, expression)
+  end.
+
+
+
+
+
 
