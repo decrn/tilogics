@@ -123,7 +123,7 @@ Fixpoint freeM_bind [T1 T2 : Type] (m : freeM T1) (f : T1 -> freeM T2) : freeM T
       bind_exists_free _
   end.
 
-Definition magic := bind_exists_free.
+Definition magic := bind_exists_free ty.
 Definition assert (t1 t2 : ty) := bind_assert_free _ t1 t2 (ret_free _ tt).
 Definition ret [A : Type] (a : A) := ret_free A a.
 
@@ -147,6 +147,10 @@ Fixpoint infer (ctx : env) (expression : expr) : freeM (prod ty expr) :=
       ret (t_magic, e_app e_e1 e_e2)
   | _ => ret (ty_bool, expression)
   end.
+
+
+Compute (infer nil (e_app (e_abst "x" ty_bool (e_var "x")) v_true)).
+Compute (infer nil (e_app (e_absu "x" (e_var "x")) v_true)).
 
 
 
