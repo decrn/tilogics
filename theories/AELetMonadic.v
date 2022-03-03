@@ -598,19 +598,30 @@ Compute (infer nil
 Theorem infer_elaborates : forall G e t ee,
   G |-- e ; t ~> ee -> is_annotated ee.
 Proof.
-  induction ee; cbn; intros.
-Admitted.
+  intros. induction H; cbn; intuition.
+Qed.
 
 Theorem uniqueness_of_typing : forall G e t1 t2 ee,
   G |-- e ; t1 ~> ee ->
   G |-- e ; t2 ~> ee ->
   t1 = t2.
 Proof.
-Admitted.
+  intros.
+  induction H; intros;
+  try match goal with (* TODO: just looks ugly, problem is inversion can be repeated inf. *)
+      | H : tpb ?x ?y ?z ?a |- _ => inversion H; subst; reflexivity
+      | H : tpb ?x ?y ?z ?a |- _ => inversion H; subst; apply IHtpb2; assumption
+      end.
+  inversion H0. subst. rewrite H in H3. inversion H3. reflexivity.
+Qed.
 
 Theorem uniqueness_of_elaboration : forall G e t ee1 ee2,
   G |-- e ; t ~> ee1 ->
   G |-- e ; t ~> ee2 ->
   ee1 = ee2.
 Proof.
+  intros. generalize dependent ee2. induction H; intros; cbn.
+  - inversion H0. reflexivity.
+  - inversion H0. reflexivity.
+  - inversion H0. reflexivity.
 Admitted.
