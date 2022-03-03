@@ -111,17 +111,19 @@ Inductive freeM (A : Type) : Type :=
   | ret_free : A -> freeM A
   | fail_free : freeM A
   | bind_assert_free : ty -> ty -> freeM A -> freeM A
-  | bind_exists_free : freeM A.
+  | bind_exists_free : (ty -> freeM A) -> freeM A.
 
-Fixpoint freeM_bind [T1 T2 : Type] (m : freeM T1) (f : T1 -> freeM T2) : freeM T2 :=
+Fixpoint freeM_bind [T1 T2 : Type] (m : freeM T1) (f : T1 -> freeM T2) {struct m} : freeM T2.
+refine (
   match m with
   | ret_free _ a => f a
   | fail_free _ => fail_free T2
   | bind_assert_free _ t1 t2 k =>
-      bind_assert_free _ t1 t2 (freeM_bind k f)
-  | bind_exists_free _ =>
-      bind_exists_free _
-  end.
+      bind_assert_free _ t1 t2 (freeM_bind _ _ k f)
+  | bind_exists_free _ tf => _
+      (* bind_exists_free _ (fun t => freeM_bind (tf t) f) *)
+  end). apply bind_exists_free. intros t. eapply freeM_bind. apply (tf t). apply f.
+Show Proof.
 
 (* 
 Inductive freeM (A : Type) : Type :=
@@ -144,7 +146,7 @@ Fixpoint freeM_bind [T1 T2 : Type] (m : freeM T1) (f : T1 -> freeM T2) : freeM T
 
 Definition assert (t1 t2 : ty) := bind_assert_free _ t1 t2 (ret_free _ tt).
 Check assert.
-Definition magic : freeM ty := bind_exists_free _.
+Definition magic : freeM ty := bind_exists_free (fun t => ret t).
 Check magic.
 Definition ret [A : Type] (a : A) := ret_free A a.
 Definition fail {A : Type} := fail_free A.
@@ -176,12 +178,6 @@ Fixpoint infer (ctx : env) (expression : expr) : freeM (prod ty expr) :=
       | None => fail
       end
   | e_app e1 e2 =>
-      (*
-  | e_app e1 e2 =>
-      exists t2,
-      gensem ctx e1 (ty_func t2 type) /\
-      gensem ctx e2 t2
- *)
       '(t_e1, e_e1) <- infer ctx e1 ;;
       '(t_e2, e_e2) <- infer ctx e2 ;;
       t_magic <- magic ;;
@@ -189,20 +185,144 @@ Fixpoint infer (ctx : env) (expression : expr) : freeM (prod ty expr) :=
       ret (t_magic, e_app e_e1 e_e2)
   | e_absu var e =>
       t_var <- magic ;;
-      (* TODO *)
       '(t_e, e_e) <- infer ((var, t_var) :: ctx) e ;;
-
-      ret (ty_bool, v_true)
+      ret (ty_func t_var t_e, e_abst var t_var e_e)
   | e_abst var t_var e =>
-      ret (ty_bool, v_true)
+      '(t_e, e_e) <- infer ((var, t_var) :: ctx) e ;;
+      ret (ty_func t_var t_e, e_abst var t_var e_e)
   end.
 
 
 Compute (infer nil (e_app (e_abst "x" ty_bool (e_var "x")) v_true)).
 Compute (infer nil (e_app (e_absu "x" (e_var "x")) v_true)).
 
+Fixpoint wlp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
+  match m with
+  | ret_free _ a => Q a
+  | bind_assert_free _ t1 t2 k => t1 = t2 ->
+      wlp_freeM k Q
+  | fail_free _ => True
+  | bind_exists_free _ => exists t : ty, True
+  end.
+
+Fixpoint wp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
+  match m with
+  | ret_free _ a => Q a
+  | bind_assert_free _ t1 t2 k => t1 = t2 /\
+      wp_freeM k Q
+  | fail_free _ => False
+  | bind_exists_free _ => exists t : ty, True
+  end.
+
+Lemma wlp_ty_eqb : forall (t1 t2 : ty) (Q : unit -> Prop),
+  wlp_freeM (assert t1 t2) Q <-> (t1 = t2 -> Q tt).
+Proof.
+  destruct t1, t2; cbn; intuition discriminate.
+Qed.
+
+Lemma wlp_exists_type : forall (Q: ty -> Prop),
+  wlp_freeM (magic) Q <-> (exists t : ty, Q t).
+Proof. (* TODO *)
+  intros. split; cbn.
+  - intro. admit.
+  - intro. exists ty_bool. auto.
+Admitted.
+
+Lemma wlp_bind : forall {A B : Type} (m1 : freeM A) (m2 : A -> freeM B) (Q : B -> Prop),
+  wlp_freeM (freeM_bind m1 m2) Q <-> wlp_freeM m1 (fun o => wlp_freeM (m2 o) Q).
+Proof.
+  split; induction m1; cbn; intuition.
+Qed.
+
+Lemma wlp_ret : forall {A : Type} (a : A) (Q : A -> Prop),
+  wlp_freeM (ret a) Q <-> Q a.
+Proof.
+  intuition.
+Qed.
+
+Lemma wlp_fail : forall {A : Type} (Q : A -> Prop),
+  wlp_freeM (fail) Q <-> True.
+Proof.
+  intuition.
+Qed.
+
+Lemma wlp_monotone : forall {O : Set} (P Q : O -> Prop) (m : freeM O),
+  (forall o : O, P o -> Q o) -> wlp_freeM m P -> wlp_freeM m Q.
+Proof.
+  intros. induction m; cbn; auto.
+Qed.
+
+Lemma wp_ty_eqb : forall (t1 t2 : ty) (Q : unit -> Prop),
+  wp_freeM (assert t1 t2) Q <-> t1 = t2 /\ Q tt.
+Proof.
+    split; intros.
+    - inversion H. cbn in H1. auto.
+    - cbn. apply H.
+Qed.
+
+(* TODO *)
+Lemma wp_exists_type : forall (Q: ty -> Prop),
+  wp_freeM (magic) Q <-> (exists t : ty, Q t).
+Proof.
+Admitted.
+
+Lemma wp_bind : forall {A B : Type} (m1 : freeM A) (m2 : A -> freeM B) (Q : B -> Prop),
+  wp_freeM (freeM_bind m1 m2) Q <-> wp_freeM m1 (fun o => wp_freeM (m2 o) Q).
+Proof.
+    split; induction m1; cbn; intuition.
+Qed.
+
+Lemma wp_ret : forall {A : Type} (a : A) (Q : A -> Prop),
+  wp_freeM (ret a) Q <-> Q a.
+Proof.
+  intuition.
+Qed.
+
+Lemma wp_fail : forall {A : Type} (Q : A -> Prop),
+  wp_freeM (fail) Q <-> False.
+Proof.
+  cbn. intuition.
+Qed.
+
+Lemma wp_monotone : forall {O : Set} (P Q : O -> Prop) (m : freeM O),
+  (forall o : O, P o -> Q o) -> wp_freeM m P -> wp_freeM m Q.
+Proof.
+    intros. induction m; cbn; auto.
+    inversion H0. intuition.
+Qed.
 
 
+Lemma infer_sound : forall (G : env) (e : expr),
+ wlp_freeM (infer G e) (fun '(t,ee) => G |-- e ; t ~> ee).
+Proof.
+  intros. generalize dependent G. induction e; cbn [infer]; intro;
+  repeat (rewrite ?wlp_exists_type, ?wlp_bind, ?wlp_ty_eqb, ?wlp_ret, ?wlp_fail; try destruct o;
+      try match goal with
+          | IHe : forall G, wlp_freeM (infer G ?e) _ |- wlp_freeM (infer ?g ?e) _ =>
+          specialize (IHe g); revert IHe; apply wlp_monotone; intros
+      | |- tpb _ _ _ _ =>
+          constructor
+      | |- ?x = ?y -> _ =>
+          intro; subst
+      | |- wlp_freeM (match ?t with _ => _ end) _ =>
+          destruct t eqn:?
+      | |- exists t, _ =>
+          exists ty_bool (* TODO *)
+      end; try reflexivity; try assumption).
+Admitted.
 
-
+Lemma infer_complete : forall  (G : env) (e ee : expr) (t : ty),
+  (G |-- e ; t ~> ee) -> wp_freeM (infer G e) (fun '(t',ee')  => t = t' /\ ee = ee').
+Proof.
+  intros. induction H; cbn;
+  repeat (rewrite ?wp_bind, ?wp_ty_eqb, ?wp_ret, ?wp_fail; try destruct o;
+      try match goal with
+      | IH : wp_freeM (infer ?g ?e) _ |- wp_freeM (infer ?g ?e) _ =>
+          revert IH; apply wp_monotone; intros; subst
+      | |- ?x = ?y /\ _ =>
+          split
+      | H : ?x = ?y /\ _ |- _ =>
+          destruct H; subst
+      end; try reflexivity); admit.
+Admitted.
 

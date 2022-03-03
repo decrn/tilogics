@@ -118,9 +118,6 @@ Class TypeCheckAxioms m {super : TypeCheckM m} : Type :=
   wlp_ty_eqb : forall (t1 t2 : ty) (Q : unit -> Prop),
     wlp (assert t1 t2) Q <-> (t1 = t2 -> Q tt);
 
-(* wlp_do : forall {A B : Type} (m1 : m A) (m2 : m B) (Q : B -> Prop),
-    @wlp B (m1 ;; m2) Q <-> wlp m1 (fun _ => wlp m2 Q); *)
-
   wlp_bind : forall {A B : Type} (m1 : m A) (m2 : A -> m B) (Q : B -> Prop),
     wlp (bind m1 m2) Q <-> wlp m1 (fun o => wlp (m2 o) Q);
 
@@ -139,9 +136,6 @@ Class TypeCheckAxioms m {super : TypeCheckM m} : Type :=
 
   wp_ty_eqb : forall (t1 t2 : ty) (Q : unit -> Prop),
     wp (assert t1 t2) Q <-> t1 = t2 /\ Q tt;
-
-(* wp_do : forall {A B : Type} (m1 : m A) (m2 : m B) (Q : B -> Prop),
-    @wp B (m1 ;; m2) Q <-> wp m1 (fun _ => wp m2 Q); *)
 
   wp_bind : forall {A B : Type} (m1 : m A) (m2 : A -> m B) (Q : B -> Prop),
     wp (bind m1 m2) Q <-> wp m1 (fun o => wp (m2 o) Q);
@@ -607,12 +601,8 @@ Theorem uniqueness_of_typing : forall G e t1 t2 ee,
   t1 = t2.
 Proof.
   intros.
-  induction H; intros;
-  try match goal with (* TODO: just looks ugly, problem is inversion can be repeated inf. *)
-      | H : tpb ?x ?y ?z ?a |- _ => inversion H; subst; reflexivity
-      | H : tpb ?x ?y ?z ?a |- _ => inversion H; subst; apply IHtpb2; assumption
-      end.
-  inversion H0. subst. rewrite H in H3. inversion H3. reflexivity.
+  induction H; intros; inversion H0; subst; intuition.
+  congruence.
 Qed.
 
 Theorem uniqueness_of_elaboration : forall G e t ee1 ee2,
@@ -620,7 +610,13 @@ Theorem uniqueness_of_elaboration : forall G e t ee1 ee2,
   G |-- e ; t ~> ee2 ->
   ee1 = ee2.
 Proof.
-  intros. generalize dependent ee2. induction H; intros; cbn.
+  intros. generalize dependent ee2. induction H; intros ? Hx; inversion Hx; subst; f_equal; firstorder.
+  - inversion H0. reflexivity.
+  - inversion H0. reflexivity.
+  - inversion H0. reflexivity.
+  -  inversion H0. subst. specialize (IHtpb _ H3). subst. reflexivity.
+  - inversion H2. reflexivity.
+  - inversion H0. reflexivity.
   - inversion H0. reflexivity.
   - inversion H0. reflexivity.
   - inversion H0. reflexivity.

@@ -131,8 +131,16 @@ Fixpoint infer (ctx : env) (expression : expr) : m (prod ty expr) :=
 (* this one breaks monad laws *)
 Inductive freeM' : Type -> Type :=
   | ret_free'  (A : Type)   :   A -> freeM' A
-  | bind_free'  (A B : Type)  : freeM' A -> (A -> freeM' B) -> freeM' B
-  | assert_free'  :  ty -> ty         -> freeM' unit.
+  | bind_free'  (A B : Type)  : freeM' A -> (() -> freeM' B) -> freeM' B
+  | assert_free'  :  ty -> ty         -> freeM' unit
+  | fail_free' : freeM' A
+  | exists_free' : freeM A.
+
+Inductive freeM (A : Type) : Type :=
+  | ret_free  :   A -> freeM A
+  | bind_assert_free :  ty -> ty -> (() -> freeM A) -> freeM A
+  | bind_exists_free : (ty -> freeM B) -> freeM B
+  | fail_free : freeM A.
 
 
   (*
