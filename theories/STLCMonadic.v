@@ -123,9 +123,31 @@ Fixpoint freeM_bind [T1 T2 : Type] (m : freeM T1) (f : T1 -> freeM T2) : freeM T
       bind_exists_free _
   end.
 
-Definition magic := bind_exists_free ty.
+(* 
+Inductive freeM (A : Type) : Type :=
+  | ret_free : A -> freeM A
+  | fail_free : freeM A
+  | bind_assert_free : ty -> ty -> freeM A -> freeM A
+  | bind_exists_free : freeM A -> freeM A.
+
+Fixpoint freeM_bind [T1 T2 : Type] (m : freeM T1) (f : T1 -> freeM T2) : freeM T2 :=
+  match m with
+  | ret_free _ a => f a
+  | fail_free _ => fail_free T2
+  | bind_assert_free _ t1 t2 k =>
+      bind_assert_free _ t1 t2 (freeM_bind k f)
+  | bind_exists_free _ k =>
+      bind_exists_free _ (freeM_bind k f)
+  end.
+
+ *)
+
 Definition assert (t1 t2 : ty) := bind_assert_free _ t1 t2 (ret_free _ tt).
+Check assert.
+Definition magic : freeM ty := bind_exists_free _.
+Check magic.
 Definition ret [A : Type] (a : A) := ret_free A a.
+Definition fail {A : Type} := fail_free A.
 
 Notation "x <- ma ;; mb" :=
         (freeM_bind ma (fun x => mb))
@@ -139,13 +161,40 @@ Notation "' x <- ma ;; mb" :=
 
 Fixpoint infer (ctx : env) (expression : expr) : freeM (prod ty expr) :=
   match expression with
+  | v_false => ret (ty_bool, expression)
+  | v_true  => ret (ty_bool, expression)
+  | e_if cnd coq alt =>
+      '(t_cnd, e_cnd) <- infer ctx cnd ;;
+      '(t_coq, e_coq) <- infer ctx coq ;;
+      '(t_alt, e_alt) <- infer ctx alt ;;
+      (assert t_cnd ty_bool) ;;
+      (assert t_coq t_alt)   ;;
+      ret (t_coq, e_if e_cnd e_coq e_alt)
+  | e_var var =>
+      match (value var ctx) with
+      | Some t_var => ret (t_var, expression)
+      | None => fail
+      end
   | e_app e1 e2 =>
+      (*
+  | e_app e1 e2 =>
+      exists t2,
+      gensem ctx e1 (ty_func t2 type) /\
+      gensem ctx e2 t2
+ *)
       '(t_e1, e_e1) <- infer ctx e1 ;;
       '(t_e2, e_e2) <- infer ctx e2 ;;
       t_magic <- magic ;;
       (assert t_e1 (ty_func t_e2 t_magic)) ;;
       ret (t_magic, e_app e_e1 e_e2)
-  | _ => ret (ty_bool, expression)
+  | e_absu var e =>
+      t_var <- magic ;;
+      (* TODO *)
+      '(t_e, e_e) <- infer ((var, t_var) :: ctx) e ;;
+
+      ret (ty_bool, v_true)
+  | e_abst var t_var e =>
+      ret (ty_bool, v_true)
   end.
 
 
