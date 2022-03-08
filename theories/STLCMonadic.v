@@ -215,7 +215,7 @@ Fixpoint wlp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
   | bind_assert_free _ t1 t2 k => t1 = t2 ->
       wlp_freeM k Q
   | fail_free _ => True
-  | bind_exists_free _ tf => exists t : ty, True (* TODO *)
+  | bind_exists_free _ tf => exists t : ty, wlp_freeM (tf t) Q
   end.
 
 Fixpoint wp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
@@ -224,7 +224,7 @@ Fixpoint wp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
   | bind_assert_free _ t1 t2 k => t1 = t2 /\
       wp_freeM k Q
   | fail_free _ => False
-  | bind_exists_free _ tf => exists t : ty, True (* TODO *)
+  | bind_exists_free _ tf => forall t : ty, wp_freeM (tf t) Q
   end.
 
 Lemma wlp_ty_eqb : forall (t1 t2 : ty) (Q : unit -> Prop),
@@ -235,16 +235,14 @@ Qed.
 
 Lemma wlp_exists_type : forall (Q: ty -> Prop),
   wlp_freeM (magic) Q <-> (exists t : ty, Q t).
-Proof. (* TODO *)
-  intros. split; cbn.
-  - intro. admit.
-  - intro. exists ty_bool. auto.
-Admitted.
+Proof.
+  intuition.
+Qed.
 
 Lemma wlp_bind : forall {A B : Type} (m1 : freeM A) (m2 : A -> freeM B) (Q : B -> Prop),
   wlp_freeM (freeM_bind m1 m2) Q <-> wlp_freeM m1 (fun o => wlp_freeM (m2 o) Q).
 Proof.
-  split; induction m1; cbn; intuition.
+  split; induction m1; cbn; intuition; destruct H0; exists x; intuition.
 Qed.
 
 Lemma wlp_ret : forall {A : Type} (a : A) (Q : A -> Prop),
@@ -262,7 +260,7 @@ Qed.
 Lemma wlp_monotone : forall {O : Set} (P Q : O -> Prop) (m : freeM O),
   (forall o : O, P o -> Q o) -> wlp_freeM m P -> wlp_freeM m Q.
 Proof.
-  intros. induction m; cbn; auto.
+  intros. induction m; cbn; auto. inversion H0. exists x. intuition.
 Qed.
 
 Lemma wp_ty_eqb : forall (t1 t2 : ty) (Q : unit -> Prop),
@@ -273,11 +271,11 @@ Proof.
     - cbn. apply H.
 Qed.
 
-(* TODO *)
 Lemma wp_exists_type : forall (Q: ty -> Prop),
-  wp_freeM (magic) Q <-> (exists t : ty, Q t).
+  wp_freeM (magic) Q <-> (forall t : ty, Q t).
 Proof.
-Admitted.
+  intuition.
+Qed.
 
 Lemma wp_bind : forall {A B : Type} (m1 : freeM A) (m2 : A -> freeM B) (Q : B -> Prop),
   wp_freeM (freeM_bind m1 m2) Q <-> wp_freeM m1 (fun o => wp_freeM (m2 o) Q).
@@ -311,7 +309,7 @@ Proof.
   intros. generalize dependent G. induction e; cbn [infer]; intro;
   repeat (rewrite ?wlp_exists_type, ?wlp_bind, ?wlp_ty_eqb, ?wlp_ret, ?wlp_fail; try destruct o;
       try match goal with
-          | IHe : forall G, wlp_freeM (infer G ?e) _ |- wlp_freeM (infer ?g ?e) _ =>
+      | IHe : forall G, wlp_freeM (infer G ?e) _ |- wlp_freeM (infer ?g ?e) _ =>
           specialize (IHe g); revert IHe; apply wlp_monotone; intros
       | |- tpb _ _ _ _ =>
           constructor
@@ -320,15 +318,24 @@ Proof.
       | |- wlp_freeM (match ?t with _ => _ end) _ =>
           destruct t eqn:?
       | |- exists t, _ =>
-          exists ty_bool (* TODO *)
+          exists ty_bool
+      | H : ?g |-- ?e ; ?t ~> ?ee |- ?g' |-- e_app ?e1 ?e2 ; ?t' ~> e_app ?e1' ?e2' =>
+              apply (tpb_app _ _ _ _ _ t0 _)
       end; try reflexivity; try assumption).
-Admitted.
+(* verbose proof for remaining existential cases ...
+      - exists ty_bool. (* this honestly seems like cheating ??? *) apply wlp_bind. specialize (IHe ((s, ty_bool) :: G)). revert IHe. apply wlp_monotone. intros.
+        destruct o. apply wlp_ret. constructor. apply H.
+      - exists ty_bool. apply wlp_bind. apply wlp_ty_eqb. intro. apply wlp_ret. apply (tpb_app _ _ _ _ _ t0 _).
+        + subst. apply H.
+        + apply H0.
+*)
+Qed.
 
 Lemma infer_complete : forall  (G : env) (e ee : expr) (t : ty),
   (G |-- e ; t ~> ee) -> wp_freeM (infer G e) (fun '(t',ee')  => t = t' /\ ee = ee').
 Proof.
   intros. induction H; cbn;
-  repeat (rewrite ?wp_bind, ?wp_ty_eqb, ?wp_ret, ?wp_fail; try destruct o;
+  repeat (rewrite ?wp_bind, ?wp_ty_eqb, ?wp_ret, ?wp_fail; try destruct o; cbn; try rewrite H;
       try match goal with
       | IH : wp_freeM (infer ?g ?e) _ |- wp_freeM (infer ?g ?e) _ =>
           revert IH; apply wp_monotone; intros; subst
@@ -336,6 +343,14 @@ Proof.
           split
       | H : ?x = ?y /\ _ |- _ =>
           destruct H; subst
-      end; try reflexivity); admit.
+(*
+          | |- forall t, ?e =>
+          intro
+*)
+      end; try reflexivity).
+      - intros. apply wp_bind. revert IHtpb. assert (Hteq : vt = t0). admit.
+        subst. apply wp_monotone. intro. destruct o. split; destruct H0; subst; reflexivity.
+      - intro. assert (Hteq: t1 = t0). admit.
+        split; rewrite Hteq; intuition.
 Admitted.
 

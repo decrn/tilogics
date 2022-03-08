@@ -611,9 +611,16 @@ Theorem uniqueness_of_elaboration : forall G e t ee1 ee2,
   ee1 = ee2.
 Proof.
   intros. generalize dependent ee2.
-  induction H; intros ? Hx; inversion Hx; subst; f_equal; firstorder.
+  induction H; intros ? Hx; inversion Hx; subst; f_equal; firstorder; subst.
+  - destruct t0, t1 eqn:?.
+    + specialize (IHtpb1 _ HE1). specialize (IHtpb2 _ HE2). subst. reflexivity.
+    + (* want to use uniqueness of typing to show contradiction, but e1' = e1'0 is not guaranteed *) admit.
+    + (* want to use uniqueness of typing to show contradiction, but e1' = e1'0 is not guaranteed *) admit.
+    + specialize (IHtpb1 _ HE1). specialize (IHtpb2 _ HE2). subst. reflexivity.
+  - admit.
+  - admit.
 Restart.
-intros. generalize dependent ee2. induction H; intros ? Hx; inversion Hx; subst. 
+intros. generalize dependent ee2. induction H; intros ? Hx; inversion Hx; subst.
 - reflexivity.
 - reflexivity.
 - reflexivity.
@@ -622,6 +629,5 @@ intros. generalize dependent ee2. induction H; intros ? Hx; inversion Hx; subst.
 - specialize (IHtpb1 _ HL). specialize (IHtpb2 _ HR). subst. reflexivity.
 - specialize (IHtpb1 _ HL). specialize (IHtpb2 _ HR). subst. reflexivity.
 - specialize (IHtpb1 _ HL). specialize (IHtpb2 _ HR). subst. reflexivity.
-- specialize (IHtpb1 _ HE1). specialize (IHtpb2 _ HR). subst. reflexivity.
-  inversion H0. subst. specialize (IHtpb _ H3). subst; reflexivity).
+- specialize (IHtpb1 e1'0). rewrite IHtpb1. admit.
 Admitted.
