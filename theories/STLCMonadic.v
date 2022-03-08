@@ -113,6 +113,9 @@ Inductive freeM (A : Type) : Type :=
   | bind_assert_free : ty -> ty -> freeM A -> freeM A
   | bind_exists_free : (ty -> freeM A) -> freeM A.
 
+(* PROOF MODE EXAMPLE *)
+
+(*
 Fixpoint freeM_bind [T1 T2 : Type] (m : freeM T1) (f : T1 -> freeM T2) {struct m} : freeM T2.
 refine (
   match m with
@@ -123,9 +126,19 @@ refine (
   | bind_exists_free _ tf => _
       (* bind_exists_free _ (fun t => freeM_bind (tf t) f) *)
   end). apply bind_exists_free. intros t. eapply freeM_bind. apply (tf t). apply f.
-Show Proof.
+Show Proof. *)
 
-(* 
+Fixpoint freeM_bind [T1 T2 : Type] (m : freeM T1) (f : T1 -> freeM T2) : freeM T2 :=
+   match m with
+   | ret_free _ a => f a
+   | fail_free _ => fail_free T2
+   | bind_assert_free _ t1 t2 k =>
+       bind_assert_free T2 t1 t2 (freeM_bind k f)
+   | bind_exists_free _ tf =>
+       bind_exists_free T2 (fun t : ty => freeM_bind (tf t) f)
+   end.
+
+(*
 Inductive freeM (A : Type) : Type :=
   | ret_free : A -> freeM A
   | fail_free : freeM A
@@ -146,7 +159,7 @@ Fixpoint freeM_bind [T1 T2 : Type] (m : freeM T1) (f : T1 -> freeM T2) : freeM T
 
 Definition assert (t1 t2 : ty) := bind_assert_free _ t1 t2 (ret_free _ tt).
 Check assert.
-Definition magic : freeM ty := bind_exists_free (fun t => ret t).
+Definition magic : freeM ty := bind_exists_free _ (fun t => ret_free _ t).
 Check magic.
 Definition ret [A : Type] (a : A) := ret_free A a.
 Definition fail {A : Type} := fail_free A.
@@ -202,7 +215,7 @@ Fixpoint wlp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
   | bind_assert_free _ t1 t2 k => t1 = t2 ->
       wlp_freeM k Q
   | fail_free _ => True
-  | bind_exists_free _ => exists t : ty, True
+  | bind_exists_free _ tf => exists t : ty, True (* TODO *)
   end.
 
 Fixpoint wp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
@@ -211,7 +224,7 @@ Fixpoint wp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
   | bind_assert_free _ t1 t2 k => t1 = t2 /\
       wp_freeM k Q
   | fail_free _ => False
-  | bind_exists_free _ => exists t : ty, True
+  | bind_exists_free _ tf => exists t : ty, True (* TODO *)
   end.
 
 Lemma wlp_ty_eqb : forall (t1 t2 : ty) (Q : unit -> Prop),

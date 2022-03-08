@@ -610,14 +610,18 @@ Theorem uniqueness_of_elaboration : forall G e t ee1 ee2,
   G |-- e ; t ~> ee2 ->
   ee1 = ee2.
 Proof.
-  intros. generalize dependent ee2. induction H; intros ? Hx; inversion Hx; subst; f_equal; firstorder.
-  - inversion H0. reflexivity.
-  - inversion H0. reflexivity.
-  - inversion H0. reflexivity.
-  -  inversion H0. subst. specialize (IHtpb _ H3). subst. reflexivity.
-  - inversion H2. reflexivity.
-  - inversion H0. reflexivity.
-  - inversion H0. reflexivity.
-  - inversion H0. reflexivity.
-  - inversion H0. reflexivity.
+  intros. generalize dependent ee2.
+  induction H; intros ? Hx; inversion Hx; subst; f_equal; firstorder.
+Restart.
+intros. generalize dependent ee2. induction H; intros ? Hx; inversion Hx; subst. 
+- reflexivity.
+- reflexivity.
+- reflexivity.
+- specialize (IHtpb _ H2). subst. reflexivity.
+- specialize (IHtpb1 _ HCND). specialize (IHtpb2 _ HCOQ). specialize (IHtpb3 _ HALT). subst. reflexivity.
+- specialize (IHtpb1 _ HL). specialize (IHtpb2 _ HR). subst. reflexivity.
+- specialize (IHtpb1 _ HL). specialize (IHtpb2 _ HR). subst. reflexivity.
+- specialize (IHtpb1 _ HL). specialize (IHtpb2 _ HR). subst. reflexivity.
+- specialize (IHtpb1 _ HE1). specialize (IHtpb2 _ HR). subst. reflexivity.
+  inversion H0. subst. specialize (IHtpb _ H3). subst; reflexivity).
 Admitted.
