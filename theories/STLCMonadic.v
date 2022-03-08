@@ -215,7 +215,7 @@ Fixpoint wlp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
   | bind_assert_free _ t1 t2 k => t1 = t2 ->
       wlp_freeM k Q
   | fail_free _ => True
-  | bind_exists_free _ tf => exists t : ty, wlp_freeM (tf t) Q
+  | bind_exists_free _ tf => forall t : ty, wlp_freeM (tf t) Q
   end.
 
 Fixpoint wp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
@@ -224,7 +224,7 @@ Fixpoint wp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
   | bind_assert_free _ t1 t2 k => t1 = t2 /\
       wp_freeM k Q
   | fail_free _ => False
-  | bind_exists_free _ tf => forall t : ty, wp_freeM (tf t) Q
+  | bind_exists_free _ tf => exists t : ty, wp_freeM (tf t) Q
   end.
 
 Lemma wlp_ty_eqb : forall (t1 t2 : ty) (Q : unit -> Prop),
@@ -234,7 +234,7 @@ Proof.
 Qed.
 
 Lemma wlp_exists_type : forall (Q: ty -> Prop),
-  wlp_freeM (magic) Q <-> (exists t : ty, Q t).
+  wlp_freeM (magic) Q <-> (forall t : ty, Q t).
 Proof.
   intuition.
 Qed.
@@ -260,7 +260,7 @@ Qed.
 Lemma wlp_monotone : forall {O : Set} (P Q : O -> Prop) (m : freeM O),
   (forall o : O, P o -> Q o) -> wlp_freeM m P -> wlp_freeM m Q.
 Proof.
-  intros. induction m; cbn; auto. inversion H0. exists x. intuition.
+  intros. induction m; cbn; auto.
 Qed.
 
 Lemma wp_ty_eqb : forall (t1 t2 : ty) (Q : unit -> Prop),
@@ -272,7 +272,7 @@ Proof.
 Qed.
 
 Lemma wp_exists_type : forall (Q: ty -> Prop),
-  wp_freeM (magic) Q <-> (forall t : ty, Q t).
+  wp_freeM (magic) Q <-> (exists t : ty, Q t).
 Proof.
   intuition.
 Qed.
@@ -280,7 +280,7 @@ Qed.
 Lemma wp_bind : forall {A B : Type} (m1 : freeM A) (m2 : A -> freeM B) (Q : B -> Prop),
   wp_freeM (freeM_bind m1 m2) Q <-> wp_freeM m1 (fun o => wp_freeM (m2 o) Q).
 Proof.
-    split; induction m1; cbn; intuition.
+    split; induction m1; cbn; intuition; destruct H0; exists x; intuition.
 Qed.
 
 Lemma wp_ret : forall {A : Type} (a : A) (Q : A -> Prop),
@@ -298,8 +298,9 @@ Qed.
 Lemma wp_monotone : forall {O : Set} (P Q : O -> Prop) (m : freeM O),
   (forall o : O, P o -> Q o) -> wp_freeM m P -> wp_freeM m Q.
 Proof.
-    intros. induction m; cbn; auto.
-    inversion H0. intuition.
+    intros. induction m; cbn; auto;
+    inversion H0; intuition.
+    exists x. apply H1. apply H2.
 Qed.
 
 
@@ -317,18 +318,11 @@ Proof.
           intro; subst
       | |- wlp_freeM (match ?t with _ => _ end) _ =>
           destruct t eqn:?
-      | |- exists t, _ =>
-          exists ty_bool
+      | |- forall t, _ =>
+          intro
       | H : ?g |-- ?e ; ?t ~> ?ee |- ?g' |-- e_app ?e1 ?e2 ; ?t' ~> e_app ?e1' ?e2' =>
               apply (tpb_app _ _ _ _ _ t0 _)
       end; try reflexivity; try assumption).
-(* verbose proof for remaining existential cases ...
-      - exists ty_bool. (* this honestly seems like cheating ??? *) apply wlp_bind. specialize (IHe ((s, ty_bool) :: G)). revert IHe. apply wlp_monotone. intros.
-        destruct o. apply wlp_ret. constructor. apply H.
-      - exists ty_bool. apply wlp_bind. apply wlp_ty_eqb. intro. apply wlp_ret. apply (tpb_app _ _ _ _ _ t0 _).
-        + subst. apply H.
-        + apply H0.
-*)
 Qed.
 
 Lemma infer_complete : forall  (G : env) (e ee : expr) (t : ty),
@@ -343,12 +337,10 @@ Proof.
           split
       | H : ?x = ?y /\ _ |- _ =>
           destruct H; subst
-(*
-          | |- forall t, ?e =>
-          intro
-*)
+      | |- exists t, _ =>
+          exists t; intros
       end; try reflexivity).
-      - intros. apply wp_bind. revert IHtpb. assert (Hteq : vt = t0). admit.
+      - intros. apply wp_bind. revert IHtpb. apply wp_monotone.
         subst. apply wp_monotone. intro. destruct o. split; destruct H0; subst; reflexivity.
       - intro. assert (Hteq: t1 = t0). admit.
         split; rewrite Hteq; intuition.

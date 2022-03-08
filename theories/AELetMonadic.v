@@ -595,39 +595,11 @@ Proof.
   intros. induction H; cbn; intuition.
 Qed.
 
-Theorem uniqueness_of_typing : forall G e t1 t2 ee,
-  G |-- e ; t1 ~> ee ->
-  G |-- e ; t2 ~> ee ->
-  t1 = t2.
-Proof.
-  intros.
-  induction H; intros; inversion H0; subst; intuition.
-  congruence.
-Qed.
-
-Theorem uniqueness_of_elaboration : forall G e t ee1 ee2,
-  G |-- e ; t ~> ee1 ->
-  G |-- e ; t ~> ee2 ->
+Theorem uniqueness_ae : forall G e t1 t2 ee1 ee2,
+  G |-- e ; t1 ~> ee1 ->
+  G |-- e ; t2 ~> ee2 ->
+  t1 = t2 ->
   ee1 = ee2.
 Proof.
-  intros. generalize dependent ee2.
-  induction H; intros ? Hx; inversion Hx; subst; f_equal; firstorder; subst.
-  - destruct t0, t1 eqn:?.
-    + specialize (IHtpb1 _ HE1). specialize (IHtpb2 _ HE2). subst. reflexivity.
-    + (* want to use uniqueness of typing to show contradiction, but e1' = e1'0 is not guaranteed *) admit.
-    + (* want to use uniqueness of typing to show contradiction, but e1' = e1'0 is not guaranteed *) admit.
-    + specialize (IHtpb1 _ HE1). specialize (IHtpb2 _ HE2). subst. reflexivity.
-  - admit.
-  - admit.
-Restart.
-intros. generalize dependent ee2. induction H; intros ? Hx; inversion Hx; subst.
-- reflexivity.
-- reflexivity.
-- reflexivity.
-- specialize (IHtpb _ H2). subst. reflexivity.
-- specialize (IHtpb1 _ HCND). specialize (IHtpb2 _ HCOQ). specialize (IHtpb3 _ HALT). subst. reflexivity.
-- specialize (IHtpb1 _ HL). specialize (IHtpb2 _ HR). subst. reflexivity.
-- specialize (IHtpb1 _ HL). specialize (IHtpb2 _ HR). subst. reflexivity.
-- specialize (IHtpb1 _ HL). specialize (IHtpb2 _ HR). subst. reflexivity.
-- specialize (IHtpb1 e1'0). rewrite IHtpb1. admit.
-Admitted.
+Abort.
+
