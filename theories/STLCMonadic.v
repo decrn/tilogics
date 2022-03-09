@@ -321,7 +321,7 @@ Proof.
       | |- forall t, _ =>
           intro
       | H : ?g |-- ?e ; ?t ~> ?ee |- ?g' |-- e_app ?e1 ?e2 ; ?t' ~> e_app ?e1' ?e2' =>
-              apply (tpb_app _ _ _ _ _ t0 _)
+          apply (tpb_app _ _ _ _ _ t0 _)
       end; try reflexivity; try assumption).
 Qed.
 
@@ -337,12 +337,8 @@ Proof.
           split
       | H : ?x = ?y /\ _ |- _ =>
           destruct H; subst
-      | |- exists t, _ =>
-          exists t; intros
       end; try reflexivity).
-      - intros. apply wp_bind. revert IHtpb. apply wp_monotone.
-        subst. apply wp_monotone. intro. destruct o. split; destruct H0; subst; reflexivity.
-      - intro. assert (Hteq: t1 = t0). admit.
-        split; rewrite Hteq; intuition.
-Admitted.
+      - exists vt. apply wp_bind. revert IHtpb. apply wp_monotone. intro. destruct o. intro. destruct H0. apply wp_ret. subst. intuition.
+      - exists t1. auto.
+Qed.
 
