@@ -1,4 +1,8 @@
 -arg "-w all"
--Q theories Master
+-arg "-w -disj-pattern-notation"
+-Q theories MasterThesis
 theories/AELetMonadic.v
 theories/STLCMonadic.v
+theories/Context.v
+theories/Environment.v
+theories/Prelude.v
