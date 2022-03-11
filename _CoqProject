@@ -1,5 +1,3 @@
--arg "-w all"
--arg "-w -disj-pattern-notation"
 -Q theories MasterThesis
 theories/AELetMonadic.v
 theories/STLCMonadic.v
