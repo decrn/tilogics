@@ -287,3 +287,19 @@ TSWLatexianTemp*
 # Uncomment the next line to have this generated file ignored.
 #*Notes.bib
 
+# Coq
+.coqdeps.d
+*.vo
+*.vok
+*.vos
+*.vio
+*.glob
+*.v.d
+*.aux
+Makefile.coq
+Makefile.coq.conf
+.Makefile.coq.d
+.lia.cache
+.nia.cache
+.coq-native/
+_build/
