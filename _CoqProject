@@ -1,0 +1,4 @@
+-arg "-w all"
+-Q theories Master
+theories/AELetMonadic.v
+theories/STLCMonadic.v
