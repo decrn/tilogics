@@ -36,6 +36,7 @@ Import ctx.notations.
 
 Local Set Implicit Arguments.
 Local Open Scope lazy_bool_scope.
+Local Unset Equations Derive Equations.
 
 Declare Scope env_scope.
 Delimit Scope env_scope with env.
@@ -152,11 +153,9 @@ Section WithBinding.
 
     End Inversions.
 
-    Fixpoint lookup {Γ} (E : Env Γ) : forall b, b ∈ Γ -> D b :=
-      match E with
-      | nil       => ctx.in_case_nil
-      | snoc E db => ctx.in_case_snoc D db (lookup E)
-      end.
+    Equations lookup {Γ} (E : Env Γ) {b} (bIn : b ∈ Γ) : D b :=
+    | snoc _ v | ctx.in_zero   => v
+    | snoc E _ | ctx.in_succ i => lookup E i.
 
     Inductive All (Q : forall b, D b -> Type) : forall {Γ}, Env Γ -> Type :=
     | all_nil : All Q nil
@@ -250,16 +249,16 @@ Section WithBinding.
         snoc (tabulate (fun y yIn => EΓb y (ctx.in_succ yIn))) (EΓb _ ctx.in_zero)
       end.
 
-    Fixpoint update {Γ} (E : Env Γ) {struct E} :
-      forall {b} (bIn : b ∈ Γ) (new : D b), Env Γ :=
-      match E with
-      | nil => ctx.in_case_nil
-      | snoc E bold =>
-        ctx.in_case_snoc
-          (fun z => D z -> Env _)
-          (fun new => snoc E new)
-          (fun b0' bIn0' new => snoc (update E bIn0' new) bold)
-      end.
+    (* Fixpoint update {Γ} (E : Env Γ) {struct E} : *)
+    (*   forall {b} (bIn : b ∈ Γ) (new : D b), Env Γ := *)
+    (*   match E with *)
+    (*   | nil => ctx.in_case_nil *)
+    (*   | snoc E bold => *)
+    (*     ctx.in_case_snoc *)
+    (*       (fun z => D z -> Env _) *)
+    (*       (fun new => snoc E new) *)
+    (*       (fun b0' bIn0' new => snoc (update E bIn0' new) bold) *)
+    (*   end. *)
 
     Definition head {Γ b} (E : Env (Γ ▻ b)) : D b :=
       match E in Env Γb
@@ -381,13 +380,13 @@ Section WithBinding.
     (*   tabulate (fun x xIn => lookup E (ctx.shift_var bIn xIn)). *)
     (* Global Arguments remove' {_} b E. *)
 
-    Lemma lookup_update {Γ} (E : Env Γ) :
-      forall {b} (bInΓ : b ∈ Γ) (db : D b),
-        lookup (update E bInΓ db) bInΓ = db.
-    Proof.
-      induction E; intros ? [n e]; try destruct e;
-        destruct n; cbn in *; subst; auto.
-    Qed.
+    (* Lemma lookup_update {Γ} (E : Env Γ) : *)
+    (*   forall {b} (bInΓ : b ∈ Γ) (db : D b), *)
+    (*     lookup (update E bInΓ db) bInΓ = db. *)
+    (* Proof. *)
+    (*   induction E; intros ? [n e]; try destruct e; *)
+    (*     destruct n; cbn in *; subst; auto. *)
+    (* Qed. *)
 
     Lemma split_takedrop {Γ} Δ (E : Env (Γ ▻▻ Δ)) :
       split Δ E = (drop Δ E , take Δ E).
@@ -413,24 +412,24 @@ Section WithBinding.
       drop Δ (cat δΓ δΔ) = δΓ.
     Proof. induction δΔ; cbn; auto. Qed.
 
-    Lemma update_update {Γ} (E : Env Γ) :
-      forall {b} (bInΓ : b ∈ Γ) (d1 d2 : D b),
-        update (update E bInΓ d1) bInΓ d2 =
-        update E bInΓ d2.
-    Proof.
-      induction E; intros ? [n e]; [ contradiction e | destruct n ].
-      - destruct e; reflexivity.
-      - cbn. intros. f_equal. auto.
-    Qed.
+    (* Lemma update_update {Γ} (E : Env Γ) : *)
+    (*   forall {b} (bInΓ : b ∈ Γ) (d1 d2 : D b), *)
+    (*     update (update E bInΓ d1) bInΓ d2 = *)
+    (*     update E bInΓ d2. *)
+    (* Proof. *)
+    (*   induction E; intros ? [n e]; [ contradiction e | destruct n ]. *)
+    (*   - destruct e; reflexivity. *)
+    (*   - cbn. intros. f_equal. auto. *)
+    (* Qed. *)
 
-    Lemma update_lookup {Γ} (E : Env Γ) :
-      forall {b} (bInΓ : b ∈ Γ),
-        update E bInΓ (lookup E bInΓ) = E.
-    Proof.
-      induction E; intros ? [n e]; [ contradiction e | destruct n ].
-      - destruct e; reflexivity.
-      - cbn. intros. f_equal. auto.
-    Qed.
+    (* Lemma update_lookup {Γ} (E : Env Γ) : *)
+    (*   forall {b} (bInΓ : b ∈ Γ), *)
+    (*     update E bInΓ (lookup E bInΓ) = E. *)
+    (* Proof. *)
+    (*   induction E; intros ? [n e]; [ contradiction e | destruct n ]. *)
+    (*   - destruct e; reflexivity. *)
+    (*   - cbn. intros. f_equal. auto. *)
+    (* Qed. *)
 
     Lemma lookup_extensional {Γ} (E1 E2 : Env Γ) :
       (forall {b} (bInΓ : b ∈ Γ), lookup E1 bInΓ = lookup E2 bInΓ) ->
@@ -575,13 +574,13 @@ Section WithBinding.
       - dependent elimination EΓΔ; apply IHΔ.
     Qed.
 
-    Lemma map_update {Γ} (E : Env D1 Γ) :
-      forall {b} (bInΓ : b ∈ Γ) (db : D1 b),
-        map (update E bInΓ db) = update (map E) bInΓ (f db).
-    Proof.
-      induction E; intros ? [n e]; try destruct e.
-      destruct n; cbn in *; subst; cbn; congruence.
-    Qed.
+    (* Lemma map_update {Γ} (E : Env D1 Γ) : *)
+    (*   forall {b} (bInΓ : b ∈ Γ) (db : D1 b), *)
+    (*     map (update E bInΓ db) = update (map E) bInΓ (f db). *)
+    (* Proof. *)
+    (*   induction E; intros ? [n e]; try destruct e. *)
+    (*   destruct n; cbn in *; subst; cbn; congruence. *)
+    (* Qed. *)
 
     Lemma map_tabulate {Γ} (g : forall b, b ∈ Γ -> D1 b) :
       map (tabulate g) = tabulate (fun b bInΓ => f (g b bInΓ)).
@@ -595,8 +594,9 @@ Section WithBinding.
       forall {b} (bInΓ : b ∈ Γ),
         lookup (map E) bInΓ = f (lookup E bInΓ).
     Proof.
-      induction E; intros ? [n e]; try destruct e;
-        destruct n; cbn in *; subst; auto.
+      induction E; intros x xIn;
+        [destruct (ctx.nilView xIn)| destruct (ctx.snocView xIn)];
+        cbn in *; now subst.
     Qed.
 
   End Map.
@@ -635,8 +635,8 @@ End WithBinding.
 Arguments Env {B} D Γ.
 Arguments nil {B D}.
 Arguments snoc {B%type D%function Γ%ctx} E%env b%ctx & db.
-Arguments lookup {B D Γ} E%env [_] x%ctx.
-Arguments update {B}%type {D}%function {Γ}%ctx E%env {b}%ctx.
+Arguments lookup {B D Γ} E%env [b] bIn%ctx.
+(* Arguments update {B}%type {D}%function {Γ}%ctx E%env {b}%ctx. *)
 (* Arguments tabulate {_ _} _. *)
 (* Arguments tail {_ _ _} / _. *)
 Arguments abstract {B} D.
@@ -648,7 +648,7 @@ Module notations.
 
   Notation "δ ► ( x ↦ u )" := (snoc δ x u) : env_scope.
   Notation "δ1 '►►' δ2" := (cat δ1 δ2) : env_scope.
-  Notation "δ ⟪ x ↦ v ⟫" := (@update _ _ _ δ (x∷_) _ v) : env_scope.
+  (* Notation "δ ⟪ x ↦ v ⟫" := (@update _ _ _ δ (x∷_) _ v) : env_scope. *)
   (* Based on and compatible with ssrnotations, also used in math-comp finmap.  *)
   Notation "e .[ i ]" := (@lookup _ _ _ e _ i)
     (at level 2, left associativity, format "e .[ i ]").
