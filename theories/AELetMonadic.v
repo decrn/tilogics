@@ -595,11 +595,21 @@ Proof.
   intros. induction H; cbn; intuition.
 Qed.
 
-Theorem uniqueness_ae : forall G e t1 t2 ee1 ee2,
+Lemma uniqueness_typing_and_elaboration : forall G e t1 t2 ee1 ee2,
   G |-- e ; t1 ~> ee1 ->
   G |-- e ; t2 ~> ee2 ->
-  t1 = t2 ->
-  ee1 = ee2.
+  t1 = t2 /\ ee1 = ee2.
 Proof.
-Abort.
+  intros.
+  generalize dependent ee2. generalize dependent t2. induction H; intros ? ? HInv; inversion HInv; subst;
+  repeat (try match goal with
+              | |- ?x /\ ?y =>
+                  split
+              | IH : forall t2 ee2, ?g |-- ?e ; t2 ~> ee2 -> ?x,
+                H  : ?g |-- ?e ; ?t ~> ?ee' |- _ =>
+                  specialize (IH t ee'); destruct IH; subst
+              | H1 : ?x = ?y, H2: ?x = ?z |- _ =>
+                  congruence
+              end; try reflexivity; try assumption).
+Qed.
 
