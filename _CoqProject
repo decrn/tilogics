@@ -6,3 +6,4 @@ theories/STLCMonadic.v
 theories/Context.v
 theories/Environment.v
 theories/Prelude.v
+theories/Example.v
