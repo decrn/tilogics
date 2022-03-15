@@ -227,6 +227,14 @@ Fixpoint infer (ctx : env) (expression : expr) : freeM (prod ty expr) :=
 Compute (infer nil (e_app (e_abst "x" ty_bool (e_var "x")) v_true)).
 Compute (infer nil (e_app (e_absu "x" (e_var "x")) v_true)).
 
+Definition K := (e_absu "k" (e_absu "l" (e_var "k"))).
+Definition I := (e_absu "i" (e_var "i")).
+Compute (infer nil K).
+Compute (infer nil I).
+Definition KKI := (e_app K (e_app K I)).
+Compute (infer nil KKI).
+
+
 Fixpoint wlp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
   match m with
   | ret_free _ a => Q a
@@ -359,4 +367,5 @@ Proof.
       - exists vt. apply wp_bind. revert IHtpb. apply wp_monotone. intro. destruct o. intro. destruct H0. apply wp_ret. subst. intuition.
       - exists t1. auto.
 Qed.
+
 
