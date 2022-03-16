@@ -1,10 +1,18 @@
 Require Import List.
 Import ListNotations.
 Require Import String.
+From MasterThesis Require Import
+     Context.
+Import ctx.notations.
 
 Inductive ty : Type :=
   | ty_bool : ty
   | ty_func : ty -> ty -> ty.
+
+Inductive Ty (Γ : Ctx nat) : Type :=
+  | Ty_bool : Ty Γ
+  | Ty_func : Ty Γ -> Ty Γ -> Ty Γ
+  | Ty_hole : forall (i : nat), i ∈ Γ -> Ty Γ.
 
 Inductive expr : Type :=
   (* values *)
@@ -16,6 +24,20 @@ Inductive expr : Type :=
   | e_absu  : string -> expr -> expr
   | e_abst  : string -> ty -> expr -> expr
   | e_app   : expr -> expr -> expr.
+
+Inductive Cstr {A} (Γ : Ctx nat) : Type :=
+  | C_eqc : Ty Γ -> Ty Γ -> Cstr Γ -> Cstr Γ
+  | C_val : A -> Cstr Γ
+  | C_fls : Cstr Γ
+  | C_exi : forall (i : nat), Cstr (Γ ▻ i) -> Cstr Γ.
+
+(* TODO: incomplete *)
+(* Env needs both a context of expression variables to types (formerly Gamma)
+              and a context of type variables to resolved (?) types (formerly ... check tapl?) *)
+Inductive Env (Γ : Ctx nat) : Type :=
+  | nil : Env Γ.
+
+Compute C_eqc ε (Ty_bool ε) (Ty_bool ε) (C_val ε (Ty_bool ε)).
 
 Definition env := list (string * ty).
 
