@@ -5,6 +5,8 @@ From MasterThesis Require Import
      Context.
 Import ctx.notations.
 
+(* TODO: ctx.notations defines :: (cons) for Binding *)
+
 Inductive ty : Type :=
   | ty_bool : ty
   | ty_func : ty -> ty -> ty.
@@ -25,29 +27,28 @@ Inductive expr : Type :=
   | e_abst  : string -> ty -> expr -> expr
   | e_app   : expr -> expr -> expr.
 
+Definition env := list (string * ty).
+Definition Env Σ := list (string * Ty Σ).
+
 Inductive Cstr {A} (Σ : Ctx nat) : Type :=
   | C_eqc : Ty Σ -> Ty Σ -> Cstr Σ -> Cstr Σ
   | C_val : A -> Cstr Σ
   | C_fls : Cstr Σ
   | C_exi : forall (i : nat), Cstr (Σ ▻ i) -> Cstr Σ.
 
-Inductive Env {Σ : Ctx nat} {A} : Type :=
-  | nil : Env
-  | cons (s : string) (a : A) : Env -> Env. (* TODO: i ∈ Σ ? *)
-
 Compute C_eqc ε (Ty_bool ε) (Ty_bool ε) (C_val ε (Ty_bool ε)).
 
-Fixpoint value {X: Type} {Σ : Ctx nat} (var : string) (ctx : @Env Σ X) : option X :=
+Fixpoint value {X: Type} (var : string) (ctx : list (string * X)) : option X :=
   match ctx with
   | nil => None
-  | cons var' val ctx' =>
+  | cons (var', val) ctx' =>
       if (string_dec var var') then Some val else (value var ctx')
   end.
 
 Reserved Notation "G |-- E ; T ~> EE"
             (at level 50).
 
-Inductive tpb {Σ : Ctx nat} : @Env Σ ty -> expr -> ty -> expr -> Prop :=
+Inductive tpb : env -> expr -> ty -> expr -> Prop :=
   | tpb_false : forall g,
       g |-- v_false ; ty_bool ~> v_false
   | tpb_true : forall g,
@@ -61,10 +62,10 @@ Inductive tpb {Σ : Ctx nat} : @Env Σ ty -> expr -> ty -> expr -> Prop :=
       value v g = Some vt ->
       g |-- (e_var v) ; vt ~> (e_var v)
   | tpb_absu : forall v vt g e e' t, (* don't we have to come up with vt ? *)
-      (cons v vt g) |-- e ; t ~> e' ->
+      (cons (v, vt) g) |-- e ; t ~> e' ->
                    g |-- (e_absu v e) ; (ty_func vt t) ~> (e_abst v vt e')
   | tpb_abst : forall v vt g e e' t,
-      (cons v vt g) |-- e ; t ~> e' ->
+      (cons (v, vt) g) |-- e ; t ~> e' ->
                    g |-- (e_abst v vt e) ; (ty_func vt t) ~> (e_abst v vt e')
   | tpb_app : forall g e1 t1 e1' e2 t2 e2',
       g |-- e1 ; (ty_func t2 t1) ~> e1' ->
@@ -216,10 +217,10 @@ Fixpoint infer (ctx : env) (expression : expr) : freeM (prod ty expr) :=
       ret (t_magic, e_app e_e1 e_e2)
   | e_absu var e =>
       t_var <- magic ;;
-      '(t_e, e_e) <- infer ((var, t_var) :: ctx) e ;;
+      '(t_e, e_e) <- infer (cons (var, t_var) ctx) e ;;
       ret (ty_func t_var t_e, e_abst var t_var e_e)
   | e_abst var t_var e =>
-      '(t_e, e_e) <- infer ((var, t_var) :: ctx) e ;;
+      '(t_e, e_e) <- infer (cons (var, t_var) ctx) e ;;
       ret (ty_func t_var t_e, e_abst var t_var e_e)
   end.
 
