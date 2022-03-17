@@ -9,10 +9,10 @@ Inductive ty : Type :=
   | ty_bool : ty
   | ty_func : ty -> ty -> ty.
 
-Inductive Ty (Γ : Ctx nat) : Type :=
-  | Ty_bool : Ty Γ
-  | Ty_func : Ty Γ -> Ty Γ -> Ty Γ
-  | Ty_hole : forall (i : nat), i ∈ Γ -> Ty Γ.
+Inductive Ty (Σ : Ctx nat) : Type :=
+  | Ty_bool : Ty Σ
+  | Ty_func : Ty Σ -> Ty Σ -> Ty Σ
+  | Ty_hole : forall (i : nat), i ∈ Σ -> Ty Σ.
 
 Inductive expr : Type :=
   (* values *)
@@ -25,33 +25,29 @@ Inductive expr : Type :=
   | e_abst  : string -> ty -> expr -> expr
   | e_app   : expr -> expr -> expr.
 
-Inductive Cstr {A} (Γ : Ctx nat) : Type :=
-  | C_eqc : Ty Γ -> Ty Γ -> Cstr Γ -> Cstr Γ
-  | C_val : A -> Cstr Γ
-  | C_fls : Cstr Γ
-  | C_exi : forall (i : nat), Cstr (Γ ▻ i) -> Cstr Γ.
+Inductive Cstr {A} (Σ : Ctx nat) : Type :=
+  | C_eqc : Ty Σ -> Ty Σ -> Cstr Σ -> Cstr Σ
+  | C_val : A -> Cstr Σ
+  | C_fls : Cstr Σ
+  | C_exi : forall (i : nat), Cstr (Σ ▻ i) -> Cstr Σ.
 
-(* TODO: incomplete *)
-(* Env needs both a context of expression variables to types (formerly Gamma)
-              and a context of type variables to resolved (?) types (formerly ... check tapl?) *)
-Inductive Env (Γ : Ctx nat) : Type :=
-  | nil : Env Γ.
+Inductive Env {Σ : Ctx nat} {A} : Type :=
+  | nil : Env
+  | cons (s : string) (a : A) : Env -> Env. (* TODO: i ∈ Σ ? *)
 
 Compute C_eqc ε (Ty_bool ε) (Ty_bool ε) (C_val ε (Ty_bool ε)).
 
-Definition env := list (string * ty).
-
-Fixpoint value {X: Type} (var : string) (ctx : list (string * X)) : option X :=
+Fixpoint value {X: Type} {Σ : Ctx nat} (var : string) (ctx : @Env Σ X) : option X :=
   match ctx with
   | nil => None
-  | (var', val) :: ctx' =>
+  | cons var' val ctx' =>
       if (string_dec var var') then Some val else (value var ctx')
   end.
 
 Reserved Notation "G |-- E ; T ~> EE"
             (at level 50).
 
-Inductive tpb : env -> expr -> ty -> expr -> Prop :=
+Inductive tpb {Σ : Ctx nat} : @Env Σ ty -> expr -> ty -> expr -> Prop :=
   | tpb_false : forall g,
       g |-- v_false ; ty_bool ~> v_false
   | tpb_true : forall g,
@@ -65,10 +61,10 @@ Inductive tpb : env -> expr -> ty -> expr -> Prop :=
       value v g = Some vt ->
       g |-- (e_var v) ; vt ~> (e_var v)
   | tpb_absu : forall v vt g e e' t, (* don't we have to come up with vt ? *)
-      ((v, vt) :: g) |-- e ; t ~> e' ->
+      (cons v vt g) |-- e ; t ~> e' ->
                    g |-- (e_absu v e) ; (ty_func vt t) ~> (e_abst v vt e')
   | tpb_abst : forall v vt g e e' t,
-      ((v, vt) :: g) |-- e ; t ~> e' ->
+      (cons v vt g) |-- e ; t ~> e' ->
                    g |-- (e_abst v vt e) ; (ty_func vt t) ~> (e_abst v vt e')
   | tpb_app : forall g e1 t1 e1' e2 t2 e2',
       g |-- e1 ; (ty_func t2 t1) ~> e1' ->
