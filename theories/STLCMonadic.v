@@ -44,7 +44,15 @@ Check Ty_bool.
 
 Check C_fls Ty.
 
-Fixpoint bind [A B] {Σ} (m : Cstr A Σ) (f : A Σ -> Cstr B Σ) {struct m} : Cstr B Σ.
+Definition access (Σ Σ' : Ctx nat -> Type) := True.
+
+Definition box A Σ := forall Σ', (access Σ Σ') -> A Σ'.
+
+Check box.
+
+Check Cstr.
+
+Fixpoint bind [A B] {Σ} (m : Cstr A Σ) (f : box (A -> Cstr B) Σ) {struct m} : Cstr B Σ.
 refine (
   match m with
   | C_val _ _ v => f v
@@ -70,6 +78,8 @@ Notation "' x <- ma ;; mb" :=
         (bind ma (fun x => mb))
           (at level 80, x pattern, ma at next level, mb at level 200, right associativity,
            format "' x  <-  ma  ;;  mb").
+
+Definition assert {Σ} t1 t2 := C_eqc Ty Σ t1 t2 (C_val Ty _ tt).
 
 Fixpoint infer' {Σ} (Γ : Env Σ) (expression : expr) : Cstr Ty Σ :=
   match expression with
