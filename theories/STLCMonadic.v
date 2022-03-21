@@ -36,11 +36,6 @@ Inductive Cstr (A : Ctx nat -> Type) (Σ : Ctx nat) : Type :=
   | C_fls : Cstr A Σ
   | C_exi : forall (i : nat), Cstr A (Σ ▻ i) -> Cstr A Σ.
 
-(* Inductive freeM (A : Type) : Type :=
-  | bind_assert_free : ty -> ty -> freeM A -> freeM A
-  | ret_free : A -> freeM A
-  | fail_free : freeM A
-   | bind_exists_free : (ty -> freeM A) -> freeM A. *)
 Check Cstr.
 
 Check Ty.
@@ -49,8 +44,22 @@ Check Ty_bool.
 
 Check C_fls Ty.
 
-Definition bind {A B} {Σ} (m : Cstr A Σ) (f : A Σ -> Cstr B Σ) : Cstr B Σ.
+Fixpoint bind [A B] {Σ} (m : Cstr A Σ) (f : A Σ -> Cstr B Σ) {struct m} : Cstr B Σ.
+refine (
+  match m with
+  | C_val _ _ v => f v
+  | C_fls _ _ => C_fls _ _ (* we just fail *)
+  | C_eqc _ _ t1 t2 C1 => _
+  | C_exi _ _ i C => _
+  end).
 Proof.
+  - apply C_eqc. apply t1. apply t2. eapply bind.
+    + apply C1.
+    + apply f.
+  - eapply bind.
+    + admit. (* ??? somehow: apply C. *)
+    + apply f.
+Show Proof.
 Admitted.
 
 Notation "x <- ma ;; mb" :=
@@ -62,18 +71,19 @@ Notation "' x <- ma ;; mb" :=
           (at level 80, x pattern, ma at next level, mb at level 200, right associativity,
            format "' x  <-  ma  ;;  mb").
 
-Fixpoint infer (expression : expr) {Σ} : Cstr Ty Σ :=
+Fixpoint infer' {Σ} (Γ : Env Σ) (expression : expr) : Cstr Ty Σ :=
   match expression with
   | v_true => C_val Ty Σ (Ty_bool Σ)
   | v_false => C_val Ty Σ (Ty_bool Σ)
   | e_if cnd coq alt =>
-      t_cnd <- infer cnd ;;
-      t_coq <- infer coq ;;
-      t_alt <- infer alt ;;
+      t_cnd <- infer' Γ cnd ;;
+      t_coq <- infer' Γ coq ;;
+      t_alt <- infer' Γ alt ;;
       C_eqc Ty Σ t_coq t_alt (C_eqc Ty Σ t_cnd (Ty_bool Σ) (C_val Ty Σ t_cnd))
   | _ => C_fls Ty Σ
   end.
 
+Compute infer' nil (e_if v_true v_true v_false).
 Compute C_eqc Ty ε (Ty_bool ε) (Ty_bool ε) (C_val Ty ε (Ty_bool ε)).
 
 Fixpoint value {X: Type} (var : string) (ctx : list (string * X)) : option X :=
@@ -262,10 +272,6 @@ Fixpoint infer (ctx : env) (expression : expr) : freeM (prod ty expr) :=
       ret (ty_func t_var t_e, e_abst var t_var e_e)
   end.
 
-Fixpoint infer (ctx : env) (expression : expr) : Cstr :=
-
-
-
 Compute (infer nil (e_app (e_abst "x" ty_bool (e_var "x")) v_true)).
 Compute (infer nil (e_app (e_absu "x" (e_var "x")) v_true)).
 
@@ -277,7 +283,7 @@ Definition KKI := (e_app K (e_app K I)).
 Compute (infer nil KKI).
 
 
-Fixpoint wlp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
+Fixpoint wlp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) : Prop :=
   match m with
   | ret_free _ a => Q a
   | bind_assert_free _ t1 t2 k => t1 = t2 ->
