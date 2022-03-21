@@ -30,13 +30,51 @@ Inductive expr : Type :=
 Definition env := list (string * ty).
 Definition Env Σ := list (string * Ty Σ).
 
-Inductive Cstr {A} (Σ : Ctx nat) : Type :=
-  | C_eqc : Ty Σ -> Ty Σ -> Cstr Σ -> Cstr Σ
-  | C_val : A -> Cstr Σ
-  | C_fls : Cstr Σ
-  | C_exi : forall (i : nat), Cstr (Σ ▻ i) -> Cstr Σ.
+Inductive Cstr (A : Ctx nat -> Type) (Σ : Ctx nat) : Type :=
+  | C_eqc : Ty Σ -> Ty Σ -> Cstr A Σ -> Cstr A Σ
+  | C_val : A Σ -> Cstr A Σ
+  | C_fls : Cstr A Σ
+  | C_exi : forall (i : nat), Cstr A (Σ ▻ i) -> Cstr A Σ.
 
-Compute C_eqc ε (Ty_bool ε) (Ty_bool ε) (C_val ε (Ty_bool ε)).
+(* Inductive freeM (A : Type) : Type :=
+  | bind_assert_free : ty -> ty -> freeM A -> freeM A
+  | ret_free : A -> freeM A
+  | fail_free : freeM A
+   | bind_exists_free : (ty -> freeM A) -> freeM A. *)
+Check Cstr.
+
+Check Ty.
+
+Check Ty_bool.
+
+Check C_fls Ty.
+
+Definition bind {A B} {Σ} (m : Cstr A Σ) (f : A Σ -> Cstr B Σ) : Cstr B Σ.
+Proof.
+Admitted.
+
+Notation "x <- ma ;; mb" :=
+        (bind ma (fun x => mb))
+          (at level 80, ma at next level, mb at level 200, right associativity).
+Notation "ma ;; mb" := (bind ma (fun _ => mb)) (at level 80, right associativity).
+Notation "' x <- ma ;; mb" :=
+        (bind ma (fun x => mb))
+          (at level 80, x pattern, ma at next level, mb at level 200, right associativity,
+           format "' x  <-  ma  ;;  mb").
+
+Fixpoint infer (expression : expr) {Σ} : Cstr Ty Σ :=
+  match expression with
+  | v_true => C_val Ty Σ (Ty_bool Σ)
+  | v_false => C_val Ty Σ (Ty_bool Σ)
+  | e_if cnd coq alt =>
+      t_cnd <- infer cnd ;;
+      t_coq <- infer coq ;;
+      t_alt <- infer alt ;;
+      C_eqc Ty Σ t_coq t_alt (C_eqc Ty Σ t_cnd (Ty_bool Σ) (C_val Ty Σ t_cnd))
+  | _ => C_fls Ty Σ
+  end.
+
+Compute C_eqc Ty ε (Ty_bool ε) (Ty_bool ε) (C_val Ty ε (Ty_bool ε)).
 
 Fixpoint value {X: Type} (var : string) (ctx : list (string * X)) : option X :=
   match ctx with
@@ -127,9 +165,9 @@ Proof.
 Qed.
 
 Inductive freeM (A : Type) : Type :=
+  | bind_assert_free : ty -> ty -> freeM A -> freeM A
   | ret_free : A -> freeM A
   | fail_free : freeM A
-  | bind_assert_free : ty -> ty -> freeM A -> freeM A
   | bind_exists_free : (ty -> freeM A) -> freeM A.
 
 (* PROOF MODE EXAMPLE *)
@@ -223,6 +261,9 @@ Fixpoint infer (ctx : env) (expression : expr) : freeM (prod ty expr) :=
       '(t_e, e_e) <- infer (cons (var, t_var) ctx) e ;;
       ret (ty_func t_var t_e, e_abst var t_var e_e)
   end.
+
+Fixpoint infer (ctx : env) (expression : expr) : Cstr :=
+
 
 
 Compute (infer nil (e_app (e_abst "x" ty_bool (e_var "x")) v_true)).
