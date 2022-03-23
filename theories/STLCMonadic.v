@@ -44,7 +44,11 @@ Check Ty_bool.
 
 Check C_fls Ty.
 
-Definition access (Σ Σ' : Ctx nat -> Type) := True.
+Axiom access : forall (Σ Σ' : Ctx nat), Type.
+
+(* Katamaran: Symbolic/Worlds.v *)
+Definition Impl (A B : Ctx nat -> Type) : Ctx nat -> Type :=
+  fun Σ => (A Σ) -> (B Σ).
 
 Definition box A Σ := forall Σ', (access Σ Σ') -> A Σ'.
 
@@ -52,24 +56,35 @@ Check box.
 
 Check Cstr.
 
-Fixpoint bind [A B] {Σ} (m : Cstr A Σ) (f : box (A -> Cstr B) Σ) {struct m} : Cstr B Σ.
+Bind Scope list_scope with list.
+Bind Scope list_scope with env.
+
+Print Scopes.
+Fixpoint value {X: Type} (var : string) (ctx : list (string * X)) : option X :=
+  match ctx with
+  | nil => None
+  | (var', val) :: ctx' =>
+      if (string_dec var var') then Some val else (value var ctx')
+  end.
+
+Fixpoint bind [A B] {Σ} (m : Cstr A Σ) (f : box (Impl A (Cstr B)) Σ) {struct m} : Cstr B Σ.
 refine (
   match m with
-  | C_val _ _ v => f v
-  | C_fls _ _ => C_fls _ _ (* we just fail *)
   | C_eqc _ _ t1 t2 C1 => _
+  | C_val _ _ v => _
+  | C_fls _ _ => C_fls _ _ (* we just fail *)
   | C_exi _ _ i C => _
   end).
 Proof.
   - apply C_eqc. apply t1. apply t2. eapply bind.
     + apply C1.
     + apply f.
-  - eapply bind.
-    + admit. (* ??? somehow: apply C. *)
-    + apply f.
+  - admit. (* Define T, apply it to f *) 
+  - eapply C_exi. eapply bind.
+    + apply C. (* ??? somehow: apply C. *)
+    + admit. (* define 4 and apply to f *)
 Show Proof.
 Admitted.
-
 Notation "x <- ma ;; mb" :=
         (bind ma (fun x => mb))
           (at level 80, ma at next level, mb at level 200, right associativity).
@@ -80,6 +95,7 @@ Notation "' x <- ma ;; mb" :=
            format "' x  <-  ma  ;;  mb").
 
 Definition assert {Σ} t1 t2 := C_eqc Ty Σ t1 t2 (C_val Ty _ tt).
+ *)
 
 Fixpoint infer' {Σ} (Γ : Env Σ) (expression : expr) : Cstr Ty Σ :=
   match expression with
@@ -95,13 +111,6 @@ Fixpoint infer' {Σ} (Γ : Env Σ) (expression : expr) : Cstr Ty Σ :=
 
 Compute infer' nil (e_if v_true v_true v_false).
 Compute C_eqc Ty ε (Ty_bool ε) (Ty_bool ε) (C_val Ty ε (Ty_bool ε)).
-
-Fixpoint value {X: Type} (var : string) (ctx : list (string * X)) : option X :=
-  match ctx with
-  | nil => None
-  | cons (var', val) ctx' =>
-      if (string_dec var var') then Some val else (value var ctx')
-  end.
 
 Reserved Notation "G |-- E ; T ~> EE"
             (at level 50).

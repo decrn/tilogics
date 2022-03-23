@@ -263,7 +263,7 @@ Module ctx.
 
     Open Scope ctx_scope.
 
-    Notation "x :: τ" := (MkB x τ) (only parsing) : ctx_scope.
+    (* Notation "x :: τ" := (MkB x τ) (only parsing) : ctx_scope. *)
     Notation "N ∷ T" := (Binding N T) : type_scope.
     Notation "x ∷ t" := (MkB x t) : ctx_scope.
 
