@@ -85,6 +85,9 @@ Proof.
     + admit. (* define 4 and apply to f *)
 Show Proof.
 Admitted.
+
+(* TODO: will need new notation that includes ω *)
+(* TODO: possibly find notation in Katamaran codebase *)
 Notation "x <- ma ;; mb" :=
         (bind ma (fun x => mb))
           (at level 80, ma at next level, mb at level 200, right associativity).
@@ -94,8 +97,11 @@ Notation "' x <- ma ;; mb" :=
           (at level 80, x pattern, ma at next level, mb at level 200, right associativity,
            format "' x  <-  ma  ;;  mb").
 
-Definition assert {Σ} t1 t2 := C_eqc Ty Σ t1 t2 (C_val Ty _ tt).
- *)
+Definition Unit (Σ : Ctx nat) := unit.
+
+Check Unit.
+
+Definition assert {Σ} t1 t2 := C_eqc Ty Σ t1 t2 (C_val _ _ Unit). (* TODO *)
 
 Fixpoint infer' {Σ} (Γ : Env Σ) (expression : expr) : Cstr Ty Σ :=
   match expression with
