@@ -589,6 +589,10 @@ Compute (infer nil
   (e_let "x" three
     (e_lte (e_var "x") two))).
 
+Compute (@infer option TC_option nil (e_plus three two)).
+Compute (@infer (option_writer (list cstr)) TC_writer nil (e_plus three two)).
+Compute (@infer freeM TC_free nil (e_plus three two)).
+
 Theorem infer_elaborates : forall G e t ee,
   G |-- e ; t ~> ee -> is_annotated ee.
 Proof.
