@@ -58,16 +58,30 @@ Definition Impl (A B : Ctx nat -> Type) : Ctx nat -> Type :=
 (* □ A *)
 Definition Box A Σ := forall Σ', Accessibility Σ Σ' -> A Σ'.
 
+(* _[_] *)
+Definition Persistent {Σ₁ Σ₂} (t : Ty Σ₁) := Accessibility Σ₁ Σ₂ -> Ty Σ₂.
+
 Definition T {A} := fun (Σ : Ctx nat) (a : Box A Σ) => a Σ (refl Σ).
 
 Check T.
 
-Check Box.
+Definition trans {Σ₁ Σ₂ Σ₃} (w12 : Accessibility Σ₁ Σ₂) (w23 : Accessibility Σ₂ Σ₃) : Accessibility Σ₁ Σ₃.
+Proof.
+  destruct w12, w23 eqn:?.
+  - constructor.
+  - apply w23.
+  - admit. (* TODO *)
+  - admit. (* TODO *)
+Admitted.
 
-Check Cstr.
+Definition _4 {A} (Σ₁ Σ₂ Σ₃ : Ctx nat)
+                  (a : Box A Σ₁)
+                  (w12 : Accessibility Σ₁ Σ₂)
+                  (w23 : Accessibility Σ₂ Σ₃)
+  := a Σ₃ (trans w12 w23).
 
-Bind Scope list_scope with list.
-Bind Scope list_scope with env.
+Check _4.
+
 
 Print Scopes.
 Fixpoint value {X: Type} (var : string) (ctx : list (string * X)) : option X :=
@@ -92,7 +106,12 @@ Proof.
   - apply T in f. unfold Impl in f. apply f. apply v.
   - eapply C_exi. eapply bind.
     + apply C.
-    + admit. (* define 4 and apply to f *)
+    + apply (_4 Σ Σ (Σ ▻ i)) in f. unfold Box. intros.
+      assert (HSame: (Σ ▻ i) = Σ').
+      { admit. }
+      rewrite <- HSame. apply f.
+      apply refl.
+      apply fresh. apply refl.
 Show Proof.
 Admitted.
 
