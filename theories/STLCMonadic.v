@@ -5,8 +5,6 @@ From MasterThesis Require Import
      Context.
 Import ctx.notations.
 
-(* TODO: ctx.notations defines :: (cons) for Binding *)
-
 Inductive ty : Type :=
   | ty_bool : ty
   | ty_func : ty -> ty -> ty.
@@ -44,15 +42,27 @@ Check Ty_bool.
 
 Check C_fls Ty.
 
-Axiom access : forall (Σ Σ' : Ctx nat), Type.
+(* Adapted from Katamaran: Symbolic/Worlds.v *)
 
-(* Katamaran: Symbolic/Worlds.v *)
+Inductive Accessibility (Σ₁ : Ctx nat) : Ctx nat -> Type :=
+  | refl    : Accessibility Σ₁ Σ₁
+  | fresh α : forall Σ₂, Accessibility Σ₁ Σ₂ -> Accessibility Σ₁ (Σ₂ ▻ α).
+
+(* ⊢ A *)
+Definition Valid (A : Ctx nat -> Type) := forall Σ, A Σ.
+
+(* A → B *)
 Definition Impl (A B : Ctx nat -> Type) : Ctx nat -> Type :=
   fun Σ => (A Σ) -> (B Σ).
 
-Definition box A Σ := forall Σ', (access Σ Σ') -> A Σ'.
+(* □ A *)
+Definition Box A Σ := forall Σ', Accessibility Σ Σ' -> A Σ'.
 
-Check box.
+Definition T {A} := fun (Σ : Ctx nat) (a : Box A Σ) => a Σ (refl Σ).
+
+Check T.
+
+Check Box.
 
 Check Cstr.
 
@@ -67,7 +77,7 @@ Fixpoint value {X: Type} (var : string) (ctx : list (string * X)) : option X :=
       if (string_dec var var') then Some val else (value var ctx')
   end.
 
-Fixpoint bind [A B] {Σ} (m : Cstr A Σ) (f : box (Impl A (Cstr B)) Σ) {struct m} : Cstr B Σ.
+Fixpoint bind [A B] {Σ} (m : Cstr A Σ) (f : Box (Impl A (Cstr B)) Σ) {struct m} : Cstr B Σ.
 refine (
   match m with
   | C_eqc _ _ t1 t2 C1 => _
@@ -79,9 +89,9 @@ Proof.
   - apply C_eqc. apply t1. apply t2. eapply bind.
     + apply C1.
     + apply f.
-  - admit. (* Define T, apply it to f *) 
+  - apply T in f. unfold Impl in f. apply f. apply v.
   - eapply C_exi. eapply bind.
-    + apply C. (* ??? somehow: apply C. *)
+    + apply C.
     + admit. (* define 4 and apply to f *)
 Show Proof.
 Admitted.
