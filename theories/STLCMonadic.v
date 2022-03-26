@@ -59,7 +59,13 @@ Definition Impl (A B : Ctx nat -> Type) : Ctx nat -> Type :=
 Definition Box A Σ := forall Σ', Accessibility Σ Σ' -> A Σ'.
 
 (* _[_] *)
-Definition Persistent {Σ₁ Σ₂} (t : Ty Σ₁) := Accessibility Σ₁ Σ₂ -> Ty Σ₂.
+Definition Persistent {Σ₁ Σ₂} (t : Ty Σ₁) : Accessibility Σ₁ Σ₂ -> Ty Σ₂.
+Proof. intro. apply Ty_bool. Qed. (* TODO: dubious at best *)
+
+(*
+Definition Persistent' {A} : Valid (Impl A (Box A)).
+Proof. cbv in *. intros. destruct H eqn:?. apply X. apply fresh in H.
+ *)
 
 Definition T {A} := fun (Σ : Ctx nat) (a : Box A Σ) => a Σ (refl Σ).
 
@@ -97,36 +103,42 @@ Proof.
   - apply T in f. unfold Impl in f. apply f. apply v.
   - eapply C_exi. eapply bind.
     + apply C.
-    + apply _4 in f. cbv in *. intuition. apply (f _ (fresh Σ i Σ (refl Σ)) _ H X).
+    + apply _4 in f. cbv in *. intros. apply (f _ (fresh _ _ _ (refl Σ)) _ H X).
 Show Proof.
 Qed.
 
-(* TODO: will need new notation that includes ω *)
-(* TODO: possibly find notation in Katamaran codebase *)
-Notation "x <- ma ;; mb" :=
+    Local Notation "[ ω ] x <- ma ;; mb" :=
+      (bind ma (fun _ ω x => mb))
+        (at level 80, x at next level,
+          ma at next level, mb at level 200,
+          right associativity).
+
+    (* Notation "x <- ma ;; mb" :=
         (bind ma (fun x => mb))
           (at level 80, ma at next level, mb at level 200, right associativity).
 Notation "ma ;; mb" := (bind ma (fun _ => mb)) (at level 80, right associativity).
 Notation "' x <- ma ;; mb" :=
         (bind ma (fun x => mb))
           (at level 80, x pattern, ma at next level, mb at level 200, right associativity,
-           format "' x  <-  ma  ;;  mb").
+       format "' x  <-  ma  ;;  mb"). *)
 
 Definition Unit (Σ : Ctx nat) := unit.
 
 Check Unit.
 
-Definition assert {Σ} t1 t2 := C_eqc Ty Σ t1 t2 (C_val _ _ Unit). (* TODO *)
+Definition assert {Σ} t1 t2 := C_eqc Unit Σ t1 t2 (C_val Unit Σ tt). (* TODO *)
 
 Fixpoint infer' {Σ} (Γ : Env Σ) (expression : expr) : Cstr Ty Σ :=
   match expression with
   | v_true => C_val Ty Σ (Ty_bool Σ)
   | v_false => C_val Ty Σ (Ty_bool Σ)
   | e_if cnd coq alt =>
-      t_cnd <- infer' Γ cnd ;;
-      t_coq <- infer' Γ coq ;;
-      t_alt <- infer' Γ alt ;;
-      C_eqc Ty Σ t_coq t_alt (C_eqc Ty Σ t_cnd (Ty_bool Σ) (C_val Ty Σ t_cnd))
+      [ ω₁ ] t_cnd <- infer' Γ cnd ;;
+      [ ω₂ ] t_coq <- infer' Γ coq ;;
+      [ ω₃ ] t_alt <- infer' Γ alt ;;
+      [ ω₄ ] _ <- assert ((Persistent t_cnd) ω₁) (Ty_bool _) ;;
+       (* [ ω₅ ] _ <- assert t_coq t_alt ;; *)
+      C_val Ty _ ((Persistent t_cnd) ω₄)
   | _ => C_fls Ty Σ
   end.
 
