@@ -66,19 +66,10 @@ Definition T {A} := fun (Σ : Ctx nat) (a : Box A Σ) => a Σ (refl Σ).
 Check T.
 
 Definition trans {Σ₁ Σ₂ Σ₃} (w12 : Accessibility Σ₁ Σ₂) (w23 : Accessibility Σ₂ Σ₃) : Accessibility Σ₁ Σ₃.
-Proof.
-  destruct w12, w23 eqn:?.
-  - constructor.
-  - apply w23.
-  - admit. (* TODO *)
-  - admit. (* TODO *)
-Admitted.
+Proof. induction w23. apply w12. apply fresh. apply IHw23. Qed.
 
 Definition _4 {A} : Valid (Impl (Box A) (Box (Box A))).
-Proof. unfold Valid. intros. unfold Impl. intros. unfold Box. intros.
-       apply X. eapply trans. apply H. apply H0.
-Show Proof.
-Qed.
+Proof. cbv in *. intros.  apply X. eapply trans. apply H. apply H0. Show Proof. Qed.
 
 Check _4.
 
