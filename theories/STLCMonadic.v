@@ -97,14 +97,9 @@ Proof.
   - apply T in f. unfold Impl in f. apply f. apply v.
   - eapply C_exi. eapply bind.
     + apply C.
-    + apply (_4 Σ Σ (Σ ▻ i)) in f. unfold Box. intros.
-      assert (HSame: (Σ ▻ i) = Σ').
-      { admit. }
-      rewrite <- HSame. apply f.
-      apply refl.
-      apply fresh. apply refl.
+    + apply _4 in f. cbv in *. intuition. apply (f _ (fresh Σ i Σ (refl Σ)) _ H X).
 Show Proof.
-Admitted.
+Qed.
 
 (* TODO: will need new notation that includes ω *)
 (* TODO: possibly find notation in Katamaran codebase *)
