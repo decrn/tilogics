@@ -74,11 +74,11 @@ Proof.
   - admit. (* TODO *)
 Admitted.
 
-Definition _4 {A} (Σ₁ Σ₂ Σ₃ : Ctx nat)
-                  (a : Box A Σ₁)
-                  (w12 : Accessibility Σ₁ Σ₂)
-                  (w23 : Accessibility Σ₂ Σ₃)
-  := a Σ₃ (trans w12 w23).
+Definition _4 {A} : Valid (Impl (Box A) (Box (Box A))).
+Proof. unfold Valid. intros. unfold Impl. intros. unfold Box. intros.
+       apply X. eapply trans. apply H. apply H0.
+Show Proof.
+Qed.
 
 Check _4.
 
