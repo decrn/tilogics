@@ -56,16 +56,21 @@ Definition Impl (A B : Ctx nat -> Type) : Ctx nat -> Type :=
   fun Σ => (A Σ) -> (B Σ).
 
 (* □ A *)
-Definition Box A Σ := forall Σ', Accessibility Σ Σ' -> A Σ'.
+Definition Box A (Σ : Ctx nat) := forall Σ', Accessibility Σ Σ' -> A Σ'.
 
 (* _[_] *)
-Definition Persistent {Σ₁ Σ₂} (t : Ty Σ₁) : Accessibility Σ₁ Σ₂ -> Ty Σ₂.
-Proof. intro. apply Ty_bool. Qed. (* TODO: dubious at best *)
+Definition Persistent' : Valid (Impl Ty (Box Ty)).
+Proof. cbv in *. intros. Abort.
 
-(*
-Definition Persistent' {A} : Valid (Impl A (Box A)).
-Proof. cbv in *. intros. destruct H eqn:?. apply X. apply fresh in H.
- *)
+Definition Persistent {Σ₁ Σ₂} (t : Ty Σ₁) {w : Accessibility Σ₁ Σ₂} : Ty Σ₂.
+Proof. cbv in *. intros. apply Ty_bool. Qed.
+
+Definition Persistent'' : Valid (Impl Ty (Box Ty)) :=
+  fun w0 x w1 ω01 =>
+    match ω01 with
+    | refl _ => x
+    | fresh _ α Σ _ => Ty_bool (Σ ▻ α)
+    end.
 
 Definition T {A} := fun (Σ : Ctx nat) (a : Box A Σ) => a Σ (refl Σ).
 
@@ -79,8 +84,8 @@ Proof. cbv in *. intros.  apply X. eapply trans. apply H. apply H0. Show Proof. 
 
 Check _4.
 
-
 Print Scopes.
+
 Fixpoint value {X: Type} (var : string) (ctx : list (string * X)) : option X :=
   match ctx with
   | nil => None
@@ -113,15 +118,6 @@ Qed.
           ma at next level, mb at level 200,
           right associativity).
 
-    (* Notation "x <- ma ;; mb" :=
-        (bind ma (fun x => mb))
-          (at level 80, ma at next level, mb at level 200, right associativity).
-Notation "ma ;; mb" := (bind ma (fun _ => mb)) (at level 80, right associativity).
-Notation "' x <- ma ;; mb" :=
-        (bind ma (fun x => mb))
-          (at level 80, x pattern, ma at next level, mb at level 200, right associativity,
-       format "' x  <-  ma  ;;  mb"). *)
-
 Definition Unit (Σ : Ctx nat) := unit.
 
 Check Unit.
@@ -133,12 +129,26 @@ Fixpoint infer' {Σ} (Γ : Env Σ) (expression : expr) : Cstr Ty Σ :=
   | v_true => C_val Ty Σ (Ty_bool Σ)
   | v_false => C_val Ty Σ (Ty_bool Σ)
   | e_if cnd coq alt =>
-      [ ω₁ ] t_cnd <- infer' Γ cnd ;;
+      [ ω₁ ] t_cnd <- infer' Γ cnd ;; (*
       [ ω₂ ] t_coq <- infer' Γ coq ;;
-      [ ω₃ ] t_alt <- infer' Γ alt ;;
-      [ ω₄ ] _ <- assert ((Persistent t_cnd) ω₁) (Ty_bool _) ;;
+      [ ω₃ ] t_alt <- infer' Γ alt ;; *)
+      [ ω₄ ] _ <- assert t_cnd (Ty_bool _) ;;
        (* [ ω₅ ] _ <- assert t_coq t_alt ;; *)
-      C_val Ty _ ((Persistent t_cnd) ω₄)
+      C_val Ty _ (@Persistent _ _ t_cnd ω₄)
+  | _ => C_fls Ty Σ
+  end.
+
+Fixpoint infer'' {Σ} (Γ : Env Σ) (expression : expr) : Cstr Ty Σ :=
+  match expression with
+  | v_true => C_val Ty Σ (Ty_bool Σ)
+  | v_false => C_val Ty Σ (Ty_bool Σ)
+  | e_if cnd coq alt =>
+      [ ω₁ ] t_cnd <- infer'' Γ cnd ;;
+      [ ω₂ ] t_coq <- infer'' Γ coq ;; (* needs even more PERSISTENCY!!!, find where to persist ω₂ from Σ -> \c0 *)
+      [ ω₃ ] t_alt <- infer'' Γ alt ;;
+      [ ω₄ ] _ <- assert (Persistent t_cnd) (Ty_bool _) ;;
+      [ ω₅ ] _ <- assert (Persistent t_coq) (Persistent t_alt) ;;
+      C_val Ty _ (Persistent t_coq)
   | _ => C_fls Ty Σ
   end.
 
