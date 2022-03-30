@@ -1,4 +1,11 @@
-Require Import List.
+(* TODO: Proof Persistent_Env
+   TODO: Proof Persistent (without the ')
+   TODO: define infer for the other cases
+   TODO: read ch 5 in paper for refinement proof *)
+
+
+
+   Require Import List.
 Import ListNotations.
 Require Import String.
 From MasterThesis Require Import
@@ -60,10 +67,19 @@ Definition Box A (Σ : Ctx nat) := forall Σ', Accessibility Σ Σ' -> A Σ'.
 
 (* _[_] *)
 Definition Persistent' : Valid (Impl Ty (Box Ty)).
-Proof. cbv in *. intros. Abort.
+Proof. cbv in *. intros. Admitted.
 
-Definition Persistent {Σ₁ Σ₂} (t : Ty Σ₁) {w : Accessibility Σ₁ Σ₂} : Ty Σ₂.
-Proof. cbv in *. intros. apply Ty_bool. Qed.
+Definition Persistent_Env : Valid (Impl Env (Box Env)).
+Admitted.
+
+Fixpoint Persistent {Σ₁ Σ₂} (t : Ty Σ₁) {w : Accessibility Σ₁ Σ₂} {struct t} : Ty Σ₂.
+Proof. cbv in *. intros. destruct t eqn:?.
+  - apply Ty_bool.
+  - constructor 2;
+    eapply Persistent. apply t0_1. apply w. apply t0_2. apply w.
+  - constructor 3 with i. admit.
+Show Proof. (* Defined, not Qed *)
+Admitted.
 
 Definition Persistent'' : Valid (Impl Ty (Box Ty)) :=
   fun w0 x w1 ω01 =>
@@ -77,10 +93,10 @@ Definition T {A} := fun (Σ : Ctx nat) (a : Box A Σ) => a Σ (refl Σ).
 Check T.
 
 Definition trans {Σ₁ Σ₂ Σ₃} (w12 : Accessibility Σ₁ Σ₂) (w23 : Accessibility Σ₂ Σ₃) : Accessibility Σ₁ Σ₃.
-Proof. induction w23. apply w12. apply fresh. apply IHw23. Qed.
+Proof. induction w23. apply w12. apply fresh. apply IHw23. Defined.
 
 Definition _4 {A} : Valid (Impl (Box A) (Box (Box A))).
-Proof. cbv in *. intros.  apply X. eapply trans. apply H. apply H0. Show Proof. Qed.
+Proof. cbv in *. intros.  apply X. eapply trans. apply H. apply H0. Show Proof. Defined.
 
 Check _4.
 
@@ -110,7 +126,9 @@ Proof.
     + apply C.
     + apply _4 in f. cbv in *. intros. apply (f _ (fresh _ _ _ (refl Σ)) _ H X).
 Show Proof.
-Qed.
+Defined.
+
+Eval cbv [bind] in @bind.
 
     Local Notation "[ ω ] x <- ma ;; mb" :=
       (bind ma (fun _ ω x => mb))
@@ -138,17 +156,20 @@ Fixpoint infer' {Σ} (Γ : Env Σ) (expression : expr) : Cstr Ty Σ :=
   | _ => C_fls Ty Σ
   end.
 
+Check Persistent_Env.
+
 Fixpoint infer'' {Σ} (Γ : Env Σ) (expression : expr) : Cstr Ty Σ :=
   match expression with
   | v_true => C_val Ty Σ (Ty_bool Σ)
   | v_false => C_val Ty Σ (Ty_bool Σ)
   | e_if cnd coq alt =>
       [ ω₁ ] t_cnd <- infer'' Γ cnd ;;
-      [ ω₂ ] t_coq <- infer'' Γ coq ;; (* needs even more PERSISTENCY!!!, find where to persist ω₂ from Σ -> \c0 *)
-      [ ω₃ ] t_alt <- infer'' Γ alt ;;
-      [ ω₄ ] _ <- assert (Persistent t_cnd) (Ty_bool _) ;;
+      [ ω₂ ] t_coq <- infer'' ((Persistent_Env _ Γ) _ ω₁) coq ;; (* needs even more PERSISTENCY!!!, find where to persist ω₂ from Σ -> \c0 *)
+      [ ω₃ ] t_alt <- infer'' Γ alt ;; (* TODO: lift Γ into right world *)
+      [ ω₄ ] _ <- assert ((Persistent' _ t_cnd) _ ω₂) (Ty_bool _) ;;
       [ ω₅ ] _ <- assert (Persistent t_coq) (Persistent t_alt) ;;
-      C_val Ty _ (Persistent t_coq)
+         C_val Ty _ (Persistent t_coq) *)
+      C_fls Ty _
   | _ => C_fls Ty Σ
   end.
 
