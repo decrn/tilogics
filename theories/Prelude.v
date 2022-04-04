@@ -123,18 +123,18 @@ Module option.
     - destruct o as [a|]; [ now exists a | discriminate ].
   Qed.
 
-  (* (* Not lazy in (a : option A). Avoid! *) *)
-  (* Definition ap {A B} (f : option (A -> B)) (a : option A) : option B := *)
-  (*   match f with *)
-  (*   | Some f => map f a *)
-  (*   | None => None *)
-  (*   end. *)
+  (* Not lazy in (a : option A). Avoid! *)
+  Definition ap {A B} (f : option (A -> B)) (a : option A) : option B :=
+    match f with
+    | Some f => map f a
+    | None => None
+    end.
 
-  (* Local Notation aplazy f a := *)
-  (*   (match f with *)
-  (*    | Some g => map g a *)
-  (*    | None   => None *)
-  (*    end). *)
+  Local Notation aplazy f a :=
+    (match f with
+     | Some g => map g a
+     | None   => None
+     end).
 
   (* Variant of Bool.reflect and BoolSpec for options, i.e.
      a weakest pre without effect observation. *)
@@ -231,18 +231,18 @@ Module option.
     spec S N (map f o) <-> spec (fun a => S (f a)) N o.
   Proof. do 2 rewrite spec_match; now destruct o. Qed.
 
-  (* Lemma spec_ap {A B S N} (f : option (A -> B)) (o : option A) : *)
-  (*   spec S N (ap f o) <-> *)
-  (*   spec (fun f => spec (fun a => S (f a)) N o) N f. *)
-  (* Proof. *)
-  (*   do 2 rewrite spec_match. destruct f; auto. *)
-  (*   rewrite spec_match; now destruct o. *)
-  (* Qed. *)
+  Lemma spec_ap {A B S N} (f : option (A -> B)) (o : option A) :
+    spec S N (ap f o) <->
+    spec (fun f => spec (fun a => S (f a)) N o) N f.
+  Proof.
+    do 2 rewrite spec_match. destruct f; try easy.
+    rewrite spec_match; now destruct o.
+  Qed.
 
-  (* Lemma spec_aplazy {A B S N} (f : option (A -> B)) (o : option A) : *)
-  (*   spec S N (aplazy f o) <-> *)
-  (*   spec (fun f => spec (fun a => S (f a)) N o) N f. *)
-  (* Proof. apply spec_ap. Qed. *)
+  Lemma spec_aplazy {A B S N} (f : option (A -> B)) (o : option A) :
+    spec S N (aplazy f o) <->
+    spec (fun f => spec (fun a => S (f a)) N o) N f.
+  Proof. apply spec_ap. Qed.
 
   Lemma spec_monotonic {A} (S1 S2 : A -> Prop) (N1 N2 : Prop)
     (fS : forall a, S1 a -> S2 a) (fN: N1 -> N2) :
@@ -250,50 +250,61 @@ Module option.
       spec S1 N1 o -> spec S2 N2 o.
   Proof. intros ? []; constructor; auto. Qed.
 
+  Lemma spec_proper {A} (S1 S2 : A -> Prop) (N1 N2 : Prop)
+    (fS : forall a, S1 a <-> S2 a) (fN: N1 <-> N2) :
+    forall (o : option A),
+      spec S1 N1 o <-> spec S2 N2 o.
+  Proof. split; apply spec_monotonic; intuition. Qed.
+
   Lemma wp_map {A B S} (f : A -> B) (o : option A) :
     wp S (map f o) <-> wp (fun a => S (f a)) o.
   Proof. do 2 rewrite wp_match; now destruct o. Qed.
 
-  (* Lemma wp_ap {A B S} (f : option (A -> B)) (o : option A) : *)
-  (*   wp S (ap f o) <-> *)
-  (*   wp (fun f => wp (fun a => S (f a)) o) f. *)
-  (* Proof. *)
-  (*   do 2 rewrite wp_match. destruct f; auto. *)
-  (*   rewrite wp_match; now destruct o. *)
-  (* Qed. *)
+  Lemma wp_ap {A B S} (f : option (A -> B)) (o : option A) :
+    wp S (ap f o) <->
+    wp (fun f => wp (fun a => S (f a)) o) f.
+  Proof.
+    do 2 rewrite wp_match. destruct f; try easy.
+    rewrite wp_match; now destruct o.
+  Qed.
 
-  (* Lemma wp_aplazy {A B S} (f : option (A -> B)) (o : option A) : *)
-  (*   wp S (aplazy f o) <-> *)
-  (*   wp (fun f => wp (fun a => S (f a)) o) f. *)
-  (* Proof. apply wp_ap. Qed. *)
+  Lemma wp_aplazy {A B S} (f : option (A -> B)) (o : option A) :
+    wp S (aplazy f o) <->
+    wp (fun f => wp (fun a => S (f a)) o) f.
+  Proof. apply wp_ap. Qed.
 
   Lemma wp_monotonic {A} (S1 S2 : A -> Prop) (fS : forall a, S1 a -> S2 a)  :
     forall (o : option A), wp S1 o -> wp S2 o.
   Proof. intros ? []; constructor; auto. Qed.
 
+  Lemma wp_proper {A} (S1 S2 : A -> Prop) (fS : forall a, S1 a <-> S2 a)  :
+    forall (o : option A), wp S1 o <-> wp S2 o.
+  Proof. split; apply wp_monotonic; intuition. Qed.
+
   Lemma wlp_map {A B S} (f : A -> B) (o : option A) :
     wlp S (map f o) <-> wlp (fun a => S (f a)) o.
   Proof. do 2 rewrite wlp_match; now destruct o. Qed.
 
-  (* Lemma wlp_ap {A B S} (f : option (A -> B)) (o : option A) : *)
-  (*   wlp S (ap f o) <-> *)
-  (*   wlp (fun f => wlp (fun a => S (f a)) o) f. *)
-  (* Proof. *)
-  (*   do 2 rewrite wlp_match. destruct f; auto. *)
-  (*   rewrite wlp_match; now destruct o. *)
-  (* Qed. *)
+  Lemma wlp_ap {A B S} (f : option (A -> B)) (o : option A) :
+    wlp S (ap f o) <->
+    wlp (fun f => wlp (fun a => S (f a)) o) f.
+  Proof.
+    do 2 rewrite wlp_match. destruct f; try easy.
+    rewrite wlp_match; now destruct o.
+  Qed.
 
-  (* Lemma wlp_aplazy {A B S} (f : option (A -> B)) (o : option A) : *)
-  (*   wlp S (aplazy f o) <-> *)
-  (*   wlp (fun f => wlp (fun a => S (f a)) o) f. *)
-  (* Proof. *)
-  (*   do 2 rewrite wlp_match. destruct f; auto. *)
-  (*   rewrite wlp_match; now destruct o. *)
-  (* Qed. *)
+  Lemma wlp_aplazy {A B S} (f : option (A -> B)) (o : option A) :
+    wlp S (aplazy f o) <->
+    wlp (fun f => wlp (fun a => S (f a)) o) f.
+  Proof. apply wlp_ap. Qed.
 
   Lemma wlp_monotonic {A} (S1 S2 : A -> Prop) (fS : forall a, S1 a -> S2 a)  :
     forall (o : option A), wlp S1 o -> wlp S2 o.
   Proof. intros ? []; constructor; auto. Qed.
+
+  Lemma wlp_proper {A} (S1 S2 : A -> Prop) (fS : forall a, S1 a <-> S2 a)  :
+    forall (o : option A), wlp S1 o <-> wlp S2 o.
+  Proof. split; apply wlp_monotonic; intuition. Qed.
 
   Module Import notations.
 
@@ -305,7 +316,7 @@ Module option.
       (bind ma (fun x => mb))
         (at level 80, ma at next level, mb at level 200, right associativity).
     Notation "f <$> a" := (map f a) (at level 40, left associativity).
-    (* Notation "f <*> a" := (ap f a) (at level 40, left associativity). *)
+    Notation "f <*> a" := (aplazy f a) (at level 40, left associativity).
 
   End notations.
 
@@ -321,6 +332,12 @@ Module option.
       | |- wlp _ (bind _ _) => apply wlp_bind_intro
       | H: wp _ ?x |- wp _ ?x => revert H; apply wp_monotonic; intros
       | H: wlp _ ?x |- wlp _ ?x => revert H; apply wlp_monotonic; intros
+      | |- wp _ ?x <-> wp _ ?x => apply wp_proper
+      | |- wlp _ ?x <-> wlp _ ?x => apply wlp_proper
+      | |- context[wp ?S (Some ?x)] => rewrite (@wp_match _ S (Some x))
+      | |- context[wlp ?S (Some ?x)] => rewrite (@wlp_match _ S (Some x))
+      | |- context[wp ?S None] => rewrite (@wp_match _ S None)
+      | |- context[wlp ?S None] => rewrite (@wlp_match _ S None)
       end.
 
   End tactics.

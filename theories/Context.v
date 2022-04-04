@@ -246,6 +246,55 @@ Module ctx.
 
     End All.
 
+    Fixpoint remove (Γ : Ctx B) {b : B} (xIn : In b Γ) : Ctx B :=
+      match xIn with
+      | @in_zero _ Γ => Γ
+      | @in_succ _ _ b' bIn => snoc (remove bIn) b'
+      end.
+    Arguments remove _ [_] _.
+
+    Equations in_thin {b x} {Σ : Ctx B} (bIn : In b Σ) (xIn : In x (remove Σ bIn)) : In x Σ :=
+    | in_zero     , xIn         => in_succ xIn
+    | in_succ bIn , in_zero     => in_zero
+    | in_succ bIn , in_succ xIn => in_succ (in_thin bIn xIn).
+
+    Inductive OccursCheckView {Σ} {x : B} (xIn : In x Σ) : forall y, In y Σ -> Set :=
+    | Same                                 : OccursCheckView xIn xIn
+    | Diff {y} (yIn : In y (remove Σ xIn)) : OccursCheckView xIn (in_thin xIn yIn).
+
+    Equations occurs_check_view {Σ} {x y: B} (xIn : In x Σ) (yIn : In y Σ) : OccursCheckView xIn yIn :=
+    | in_zero     , in_zero     => Same in_zero
+    | in_zero     , in_succ yIn => Diff in_zero yIn
+    | in_succ xIn , in_zero     => Diff (in_succ xIn) in_zero
+    | in_succ xIn , in_succ yIn => match occurs_check_view xIn yIn with
+                                   | Same _     => Same (in_succ xIn)
+                                   | Diff _ yIn => Diff (in_succ xIn) (in_succ yIn)
+                                   end.
+
+    Lemma occurs_check_view_refl {Σ x} (xIn : In x Σ) :
+      occurs_check_view xIn xIn = Same xIn.
+    Proof. induction xIn; cbn; now rewrite ?IHxIn. Qed.
+
+    Lemma occurs_check_view_thin {Σ x y} (xIn : In x Σ) (yIn : In y (remove Σ xIn)) :
+      occurs_check_view xIn (in_thin xIn yIn) = Diff xIn yIn.
+    Proof. induction xIn; [|depelim yIn]; cbn; now rewrite ?IHxIn. Qed.
+
+    Fixpoint length (Γ : Ctx B) : nat :=
+      match Γ with
+      | nil => 0
+      | snoc Γ _ => S (length Γ)
+      end.
+
+    Lemma length_remove {x} (Γ : Ctx B) :
+      forall (xIn : In x Γ),
+        S (length (remove Γ xIn)) = length Γ.
+    Proof.
+      induction xIn using In_ind.
+      - reflexivity.
+      - cbn - [remove].
+        f_equal. apply IHxIn.
+    Qed.
+
   End WithBinding.
 
   Section WithAB.
@@ -277,6 +326,7 @@ Module ctx.
     Notation "[ x ]" := (snoc nil x) : ctx_scope.
     Notation "[ x ; y ; .. ; z ]" :=
       (snoc .. (snoc (snoc nil x) y) .. z) : ctx_scope.
+    Notation "Γ - x" := (@remove _ Γ x _) : ctx_scope.
 
   End notations.
   Import notations.
