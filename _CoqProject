@@ -4,5 +4,6 @@ theories/Context.v
 theories/Environment.v
 theories/Example.v
 theories/Prelude.v
+theories/STLC.v
 theories/STLCMonadic.v
 theories/Unification.v

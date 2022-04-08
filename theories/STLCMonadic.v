@@ -8,74 +8,21 @@ Import ListNotations.
 Require Import String.
 From MasterThesis Require Import
      Context.
+From MasterThesis Require Import
+     STLC.
 Import ctx.notations.
 
-Section Shallow.
-
-  Inductive ty : Type :=
-    | ty_bool : ty
-    | ty_func : ty -> ty -> ty.
-
-  Inductive expr : Type :=
-    (* values *)
-    | v_true  : expr
-    | v_false : expr
-    (* compound expressions *)
-    | e_if    : expr -> expr -> expr -> expr
-    | e_var   : string -> expr
-    | e_absu  : string -> expr -> expr
-    | e_abst  : string -> ty -> expr -> expr
-    | e_app   : expr -> expr -> expr.
-
-  Definition env := list (string * ty).
-
-  Fixpoint value {X: Type} (var : string) (ctx : list (string * X)) : option X :=
-    match ctx with
-    | nil => None
-    | (var', val) :: ctx' =>
-        if (string_dec var var') then Some val else (value var ctx')
-    end.
-
-  Reserved Notation "G |-- E ; T ~> EE"
-              (at level 50).
-
-  Inductive tpb : env -> expr -> ty -> expr -> Prop :=
-    | tpb_false : forall g,
-        g |-- v_false ; ty_bool ~> v_false
-    | tpb_true : forall g,
-        g |-- v_true ; ty_bool ~> v_true
-    | tpb_if : forall g cnd cnd' coq coq' alt alt' t,
-        g |-- cnd ; ty_bool ~> cnd' ->
-        g |-- coq ; t       ~> coq' ->
-        g |-- alt ; t       ~> alt' ->
-        g |-- (e_if cnd coq alt) ; t ~> (e_if cnd' coq' alt')
-    | tpb_var : forall g v vt,
-        value v g = Some vt ->
-        g |-- (e_var v) ; vt ~> (e_var v)
-    | tpb_absu : forall v vt g e e' t,
-        ((v, vt) :: g) |-- e ; t ~> e' ->
-        g |-- (e_absu v e) ; (ty_func vt t) ~> (e_abst v vt e')
-    | tpb_abst : forall v vt g e e' t,
-        ((v, vt) :: g) |-- e ; t ~> e' ->
-        g |-- (e_abst v vt e) ; (ty_func vt t) ~> (e_abst v vt e')
-    | tpb_app : forall g e1 t1 e1' e2 t2 e2',
-        g |-- e1 ; (ty_func t2 t1) ~> e1' ->
-        g |-- e2 ; t2 ~> e2' ->
-        g |-- (e_app e1 e2) ; t1 ~> (e_app e1' e2')
-
-    where "G |-- E ; T ~> EE" := (tpb G E T EE).
-
-  Example ex_typing1 :
-    nil |-- (e_abst "x" ty_bool (e_var "x")) ; (ty_func ty_bool ty_bool) ~> (e_abst "x" ty_bool (e_var "x")).
-  Proof.
-    apply tpb_abst. apply tpb_var. cbn. reflexivity.
-  Qed.
-
-  Example ex_typing2 :
-    nil |-- (e_absu "x" (e_var "x")) ; (ty_func ty_bool ty_bool) ~> (e_abst "x" ty_bool (e_var "x")).
-  Proof.
-    apply tpb_absu. apply tpb_var. cbn. reflexivity.
-  Qed.
+  (* Monadic type inference for STLC is expressed as a computation inside TypeCheckM.
+     Note that STLC requires unification of type variables.
+     These type variables are introduced by the exists_ty computation *)
+  Class TypeCheckM (M : Type -> Type) : Type :=
+    {
+      ret    {A : Type} :   A -> M A ;
+      bind {A B : Type} : M A -> (A -> M B) -> M B ;
+      assert            :  ty -> ty         -> M unit ;
+      fail   {A : Type} : M A ;
+      exists_ty         : M ty ; (* NEW *)
+    }.
 
   Inductive freeM (A : Type) : Type :=
     | bind_assert_free : ty -> ty -> freeM A -> freeM A
@@ -83,32 +30,44 @@ Section Shallow.
     | fail_free : freeM A
     | bind_exists_free : (ty -> freeM A) -> freeM A.
 
-Fixpoint freeM_bind [T1 T2 : Type] (m : freeM T1) (f : T1 -> freeM T2) : freeM T2 :=
-   match m with
-   | ret_free _ a => f a
-   | fail_free _ => fail_free T2
-   | bind_assert_free _ t1 t2 k =>
-       bind_assert_free T2 t1 t2 (freeM_bind k f)
-   | bind_exists_free _ tf =>
-       bind_exists_free T2 (fun t : ty => freeM_bind (tf t) f)
-   end.
-
-  Definition assert (t1 t2 : ty) := bind_assert_free _ t1 t2 (ret_free _ tt).
-  Definition exists_ty : freeM ty := bind_exists_free _ (fun t => ret_free _ t).
-  Definition ret [A : Type] (a : A) := ret_free A a.
-  Definition fail {A : Type} := fail_free A.
-
   Notation "x <- ma ;; mb" :=
-          (freeM_bind ma (fun x => mb))
+          (bind ma (fun x => mb))
             (at level 80, ma at next level, mb at level 200, right associativity).
-  Notation "ma ;; mb" := (freeM_bind ma (fun _ => mb)) (at level 80, right associativity).
+  Notation "ma ;; mb" := (bind ma (fun _ => mb)) (at level 80, right associativity).
   Notation "' x <- ma ;; mb" :=
-          (freeM_bind ma (fun x => mb))
+          (bind ma (fun x => mb))
             (at level 80, x pattern, ma at next level, mb at level 200, right associativity,
              format "' x  <-  ma  ;;  mb").
 
+(* This section implements type inference for STLC
+   using a shallow representation of constraints.
+   Essentially, constraints are nothing more than propositions in Coq.
+   This results in a fairly straightforward implementation,
+   but one which is essentially unusable, because we cannot inspect
+   the witnesses for these propositions. This is problematic,
+   because these witnesses are the unified type variables
+   which give the type and the elaboration of the term. *)
+Section Shallow.
 
-  Fixpoint infer (ctx : env) (expression : expr) : freeM (prod ty expr) :=
+  Fixpoint freeM_bind [T1 T2 : Type] (m : freeM T1) (f : T1 -> freeM T2) : freeM T2 :=
+    match m with
+    | ret_free _ a => f a
+    | fail_free _ => fail_free T2
+    | bind_assert_free _ t1 t2 k =>
+        bind_assert_free T2 t1 t2 (freeM_bind k f)
+    | bind_exists_free _ tf =>
+        bind_exists_free T2 (fun t : ty => freeM_bind (tf t) f)
+    end.
+
+  #[global] Instance TC_free : TypeCheckM freeM :=
+    { bind         := freeM_bind ;
+      ret T u      := ret_free T u ;
+      assert t1 t2 := bind_assert_free _ t1 t2 (ret_free _ tt);
+      fail T       := fail_free T;
+      exists_ty    := bind_exists_free _ (fun t => ret_free _ t);
+    }.
+
+  Fixpoint infer {m} `{TypeCheckM m} (ctx : env) (expression : expr) : m (prod ty expr) :=
     match expression with
     | v_false => ret (ty_bool, expression)
     | v_true  => ret (ty_bool, expression)
@@ -139,34 +98,33 @@ Fixpoint freeM_bind [T1 T2 : Type] (m : freeM T1) (f : T1 -> freeM T2) : freeM T
         ret (ty_func t_var t_e, e_abst var t_var e_e)
     end.
 
-Compute (infer nil (e_app (e_abst "x" ty_bool (e_var "x")) v_true)).
-Compute (infer nil (e_app (e_absu "x" (e_var "x")) v_true)).
+  Compute (infer nil (e_app (e_abst "x" ty_bool (e_var "x")) v_true)).
+  Compute (infer nil (e_app (e_absu "x" (e_var "x")) v_true)).
 
-Definition K1 := (e_absu "k1" (e_absu "l" (e_var "k1"))).
-Definition K2 := (e_absu "k2" (e_absu "l" (e_var "k2"))).
-Definition I := (e_absu "i" (e_var "i")).
+  Definition K1 := (e_absu "k1" (e_absu "l" (e_var "k1"))).
+  Definition K2 := (e_absu "k2" (e_absu "l" (e_var "k2"))).
+  Definition I := (e_absu "i" (e_var "i")).
 
-Definition KKI := (e_app K1 (e_app K2 I)).
-Compute (infer nil KKI).
+  Definition KKI := (e_app K1 (e_app K2 I)).
+  Compute (infer nil KKI).
 
+  Fixpoint wlp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) : Prop :=
+    match m with
+    | ret_free _ a => Q a
+    | bind_assert_free _ t1 t2 k => t1 = t2 ->
+        wlp_freeM k Q
+    | fail_free _ => True
+    | bind_exists_free _ tf => forall t : ty, wlp_freeM (tf t) Q
+    end.
 
-Fixpoint wlp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) : Prop :=
-  match m with
-  | ret_free _ a => Q a
-  | bind_assert_free _ t1 t2 k => t1 = t2 ->
-      wlp_freeM k Q
-  | fail_free _ => True
-  | bind_exists_free _ tf => forall t : ty, wlp_freeM (tf t) Q
-  end.
-
-Fixpoint wp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
-  match m with
-  | ret_free _ a => Q a
-  | bind_assert_free _ t1 t2 k => t1 = t2 /\
-      wp_freeM k Q
-  | fail_free _ => False
-  | bind_exists_free _ tf => exists t : ty, wp_freeM (tf t) Q
-  end.
+  Fixpoint wp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
+    match m with
+    | ret_free _ a => Q a
+    | bind_assert_free _ t1 t2 k => t1 = t2 /\
+        wp_freeM k Q
+    | fail_free _ => False
+    | bind_exists_free _ tf => exists t : ty, wp_freeM (tf t) Q
+    end.
 
   Lemma wlp_ty_eqb : forall (t1 t2 : ty) (Q : unit -> Prop),
     wlp_freeM (assert t1 t2) Q <-> (t1 = t2 -> Q tt).
@@ -307,27 +265,6 @@ End Shallow.
 
 Section Symbolic.
 
-  Inductive Ty (Σ : Ctx nat) : Type :=
-    | Ty_bool : Ty Σ
-    | Ty_func : Ty Σ -> Ty Σ -> Ty Σ
-    | Ty_hole : forall (i : nat), i ∈ Σ -> Ty Σ.
-
-  Definition Env Σ := list (string * Ty Σ).
-
-  Inductive Cstr (A : Ctx nat -> Type) (Σ : Ctx nat) : Type :=
-    | C_eqc : Ty Σ -> Ty Σ -> Cstr A Σ -> Cstr A Σ
-    | C_val : A Σ -> Cstr A Σ
-    | C_fls : Cstr A Σ
-    | C_exi : forall (i : nat), Cstr A (Σ ▻ i) -> Cstr A Σ.
-
-  Check Cstr.
-
-  Check Ty.
-
-  Check Ty_bool.
-
-  Check C_fls Ty.
-
   (* Adapted from Katamaran: Symbolic/Worlds.v *)
 
   Inductive Accessibility (Σ₁ : Ctx nat) : Ctx nat -> Type :=
@@ -381,7 +318,7 @@ Section Symbolic.
 
   Print Scopes.
 
-  Fixpoint bind [A B] {Σ} (m : Cstr A Σ) (f : Box (Impl A (Cstr B)) Σ) {struct m} : Cstr B Σ.
+  Fixpoint bind' [A B] {Σ} (m : Cstr A Σ) (f : Box (Impl A (Cstr B)) Σ) {struct m} : Cstr B Σ.
   refine (
     match m with
     | C_eqc _ _ t1 t2 C1 => _
@@ -390,20 +327,20 @@ Section Symbolic.
     | C_exi _ _ i C => _
     end).
   Proof.
-    - apply C_eqc. apply t1. apply t2. eapply bind.
+    - apply C_eqc. apply t1. apply t2. eapply bind'.
       + apply C1.
       + apply f.
     - apply T in f. unfold Impl in f. apply f. apply v.
-    - eapply C_exi. eapply bind.
+    - eapply C_exi. eapply bind'.
       + apply C.
       + apply _4 in f. cbv in *. intros. apply (f _ (fresh _ _ _ (refl Σ)) _ H X).
   Show Proof.
   Defined.
 
-  Eval cbv [bind] in @bind.
+  Eval cbv [bind] in @bind'.
 
       Local Notation "[ ω ] x <- ma ;; mb" :=
-        (bind ma (fun _ ω x => mb))
+        (bind' ma (fun _ ω x => mb))
           (at level 80, x at next level,
             ma at next level, mb at level 200,
             right associativity).
