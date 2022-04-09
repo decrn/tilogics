@@ -11,7 +11,6 @@ Import ctx.notations.
 (*      extended with Booleans         *)
 (* =================================== *)
 
-
 (* ===== Language ===== *)
 
   Inductive ty : Type :=
@@ -98,4 +97,5 @@ Section Symbolic.
     | C_val : A Σ -> Cstr A Σ
     | C_fls : Cstr A Σ
     | C_exi : forall (i : nat), Cstr A (Σ ▻ i) -> Cstr A Σ.
+
 End Symbolic.

@@ -1,7 +1,8 @@
 (* TODO: Proof Persistent_Env
    TODO: Use implicit argument def. of Persistent
    TODO: define infer for the other cases
-   TODO: Refinement proof of deep embedding *)
+   TODO: Refinement proof of deep embedding
+   TODO: Prenex form of constraints *)
 
 Require Import List.
 Import ListNotations.
@@ -128,7 +129,7 @@ Section Shallow.
 
   Lemma wlp_ty_eqb : forall (t1 t2 : ty) (Q : unit -> Prop),
     wlp_freeM (assert t1 t2) Q <-> (t1 = t2 -> Q tt).
-  Proof.  destruct t1, t2; cbn; intuition discriminate.  Qed.
+  Proof. destruct t1, t2; cbn; intuition discriminate.  Qed.
 
   Lemma wlp_exists_type : forall (Q: ty -> Prop),
     wlp_freeM (exists_ty) Q <-> (forall t : ty, Q t).
@@ -282,11 +283,19 @@ Section Symbolic.
   Definition Box A (Σ : Ctx nat) := forall Σ', Accessibility Σ Σ' -> A Σ'.
 
   (* _[_] *)
-  Definition Persistent' : Valid (Impl Ty (Box Ty)).
-  Proof. cbv in *. intros. Admitted.
-
-  Definition Persistent_Env : Valid (Impl Env (Box Env)).
+  Definition transient : forall (Σ Σ' : Ctx nat) (i : nat),
+      Accessibility Σ Σ' ->
+      i ∈ Σ ->
+      i ∈ Σ'.
   Admitted.
+
+  Definition Persistent' : Valid (Impl Ty (Box Ty)).
+  Proof. cbv in *. intros. induction H.
+    - apply Ty_bool.
+    - constructor 2. apply IHTy1. apply IHTy2.
+    - constructor 3 with i. apply transient with Σ. apply H0. apply i0.
+  Qed.
+
 
   Fixpoint Persistent {Σ₁ Σ₂} (t : Ty Σ₁) {w : Accessibility Σ₁ Σ₂} {struct t} : Ty Σ₂.
   Proof. cbv in *. intros. destruct t eqn:?.
@@ -296,6 +305,10 @@ Section Symbolic.
     - constructor 3 with i. admit.
   Show Proof. (* Defined, not Qed *)
   Admitted.
+
+  Definition Persistent_Env : Valid (Impl Env (Box Env)).
+  Admitted.
+
 
   Definition Persistent'' : Valid (Impl Ty (Box Ty)) :=
     fun w0 x w1 ω01 =>
@@ -353,7 +366,11 @@ Section Symbolic.
 
   Check Persistent_Env.
 
-  (*
+  Local Notation "<[ G ~ w ]>" := ((Persistent_Env _ G) _ w).
+
+  Local Notation "w1 .> w2" := (trans w1 w2) (at level 80).
+
+  Local Notation "<{ v ~ w }>" := (@Persistent _ _ v w).
 
   Fixpoint infer'' {Σ} (Γ : Env Σ) (expression : expr) : Cstr Ty Σ :=
     match expression with
@@ -361,18 +378,20 @@ Section Symbolic.
     | v_false => C_val Ty Σ (Ty_bool Σ)
     | e_if cnd coq alt =>
         [ ω₁ ] t_cnd <- infer'' Γ cnd ;;
-        [ ω₂ ] t_coq <- infer'' ((Persistent_Env _ Γ) _ ω₁) coq ;; (* needs even more PERSISTENCY!!!, find where to persist ω₂ from Σ -> \c0 *)
-        [ ω₃ ] t_alt <- infer'' Γ alt ;; (* TODO: lift Γ into right world *)
-        [ ω₄ ] _ <- assert ((Persistent' _ t_cnd) _ ω₂) (Ty_bool _) ;;
-        [ ω₅ ] _ <- assert (Persistent t_coq) (Persistent t_alt) ;;
-           C_val Ty _ (Persistent t_coq)
-        C_fls Ty _
+        [ ω₂ ] _     <- assert' t_cnd (Ty_bool _) ;;
+        [ ω₃ ] t_coq <- infer'' <[ <[ Γ ~ ω₁ ]> ~ ω₂ ]> coq ;;
+        [ ω₄ ] t_alt <- infer'' <[ <[ Γ ~ ω₁ ]> ~ ω₂ .> ω₃ ]> alt ;;
+        [ ω₅ ] _     <- assert' <{ t_coq ~ ω₄ }>  <{ t_alt ~ (refl _) }> ;;
+           C_val Ty _ <{ t_coq ~ ω₄ .> ω₅ }>
+    | e_var var =>
+        match (value var Γ) with
+        | Some t_var => C_val Ty _ t_var
+        | None => C_fls Ty Σ
+        end
     | _ => C_fls Ty Σ
     end.
 
-  Compute infer' nil (e_if v_true v_true v_false).
+  Compute infer'' nil (e_if v_true v_true v_false).
   Compute C_eqc Ty ε (Ty_bool ε) (Ty_bool ε) (C_val Ty ε (Ty_bool ε)).
-
-  *)
 
 End Symbolic.
