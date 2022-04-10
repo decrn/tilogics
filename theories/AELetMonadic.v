@@ -235,11 +235,11 @@ Check (option_writer (list cstr)).
     match ma with
     | None => None
     | Some ma' => let (cs, x) := ma' in
-                 match (f x) with
-                 | None => None
-                 | Some mb => let (cs', y) := mb in
-                              Some (cs ++ cs', y)
-                 end
+                  match (f x) with
+                  | None => None
+                  | Some mb => let (cs', y) := mb in
+                               Some (cs ++ cs', y)
+                  end
     end ;
   ret T u := Some (nil, u) ;
   assert t1 t2 := Some ([(CEq t1 t2)], tt) ; (* ( [t1 ~~ t2] , () ) *)
