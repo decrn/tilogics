@@ -289,33 +289,39 @@ Section Symbolic.
       i ∈ Σ'.
   Admitted.
 
-  Definition Persistent' : Valid (Impl Ty (Box Ty)).
-  Proof. cbv in *. intros. induction H.
-    - apply Ty_bool.
-    - constructor 2. apply IHTy1. apply IHTy2.
-    - constructor 3 with i. apply transient with Σ. apply H0. apply i0.
-  Qed.
-
-
   Fixpoint Persistent {Σ₁ Σ₂} (t : Ty Σ₁) {w : Accessibility Σ₁ Σ₂} {struct t} : Ty Σ₂.
   Proof. cbv in *. intros. destruct t eqn:?.
     - apply Ty_bool.
     - constructor 2;
       eapply Persistent. apply t0_1. apply w. apply t0_2. apply w.
-    - constructor 3 with i. admit.
-  Show Proof. (* Defined, not Qed *)
-  Admitted.
+    - constructor 3 with i. apply transient with Σ₁. apply w. apply i0.
+  Show Proof.
+  Defined.
 
+  Definition Persistent' : Valid (Impl Ty (Box Ty)).
+  Proof. cbv in *. intros. induction H.
+    - apply Ty_bool.
+    - constructor 2. apply IHTy1. apply IHTy2.
+    - constructor 3 with i. apply transient with Σ. apply H0. apply i0.
+  Show Proof.
+  Defined.
+
+  (* Not a valid fixp because e is non-decreasing *)
+  (*
+  Fixpoint Persistent_Env {S S' : Ctx nat} (e : Env S) {w : Accessibility S S'} {struct e} : Env S'.
+  Proof. cbv in *. intros. induction w.
+    - apply e.
+    - apply (fresh _ α) in w. eapply Persistent_Env. apply e. apply w.
+      Show Proof.
+      Defined. *)
+
+  (* This proof looks dodgy *)
   Definition Persistent_Env : Valid (Impl Env (Box Env)).
-  Admitted.
-
-
-  Definition Persistent'' : Valid (Impl Ty (Box Ty)) :=
-    fun w0 x w1 ω01 =>
-      match ω01 with
-      | refl _ => x
-      | fresh _ α Σ _ => Ty_bool (Σ ▻ α)
-      end.
+  Proof. cbv in *. intros. induction H.
+    - apply nil.
+    - apply IHlist.
+  Show Proof.
+  Defined.
 
   Definition T {A} := fun (Σ : Ctx nat) (a : Box A Σ) => a Σ (refl Σ).
 
@@ -362,7 +368,7 @@ Section Symbolic.
 
   Check Unit.
 
-  Definition assert' {Σ} t1 t2 := C_eqc Unit Σ t1 t2 (C_val Unit Σ tt). (* TODO *)
+  Definition assert' {Σ} t1 t2 := C_eqc Unit Σ t1 t2 (C_val Unit Σ tt).
 
   Check Persistent_Env.
 
@@ -372,15 +378,17 @@ Section Symbolic.
 
   Local Notation "<{ v ~ w }>" := (@Persistent _ _ v w).
 
-  Fixpoint infer'' {Σ} (Γ : Env Σ) (expression : expr) : Cstr Ty Σ :=
+  Fixpoint infer'' {Σ : Ctx nat} (Γ : Env Σ) (expression : expr) {struct expression} : Cstr Ty Σ.
+  Proof.
+  refine (
     match expression with
     | v_true => C_val Ty Σ (Ty_bool Σ)
     | v_false => C_val Ty Σ (Ty_bool Σ)
     | e_if cnd coq alt =>
-        [ ω₁ ] t_cnd <- infer'' Γ cnd ;;
+        [ ω₁ ] t_cnd <- infer'' _ Γ cnd ;;
         [ ω₂ ] _     <- assert' t_cnd (Ty_bool _) ;;
-        [ ω₃ ] t_coq <- infer'' <[ <[ Γ ~ ω₁ ]> ~ ω₂ ]> coq ;;
-        [ ω₄ ] t_alt <- infer'' <[ <[ Γ ~ ω₁ ]> ~ ω₂ .> ω₃ ]> alt ;;
+        [ ω₃ ] t_coq <- infer'' _ <[ <[ Γ ~ ω₁ ]> ~ ω₂ ]> coq ;;
+        [ ω₄ ] t_alt <- infer'' _ <[ <[ Γ ~ ω₁ ]> ~ ω₂ .> ω₃ ]> alt ;;
         [ ω₅ ] _     <- assert' <{ t_coq ~ ω₄ }>  <{ t_alt ~ (refl _) }> ;;
            C_val Ty _ <{ t_coq ~ ω₄ .> ω₅ }>
     | e_var var =>
@@ -388,9 +396,16 @@ Section Symbolic.
         | Some t_var => C_val Ty _ t_var
         | None => C_fls Ty Σ
         end
+    | e_app f a =>
+        [ w1 ] t_co <- _ ;; (* TODO: need an existential here, but what value for i? *)
+        [ w2 ] t_do <- infer'' _ <[ Γ ~ w1 ]> a ;;
+        [ w3 ] t_fn <- infer'' _ <[ Γ ~ w1 .> w2 ]> f ;;
+        [ w4 ] _    <- assert' t_fn <{ (Ty_func _ t_do <{ t_co ~ w2 }> ) ~ w3 }> ;;
+           C_val Ty _ <{ t_co ~ w2 .> w3 .> w4 }>
     | _ => C_fls Ty Σ
-    end.
-
+    end).
+  eapply C_exi. admit.
+  Admitted.
   Compute infer'' nil (e_if v_true v_true v_false).
   Compute C_eqc Ty ε (Ty_bool ε) (Ty_bool ε) (C_val Ty ε (Ty_bool ε)).
 
