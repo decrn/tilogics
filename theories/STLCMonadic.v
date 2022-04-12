@@ -1,9 +1,3 @@
-(* TODO: Proof Persistent_Env
-   TODO: Use implicit argument def. of Persistent
-   TODO: define infer for the other cases
-   TODO: Refinement proof of deep embedding
-   TODO: Prenex form of constraints *)
-
 Require Import List.
 Import ListNotations.
 Require Import String.
@@ -264,6 +258,10 @@ Section Shallow.
 
 End Shallow.
 
+(* TODO: define infer for the other cases
+   TODO: Refinement proof of deep embedding
+   TODO: Prenex form of constraints *)
+
 Section Symbolic.
 
   (* Adapted from Katamaran: Symbolic/Worlds.v *)
@@ -287,7 +285,11 @@ Section Symbolic.
       Accessibility Σ Σ' ->
       i ∈ Σ ->
       i ∈ Σ'.
-  Admitted.
+  Proof.
+    intros. induction H.
+    - apply H0.
+    - Search "x ∈ x". apply ctx.in_succ. apply IHAccessibility.
+  Qed.
 
   Fixpoint Persistent {Σ₁ Σ₂} (t : Ty Σ₁) {w : Accessibility Σ₁ Σ₂} {struct t} : Ty Σ₂.
   Proof. cbv in *. intros. destruct t eqn:?.
@@ -378,6 +380,12 @@ Section Symbolic.
 
   Local Notation "<{ v ~ w }>" := (@Persistent _ _ v w).
 
+  Fixpoint convert (t : ty) (Σ : Ctx nat) : Ty Σ :=
+    match t with
+    | ty_bool => Ty_bool Σ
+    | ty_func do co => Ty_func Σ (convert do Σ) (convert co Σ)
+    end.
+
   Fixpoint infer'' {Σ : Ctx nat} (Γ : Env Σ) (expression : expr) {struct expression} : Cstr Ty Σ.
   Proof.
   refine (
@@ -402,11 +410,21 @@ Section Symbolic.
         [ w3 ] t_fn <- infer'' _ <[ Γ ~ w1 .> w2 ]> f ;;
         [ w4 ] _    <- assert' t_fn <{ (Ty_func _ t_do <{ t_co ~ w2 }> ) ~ w3 }> ;;
            C_val Ty _ <{ t_co ~ w2 .> w3 .> w4 }>
-    | _ => C_fls Ty Σ
+    | e_abst var t_var e =>
+        let t_var' := (convert t_var Σ) in
+        [ w1 ] t_e <- infer'' _ ((var, t_var') :: Γ) e ;;
+          C_val Ty _ (Ty_func _ <{ t_var' ~ w1 }> t_e)
+    | e_absu var e =>
+        [ w1 ] t_var <- _ ;;
+        [ w2 ] t_e <- infer'' _ <[ ((var, t_var) :: Γ) ~ w1 ]> e ;;
+          C_val Ty _ (Ty_func _ <{ t_var ~ w1 .> w2 }> t_e)
     end).
-  eapply C_exi. admit.
+    - eapply C_exi. admit.
+    - eapply C_exi. admit.
   Admitted.
+
   Compute infer'' nil (e_if v_true v_true v_false).
   Compute C_eqc Ty ε (Ty_bool ε) (Ty_bool ε) (C_val Ty ε (Ty_bool ε)).
 
 End Symbolic.
+
