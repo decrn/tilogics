@@ -293,7 +293,15 @@ Section Symbolic.
 
   Eval cbv [transient Accessibility_rec Accessibility_rect] in @transient.
 
-  Definition Persistent : Valid (Impl Ty (Box Ty)).
+  Check Ty.
+  Check Env.
+  Check Cstr.
+
+
+  Class Persistent (A : Ctx nat -> Type) : Type :=
+  { persist : Valid (Impl A (Box A)) }.
+
+  #[refine] Instance Persistent_Ty : Persistent Ty := { persist := _ }.
   Proof. cbv in *. intros. induction H.
     - constructor 1.
     - constructor 2. apply IHTy1. apply IHTy2.
@@ -301,13 +309,13 @@ Section Symbolic.
   Show Proof.
   Defined.
 
-  Definition Persistent_Env : Valid (Impl Env (Box Env)).
+  #[refine] Instance Persistent_Env : Persistent Env := { persist := _ }.
   Proof. cbv in *. intro Σ. refine (fix F E := _). intros. destruct E.
   - apply nil.
-  - destruct p. apply cons. apply pair. apply s. apply Persistent in t. apply t. apply H. apply F. apply E. apply H.
-  Show Proof.
+  - destruct p. apply cons. apply pair. apply s. apply persist in t. apply t. apply H.
+    apply F. apply E. apply H.
+    Show Proof. (* Something <>< *)
   Defined.
-  Eval cbv [Persistent_Env list_rec list_rect] in @Persistent_Env.
 
   Definition T {A} := fun (Σ : Ctx nat) (a : Box A Σ) => a Σ (refl Σ).
 
@@ -358,11 +366,9 @@ Section Symbolic.
 
   Check Persistent_Env.
 
-  Local Notation "<[ G ~ w ]>" := ((Persistent_Env _ G) _ w).
-
   Local Notation "w1 .> w2" := (trans w1 w2) (at level 80).
 
-  Local Notation "<{ v ~ w }>" := (@Persistent _ v _ w).
+  Local Notation "<{ A ~ w }>" := (persist _ A _ w).
 
   Check exists_ty.
 
@@ -391,8 +397,8 @@ Section Symbolic.
     | e_if cnd coq alt =>
         [ ω₁ ] t_cnd <- infer'' Γ cnd ;;
         [ ω₂ ] _     <- assert' t_cnd (Ty_bool _) ;;
-        [ ω₃ ] t_coq <- infer'' <[ <[ Γ ~ ω₁ ]> ~ ω₂ ]> coq ;;
-        [ ω₄ ] t_alt <- infer'' <[ <[ Γ ~ ω₁ ]> ~ ω₂ .> ω₃ ]> alt ;;
+        [ ω₃ ] t_coq <- infer'' <{ Γ ~ ω₁ .> ω₂ }> coq ;;
+        [ ω₄ ] t_alt <- infer'' <{ Γ ~ ω₁ .> ω₂ .> ω₃ }> alt ;;
         [ ω₅ ] _     <- assert' <{ t_coq ~ ω₄ }>  <{ t_alt ~ (refl _) }> ;;
            C_val Ty _ <{ t_coq ~ ω₄ .> ω₅ }>
     | e_var var =>
@@ -402,8 +408,8 @@ Section Symbolic.
         end
     | e_app f a =>
         [ w1 ] t_co <- exists_Ty Σ ;;
-        [ w2 ] t_do <- infer'' <[ Γ ~ w1 ]> a ;;
-        [ w3 ] t_fn <- infer'' <[ Γ ~ w1 .> w2 ]> f ;;
+        [ w2 ] t_do <- infer'' <{ Γ ~ w1 }> a ;;
+        [ w3 ] t_fn <- infer'' <{ Γ ~ w1 .> w2 }> f ;;
         [ w4 ] _    <- assert' t_fn <{ (Ty_func _ t_do <{ t_co ~ w2 }> ) ~ w3 }> ;;
            C_val Ty _ <{ t_co ~ w2 .> w3 .> w4 }>
     | e_abst var t_var e =>
@@ -412,7 +418,7 @@ Section Symbolic.
           C_val Ty _ (Ty_func _ <{ t_var' ~ w1 }> t_e)
     | e_absu var e =>
         [ w1 ] t_var <- exists_Ty Σ ;;
-        [ w2 ] t_e <- infer'' ((var, t_var) :: <[ Γ ~ w1 ]>) e ;;
+        [ w2 ] t_e <- infer'' ((var, t_var) :: <{ Γ ~ w1 }>) e ;;
           C_val Ty _ (Ty_func _ <{ t_var ~ w2 }> t_e)
     end.
 
