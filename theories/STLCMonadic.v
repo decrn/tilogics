@@ -293,45 +293,22 @@ Section Symbolic.
 
   Eval cbv [transient Accessibility_rec Accessibility_rect] in @transient.
 
-  Fixpoint Persistent {Σ₁ Σ₂} (t : Ty Σ₁) {w : Accessibility Σ₁ Σ₂} {struct t} : Ty Σ₂.
-  Proof. cbv in *. intros. destruct t eqn:?.
-    - apply Ty_bool.
-    - constructor 2;
-      eapply Persistent. apply t0_1. apply w. apply t0_2. apply w.
-    - constructor 3 with i. apply transient with Σ₁. apply w. apply i0.
-  Show Proof.
-  Defined.
-
-  Definition Persistent' : Valid (Impl Ty (Box Ty)).
+  Definition Persistent : Valid (Impl Ty (Box Ty)).
   Proof. cbv in *. intros. induction H.
-    - apply Ty_bool.
+    - constructor 1.
     - constructor 2. apply IHTy1. apply IHTy2.
     - constructor 3 with i. apply transient with Σ. apply H0. apply i0.
   Show Proof.
   Defined.
 
-Print Ty.
-
-  (* Not a valid fixp because e is non-decreasing *)
-  (*
-  Fixpoint Persistent_Env {S S' : Ctx nat} (e : Env S) {w : Accessibility S S'} {struct e} : Env S'.
-  Proof. cbv in *. intros. induction w.
-    - apply e.
-    - apply (fresh _ α) in w. eapply Persistent_Env. apply e. apply w.
-      Show Proof.
-      Defined.
-
-  (* This proof looks dodgy *)
   Definition Persistent_Env : Valid (Impl Env (Box Env)).
-  Proof. cbv in *. intro S. refine (fix F E := _). destruct E eqn:?; intros. apply nil. apply F.  intros. induction H.
-    - apply nil.
-    - apply IHlist.
+  Proof. cbv in *. intro Σ. refine (fix F E := _). intros. destruct E.
+  - apply nil.
+  - destruct p. apply cons. apply pair. apply s. apply Persistent in t. apply t. apply H. apply F. apply E. apply H.
   Show Proof.
   Defined.
   Eval cbv [Persistent_Env list_rec list_rect] in @Persistent_Env.
 
- *)
-  Definition Persistent_Env : Valid (Impl Env (Box Env)). Admitted.
   Definition T {A} := fun (Σ : Ctx nat) (a : Box A Σ) => a Σ (refl Σ).
 
   Check T.
@@ -385,7 +362,7 @@ Print Ty.
 
   Local Notation "w1 .> w2" := (trans w1 w2) (at level 80).
 
-  Local Notation "<{ v ~ w }>" := (@Persistent _ _ v w).
+  Local Notation "<{ v ~ w }>" := (@Persistent _ v _ w).
 
   Check exists_ty.
 
