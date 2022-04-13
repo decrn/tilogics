@@ -62,6 +62,7 @@ Section Shallow.
       exists_ty    := bind_exists_free _ (fun t => ret_free _ t);
     }.
 
+
   Fixpoint infer {m} `{TypeCheckM m} (ctx : env) (expression : expr) : m (prod ty expr) :=
     match expression with
     | v_false => ret (ty_bool, expression)
@@ -258,9 +259,8 @@ Section Shallow.
 
 End Shallow.
 
-(* TODO: define infer for the other cases
-   TODO: Refinement proof of deep embedding
-   TODO: Prenex form of constraints *)
+(* TODO: Refinement proof of deep embedding
+   TODO: Prenex form of constraints, foldr style *)
 
 Section Symbolic.
 
@@ -288,8 +288,10 @@ Section Symbolic.
   Proof.
     intros. induction H.
     - apply H0.
-    - Search "x ∈ x". apply ctx.in_succ. apply IHAccessibility.
-  Qed.
+    - Search "x ∈ y". apply ctx.in_succ. apply IHAccessibility.
+  Defined.
+
+  Eval cbv [transient Accessibility_rec Accessibility_rect] in @transient.
 
   Fixpoint Persistent {Σ₁ Σ₂} (t : Ty Σ₁) {w : Accessibility Σ₁ Σ₂} {struct t} : Ty Σ₂.
   Proof. cbv in *. intros. destruct t eqn:?.
@@ -308,6 +310,8 @@ Section Symbolic.
   Show Proof.
   Defined.
 
+Print Ty.
+
   (* Not a valid fixp because e is non-decreasing *)
   (*
   Fixpoint Persistent_Env {S S' : Ctx nat} (e : Env S) {w : Accessibility S S'} {struct e} : Env S'.
@@ -315,16 +319,19 @@ Section Symbolic.
     - apply e.
     - apply (fresh _ α) in w. eapply Persistent_Env. apply e. apply w.
       Show Proof.
-      Defined. *)
+      Defined.
 
   (* This proof looks dodgy *)
   Definition Persistent_Env : Valid (Impl Env (Box Env)).
-  Proof. cbv in *. intros. induction H.
+  Proof. cbv in *. intro S. refine (fix F E := _). destruct E eqn:?; intros. apply nil. apply F.  intros. induction H.
     - apply nil.
     - apply IHlist.
   Show Proof.
   Defined.
+  Eval cbv [Persistent_Env list_rec list_rect] in @Persistent_Env.
 
+ *)
+  Definition Persistent_Env : Valid (Impl Env (Box Env)). Admitted.
   Definition T {A} := fun (Σ : Ctx nat) (a : Box A Σ) => a Σ (refl Σ).
 
   Check T.
@@ -380,23 +387,35 @@ Section Symbolic.
 
   Local Notation "<{ v ~ w }>" := (@Persistent _ _ v w).
 
+  Check exists_ty.
+
+  Check Cstr _ _.
+  Print freeM.
+
+  Check Cstr Ty _.
+
+  Print ctx.In.
+  (* Valid *)
+  Definition exists_Ty : forall GS, Cstr Ty GS :=
+    fun GS => let i := ctx.length GS in C_exi Ty GS i (C_val _ _ (Ty_hole _ i ctx.in_zero)).
+
+  Check exists_Ty.
+
   Fixpoint convert (t : ty) (Σ : Ctx nat) : Ty Σ :=
     match t with
     | ty_bool => Ty_bool Σ
     | ty_func do co => Ty_func Σ (convert do Σ) (convert co Σ)
     end.
 
-  Fixpoint infer'' {Σ : Ctx nat} (Γ : Env Σ) (expression : expr) {struct expression} : Cstr Ty Σ.
-  Proof.
-  refine (
+  Fixpoint infer'' {Σ : Ctx nat} (Γ : Env Σ) (expression : expr) {struct expression} : Cstr Ty Σ :=
     match expression with
     | v_true => C_val Ty Σ (Ty_bool Σ)
     | v_false => C_val Ty Σ (Ty_bool Σ)
     | e_if cnd coq alt =>
-        [ ω₁ ] t_cnd <- infer'' _ Γ cnd ;;
+        [ ω₁ ] t_cnd <- infer'' Γ cnd ;;
         [ ω₂ ] _     <- assert' t_cnd (Ty_bool _) ;;
-        [ ω₃ ] t_coq <- infer'' _ <[ <[ Γ ~ ω₁ ]> ~ ω₂ ]> coq ;;
-        [ ω₄ ] t_alt <- infer'' _ <[ <[ Γ ~ ω₁ ]> ~ ω₂ .> ω₃ ]> alt ;;
+        [ ω₃ ] t_coq <- infer'' <[ <[ Γ ~ ω₁ ]> ~ ω₂ ]> coq ;;
+        [ ω₄ ] t_alt <- infer'' <[ <[ Γ ~ ω₁ ]> ~ ω₂ .> ω₃ ]> alt ;;
         [ ω₅ ] _     <- assert' <{ t_coq ~ ω₄ }>  <{ t_alt ~ (refl _) }> ;;
            C_val Ty _ <{ t_coq ~ ω₄ .> ω₅ }>
     | e_var var =>
@@ -405,23 +424,20 @@ Section Symbolic.
         | None => C_fls Ty Σ
         end
     | e_app f a =>
-        [ w1 ] t_co <- _ ;; (* TODO: need an existential here, but what value for i? *)
-        [ w2 ] t_do <- infer'' _ <[ Γ ~ w1 ]> a ;;
-        [ w3 ] t_fn <- infer'' _ <[ Γ ~ w1 .> w2 ]> f ;;
+        [ w1 ] t_co <- exists_Ty Σ ;;
+        [ w2 ] t_do <- infer'' <[ Γ ~ w1 ]> a ;;
+        [ w3 ] t_fn <- infer'' <[ Γ ~ w1 .> w2 ]> f ;;
         [ w4 ] _    <- assert' t_fn <{ (Ty_func _ t_do <{ t_co ~ w2 }> ) ~ w3 }> ;;
            C_val Ty _ <{ t_co ~ w2 .> w3 .> w4 }>
     | e_abst var t_var e =>
-        let t_var' := (convert t_var Σ) in
-        [ w1 ] t_e <- infer'' _ ((var, t_var') :: Γ) e ;;
+        let t_var' := (convert t_var Σ) in (* t_var lives in ty, not in (Ty w) *)
+        [ w1 ] t_e <- infer'' ((var, t_var') :: Γ) e ;;
           C_val Ty _ (Ty_func _ <{ t_var' ~ w1 }> t_e)
     | e_absu var e =>
-        [ w1 ] t_var <- _ ;;
-        [ w2 ] t_e <- infer'' _ <[ ((var, t_var) :: Γ) ~ w1 ]> e ;;
-          C_val Ty _ (Ty_func _ <{ t_var ~ w1 .> w2 }> t_e)
-    end).
-    - eapply C_exi. admit.
-    - eapply C_exi. admit.
-  Admitted.
+        [ w1 ] t_var <- exists_Ty Σ ;;
+        [ w2 ] t_e <- infer'' ((var, t_var) :: <[ Γ ~ w1 ]>) e ;;
+          C_val Ty _ (Ty_func _ <{ t_var ~ w2 }> t_e)
+    end.
 
   Compute infer'' nil (e_if v_true v_true v_false).
   Compute C_eqc Ty ε (Ty_bool ε) (Ty_bool ε) (C_val Ty ε (Ty_bool ε)).
