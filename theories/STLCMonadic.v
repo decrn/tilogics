@@ -280,6 +280,9 @@ Section Symbolic.
   (* □ A *)
   Definition Box A (Σ : Ctx nat) := forall Σ', Accessibility Σ Σ' -> A Σ'.
 
+  Lemma access_any_world_from_empty : forall Σ, Accessibility ctx.nil Σ.
+  Proof. intros. induction Σ. apply refl. apply fresh. apply IHΣ. Qed.
+
   (* _[_] *)
   Definition transient : forall (Σ Σ' : Ctx nat) (i : nat),
       Accessibility Σ Σ' ->
@@ -422,8 +425,40 @@ Section Symbolic.
           C_val Ty _ (Ty_func _ <{ t_var ~ w2 }> t_e)
     end.
 
-  Compute infer'' nil (e_if v_true v_true v_false).
-  Compute C_eqc Ty ε (Ty_bool ε) (Ty_bool ε) (C_val Ty ε (Ty_bool ε)).
+  (* Submitting a generated constraint to the unifier requires
+     converting the constraint into prenex normal form.
+     We could do this while generating the constraints,
+     but instead we choose to do it afterwards.
+     See theories/STLC.v for the datatype *)
+  Section PrenexNormalForm.
+
+    (* Insert a given type equality in front of the first non-quantifier.
+       This essentially only requires finding the first non quantifier,
+       and then weakening the world in the type equality lives to match
+       the current world *)
+    Fixpoint insert_tyeq [A] {Σ} (t1 t2 : Ty Σ) (c : Prenex A Σ) : Prenex A Σ :=
+      match c with
+      | P_Constraint _ _ l => P_Constraint _ _ (C_Equal _ _ t1 t2 l)
+      | P_Exist _ _ i cont =>
+          P_Exist _ _ i (insert_tyeq <{ t1 ~ (fresh _ i _ (refl _)) }>
+                                     <{ t2 ~ (fresh _ i _ (refl _)) }>
+                                     cont)
+      end.
+
+    (* Turns a given constraint into prenex normal form *)
+    Fixpoint pnf [A] {Σ} (c : Cstr A Σ) : Prenex A Σ :=
+      match c with
+      | C_val _ _ val => P_Constraint _ _ (L_Value _ _ val)
+      | C_fls _ _ => P_Constraint _ _ (L_False _ _)
+      | C_eqc _ _ t1 t2 cont =>
+          insert_tyeq t1 t2 (pnf cont)
+      | C_exi _ _ i cont => P_Exist _ _ i (pnf cont)
+      end.
+
+    Compute infer'' nil (e_if v_true (e_absu "x" (e_var "x")) (e_absu "x" (e_var "x"))).
+    Compute pnf (infer'' nil (e_if v_true (e_absu "x" (e_var "x")) (e_absu "x" (e_var "x")))).
+
+  End PrenexNormalForm.
 
 End Symbolic.
 

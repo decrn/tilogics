@@ -98,4 +98,14 @@ Section Symbolic.
     | C_fls : Cstr A Σ
     | C_exi : forall (i : nat), Cstr A (Σ ▻ i) -> Cstr A Σ.
 
+  (* Data types for constraints in prenex form *)
+  Inductive PConstraint A Σ : Type :=
+    | L_Value (v : A Σ)
+    | L_False
+    | C_Equal (τ σ : Ty Σ) : PConstraint A Σ -> PConstraint A Σ.
+
+  Inductive Prenex A Σ : Type :=
+    | P_Constraint (c : PConstraint A Σ)
+    | P_Exist (i : nat) : Prenex A (Σ ▻ i) -> Prenex A Σ.
+
 End Symbolic.
