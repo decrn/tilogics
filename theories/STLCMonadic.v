@@ -281,7 +281,7 @@ Section Symbolic.
   Definition Box A (Σ : Ctx nat) := forall Σ', Accessibility Σ Σ' -> A Σ'.
 
   Lemma access_any_world_from_empty : forall Σ, Accessibility ctx.nil Σ.
-  Proof. intros. induction Σ. apply refl. apply fresh. apply IHΣ. Qed.
+  Proof. intros. induction Σ. apply refl. apply fresh. apply IHΣ. Defined.
 
   (* _[_] *)
   Definition transient : forall (Σ Σ' : Ctx nat) (i : nat),
@@ -459,6 +459,30 @@ Section Symbolic.
     Compute pnf (infer'' nil (e_if v_true (e_absu "x" (e_var "x")) (e_absu "x" (e_var "x")))).
 
   End PrenexNormalForm.
+
+  (* 
+  Section Refinement.
+
+    Fixpoint Val {Σ} (σ : Ty Σ) : ty :=
+      match σ with
+      | Ty_bool _ => ty_bool
+      | Ty_func _ t1 t2 => ty_func (Val t1) (Val t2)
+      | Ty_hole _ _ _ => ty_bool
+      end.
+
+    (* Assigning to every unification variable a type *)
+    Definition Valuation (Σ : Ctx nat) : list (nat * ty). Admitted. (* ? *)
+
+      Class Approx (AT : Ctx nat -> Type) (A : Type) : Type :=
+        approx : forall (w : Ctx nat) (v : Valuation w),
+          AT w -> A -> Prop.
+
+      Global Instance ApproxEnv :
+        Approx Env env.
+      Admitted.
+
+  End Refinement.
+  *)
 
 End Symbolic.
 
