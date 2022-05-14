@@ -76,8 +76,6 @@ Inductive freeM' : Type -> Type :=
   | bind_free'  (A B : Type)  : freeM' A -> (A -> freeM' B) -> freeM' B
   | assert_free'  :  ty -> ty         -> freeM' unit.
 
-
-
 Definition option_assert_eq (a b : ty) : option unit :=
   if ty_eqb a b then Some tt else None.
 
@@ -439,7 +437,7 @@ Fixpoint infer {m} `{TypeCheckM m} (ctx : env) (expression : expr) : m (prod ty 
       ret (t_bod, e_tlet var t_val e_val e_bod)
   | e_tlet var et_val val bod =>
       '(at_val, e_val) <- infer ctx val ;;
-      (assert at_val et_val) ;; (* expected/annotated type matches actual type *)
+      (assert at_val et_val) ;; (* actual type matches expected/annotated type *)
       '(t_bod, e_bod) <- infer ((var, at_val) :: ctx) bod ;;
       ret (t_bod, e_tlet var at_val e_val e_bod)
   | e_var var =>
@@ -503,6 +501,7 @@ Inductive tpb : env -> expr -> ty -> expr -> Prop :=
 
 Notation "G |-- E ; T ~> EE" := (tpb G E T EE) (at level 50).
 
+(* TODO: define {m} and `{TypeCheckAxioms m} as section variables *)
 Lemma infer_sound : forall {m} `{TypeCheckAxioms m} (G : env) (e : expr),
  wlp (infer G e) (fun '(t,ee) => G |-- e ; t ~> ee).
 Proof.

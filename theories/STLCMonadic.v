@@ -62,7 +62,6 @@ Section Shallow.
       exists_ty    := bind_exists_free _ (fun t => ret_free _ t);
     }.
 
-
   Fixpoint infer {m} `{TypeCheckM m} (ctx : env) (expression : expr) : m (prod ty expr) :=
     match expression with
     | v_false => ret (ty_bool, expression)
@@ -149,7 +148,7 @@ Section Shallow.
   Lemma wp_ty_eqb : forall (t1 t2 : ty) (Q : unit -> Prop),
     wp_freeM (assert t1 t2) Q <-> t1 = t2 /\ Q tt.
   Proof.
-      split; intros.
+    split; intros.
       - inversion H. cbn in H1. auto.
       - cbn. apply H.
   Qed.

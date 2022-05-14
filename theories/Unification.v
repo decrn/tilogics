@@ -92,8 +92,13 @@ Notation "Σ1 ⊒ Σ2" := (Tri.Tri Σ1 Σ2) (at level 80).
 
 Definition Box (A : TYPE) : TYPE :=
   fun w0 => forall w1, w0 ⊒ w1 -> A w1.
+
+Unset Printing Notations.
 Definition Diamond (A : TYPE) : TYPE :=
   fun w0 => {w1 : Ctx nat & ((w0 ⊒ w1) * A w1)}%type.
+
+Print Diamond.
+
 Definition DiamondT (M : TYPE -> TYPE) : TYPE -> TYPE :=
   fun A => M (fun w0 => {w1 : Ctx nat & ((w0 ⊒ w1) * A w1)}%type).
 

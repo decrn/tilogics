@@ -153,6 +153,7 @@ Section WithBinding.
 
     End Inversions.
 
+    (*!*)
     Equations lookup {Γ} (E : Env Γ) {b} (bIn : b ∈ Γ) : D b :=
     | snoc _ v | ctx.in_zero   => v
     | snoc E _ | ctx.in_succ i => lookup E i.
@@ -242,6 +243,7 @@ Section WithBinding.
 
     End HetEquality.
 
+    (* ! *)
     Fixpoint tabulate {Γ} : (forall b, b ∈ Γ -> D b) -> Env Γ :=
       match Γ with
       | []    => fun _ => nil
