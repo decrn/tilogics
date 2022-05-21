@@ -2,9 +2,11 @@ Require Import List.
 Import ListNotations.
 Require Import String.
 From MasterThesis Require Import
-     Context.
+     Context Environment.
 From MasterThesis Require Import
      STLC.
+From MasterThesis Require
+  Prelude Unification.
 Import ctx.notations.
 
   (* Monadic type inference for STLC is expressed as a computation inside TypeCheckM.
@@ -229,20 +231,19 @@ Section Shallow.
 
   Eval compute in fun t => extract (test t).
 
+  (* Unset Printing Notations. *)
+  (* Print wp_freeM'. *)
 
-  Unset Printing Notations.
-  Print wp_freeM'.
+  (* Check eq. *)
+  (* Check prod. *)
+  (* Print ex. *)
+  (* Print sig. *)
 
-  Check eq.
-  Check prod.
-  Print ex.
-  Print sig.
+  (* Set Printing Universes. *)
+  (* Check Prop. *)
+  (* Check Set. *)
 
-  Set Printing Universes.
-  Check Prop.
-  Check Set.
-
-  Check forall (a : Prop), a.
+  (* Check forall (a : Prop), a. *)
 
   Lemma infer_sound : forall (G : env) (e : expr),
    wlp_freeM (infer G e) (fun '(t,ee) => G |-- e ; t ~> ee).
@@ -522,6 +523,39 @@ Section Symbolic.
 
     Compute infer'' nil (e_if v_true (e_absu "x" (e_var "x")) (e_absu "x" (e_var "x"))).
     Compute pnf (infer'' nil (e_if v_true (e_absu "x" (e_var "x")) (e_absu "x" (e_var "x")))).
+
+    Definition Prenex' A Σ : Type :=
+      option { Σ' : Ctx nat & Accessibility Σ Σ' * list (Ty Σ' * Ty Σ') * A Σ' }%type.
+
+    Fixpoint ground {Σ} : Unification.Assignment Σ :=
+      match Σ with
+      | ctx.nil => env.nil
+      | Γ ▻ b   => env.snoc ground b ty_bool
+      end.
+
+    Definition solve_constraints {AT AV Σ}
+      (Aassign : forall Σ, Unification.Assignment Σ -> AT Σ -> AV) :
+      Prenex' AT Σ -> option AV.
+    Proof.
+      intros pn.
+      apply (Prelude.option.bind pn).
+      intros (Σ' & (_ & cs) & a).
+      apply (Prelude.option.bind (Unification.Variant1.solve cs)).
+      intros (Σrest & ζ & _).
+      apply Some.
+      revert a. apply Aassign.
+      apply (Unification.compose ζ).
+      apply ground.
+    Defined.
+
+    Definition runTI : expr -> option ty.
+    Proof.
+      intros e.
+      refine (@solve_constraints Ty ty [] _ _).
+      intros ? ass T.
+      apply (Unification.applyassign T ass).
+      revert e.
+    Admitted.
 
   End PrenexNormalForm.
 

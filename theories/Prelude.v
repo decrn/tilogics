@@ -330,12 +330,17 @@ Module option.
       | |- wlp _ (Some _) => constructor
       | |- wlp _ (map _ _) => apply wlp_map
       | |- wlp _ (bind _ _) => apply wlp_bind_intro
+      | |- spec _ _ (match _ with _ => _ end) => apply spec_aplazy
+      | |- spec _ _ (map _ _) => apply spec_map
       | H: wp _ ?x |- wp _ ?x => revert H; apply wp_monotonic; intros
       | H: wlp _ ?x |- wlp _ ?x => revert H; apply wlp_monotonic; intros
+      | H: spec _ _ ?x |- spec _ _ ?x => revert H; apply spec_monotonic; intros
       | |- wp _ ?x <-> wp _ ?x => apply wp_proper
       | |- wlp _ ?x <-> wlp _ ?x => apply wlp_proper
+      | |- spec _ _ ?x <-> spec _ _ ?x => apply spec_proper
       | |- context[wp ?S (Some ?x)] => rewrite (@wp_match _ S (Some x))
       | |- context[wlp ?S (Some ?x)] => rewrite (@wlp_match _ S (Some x))
+      | |- context[spec ?S ?N (Some ?x)] => rewrite (@spec_match _ S N (Some x))
       | |- context[wp ?S None] => rewrite (@wp_match _ S None)
       | |- context[wlp ?S None] => rewrite (@wlp_match _ S None)
       end.
@@ -370,6 +375,13 @@ Proof. firstorder. Qed.
 
 Lemma forall_and_compat {A} (P Q : A -> Prop):
   (forall a, P a /\ Q a) <-> (forall a, P a) /\ (forall a, Q a).
+Proof. firstorder. Qed.
+
+Lemma forall_proper {A} (P Q : A -> Prop) :
+  (forall x, P x <-> Q x) -> (forall x, P x) <-> (forall x, Q x).
+Proof. firstorder. Qed.
+Lemma exists_proper {A} (P Q : A -> Prop) :
+  (forall x, P x <-> Q x) -> (exists x, P x) <-> (exists x, Q x).
 Proof. firstorder. Qed.
 
 (* Really short summary on notations in Coq:

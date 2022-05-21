@@ -324,33 +324,31 @@ Section WithBinding.
         end (split Δ)
       end.
 
-    (* Fixpoint remove {Γ b} (E : Env Γ) : forall (bIn : b ∈ Γ), Env (Γ - b) := *)
-    (*   match E with *)
-    (*   | nil => fun bIn => match ctx.nilView bIn with end *)
-    (*   | @snoc Γ0 E0 b0 db => *)
-    (*     fun '(ctx.MkIn n e) => *)
-    (*       match n return forall e, Env (ctx.remove (@ctx.MkIn B b (Γ0 ▻ b0) n e)) *)
-    (*       with *)
-    (*       | O   => fun _ => E0 *)
-    (*       | S n => fun e => snoc (remove E0 (@ctx.MkIn B b Γ0 n e)) db *)
-    (*       end e *)
-    (*   end. *)
-    (* Global Arguments remove {_} b%ctx E. *)
+    Fixpoint remove {Γ b} (E : Env Γ) : forall (bIn : b ∈ Γ), Env (Γ - b) :=
+      match E with
+      | nil      => fun bIn => match ctx.nilView bIn with end
+      | snoc E d => fun bIn =>
+                      match ctx.snocView bIn return Env (_ - _) with
+                      | ctx.snocViewZero => E
+                      | ctx.snocViewSucc i => snoc (remove E i) d
+                      end
+      end.
+    Global Arguments remove {_} b%ctx E.
 
-    (* Fixpoint insert {Γ : Ctx B} {b} {struct Γ} : *)
-    (*   forall (bIn : b ∈ Γ) (E : Env (Γ - b)) (v : D b), Env Γ := *)
-    (*   match Γ with *)
-    (*   | []     => fun bIn => match ctx.nilView bIn with end *)
-    (*   | Γ ▻ b' => fun bIn => *)
-    (*     match ctx.snocView bIn with *)
-    (*     | ctx.snocViewZero   => fun E v => snoc E v *)
-    (*     | ctx.snocViewSucc i => *)
-    (*         fun E v => *)
-    (*           match snocView E with *)
-    (*           | isSnoc E v' => snoc (insert i E v) v' *)
-    (*           end *)
-    (*     end *)
-    (*   end. *)
+    Fixpoint insert {Γ : Ctx B} {b} {struct Γ} :
+      forall (bIn : b ∈ Γ) (E : Env (Γ - b)) (v : D b), Env Γ :=
+      match Γ with
+      | []     => fun bIn => match ctx.nilView bIn with end
+      | Γ ▻ b' => fun bIn =>
+        match ctx.snocView bIn with
+        | ctx.snocViewZero   => fun E v => snoc E v
+        | ctx.snocViewSucc i =>
+            fun E v =>
+              match snocView E with
+              | isSnoc E v' => snoc (insert i E v) v'
+              end
+        end
+      end.
 
     (* Lemma remove_insert {b} {Γ} (bIn : b ∈ Γ) (v : D b) (E : Env (Γ - b)) : *)
     (*   remove b (insert bIn E v) bIn = E. *)
