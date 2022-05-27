@@ -82,7 +82,7 @@ Section Shallow.
         '(t_e1, e_e1) <- infer ctx e1 ;;
         '(t_e2, e_e2) <- infer ctx e2 ;;
         t_exists_ty <- exists_ty ;;
-        (assert t_e1 (ty_func t_e2 t_exists_ty)) ;;
+        (* -> *) (assert t_e1 (ty_func t_e2 t_exists_ty)) ;;
         ret (t_exists_ty, e_app e_e1 e_e2)
     | e_absu var e =>
         t_var <- exists_ty ;;
@@ -177,6 +177,72 @@ Section Shallow.
       exists x. apply H1. apply H2.
   Qed.
 
+  (* (λx.x) (λy.y) *)
+  Lemma test : forall (τ : ty) POST,
+    wp_freeM (infer nil
+    (e_app (e_absu "x" (e_var "x")) (e_absu "y" (e_var "y"))))
+      (POST).
+  Proof.
+    compute.
+    eexists.
+    eexists.
+    eexists.
+    split.
+    reflexivity.
+  Unshelve.
+    2: exact τ.
+  Unshelve.
+  Abort.
+
+
+
+  Print sigT.
+  Fixpoint gen [A : Type] (m : freeM A) : Type :=
+    match m with
+    | ret_free _ a => unit (* equiv. True in Prop *)
+    | bind_assert_free _ t1 t2 k => (t1 = t2) * gen k
+    | fail_free _ => Empty_set (* equiv. False in Prop *)
+    | bind_exists_free _ tf => { τ : ty & gen (tf τ)}
+    end%type.
+
+  Fixpoint extract [A : Type] [m : freeM A] {struct m} : gen m -> A.
+  Proof.
+    destruct m; intros P; cbn in P.
+    - destruct P. apply (extract _ _ g).
+    - apply a.
+    - contradiction P.
+    - destruct P. apply (extract _ _ g).
+  Defined.
+
+  Print extract.
+
+  Eval compute [extract] in extract.
+
+  Lemma test : forall (τ : ty),
+    gen (infer nil
+    (e_app (e_absu "x" (e_var "x")) (e_absu "y" (e_var "y")))).
+  Proof.
+    repeat eexists; eauto.
+  Unshelve.
+    exact τ.
+  Defined.
+
+  Eval compute in fun t => extract (test t).
+
+
+  Unset Printing Notations.
+  Print wp_freeM'.
+
+  Check eq.
+  Check prod.
+  Print ex.
+  Print sig.
+
+  Set Printing Universes.
+  Check Prop.
+  Check Set.
+
+  Check forall (a : Prop), a.
 
   Lemma infer_sound : forall (G : env) (e : expr),
    wlp_freeM (infer G e) (fun '(t,ee) => G |-- e ; t ~> ee).
