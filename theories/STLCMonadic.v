@@ -69,30 +69,30 @@ Section Shallow.
     | v_false => ret (ty_bool, expression)
     | v_true  => ret (ty_bool, expression)
     | e_if cnd coq alt =>
-        '(t_cnd, e_cnd) <- infer ctx cnd ;;
-        '(t_coq, e_coq) <- infer ctx coq ;;
-        '(t_alt, e_alt) <- infer ctx alt ;;
-        (assert t_cnd ty_bool) ;;
-        (assert t_coq t_alt)   ;;
-        ret (t_coq, e_if e_cnd e_coq e_alt)
+        '(Tcnd, Ecnd) <- infer ctx cnd ;;
+        '(Tcoq, Ecoq) <- infer ctx coq ;;
+        '(Talt, Ealt) <- infer ctx alt ;;
+        (assert Tcnd ty_bool) ;;
+        (assert Tcoq Talt)   ;;
+        ret (Tcoq, e_if Ecnd Ecoq Ealt)
     | e_var var =>
         match (value var ctx) with
-        | Some t_var => ret (t_var, expression)
+        | Some Tvar => ret (Tvar, expression)
         | None => fail
         end
     | e_app e1 e2 =>
-        '(t_e1, e_e1) <- infer ctx e1 ;;
-        '(t_e2, e_e2) <- infer ctx e2 ;;
-        t_exists_ty <- exists_ty ;;
-        (* -> *) (assert t_e1 (ty_func t_e2 t_exists_ty)) ;;
-        ret (t_exists_ty, e_app e_e1 e_e2)
+        '(T1, E1) <- infer ctx e1 ;;
+        '(T2, E2) <- infer ctx e2 ;;
+        T0 <- exists_ty           ;;
+        assert T1 (ty_func T2 T0) ;;
+        ret (T0, e_app E1 E2)
     | e_absu var e =>
-        t_var <- exists_ty ;;
-        '(t_e, e_e) <- infer (cons (var, t_var) ctx) e ;;
-        ret (ty_func t_var t_e, e_abst var t_var e_e)
-    | e_abst var t_var e =>
-        '(t_e, e_e) <- infer (cons (var, t_var) ctx) e ;;
-        ret (ty_func t_var t_e, e_abst var t_var e_e)
+        Tvar <- exists_ty ;;
+        '(T, E) <- infer (cons (var, Tvar) ctx) e ;;
+        ret (ty_func Tvar T, e_abst var Tvar E)
+    | e_abst var Tvar e =>
+        '(T, E) <- infer (cons (var, Tvar) ctx) e ;;
+        ret (ty_func Tvar T, e_abst var Tvar E)
     end.
 
   Compute (infer nil (e_app (e_abst "x" ty_bool (e_var "x")) v_true)).
@@ -188,12 +188,7 @@ Section Shallow.
     compute.
     eexists.
     eexists.
-    eexists.
-    split.
-    reflexivity.
-  Unshelve.
-    2: exact τ.
-  Unshelve.
+    eexists; admit.
   Abort.
 
 
@@ -227,7 +222,7 @@ Section Shallow.
     repeat eexists; eauto.
   Unshelve.
     exact τ.
-  Defined.
+  Qed.
 
   Eval compute in fun t => extract (test t).
 
@@ -280,7 +275,7 @@ Section Shallow.
             destruct H; subst
         end; try reflexivity).
         - exists vt. apply wp_bind. revert IHtpb. apply wp_monotone. intro. destruct o. intro. destruct H0. apply wp_ret. subst. intuition.
-        - exists t1. auto.
+        - exists t1. split. reflexivity. split; reflexivity.
   Qed.
 
   Fixpoint gensem (ctx : list (string * ty)) (expression : expr) (type : ty) : Prop :=
