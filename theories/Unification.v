@@ -1609,8 +1609,15 @@ Module Variant2.
 
 End Variant2.
 
-Fixpoint applyassign {w} (t : Ty w) (ass : Assignment w) : ty.
-Admitted.
+Fixpoint applyassign {w} (t : Ty w) (ass : Assignment w) : ty :=
+  match t with
+  | Ty_bool => ty_bool
+  | Ty_func σ τ =>
+      let σ' := applyassign σ ass in
+      let τ' := applyassign τ ass in
+      ty_func σ' τ'
+  | Ty_hole i => env.lookup ass i
+  end.
 
 Fixpoint compose {w0 w1} (ζ : w0 ⊒⁻ w1) : Assignment w1 -> Assignment w0 :=
   match ζ in (_ ⊒⁻ c) return (Assignment c -> Assignment w0) with

@@ -191,9 +191,21 @@ Section Shallow.
     eexists; admit.
   Abort.
 
+  Print ex. (* Prop -> Prop *)
+  Print sig. (* Prop -> Type *)
+  Print sigT. (* Type -> Type *)
+  Check eq.
+  Check prod.
+
+  Set Printing Universes.
+  Check Prop.
+  Check Set.
+
+  Check forall (a : Prop), a. (* impredicativity of Prop *)
+  Check forall (a : Set), a.
 
 
-  Print sigT.
+  (* WP but in Type instead of Prop *)
   Fixpoint gen [A : Type] (m : freeM A) : Type :=
     match m with
     | ret_free _ a => unit (* equiv. True in Prop *)
@@ -202,6 +214,7 @@ Section Shallow.
     | bind_exists_free _ tf => { τ : ty & gen (tf τ)}
     end%type.
 
+  (* Generates an A from a computation m and its proof *)
   Fixpoint extract [A : Type] [m : freeM A] {struct m} : gen m -> A.
   Proof.
     destruct m; intros P; cbn in P.
@@ -213,7 +226,7 @@ Section Shallow.
 
   Print extract.
 
-  Eval compute [extract] in extract.
+  Eval compute [extract] in extract. (* normalised *)
 
   Lemma test : forall (τ : ty),
     gen (infer nil
@@ -225,20 +238,6 @@ Section Shallow.
   Qed.
 
   Eval compute in fun t => extract (test t).
-
-  (* Unset Printing Notations. *)
-  (* Print wp_freeM'. *)
-
-  (* Check eq. *)
-  (* Check prod. *)
-  (* Print ex. *)
-  (* Print sig. *)
-
-  (* Set Printing Universes. *)
-  (* Check Prop. *)
-  (* Check Set. *)
-
-  (* Check forall (a : Prop), a. *)
 
   Lemma infer_sound : forall (G : env) (e : expr),
    wlp_freeM (infer G e) (fun '(t,ee) => G |-- e ; t ~> ee).
@@ -522,6 +521,39 @@ Section Symbolic.
     Definition Prenex' A Σ : Type :=
       option { Σ' : Ctx nat & Accessibility Σ Σ' * list (Ty Σ' * Ty Σ') * A Σ' }%type.
 
+    Fixpoint pnf_conv [A] {Σ} (cstr : Cstr A Σ) : Prenex' A Σ.
+    Admitted.
+
+    Fixpoint prenex_convert [A] {Σ} (pnf : Prenex A Σ) : Prenex' A Σ.
+    Proof.
+      refine(
+      match pnf with
+      | P_Constraint _ _ c =>
+          match c with
+          | L_Value _ _ v =>
+              _
+          | L_False _ _ =>
+              None
+          | C_Equal _ _ σ τ k =>
+              _
+          end
+      | P_Exist _ _ i c =>
+          let t := prenex_convert _ _ c in
+          _
+      end).
+      - apply Some. exists Σ. repeat apply pair.
+        apply refl.  apply nil.  apply v.
+      - apply Some. exists Σ. repeat apply pair.
+        apply refl. eapply cons. apply (pair σ τ).
+        admit. admit.
+      - destruct t. destruct s. destruct p. destruct p.
+        apply Some. exists (Σ ▻ i). repeat apply pair.
+        Search refl.
+
+        apply fresh. apply refl. apply Box in l. apply nil. admit.
+    Show Proof.
+    Defined.
+
     Fixpoint ground {Σ} : Unification.Assignment Σ :=
       match Σ with
       | ctx.nil => env.nil
@@ -554,7 +586,7 @@ Section Symbolic.
 
   End PrenexNormalForm.
 
-  (* 
+  (*
   Section Refinement.
 
     Fixpoint Val {Σ} (σ : Ty Σ) : ty :=
