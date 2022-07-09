@@ -177,15 +177,17 @@ Inductive cstr : Set :=
 #[refine] Instance TCF_option : TypeCheckAxioms option :=
 {
   wlp [O: Type] (m : option O) (Q : O -> Prop) :=
-    match m with
+  forall o, m = Some o -> Q o;
+(* match m with
     | Some o => Q o
     | None => True
-    end;
+    end; *)
   wp [O : Type] (m : option O) (Q : O -> Prop) :=
-    match m with
+  exists o, m = Some o /\ Q o;
+(*  match m with
     | Some o => Q o
     | None => False
-    end;
+   end; *)
 }. Proof.
   * (* wlp_ty_eqb *)
     destruct t1, t2; cbn; intuition discriminate.
