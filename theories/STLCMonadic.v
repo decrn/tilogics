@@ -1,4 +1,5 @@
 Require Import List.
+Require Import Relation_Definitions.
 Import ListNotations.
 Require Import String.
 From MasterThesis Require Import
@@ -64,7 +65,7 @@ Section Shallow.
       exists_ty    := bind_exists_free _ (fun t => ret_free _ t);
     }.
 
-  Fixpoint infer {m} `{TypeCheckM m} (ctx : env) (expression : expr) : m (prod ty expr) :=
+  Fixpoint infer {m} `{TypeCheckM m} (expression : expr) (ctx : env) : m (prod ty expr) :=
     match expression with
     | v_false => ret (ty_bool, expression)
     | v_true  => ret (ty_bool, expression)
@@ -188,7 +189,8 @@ Section Shallow.
     compute.
     eexists.
     eexists.
-    eexists; admit.
+    eexists.
+    admit.
   Abort.
 
   Print ex. (* Prop -> Prop *)
@@ -197,6 +199,9 @@ Section Shallow.
   Check eq.
   Check prod.
 
+  Unset Printing Universes.
+  Check Prop.
+  Check Set.
   Set Printing Universes.
   Check Prop.
   Check Set.
@@ -257,7 +262,7 @@ Section Shallow.
             intro
         | H : ?g |-- ?e ; ?t ~> ?ee |- ?g' |-- e_app ?e1 ?e2 ; ?t' ~> e_app ?e1' ?e2' =>
             apply (tpb_app _ _ _ _ _ t0 _)
-        end; try reflexivity; try assumption).
+        end; try firstorder).
   Qed.
 
   Lemma infer_complete : forall  (G : env) (e ee : expr) (t : ty),
@@ -273,8 +278,8 @@ Section Shallow.
         | H : ?x = ?y /\ _ |- _ =>
             destruct H; subst
         end; try reflexivity).
-        - exists vt. apply wp_bind. revert IHtpb. apply wp_monotone. intro. destruct o. intro. destruct H0. apply wp_ret. subst. intuition.
-        - exists t1. split. reflexivity. split; reflexivity.
+        - exists vt. apply wp_bind. revert IHtpb. apply wp_monotone. intro. destruct o. intro. firstorder; subst; reflexivity.
+        - exists t1. firstorder. 
   Qed.
 
   Fixpoint gensem (ctx : list (string * ty)) (expression : expr) (type : ty) : Prop :=
@@ -319,9 +324,6 @@ Section Shallow.
 
 End Shallow.
 
-(* TODO: Refinement proof of deep embedding
-   TODO: Prenex form of constraints, foldr style *)
-
 Section Symbolic.
 
   (* Adapted from Katamaran: Symbolic/Worlds.v *)
@@ -339,7 +341,7 @@ Section Symbolic.
 
   (* □ A *)
   Definition Box A (Σ : Ctx nat) := forall Σ', Accessibility Σ Σ' -> A Σ'.
-
+    
   Lemma access_any_world_from_empty : forall Σ, Accessibility ctx.nil Σ.
   Proof. intros. induction Σ. apply refl. apply fresh. apply IHΣ. Defined.
 
@@ -453,15 +455,15 @@ Section Symbolic.
     | ty_func do co => Ty_func Σ (convert do Σ) (convert co Σ)
     end.
 
-  Fixpoint infer'' {Σ : Ctx nat} (Γ : Env Σ) (expression : expr) {struct expression} : Cstr Ty Σ :=
+  Fixpoint infer'' (expression : expr) {Σ : Ctx nat} (Γ : Env Σ) {struct expression} : Cstr Ty Σ :=
     match expression with
     | v_true => C_val Ty Σ (Ty_bool Σ)
     | v_false => C_val Ty Σ (Ty_bool Σ)
     | e_if cnd coq alt =>
-        [ ω₁ ] t_cnd <- infer'' Γ cnd ;;
+        [ ω₁ ] t_cnd <- infer'' cnd Γ ;;
         [ ω₂ ] _     <- assert' t_cnd (Ty_bool _) ;;
-        [ ω₃ ] t_coq <- infer'' <{ Γ ~ ω₁ .> ω₂ }> coq ;;
-        [ ω₄ ] t_alt <- infer'' <{ Γ ~ ω₁ .> ω₂ .> ω₃ }> alt ;;
+        [ ω₃ ] t_coq <- infer'' coq <{ Γ ~ ω₁ .> ω₂ }> ;;
+        [ ω₄ ] t_alt <- infer'' alt <{ Γ ~ ω₁ .> ω₂ .> ω₃ }> ;;
         [ ω₅ ] _     <- assert' <{ t_coq ~ ω₄ }>  <{ t_alt ~ (refl _) }> ;;
            C_val Ty _ <{ t_coq ~ ω₄ .> ω₅ }>
     | e_var var =>
@@ -471,17 +473,17 @@ Section Symbolic.
         end
     | e_app f a =>
         [ w1 ] t_co <- exists_Ty Σ ;;
-        [ w2 ] t_do <- infer'' <{ Γ ~ w1 }> a ;;
-        [ w3 ] t_fn <- infer'' <{ Γ ~ w1 .> w2 }> f ;;
+        [ w2 ] t_do <- infer'' a <{ Γ ~ w1 }> ;;
+        [ w3 ] t_fn <- infer'' f <{ Γ ~ w1 .> w2 }> ;;
         [ w4 ] _    <- assert' t_fn <{ (Ty_func _ t_do <{ t_co ~ w2 }> ) ~ w3 }> ;;
            C_val Ty _ <{ t_co ~ w2 .> w3 .> w4 }>
     | e_abst var t_var e =>
         let t_var' := (convert t_var Σ) in (* t_var lives in ty, not in (Ty w) *)
-        [ w1 ] t_e <- infer'' ((var, t_var') :: Γ) e ;;
+        [ w1 ] t_e <- infer'' e ((var, t_var') :: Γ) ;;
           C_val Ty _ (Ty_func _ <{ t_var' ~ w1 }> t_e)
     | e_absu var e =>
         [ w1 ] t_var <- exists_Ty Σ ;;
-        [ w2 ] t_e <- infer'' ((var, t_var) :: <{ Γ ~ w1 }>) e ;;
+        [ w2 ] t_e <- infer'' e ((var, t_var) :: <{ Γ ~ w1 }>) ;;
           C_val Ty _ (Ty_func _ <{ t_var ~ w2 }> t_e)
     end.
 
@@ -515,11 +517,13 @@ Section Symbolic.
       | C_exi _ _ i cont => P_Exist _ _ i (pnf cont)
       end.
 
-    Compute infer'' nil (e_if v_true (e_absu "x" (e_var "x")) (e_absu "x" (e_var "x"))).
-    Compute pnf (infer'' nil (e_if v_true (e_absu "x" (e_var "x")) (e_absu "x" (e_var "x")))).
+    Compute infer'' (e_if v_true (e_absu "x" (e_var "x")) (e_absu "x" (e_var "x"))) nil.
+    Compute pnf (infer'' (e_if v_true (e_absu "x" (e_var "x")) (e_absu "x" (e_var "x"))) nil).
 
     Definition Prenex' A Σ : Type :=
       option { Σ' : Ctx nat & Accessibility Σ Σ' * list (Ty Σ' * Ty Σ') * A Σ' }%type.
+      
+    Check Prenex'.
 
     Fixpoint pnf_conv [A] {Σ} (cstr : Cstr A Σ) : Prenex' A Σ.
     Admitted.
@@ -541,18 +545,20 @@ Section Symbolic.
           let t := prenex_convert _ _ c in
           _
       end).
-      - apply Some. exists Σ. repeat apply pair.
+      - (* L_Value *)
+        apply Some. exists Σ. repeat apply pair.
         apply refl.  apply nil.  apply v.
-      - apply Some. exists Σ. repeat apply pair.
+      - (* C_Equal *)
+        apply Some. exists Σ. repeat apply pair.
         apply refl. eapply cons. apply (pair σ τ).
         admit. admit.
-      - destruct t. destruct s. destruct p. destruct p.
+      - (* P_Exist *)
+        destruct t. destruct s. destruct p. destruct p.
         apply Some. exists (Σ ▻ i). repeat apply pair.
         Search refl.
-
-        apply fresh. apply refl. apply Box in l. apply nil. admit.
+        apply fresh. apply refl. admit. admit. apply Box in l. apply nil. admit.
     Show Proof.
-    Defined.
+    Admitted.
 
     Fixpoint ground {Σ} : Unification.Assignment Σ :=
       match Σ with
@@ -586,29 +592,68 @@ Section Symbolic.
 
   End PrenexNormalForm.
 
-  (*
   Section Refinement.
-
-    Fixpoint Val {Σ} (σ : Ty Σ) : ty :=
-      match σ with
-      | Ty_bool _ => ty_bool
-      | Ty_func _ t1 t2 => ty_func (Val t1) (Val t2)
-      | Ty_hole _ _ _ => ty_bool
-      end.
-
-    (* Assigning to every unification variable a type *)
-    Definition Valuation (Σ : Ctx nat) : list (nat * ty). Admitted. (* ? *)
-
-      Class Approx (AT : Ctx nat -> Type) (A : Type) : Type :=
-        approx : forall (w : Ctx nat) (v : Valuation w),
-          AT w -> A -> Prop.
-
-      Global Instance ApproxEnv :
-        Approx Env env.
-      Admitted.
-
+  
+    (* The refinement proof, relating the deeply-embedded or symbolic `infer` to the shallowly-embedded `infer` is accomplished
+       using a logical relation similar to [Keuchel22]. *)
+  
+    Definition Assignment : Ctx nat -> Type :=
+      env.Env (fun _ => ty).
+    
+    (* A  variation on the definition of `Relations.Relation_Definitions.relation` but now
+       relating a World-indexed Type `A` to a regular type `a` *)
+    Check relation.
+    (* Given a world `w` and an assignment (or valuation) `ass` assigning concrete types to
+       each unification variable in the world, we can relate the world-indexed type `A w`
+       to the regular type `a` *)
+    Definition Relation (A : Ctx nat -> Type) (a : Type) : Type :=
+      forall (w : Ctx nat) (ass : Assignment w),
+      A w -> a -> Prop.
+  
+    Check Relation.
+  
+    (* To start, we define a relation between deeply-embedded object-language types `Ty`
+       and shallowly-embedded object-language types `ty` *)
+    (* These two are related if, given a world and an assignment (or valuation) from unification variables
+       in the world to concrete object language types, applying the assignment to the `Ty` is equal to `ty` *)
+    Definition RTy : Relation Ty ty :=
+      fun (w : Ctx nat) (ass : Assignment w) (T : Ty w) (t : ty) => Unification.applyassign T ass = t.
+  
+    (* We can also relate deeply-embedded free computations `Cstr` to shallowly-embedded free computations `freeM`.
+       This is parametric in the relation of values `A` and `a` in their respective free monads *)
+    (* i.e., RFree : Relation A a -> Relation (Cstr A) (freeM a) *)
+    Definition RFree {A a} (RA : Relation A a) : Relation (Cstr A) (freeM a).
+    refine (
+      fix R (w : Ctx nat) (ass : Assignment w) (F : Cstr A w) (f : freeM a) : Prop :=
+        match F, f with
+        | C_val _ _ V, ret_free _ v =>
+            RA w ass V v
+        | C_fls _ _, fail_free _ =>
+            True
+        | C_eqc _ _ t1 t2 cont, bind_assert_free _ t1' t2' cont' =>
+            RTy w ass t1 t1' /\ 
+            RTy w ass t2 t2' /\ 
+            R w ass cont cont'
+        | C_exi _ _ i cont, bind_exists_free _ tf => 
+            forall (T : Ty w) (t : ty),
+            RTy w ass T t -> R _ _ _ _
+            (* R (w ▻ i) (env.snoc ass i t) cont (tf t) *)
+        | _, _ =>
+            False
+        end). Proof. Show Proof. Admitted.
+  
+    Check RFree.
+    
+    (* Relating boxed symbolic values is more interesting, since the accessibility witness
+       can now contain an arbitrary amount of unification variables. *)
+    Definition RBox {A a} (RA : Relation A a) : Relation (Box A) a.
+    refine (
+      fun (w : Ctx nat) (ass : Assignment w) (x : Box A w) (y : a) =>
+        forall (w' : Ctx nat) (ω : Accessibility w w') (ass' : Assignment w'),
+            _ (* ass is subsumed by ass' *) -> RA _ ass' (x w' ω) y
+    ). unfold Assignment in ass'. admit. Admitted.
+  
   End Refinement.
-  *)
 
 End Symbolic.
 
