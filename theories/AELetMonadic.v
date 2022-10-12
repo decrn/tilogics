@@ -190,31 +190,41 @@ Inductive cstr : Set :=
    end; *)
 }. Proof.
   * (* wlp_ty_eqb *)
-    destruct t1, t2; cbn; intuition discriminate.
+    destruct t1, t2; cbn; intuition.
+    - inversion H.  apply H0.
+    - apply H. discriminate.
+    - inversion H0.
+    - apply H. discriminate.
+    - inversion H0.
+    - inversion H. apply H0.
   * (* wlp_bind *)
-    destruct m1; reflexivity.
+    destruct m1 eqn:?; intuition; inversion H0; subst. apply H. cbn. assumption.
+    apply (H a); intuition.
   * (* wlp_ret *)
-    intuition.
+    intuition. inversion H0. subst. apply H.
   * (* wlp_fail *)
-    intuition.
+    intuition. inversion H0.
   * (* wlp_monotone *)
     destruct m as [|]; intuition.
   * (* wp_ty_eqb *)
     unfold wp. intros t1 t2 Q. destruct (assert t1 t2) eqn:Heq.
     - destruct u. assert (t1 = t2).
       { simpl in Heq. destruct ty_eqb in Heq; congruence. }
-      destruct H. clear Heq. firstorder.
+      destruct H. clear Heq. firstorder. inversion H. subst. apply H0.
     - assert (t1 <> t2).
       { simpl in Heq. destruct ty_eqb in Heq; congruence. }
-      clear Heq. unfold not in H. firstorder.
+      clear Heq. unfold not in H. firstorder; inversion H0.
   * (* wp_bind *)
-    destruct m1; reflexivity.
+    destruct m1; intuition; destruct H; destruct H; inversion H; auto.
+    exists a. intuition. exists x. intuition.
   * (* wp_ret *)
-    intuition.
+    intuition. destruct H. destruct H. inversion H. subst. apply H0.
+    exists a. split; auto.
   * (* wp_fail *)
-    intuition.
+    intuition. destruct H. destruct H. inversion H.
   * (* wp_monotone *)
-    destruct m; simpl; eauto.
+    destruct m; intuition; destruct H0; destruct H0; inversion H0; subst.
+    exists x. auto. 
 Qed.
 
 (* ================================================ *)
