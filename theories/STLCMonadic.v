@@ -70,9 +70,9 @@ Section Shallow.
     | v_false => ret (ty_bool, expression)
     | v_true  => ret (ty_bool, expression)
     | e_if cnd coq alt =>
-        '(Tcnd, Ecnd) <- infer ctx cnd ;;
-        '(Tcoq, Ecoq) <- infer ctx coq ;;
-        '(Talt, Ealt) <- infer ctx alt ;;
+        '(Tcnd, Ecnd) <- infer cnd ctx ;;
+        '(Tcoq, Ecoq) <- infer coq ctx ;;
+        '(Talt, Ealt) <- infer alt ctx ;;
         (assert Tcnd ty_bool) ;;
         (assert Tcoq Talt)   ;;
         ret (Tcoq, e_if Ecnd Ecoq Ealt)
@@ -82,29 +82,29 @@ Section Shallow.
         | None => fail
         end
     | e_app e1 e2 =>
-        '(T1, E1) <- infer ctx e1 ;;
-        '(T2, E2) <- infer ctx e2 ;;
+        '(T1, E1) <- infer e1 ctx ;;
+        '(T2, E2) <- infer e2 ctx ;;
         T0 <- exists_ty           ;;
         assert T1 (ty_func T2 T0) ;;
         ret (T0, e_app E1 E2)
     | e_absu var e =>
         Tvar <- exists_ty ;;
-        '(T, E) <- infer (cons (var, Tvar) ctx) e ;;
+        '(T, E) <- infer e (cons (var, Tvar) ctx) ;;
         ret (ty_func Tvar T, e_abst var Tvar E)
     | e_abst var Tvar e =>
-        '(T, E) <- infer (cons (var, Tvar) ctx) e ;;
+        '(T, E) <- infer e (cons (var, Tvar) ctx) ;;
         ret (ty_func Tvar T, e_abst var Tvar E)
     end.
 
-  Compute (infer nil (e_app (e_abst "x" ty_bool (e_var "x")) v_true)).
-  Compute (infer nil (e_app (e_absu "x" (e_var "x")) v_true)).
+  Compute (infer (e_app (e_abst "x" ty_bool (e_var "x")) v_true) nil).
+  Compute (infer (e_app (e_absu "x" (e_var "x")) v_true) nil).
 
   Definition K1 := (e_absu "k1" (e_absu "l" (e_var "k1"))).
   Definition K2 := (e_absu "k2" (e_absu "l" (e_var "k2"))).
   Definition I := (e_absu "i" (e_var "i")).
 
   Definition KKI := (e_app K1 (e_app K2 I)).
-  Compute (infer nil KKI).
+  Compute (infer KKI nil).
 
   Fixpoint wlp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) : Prop :=
     match m with
@@ -182,8 +182,8 @@ Section Shallow.
 
   (* (λx.x) (λy.y) *)
   Lemma test : forall (τ : ty) POST,
-    wp_freeM (infer nil
-    (e_app (e_absu "x" (e_var "x")) (e_absu "y" (e_var "y"))))
+    wp_freeM (infer
+    (e_app (e_absu "x" (e_var "x")) (e_absu "y" (e_var "y"))) nil)
       (POST).
   Proof.
     compute.
@@ -234,8 +234,8 @@ Section Shallow.
   Eval compute [extract] in extract. (* normalised *)
 
   Lemma test : forall (τ : ty),
-    gen (infer nil
-    (e_app (e_absu "x" (e_var "x")) (e_absu "y" (e_var "y")))).
+    gen (infer
+    (e_app (e_absu "x" (e_var "x")) (e_absu "y" (e_var "y"))) nil).
   Proof.
     repeat eexists; eauto.
   Unshelve.
@@ -245,12 +245,12 @@ Section Shallow.
   Eval compute in fun t => extract (test t).
 
   Lemma infer_sound : forall (G : env) (e : expr),
-   wlp_freeM (infer G e) (fun '(t,ee) => G |-- e ; t ~> ee).
+   wlp_freeM (infer e G) (fun '(t,ee) => G |-- e ; t ~> ee).
   Proof.
     intros. generalize dependent G. induction e; cbn [infer]; intro;
     repeat (rewrite ?wlp_exists_type, ?wlp_bind, ?wlp_ty_eqb, ?wlp_ret, ?wlp_fail; try destruct o;
         try match goal with
-        | IHe : forall G, wlp_freeM (infer G ?e) _ |- wlp_freeM (infer ?g ?e) _ =>
+        | IHe : forall G, wlp_freeM (infer ?e G) _ |- wlp_freeM (infer ?e ?g) _ =>
             specialize (IHe g); revert IHe; apply wlp_monotone; intros
         | |- tpb _ _ _ _ =>
             constructor
@@ -266,12 +266,12 @@ Section Shallow.
   Qed.
 
   Lemma infer_complete : forall  (G : env) (e ee : expr) (t : ty),
-    (G |-- e ; t ~> ee) -> wp_freeM (infer G e) (fun '(t',ee')  => t = t' /\ ee = ee').
+    (G |-- e ; t ~> ee) -> wp_freeM (infer e G) (fun '(t',ee')  => t = t' /\ ee = ee').
   Proof.
     intros. induction H; cbn;
     repeat (rewrite ?wp_bind, ?wp_ty_eqb, ?wp_ret, ?wp_fail; try destruct o; cbn; try rewrite H;
         try match goal with
-        | IH : wp_freeM (infer ?g ?e) _ |- wp_freeM (infer ?g ?e) _ =>
+        | IH : wp_freeM (infer ?e ?g) _ |- wp_freeM (infer ?e ?g) _ =>
             revert IH; apply wp_monotone; intros; subst
         | |- ?x = ?y /\ _ =>
             split
@@ -556,7 +556,7 @@ Section Symbolic.
         destruct t. destruct s. destruct p. destruct p.
         apply Some. exists (Σ ▻ i). repeat apply pair.
         Search refl.
-        apply fresh. apply refl. admit. admit. apply Box in l. apply nil. admit.
+        apply fresh. apply refl. admit. admit. admit. (* apply Box in l. apply nil. admit. *)
     Show Proof.
     Admitted.
 
@@ -630,27 +630,41 @@ Section Symbolic.
         | C_fls _ _, fail_free _ =>
             True
         | C_eqc _ _ t1 t2 cont, bind_assert_free _ t1' t2' cont' =>
-            RTy w ass t1 t1' /\ 
-            RTy w ass t2 t2' /\ 
+            RTy w ass t1 t1' /\
+            RTy w ass t2 t2' /\
             R w ass cont cont'
         | C_exi _ _ i cont, bind_exists_free _ tf => 
             forall (T : Ty w) (t : ty),
             RTy w ass T t ->
             R (w ▻ i) (env.snoc ass i t) cont (tf (Unification.applyassign T ass))
+            (* I replaced the right `t` in the cont with an assignment to `T`, 
+               but I think I should instead replace the left `t` in the extended assignment? *)
         | _, _ =>
             False
         end.
-  
+ 
     Check RFree.
-    
+
     (* Relating boxed symbolic values is more interesting, since the accessibility witness
-       can now contain an arbitrary amount of unification variables. *)
+       can now contain an arbitrary amount of new unification variables.
+       We say that in every accessible world, i.e. given a witness ω: w ⊑ w',
+       a symbolic computation x is related to a shallow computation y,
+       iff the type assignment in w' subsumes the assignment in w.
+       an assignment a subsumes an assignment b iff every type assignment in b
+       also occurs in a. E.g.
+       { τ₀ -> Bool ; } is subsumed by { τ₀ -> Bool ; τ₁ -> Arrow τ₀ τ₀ }
+       But
+       { τ₀ -> Bool ; } is NOT subsumed by { τ₀ -> Nat ; τ₁ -> Arrow τ₀ τ₀ }
+       since τ₀ has a different assignment.
+       *)
     Definition RBox {A a} (RA : Relation A a) : Relation (Box A) a.
     refine (
       fun (w : Ctx nat) (ass : Assignment w) (x : Box A w) (y : a) =>
         forall (w' : Ctx nat) (ω : Accessibility w w') (ass' : Assignment w'),
             _ (* ass is subsumed by ass' *) -> RA _ ass' (x w' ω) y
     ). unfold Assignment in ass'. admit. Admitted.
+
+    Check RBox.
   
   End Refinement.
 
