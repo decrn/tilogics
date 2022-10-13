@@ -417,11 +417,11 @@ Section Symbolic.
 
   Eval cbv [bind] in @bind'.
 
-      Local Notation "[ ω ] x <- ma ;; mb" :=
-        (bind' ma (fun _ ω x => mb))
-          (at level 80, x at next level,
-            ma at next level, mb at level 200,
-            right associativity).
+  Local Notation "[ ω ] x <- ma ;; mb" :=
+    (bind' ma (fun _ ω x => mb))
+      (at level 80, x at next level,
+        ma at next level, mb at level 200,
+        right associativity).
 
   Definition Unit (Σ : Ctx nat) := unit.
 
@@ -634,11 +634,8 @@ Section Symbolic.
             RTy w ass t2 t2' /\
             R w ass cont cont'
         | C_exi _ _ i cont, bind_exists_free _ tf => 
-            forall (T : Ty w) (t : ty),
-            RTy w ass T t ->
-            R (w ▻ i) (env.snoc ass i t) cont (tf (Unification.applyassign T ass))
-            (* I replaced the right `t` in the cont with an assignment to `T`, 
-               but I think I should instead replace the left `t` in the extended assignment? *)
+            forall (t : ty),
+            R (w ▻ i) (env.snoc ass i t) cont (tf t)
         | _, _ =>
             False
         end.
@@ -665,7 +662,25 @@ Section Symbolic.
     ). unfold Assignment in ass'. admit. Admitted.
 
     Check RBox.
-  
+
+    (* For functions/impl: related inputs go to related outputs *)
+    Definition RArr {A a B b} (RA : Relation A a) (RB : Relation B b) : Relation (Impl A B) (a -> b) :=
+      fun w ass fS fs => forall (V : A w) (v : a),
+        RA w ass V v -> RB w ass (fS V) (fs v).
+
+    Check RArr.
+
+    Check C_val.
+    
+    Check Impl.
+
+    (* Using our relation on functions, we can now prove that both the symbolic and the shallow return are related *)
+    Lemma Pure_relates_pure {A a} (RA : Relation A a) : forall (w : Ctx nat) (ass : Assignment w),
+      RArr RA (RFree RA) w ass (C_val A w) (ret_free a).
+    Proof.
+      unfold RArr. unfold RFree. auto.
+    Qed.
+    
   End Refinement.
 
 End Symbolic.
