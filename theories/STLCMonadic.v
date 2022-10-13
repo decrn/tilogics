@@ -622,8 +622,7 @@ Section Symbolic.
     (* We can also relate deeply-embedded free computations `Cstr` to shallowly-embedded free computations `freeM`.
        This is parametric in the relation of values `A` and `a` in their respective free monads *)
     (* i.e., RFree : Relation A a -> Relation (Cstr A) (freeM a) *)
-    Definition RFree {A a} (RA : Relation A a) : Relation (Cstr A) (freeM a).
-    refine (
+    Definition RFree {A a} (RA : Relation A a) : Relation (Cstr A) (freeM a) :=
       fix R (w : Ctx nat) (ass : Assignment w) (F : Cstr A w) (f : freeM a) : Prop :=
         match F, f with
         | C_val _ _ V, ret_free _ v =>
@@ -636,11 +635,11 @@ Section Symbolic.
             R w ass cont cont'
         | C_exi _ _ i cont, bind_exists_free _ tf => 
             forall (T : Ty w) (t : ty),
-            RTy w ass T t -> R _ _ _ _
-            (* R (w ▻ i) (env.snoc ass i t) cont (tf t) *)
+            RTy w ass T t ->
+            R (w ▻ i) (env.snoc ass i t) cont (tf (Unification.applyassign T ass))
         | _, _ =>
             False
-        end). Proof. Show Proof. Admitted.
+        end.
   
     Check RFree.
     
