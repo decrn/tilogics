@@ -668,18 +668,60 @@ Section Symbolic.
       fun w ass fS fs => forall (V : A w) (v : a),
         RA w ass V v -> RB w ass (fS V) (fs v).
 
-    Check RArr.
-
+    Check Unit.
+    Definition RUnit : Relation Unit unit :=
+      fun w ass _ _ => True.
+      
     Check C_val.
     
     Check Impl.
 
+
+    Declare Scope rel_scope.
+    Delimit Scope rel_scope with R.
+    Notation "A -> B" := (RArr A B) : rel_scope.
+
     (* Using our relation on functions, we can now prove that both the symbolic and the shallow return are related *)
-    Lemma Pure_relates_pure {A a} (RA : Relation A a) : forall (w : Ctx nat) (ass : Assignment w),
-      RArr RA (RFree RA) w ass (C_val A w) (ret_free a).
+    Lemma Pure_relates_pure {A a} (RA : Relation A a) :
+      forall (w : Ctx nat) (ass : Assignment w),
+        (RA -> (RFree RA))%R w ass (C_val A w) (ret_free a).
     Proof.
       unfold RArr. unfold RFree. auto.
     Qed.
+    Axiom A : Ctx nat -> Type.
+    Axiom a : Type.
+    
+    Axiom RA : Relation A a.
+    (* Check R RA (RFree RA). *)
+    Check C_fls.
+    Check RFree.
+    
+    Lemma False_relates_false {A a} (RA : Relation A a) :
+      forall (w : Ctx nat) (ass : Assignment w),
+        RFree RA w ass (C_fls A w) (@fail_free a).
+    Proof.
+      unfold RArr. unfold RFree. auto.
+    Qed.
+    
+    Check C_eqc.
+    
+    Check RUnit.
+    Check assert.
+    Check assert'.
+
+    (* RTy -> RTy -> RFree RUnit *)
+    Lemma Assert_relates_assert :
+      forall (w : Ctx nat) (ass : Assignment w),
+        (RTy -> RTy -> (RFree RUnit))%R w ass assert' assert.
+    Proof. firstorder. Qed.
+    
+    Check exists_ty.
+    Check exists_Ty.
+    
+    Lemma Exists_relates_exists :
+      forall (w : Ctx nat) (ass : Assignment w),
+        (RFree RTy) w ass (exists_Ty w) exists_ty.
+    Proof. firstorder. Qed.
     
   End Refinement.
 
