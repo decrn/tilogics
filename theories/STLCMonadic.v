@@ -496,8 +496,8 @@ Section Symbolic.
 
     (* Insert a given type equality in front of the first non-quantifier.
        This essentially only requires finding the first non quantifier,
-       and then weakening the world in the type equality lives to match
-       the current world *)
+       and then weakening the world in which the type equality lives to
+       match the current world *)
     Fixpoint insert_tyeq [A] {Σ} (t1 t2 : Ty Σ) (c : Prenex A Σ) : Prenex A Σ :=
       match c with
       | P_Constraint _ _ l => P_Constraint _ _ (C_Equal _ _ t1 t2 l)
@@ -639,6 +639,7 @@ Section Symbolic.
         | _, _ =>
             False
         end.
+          
  
     Check RFree.
 
@@ -654,13 +655,31 @@ Section Symbolic.
        { τ₀ -> Bool ; } is NOT subsumed by { τ₀ -> Nat ; τ₁ -> Arrow τ₀ τ₀ }
        since τ₀ has a different assignment.
        *)
-    Definition RBox {A a} (RA : Relation A a) : Relation (Box A) a.
+
+    Check transient.
+    Check @env.lookup.
+    Check env.tabulate.
+
+    Definition compose {w0 w1} (ω : Accessibility w0 w1) : Assignment w1 -> Assignment w0.
     refine (
+      fun ass => env.tabulate _
+    ). Proof.
+      intros x xIn.
+      apply (transient _ _ _ ω) in xIn.
+      hnf in ass.
+      Check env.lookup ass xIn.
+      exact (env.lookup ass xIn).
+      Show Proof.
+      Defined.
+      
+      Eval cbv [compose] in @compose.
+      
+    Definition RBox {A a} (RA : Relation A a) : Relation (Box A) a :=
       fun (w : Ctx nat) (ass : Assignment w) (x : Box A w) (y : a) =>
         forall (w' : Ctx nat) (ω : Accessibility w w') (ass' : Assignment w'),
-            _ (* ass is subsumed by ass' *) -> RA _ ass' (x w' ω) y
-    ). unfold Assignment in ass'. admit. Admitted.
-
+          ass = compose ω ass' ->
+          RA _ ass' (x w' ω) y.
+    
     Check RBox.
 
     (* For functions/impl: related inputs go to related outputs *)
@@ -671,11 +690,6 @@ Section Symbolic.
     Check Unit.
     Definition RUnit : Relation Unit unit :=
       fun w ass _ _ => True.
-      
-    Check C_val.
-    
-    Check Impl.
-
 
     Declare Scope rel_scope.
     Delimit Scope rel_scope with R.
@@ -688,21 +702,14 @@ Section Symbolic.
     Proof.
       unfold RArr. unfold RFree. auto.
     Qed.
-    Axiom A : Ctx nat -> Type.
-    Axiom a : Type.
-    
-    Axiom RA : Relation A a.
-    (* Check R RA (RFree RA). *)
-    Check C_fls.
-    Check RFree.
-    
+
     Lemma False_relates_false {A a} (RA : Relation A a) :
       forall (w : Ctx nat) (ass : Assignment w),
         RFree RA w ass (C_fls A w) (@fail_free a).
     Proof.
       unfold RArr. unfold RFree. auto.
     Qed.
-    
+
     Check C_eqc.
     
     Check RUnit.
@@ -722,7 +729,61 @@ Section Symbolic.
       forall (w : Ctx nat) (ass : Assignment w),
         (RFree RTy) w ass (exists_Ty w) exists_ty.
     Proof. firstorder. Qed.
+
+    Check bind.
+    Check bind'.
+
+    Lemma Bind_relates_bind {A B a b} (RA : Relation A a) (RB : Relation B b) :
+      forall (w : Ctx nat) (ass : Assignment w),
+        ((RFree RA) -> (RBox (RA -> RFree RB)) -> (RFree RB))%R w ass (@bind' A B w) bind.
+    Proof. cbn. intros w ass. intros X. induction X; intros x rx; destruct x; cbn in rx; try contradiction. admit. Admitted.
     
+    (* As an alternative to messing with fixpoint definitions for the RFree, perhaps it makes
+       more sense to define it as an inductive proposition. *)
+    Section WithInductive.
+
+    Inductive RFree' {A a} (RA : Relation A a) : Relation (Cstr A) (freeM a) :=
+    | RPure : forall w ass V v,
+        RFree' RA w ass (C_val _ _ V) (ret_free _ v)
+    | RFalse : forall w ass,
+        RFree' RA w ass (C_fls _ _) (fail_free _)
+    | RAssert : forall w ass T1 T2 t1 t2 Cont cont,
+        RTy w ass T1 t1 ->
+        RTy w ass T2 t2 -> 
+        RFree' RA w ass (C_eqc _ _ T1 T2 Cont) (bind_assert_free _ t1 t2 cont)
+    | RExists : forall w ass i Cont cont t,
+        RFree' RA (w ▻ i) (env.snoc ass i t) Cont (cont t).
+    
+      (* Binary parametricity translation *)
+    
+    Lemma Pure_relates_pure' {A a} (RA : Relation A a) :
+    forall (w : Ctx nat) (ass : Assignment w),
+        (RA -> (RFree' RA))%R w ass (C_val A w) (ret_free a).
+    Proof.  constructor. Qed.
+
+    Lemma False_relates_false' {A a} (RA : Relation A a) :
+    forall (w : Ctx nat) (ass : Assignment w),
+        RFree' RA w ass (C_fls A w) (@fail_free a).
+    Proof.  constructor. Qed.
+
+    Lemma Assert_relates_assert' :
+      forall (w : Ctx nat) (ass : Assignment w),
+        (RTy -> RTy -> (RFree' RUnit))%R w ass assert' assert.
+    Proof. constructor; assumption. Qed.
+
+    Lemma Exists_relates_exists' :
+      forall (w : Ctx nat) (ass : Assignment w),
+        (RFree' RTy) w ass (exists_Ty w) exists_ty.
+    Proof. admit. Admitted.
+
+    Lemma Bind_relates_bind' {A B a b} (RA : Relation A a) (RB : Relation B b) :
+      forall (w : Ctx nat) (ass : Assignment w),
+        ((RFree' RA) -> (RBox (RA -> RFree' RB)) -> (RFree' RB))%R w ass (@bind' A B w) bind.
+    Proof. intros w ass ? ? ?. induction H. admit.
+      Admitted.
+
+    End WithInductive.
+
   End Refinement.
 
 End Symbolic.
