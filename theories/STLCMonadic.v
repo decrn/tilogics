@@ -45,7 +45,7 @@ Import ctx.notations.
    the witnesses for these propositions. This is problematic,
    because these witnesses are the unified type variables
    which give the type and the elaboration of the term. *)
-Section Shallow.
+Module Shallow.
 
   Fixpoint freeM_bind [T1 T2 : Type] (m : freeM T1) (f : T1 -> freeM T2) : freeM T2 :=
     match m with
@@ -279,7 +279,7 @@ Section Shallow.
             destruct H; subst
         end; try reflexivity).
         - exists vt. apply wp_bind. revert IHtpb. apply wp_monotone. intro. destruct o. intro. firstorder; subst; reflexivity.
-        - exists t1. firstorder. 
+        - exists t1. firstorder.
   Qed.
 
   Fixpoint gensem (ctx : list (string * ty)) (expression : expr) (type : ty) : Prop :=
@@ -324,7 +324,7 @@ Section Shallow.
 
 End Shallow.
 
-Section Symbolic.
+Module Symbolic.
 
   (* Adapted from Katamaran: Symbolic/Worlds.v *)
 
@@ -341,7 +341,7 @@ Section Symbolic.
 
   (* □ A *)
   Definition Box A (Σ : Ctx nat) := forall Σ', Accessibility Σ Σ' -> A Σ'.
-    
+
   Lemma access_any_world_from_empty : forall Σ, Accessibility ctx.nil Σ.
   Proof. intros. induction Σ. apply refl. apply fresh. apply IHΣ. Defined.
 
@@ -522,7 +522,7 @@ Section Symbolic.
 
     Definition Prenex' A Σ : Type :=
       option { Σ' : Ctx nat & Accessibility Σ Σ' * list (Ty Σ' * Ty Σ') * A Σ' }%type.
-      
+
     Check Prenex'.
 
     Fixpoint pnf_conv [A] {Σ} (cstr : Cstr A Σ) : Prenex' A Σ.
@@ -592,199 +592,198 @@ Section Symbolic.
 
   End PrenexNormalForm.
 
-  Section Refinement.
-  
-    (* The refinement proof, relating the deeply-embedded or symbolic `infer` to the shallowly-embedded `infer` is accomplished
-       using a logical relation similar to [Keuchel22]. *)
-  
-    Definition Assignment : Ctx nat -> Type :=
-      env.Env (fun _ => ty).
-    
-    (* A  variation on the definition of `Relations.Relation_Definitions.relation` but now
-       relating a World-indexed Type `A` to a regular type `a` *)
-    Check relation.
-    (* Given a world `w` and an assignment (or valuation) `ass` assigning concrete types to
-       each unification variable in the world, we can relate the world-indexed type `A w`
-       to the regular type `a` *)
-    Definition Relation (A : Ctx nat -> Type) (a : Type) : Type :=
-      forall (w : Ctx nat) (ass : Assignment w),
-      A w -> a -> Prop.
-  
-    Check Relation.
-  
-    (* To start, we define a relation between deeply-embedded object-language types `Ty`
-       and shallowly-embedded object-language types `ty` *)
-    (* These two are related if, given a world and an assignment (or valuation) from unification variables
-       in the world to concrete object language types, applying the assignment to the `Ty` is equal to `ty` *)
-    Definition RTy : Relation Ty ty :=
-      fun (w : Ctx nat) (ass : Assignment w) (T : Ty w) (t : ty) => Unification.applyassign T ass = t.
-  
-    (* We can also relate deeply-embedded free computations `Cstr` to shallowly-embedded free computations `freeM`.
-       This is parametric in the relation of values `A` and `a` in their respective free monads *)
-    (* i.e., RFree : Relation A a -> Relation (Cstr A) (freeM a) *)
-    Definition RFree {A a} (RA : Relation A a) : Relation (Cstr A) (freeM a) :=
-      fix R (w : Ctx nat) (ass : Assignment w) (F : Cstr A w) (f : freeM a) : Prop :=
-        match F, f with
-        | C_val _ _ V, ret_free _ v =>
-            RA w ass V v
-        | C_fls _ _, fail_free _ =>
-            True
-        | C_eqc _ _ t1 t2 cont, bind_assert_free _ t1' t2' cont' =>
-            RTy w ass t1 t1' /\
-            RTy w ass t2 t2' /\
-            R w ass cont cont'
-        | C_exi _ _ i cont, bind_exists_free _ tf => 
-            forall (t : ty),
-            R (w ▻ i) (env.snoc ass i t) cont (tf t)
-        | _, _ =>
-            False
-        end.
-          
- 
-    Check RFree.
-
-    (* Relating boxed symbolic values is more interesting, since the accessibility witness
-       can now contain an arbitrary amount of new unification variables.
-       We say that in every accessible world, i.e. given a witness ω: w ⊑ w',
-       a symbolic computation x is related to a shallow computation y,
-       iff the type assignment in w' subsumes the assignment in w.
-       an assignment a subsumes an assignment b iff every type assignment in b
-       also occurs in a. E.g.
-       { τ₀ -> Bool ; } is subsumed by { τ₀ -> Bool ; τ₁ -> Arrow τ₀ τ₀ }
-       But
-       { τ₀ -> Bool ; } is NOT subsumed by { τ₀ -> Nat ; τ₁ -> Arrow τ₀ τ₀ }
-       since τ₀ has a different assignment.
-       *)
-
-    Check transient.
-    Check @env.lookup.
-    Check env.tabulate.
-
-    Definition compose {w0 w1} (ω : Accessibility w0 w1) : Assignment w1 -> Assignment w0.
-    refine (
-      fun ass => env.tabulate _
-    ). Proof.
-      intros x xIn.
-      apply (transient _ _ _ ω) in xIn.
-      hnf in ass.
-      Check env.lookup ass xIn.
-      exact (env.lookup ass xIn).
-      Show Proof.
-      Defined.
-      
-      Eval cbv [compose] in @compose.
-      
-    Definition RBox {A a} (RA : Relation A a) : Relation (Box A) a :=
-      fun (w : Ctx nat) (ass : Assignment w) (x : Box A w) (y : a) =>
-        forall (w' : Ctx nat) (ω : Accessibility w w') (ass' : Assignment w'),
-          ass = compose ω ass' ->
-          RA _ ass' (x w' ω) y.
-    
-    Check RBox.
-
-    (* For functions/impl: related inputs go to related outputs *)
-    Definition RArr {A a B b} (RA : Relation A a) (RB : Relation B b) : Relation (Impl A B) (a -> b) :=
-      fun w ass fS fs => forall (V : A w) (v : a),
-        RA w ass V v -> RB w ass (fS V) (fs v).
-
-    Check Unit.
-    Definition RUnit : Relation Unit unit :=
-      fun w ass _ _ => True.
-
-    Declare Scope rel_scope.
-    Delimit Scope rel_scope with R.
-    Notation "A -> B" := (RArr A B) : rel_scope.
-
-    (* Using our relation on functions, we can now prove that both the symbolic and the shallow return are related *)
-    Lemma Pure_relates_pure {A a} (RA : Relation A a) :
-      forall (w : Ctx nat) (ass : Assignment w),
-        (RA -> (RFree RA))%R w ass (C_val A w) (ret_free a).
-    Proof.
-      unfold RArr. unfold RFree. auto.
-    Qed.
-
-    Lemma False_relates_false {A a} (RA : Relation A a) :
-      forall (w : Ctx nat) (ass : Assignment w),
-        RFree RA w ass (C_fls A w) (@fail_free a).
-    Proof.
-      unfold RArr. unfold RFree. auto.
-    Qed.
-
-    Check C_eqc.
-    
-    Check RUnit.
-    Check assert.
-    Check assert'.
-
-    (* RTy -> RTy -> RFree RUnit *)
-    Lemma Assert_relates_assert :
-      forall (w : Ctx nat) (ass : Assignment w),
-        (RTy -> RTy -> (RFree RUnit))%R w ass assert' assert.
-    Proof. firstorder. Qed.
-    
-    Check exists_ty.
-    Check exists_Ty.
-    
-    Lemma Exists_relates_exists :
-      forall (w : Ctx nat) (ass : Assignment w),
-        (RFree RTy) w ass (exists_Ty w) exists_ty.
-    Proof. firstorder. Qed.
-
-    Check bind.
-    Check bind'.
-
-    Lemma Bind_relates_bind {A B a b} (RA : Relation A a) (RB : Relation B b) :
-      forall (w : Ctx nat) (ass : Assignment w),
-        ((RFree RA) -> (RBox (RA -> RFree RB)) -> (RFree RB))%R w ass (@bind' A B w) bind.
-    Proof. cbn. intros w ass. intros X. induction X; intros x rx; destruct x; cbn in rx; try contradiction. admit. Admitted.
-    
-    (* As an alternative to messing with fixpoint definitions for the RFree, perhaps it makes
-       more sense to define it as an inductive proposition. *)
-    Section WithInductive.
-
-    Inductive RFree' {A a} (RA : Relation A a) : Relation (Cstr A) (freeM a) :=
-    | RPure : forall w ass V v,
-        RFree' RA w ass (C_val _ _ V) (ret_free _ v)
-    | RFalse : forall w ass,
-        RFree' RA w ass (C_fls _ _) (fail_free _)
-    | RAssert : forall w ass T1 T2 t1 t2 Cont cont,
-        RTy w ass T1 t1 ->
-        RTy w ass T2 t2 -> 
-        RFree' RA w ass (C_eqc _ _ T1 T2 Cont) (bind_assert_free _ t1 t2 cont)
-    | RExists : forall w ass i Cont cont t,
-        RFree' RA (w ▻ i) (env.snoc ass i t) Cont (cont t).
-    
-      (* Binary parametricity translation *)
-    
-    Lemma Pure_relates_pure' {A a} (RA : Relation A a) :
-    forall (w : Ctx nat) (ass : Assignment w),
-        (RA -> (RFree' RA))%R w ass (C_val A w) (ret_free a).
-    Proof.  constructor. Qed.
-
-    Lemma False_relates_false' {A a} (RA : Relation A a) :
-    forall (w : Ctx nat) (ass : Assignment w),
-        RFree' RA w ass (C_fls A w) (@fail_free a).
-    Proof.  constructor. Qed.
-
-    Lemma Assert_relates_assert' :
-      forall (w : Ctx nat) (ass : Assignment w),
-        (RTy -> RTy -> (RFree' RUnit))%R w ass assert' assert.
-    Proof. constructor; assumption. Qed.
-
-    Lemma Exists_relates_exists' :
-      forall (w : Ctx nat) (ass : Assignment w),
-        (RFree' RTy) w ass (exists_Ty w) exists_ty.
-    Proof. admit. Admitted.
-
-    Lemma Bind_relates_bind' {A B a b} (RA : Relation A a) (RB : Relation B b) :
-      forall (w : Ctx nat) (ass : Assignment w),
-        ((RFree' RA) -> (RBox (RA -> RFree' RB)) -> (RFree' RB))%R w ass (@bind' A B w) bind.
-    Proof. intros w ass ? ? ?. induction H. admit.
-      Admitted.
-
-    End WithInductive.
-
-  End Refinement.
-
 End Symbolic.
 
+Section Refinement.
+
+  (* The refinement proof, relating the deeply-embedded or symbolic `infer` to the shallowly-embedded `infer` is accomplished
+     using a logical relation similar to [Keuchel22]. *)
+
+  Definition Assignment : Ctx nat -> Type :=
+    env.Env (fun _ => ty).
+
+  (* A  variation on the definition of `Relations.Relation_Definitions.relation` but now
+     relating a World-indexed Type `A` to a regular type `a` *)
+  Check relation.
+  (* Given a world `w` and an assignment (or valuation) `ass` assigning concrete types to
+     each unification variable in the world, we can relate the world-indexed type `A w`
+     to the regular type `a` *)
+  Definition Relation (A : Ctx nat -> Type) (a : Type) : Type :=
+    forall (w : Ctx nat) (ass : Assignment w),
+    A w -> a -> Prop.
+
+  Check Relation.
+
+  (* To start, we define a relation between deeply-embedded object-language types `Ty`
+     and shallowly-embedded object-language types `ty` *)
+  (* These two are related if, given a world and an assignment (or valuation) from unification variables
+     in the world to concrete object language types, applying the assignment to the `Ty` is equal to `ty` *)
+  Definition RTy : Relation Ty ty :=
+    fun (w : Ctx nat) (ass : Assignment w) (T : Ty w) (t : ty) => Unification.applyassign T ass = t.
+
+  (* We can also relate deeply-embedded free computations `Cstr` to shallowly-embedded free computations `freeM`.
+     This is parametric in the relation of values `A` and `a` in their respective free monads *)
+  (* i.e., RFree : Relation A a -> Relation (Cstr A) (freeM a) *)
+  Definition RFree {A a} (RA : Relation A a) : Relation (Cstr A) (freeM a) :=
+    fix R (w : Ctx nat) (ass : Assignment w) (F : Cstr A w) (f : freeM a) : Prop :=
+      match F, f with
+      | C_val _ _ V, ret_free _ v =>
+          RA w ass V v
+      | C_fls _ _, fail_free _ =>
+          True
+      | C_eqc _ _ t1 t2 cont, bind_assert_free _ t1' t2' cont' =>
+          RTy w ass t1 t1' /\
+          RTy w ass t2 t2' /\
+          R w ass cont cont'
+      | C_exi _ _ i cont, bind_exists_free _ tf =>
+          forall (t : ty),
+          R (w ▻ i) (env.snoc ass i t) cont (tf t)
+      | _, _ =>
+          False
+      end.
+
+
+  Check RFree.
+
+  (* Relating boxed symbolic values is more interesting, since the accessibility witness
+     can now contain an arbitrary amount of new unification variables.
+     We say that in every accessible world, i.e. given a witness ω: w ⊑ w',
+     a symbolic computation x is related to a shallow computation y,
+     iff the type assignment in w' subsumes the assignment in w.
+     an assignment a subsumes an assignment b iff every type assignment in b
+     also occurs in a. E.g.
+     { τ₀ -> Bool ; } is subsumed by { τ₀ -> Bool ; τ₁ -> Arrow τ₀ τ₀ }
+     But
+     { τ₀ -> Bool ; } is NOT subsumed by { τ₀ -> Nat ; τ₁ -> Arrow τ₀ τ₀ }
+     since τ₀ has a different assignment.
+     *)
+
+  Check Symbolic.transient.
+  Check @env.lookup.
+  Check env.tabulate.
+
+  Definition compose {w0 w1} (ω : Symbolic.Accessibility w0 w1) : Assignment w1 -> Assignment w0.
+  refine (
+    fun ass => env.tabulate _
+  ). Proof.
+    intros x xIn.
+    apply (Symbolic.transient _ _ _ ω) in xIn.
+    hnf in ass.
+    Check env.lookup ass xIn.
+    exact (env.lookup ass xIn).
+    Show Proof.
+    Defined.
+
+    Eval cbv [compose] in @compose.
+
+  Definition RBox {A a} (RA : Relation A a) : Relation (Symbolic.Box A) a :=
+    fun (w : Ctx nat) (ass : Assignment w) (x : Symbolic.Box A w) (y : a) =>
+      forall (w' : Ctx nat) (ω : Symbolic.Accessibility w w') (ass' : Assignment w'),
+        ass = compose ω ass' ->
+        RA _ ass' (x w' ω) y.
+
+  Check RBox.
+
+  (* For functions/impl: related inputs go to related outputs *)
+  Definition RArr {A a B b} (RA : Relation A a) (RB : Relation B b) : Relation (Symbolic.Impl A B) (a -> b) :=
+    fun w ass fS fs => forall (V : A w) (v : a),
+      RA w ass V v -> RB w ass (fS V) (fs v).
+
+  Check Symbolic.Unit.
+  Definition RUnit : Relation Symbolic.Unit unit :=
+    fun w ass _ _ => True.
+
+  Declare Scope rel_scope.
+  Delimit Scope rel_scope with R.
+  Notation "A -> B" := (RArr A B) : rel_scope.
+
+  (* Using our relation on functions, we can now prove that both the symbolic and the shallow return are related *)
+  Lemma Pure_relates_pure {A a} (RA : Relation A a) :
+    forall (w : Ctx nat) (ass : Assignment w),
+      (RA -> (RFree RA))%R w ass (C_val A w) (ret_free a).
+  Proof.
+    unfold RArr. unfold RFree. auto.
+  Qed.
+
+  Lemma False_relates_false {A a} (RA : Relation A a) :
+    forall (w : Ctx nat) (ass : Assignment w),
+      RFree RA w ass (C_fls A w) (@fail_free a).
+  Proof.
+    unfold RArr. unfold RFree. auto.
+  Qed.
+
+  Check C_eqc.
+
+  Check RUnit.
+  Check assert.
+  Check Symbolic.assert'.
+
+  (* RTy -> RTy -> RFree RUnit *)
+  Lemma Assert_relates_assert :
+    forall (w : Ctx nat) (ass : Assignment w),
+      (RTy -> RTy -> (RFree RUnit))%R w ass Symbolic.assert' assert.
+  Proof. firstorder. Qed.
+
+  Check exists_ty.
+  Check Symbolic.exists_Ty.
+
+  Lemma Exists_relates_exists :
+    forall (w : Ctx nat) (ass : Assignment w),
+      (RFree RTy) w ass (Symbolic.exists_Ty w) exists_ty.
+  Proof. firstorder. Qed.
+
+  Check bind.
+  Check Symbolic.bind'.
+
+  Lemma Bind_relates_bind {A B a b} (RA : Relation A a) (RB : Relation B b) :
+    forall (w : Ctx nat) (ass : Assignment w),
+      ((RFree RA) -> (RBox (RA -> RFree RB)) -> (RFree RB))%R w ass (@Symbolic.bind' A B w) bind.
+  Proof. cbn. intros w ass. intros X. induction X; intros x rx; destruct x; cbn in rx; try contradiction. admit. Admitted.
+
+  (* As an alternative to messing with fixpoint definitions for the RFree, perhaps it makes
+     more sense to define it as an inductive proposition. *)
+  Section WithInductive.
+
+  Inductive RFree' {A a} (RA : Relation A a) : Relation (Cstr A) (freeM a) :=
+  | RPure : forall w ass V v,
+      RFree' RA w ass (C_val _ _ V) (ret_free _ v)
+  | RFalse : forall w ass,
+      RFree' RA w ass (C_fls _ _) (fail_free _)
+  | RAssert : forall w ass T1 T2 t1 t2 Cont cont,
+      RTy w ass T1 t1 ->
+      RTy w ass T2 t2 ->
+      RFree' RA w ass (C_eqc _ _ T1 T2 Cont) (bind_assert_free _ t1 t2 cont)
+  | RExists : forall w ass i Cont cont t,
+      RFree' RA (w ▻ i) (env.snoc ass i t) Cont (cont t).
+
+    (* Binary parametricity translation *)
+
+  Lemma Pure_relates_pure' {A a} (RA : Relation A a) :
+  forall (w : Ctx nat) (ass : Assignment w),
+      (RA -> (RFree' RA))%R w ass (C_val A w) (ret_free a).
+  Proof.  constructor. Qed.
+
+  Lemma False_relates_false' {A a} (RA : Relation A a) :
+  forall (w : Ctx nat) (ass : Assignment w),
+      RFree' RA w ass (C_fls A w) (@fail_free a).
+  Proof.  constructor. Qed.
+
+  Lemma Assert_relates_assert' :
+    forall (w : Ctx nat) (ass : Assignment w),
+      (RTy -> RTy -> (RFree' RUnit))%R w ass Symbolic.assert' assert.
+  Proof. constructor; assumption. Qed.
+
+  Lemma Exists_relates_exists' :
+    forall (w : Ctx nat) (ass : Assignment w),
+      (RFree' RTy) w ass (Symbolic.exists_Ty w) exists_ty.
+  Proof. admit. Admitted.
+
+  Lemma Bind_relates_bind' {A B a b} (RA : Relation A a) (RB : Relation B b) :
+    forall (w : Ctx nat) (ass : Assignment w),
+      ((RFree' RA) -> (RBox (RA -> RFree' RB)) -> (RFree' RB))%R w ass (@Symbolic.bind' A B w) bind.
+  Proof. intros w ass ? ? ?. induction H. admit.
+    Admitted.
+
+  End WithInductive.
+
+End Refinement.
