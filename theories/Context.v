@@ -35,7 +35,7 @@ From Coq Require Import
      Strings.String.
 
 From Equations Require Import Equations.
-From MasterThesis Require Import
+From Em Require Import
      Prelude.
 
 Local Set Implicit Arguments.

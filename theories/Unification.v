@@ -42,7 +42,7 @@ From Equations.Type Require
      WellFounded.
 From Equations.Prop Require
      Classes.
-From MasterThesis Require Import
+From Em Require Import
      Context Environment Prelude STLC.
 Import ctx.
 Import ctx.notations.

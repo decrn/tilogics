@@ -30,7 +30,7 @@ From Coq Require Import
      Bool.Bool.
 From Equations Require Import Equations.
 
-From MasterThesis Require Import
+From Em Require Import
      Context Prelude.
 Import ctx.notations.
 
