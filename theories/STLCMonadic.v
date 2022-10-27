@@ -739,46 +739,84 @@ Section Refinement.
      more sense to define it as an inductive proposition. *)
   Section WithInductive.
 
-  Inductive RFree' {A a} (RA : Relation A a) : Relation (Cstr A) (freeM a) :=
-  | RPure : forall w ass V v,
-      RFree' RA w ass (C_val _ _ V) (ret_free _ v)
-  | RFalse : forall w ass,
-      RFree' RA w ass (C_fls _ _) (fail_free _)
-  | RAssert : forall w ass T1 T2 t1 t2 Cont cont,
-      RTy w ass T1 t1 ->
-      RTy w ass T2 t2 ->
-      RFree' RA w ass (C_eqc _ _ T1 T2 Cont) (bind_assert_free _ t1 t2 cont)
-  | RExists : forall w ass i Cont cont t,
-      RFree' RA (w ▻ i) (env.snoc ass i t) Cont (cont t).
+    Inductive RFree' {A a} (RA : Relation A a) (w : Ctx nat)
+                     (ass : Assignment w) : Cstr A w -> freeM a -> Prop :=
+    | RPure : forall (V : A w) (v : a),
+        RA w ass V v ->
+        RFree' RA w ass (C_val _ _ V) (ret_free _ v)
+    | RFalse :
+        RFree' RA w ass (C_fls _ _) (fail_free _)
+    | RAssert : forall T1 T2 t1 t2 Cont cont,
+        RTy w ass T1 t1 ->
+        RTy w ass T2 t2 ->
+        RFree' RA w ass Cont cont ->
+        RFree' RA w ass (C_eqc _ _ T1 T2 Cont) (bind_assert_free _ t1 t2 cont)
+    | RExists : forall i Cont cont,
+        (forall (t : ty),
+         RFree' RA (w ▻ i) (env.snoc ass i t) Cont (cont t)) ->
+        RFree' RA w ass (C_exi _ _ i Cont) (bind_exists_free _ cont).
 
     (* Binary parametricity translation *)
 
-  Lemma Pure_relates_pure' {A a} (RA : Relation A a) :
-  forall (w : Ctx nat) (ass : Assignment w),
-      (RA -> (RFree' RA))%R w ass (C_val A w) (ret_free a).
-  Proof.  constructor. Qed.
-
-  Lemma False_relates_false' {A a} (RA : Relation A a) :
-  forall (w : Ctx nat) (ass : Assignment w),
-      RFree' RA w ass (C_fls A w) (@fail_free a).
-  Proof.  constructor. Qed.
-
-  Lemma Assert_relates_assert' :
+    Lemma Pure_relates_pure' {A a} (RA : Relation A a) :
     forall (w : Ctx nat) (ass : Assignment w),
-      (RTy -> RTy -> (RFree' RUnit))%R w ass Symbolic.assert Shallow.assert.
-  Proof. constructor; assumption. Qed.
+        (RA -> (RFree' RA))%R w ass (C_val A w) (ret_free a).
+    Proof.  constructor. assumption. Qed.
 
-  Lemma Exists_relates_exists' :
+    Lemma False_relates_false' {A a} (RA : Relation A a) :
     forall (w : Ctx nat) (ass : Assignment w),
-      (RFree' RTy) w ass (Symbolic.exists_Ty w) Shallow.exists_ty.
-  Proof. admit. Admitted.
+        RFree' RA w ass (C_fls A w) (@fail_free a).
+    Proof.  constructor. Qed.
 
-  Lemma Bind_relates_bind' {A B a b} (RA : Relation A a) (RB : Relation B b) :
-    forall (w : Ctx nat) (ass : Assignment w),
-      ((RFree' RA) -> (RBox (RA -> RFree' RB)) -> (RFree' RB))%R w ass (@Symbolic.bind A B w) Shallow.bind.
-  Proof. intros w ass ? ? ?. induction H. admit.
+    Lemma Assert_relates_assert' :
+      forall (w : Ctx nat) (ass : Assignment w),
+        (RTy -> RTy -> (RFree' RUnit))%R w ass Symbolic.assert Shallow.assert.
+      Proof. repeat (constructor; try assumption). Qed.
+
+    Lemma Exists_relates_exists' :
+      forall (w : Ctx nat) (ass : Assignment w),
+        (RFree' RTy) w ass (Symbolic.exists_Ty w) Shallow.exists_ty.
+    Proof. repeat constructor. Qed.
+
+    Lemma Bind_relates_bind' {A B a b} (RA : Relation A a) (RB : Relation B b) :
+      forall (w : Ctx nat) (ass : Assignment w),
+        ((RFree' RA) -> (RBox (RA -> RFree' RB)) -> (RFree' RB))%R w ass (@Symbolic.bind A B w) Shallow.bind.
+    Proof. intros w ass ? ? ?. induction H;  cbn.
+           - intros F f HF. unfold Symbolic.T. unfold RBox in HF. unfold RArr in HF. apply HF.
+             + admit.
+             + assumption.
+           - admit.
+           - admit.
+           - admit.
     Admitted.
 
-  End WithInductive.
+    End WithInductive.
+
+  Check Symbolic.infer.
+  Check Shallow.infer.
+
+  Axiom infer_no_elab : expr -> env -> freeM ty.
+  Axiom REnv : Relation Env env.
+
+  Lemma infers_are_related (e : expr) (w : Ctx nat) (ass : Assignment w) : Prop.
+    Check Symbolic.infer e.
+    Check infer_no_elab e.
+    Check RArr REnv (RFree' _).
+    Check RArr REnv (RFree' RTy).
+    Check (RArr REnv (RFree' RTy)) w ass.
+    apply (RArr REnv (RFree' RTy) w ass).
+    unfold Symbolic.Impl.
+    Check Symbolic.infer.
+    apply (Symbolic.infer e).
+    Check infer_no_elab.
+    apply (infer_no_elab e).
+    Restart.
+    apply (RArr REnv (RFree' RTy) w ass (Symbolic.infer e) (infer_no_elab e)).
+  Abort.
+
+  Lemma infers_are_related (e : expr) (w : Ctx nat) (ass : Assignment w)
+    : (RArr REnv (RFree' RTy) w ass (Symbolic.infer e) (infer_no_elab e)).
+  Proof.
+  Admitted.
 
 End Refinement.
