@@ -10,6 +10,16 @@ From Em Require
   Prelude Unification.
 Import ctx.notations.
 
+(* This module implements type inference for STLC
+   using a shallow representation of constraints.
+   Essentially, constraints are nothing more than propositions in Coq.
+   This results in a fairly straightforward implementation,
+   but one which is essentially unusable, because we cannot inspect
+   the witnesses for these propositions. This is problematic,
+   because these witnesses are the unified type variables
+   which give the type and the elaboration of the term. *)
+Module Shallow.
+
   (* Monadic type inference for STLC is expressed as a computation inside TypeCheckM.
      Note that STLC requires unification of type variables.
      These type variables are introduced by the exists_ty computation *)
@@ -22,12 +32,6 @@ Import ctx.notations.
       exists_ty         : M ty ; (* NEW *)
     }.
 
-  Inductive freeM (A : Type) : Type :=
-    | bind_assert_free : ty -> ty -> freeM A -> freeM A
-    | ret_free : A -> freeM A
-    | fail_free : freeM A
-    | bind_exists_free : (ty -> freeM A) -> freeM A.
-
   Notation "x <- ma ;; mb" :=
           (bind ma (fun x => mb))
             (at level 80, ma at next level, mb at level 200, right associativity).
@@ -37,15 +41,6 @@ Import ctx.notations.
             (at level 80, x pattern, ma at next level, mb at level 200, right associativity,
              format "' x  <-  ma  ;;  mb").
 
-(* This section implements type inference for STLC
-   using a shallow representation of constraints.
-   Essentially, constraints are nothing more than propositions in Coq.
-   This results in a fairly straightforward implementation,
-   but one which is essentially unusable, because we cannot inspect
-   the witnesses for these propositions. This is problematic,
-   because these witnesses are the unified type variables
-   which give the type and the elaboration of the term. *)
-Module Shallow.
 
   Fixpoint freeM_bind [T1 T2 : Type] (m : freeM T1) (f : T1 -> freeM T2) : freeM T2 :=
     match m with
@@ -396,7 +391,7 @@ Module Symbolic.
 
   Print Scopes.
 
-  Fixpoint bind' [A B] {Σ} (m : Cstr A Σ) (f : Box (Impl A (Cstr B)) Σ) {struct m} : Cstr B Σ.
+  Fixpoint bind [A B] {Σ} (m : Cstr A Σ) (f : Box (Impl A (Cstr B)) Σ) {struct m} : Cstr B Σ.
   refine (
     match m with
     | C_eqc _ _ t1 t2 C1 => _
@@ -405,20 +400,20 @@ Module Symbolic.
     | C_exi _ _ i C => _
     end).
   Proof.
-    - apply C_eqc. apply t1. apply t2. eapply bind'.
+    - apply C_eqc. apply t1. apply t2. eapply bind.
       + apply C1.
       + apply f.
     - apply T in f. unfold Impl in f. apply f. apply v.
-    - eapply C_exi. eapply bind'.
+    - eapply C_exi. eapply bind.
       + apply C.
       + apply _4 in f. cbv in *. intros. apply (f _ (fresh _ _ _ (refl Σ)) _ H X).
   Show Proof.
   Defined.
 
-  Eval cbv [bind] in @bind'.
+  Eval cbv [bind] in @bind.
 
   Local Notation "[ ω ] x <- ma ;; mb" :=
-    (bind' ma (fun _ ω x => mb))
+    (bind ma (fun _ ω x => mb))
       (at level 80, x at next level,
         ma at next level, mb at level 200,
         right associativity).
@@ -427,7 +422,7 @@ Module Symbolic.
 
   Check Unit.
 
-  Definition assert' {Σ} t1 t2 := C_eqc Unit Σ t1 t2 (C_val Unit Σ tt).
+  Definition assert {Σ} t1 t2 := C_eqc Unit Σ t1 t2 (C_val Unit Σ tt).
 
   Check Persistent_Env.
 
@@ -435,7 +430,7 @@ Module Symbolic.
 
   Local Notation "<{ A ~ w }>" := (persist _ A _ w).
 
-  Check exists_ty.
+  Check Shallow.exists_ty.
 
   Check Cstr _ _.
   Print freeM.
@@ -455,16 +450,16 @@ Module Symbolic.
     | ty_func do co => Ty_func Σ (convert do Σ) (convert co Σ)
     end.
 
-  Fixpoint infer'' (expression : expr) {Σ : Ctx nat} (Γ : Env Σ) {struct expression} : Cstr Ty Σ :=
+  Fixpoint infer (expression : expr) {Σ : Ctx nat} (Γ : Env Σ) {struct expression} : Cstr Ty Σ :=
     match expression with
     | v_true => C_val Ty Σ (Ty_bool Σ)
     | v_false => C_val Ty Σ (Ty_bool Σ)
     | e_if cnd coq alt =>
-        [ ω₁ ] t_cnd <- infer'' cnd Γ ;;
-        [ ω₂ ] _     <- assert' t_cnd (Ty_bool _) ;;
-        [ ω₃ ] t_coq <- infer'' coq <{ Γ ~ ω₁ .> ω₂ }> ;;
-        [ ω₄ ] t_alt <- infer'' alt <{ Γ ~ ω₁ .> ω₂ .> ω₃ }> ;;
-        [ ω₅ ] _     <- assert' <{ t_coq ~ ω₄ }>  <{ t_alt ~ (refl _) }> ;;
+        [ ω₁ ] t_cnd <- infer cnd Γ ;;
+        [ ω₂ ] _     <- assert t_cnd (Ty_bool _) ;;
+        [ ω₃ ] t_coq <- infer coq <{ Γ ~ ω₁ .> ω₂ }> ;;
+        [ ω₄ ] t_alt <- infer alt <{ Γ ~ ω₁ .> ω₂ .> ω₃ }> ;;
+        [ ω₅ ] _     <- assert <{ t_coq ~ ω₄ }>  <{ t_alt ~ (refl _) }> ;;
            C_val Ty _ <{ t_coq ~ ω₄ .> ω₅ }>
     | e_var var =>
         match (value var Γ) with
@@ -473,17 +468,17 @@ Module Symbolic.
         end
     | e_app f a =>
         [ w1 ] t_co <- exists_Ty Σ ;;
-        [ w2 ] t_do <- infer'' a <{ Γ ~ w1 }> ;;
-        [ w3 ] t_fn <- infer'' f <{ Γ ~ w1 .> w2 }> ;;
-        [ w4 ] _    <- assert' t_fn <{ (Ty_func _ t_do <{ t_co ~ w2 }> ) ~ w3 }> ;;
+        [ w2 ] t_do <- infer a <{ Γ ~ w1 }> ;;
+        [ w3 ] t_fn <- infer f <{ Γ ~ w1 .> w2 }> ;;
+        [ w4 ] _    <- assert t_fn <{ (Ty_func _ t_do <{ t_co ~ w2 }> ) ~ w3 }> ;;
            C_val Ty _ <{ t_co ~ w2 .> w3 .> w4 }>
     | e_abst var t_var e =>
         let t_var' := (convert t_var Σ) in (* t_var lives in ty, not in (Ty w) *)
-        [ w1 ] t_e <- infer'' e ((var, t_var') :: Γ) ;;
+        [ w1 ] t_e <- infer e ((var, t_var') :: Γ) ;;
           C_val Ty _ (Ty_func _ <{ t_var' ~ w1 }> t_e)
     | e_absu var e =>
         [ w1 ] t_var <- exists_Ty Σ ;;
-        [ w2 ] t_e <- infer'' e ((var, t_var) :: <{ Γ ~ w1 }>) ;;
+        [ w2 ] t_e <- infer e ((var, t_var) :: <{ Γ ~ w1 }>) ;;
           C_val Ty _ (Ty_func _ <{ t_var ~ w2 }> t_e)
     end.
 
@@ -517,8 +512,8 @@ Module Symbolic.
       | C_exi _ _ i cont => P_Exist _ _ i (pnf cont)
       end.
 
-    Compute infer'' (e_if v_true (e_absu "x" (e_var "x")) (e_absu "x" (e_var "x"))) nil.
-    Compute pnf (infer'' (e_if v_true (e_absu "x" (e_var "x")) (e_absu "x" (e_var "x"))) nil).
+    Compute infer (e_if v_true (e_absu "x" (e_var "x")) (e_absu "x" (e_var "x"))) nil.
+    Compute pnf (infer (e_if v_true (e_absu "x" (e_var "x")) (e_absu "x" (e_var "x"))) nil).
 
     Definition Prenex' A Σ : Type :=
       option { Σ' : Ctx nat & Accessibility Σ Σ' * list (Ty Σ' * Ty Σ') * A Σ' }%type.
@@ -631,13 +626,13 @@ Section Refinement.
           RA w ass V v
       | C_fls _ _, fail_free _ =>
           True
-      | C_eqc _ _ t1 t2 cont, bind_assert_free _ t1' t2' cont' =>
-          RTy w ass t1 t1' /\
-          RTy w ass t2 t2' /\
-          R w ass cont cont'
-      | C_exi _ _ i cont, bind_exists_free _ tf =>
+      | C_eqc _ _ T1 T2 K, bind_assert_free _ t1 t2 k =>
+          RTy w ass T1 t1 /\
+          RTy w ass T2 t2 /\
+          R w ass K k
+      | C_exi _ _ i K, bind_exists_free _ k =>
           forall (t : ty),
-          R (w ▻ i) (env.snoc ass i t) cont (tf t)
+          R (w ▻ i) (env.snoc ass i t) K (k t)
       | _, _ =>
           False
       end.
@@ -715,29 +710,29 @@ Section Refinement.
   Check C_eqc.
 
   Check RUnit.
-  Check assert.
-  Check Symbolic.assert'.
+  Check Shallow.assert.
+  Check Symbolic.assert.
 
   (* RTy -> RTy -> RFree RUnit *)
   Lemma Assert_relates_assert :
     forall (w : Ctx nat) (ass : Assignment w),
-      (RTy -> RTy -> (RFree RUnit))%R w ass Symbolic.assert' assert.
+      (RTy -> RTy -> (RFree RUnit))%R w ass Symbolic.assert Shallow.assert.
   Proof. firstorder. Qed.
 
-  Check exists_ty.
+  Check Shallow.exists_ty.
   Check Symbolic.exists_Ty.
 
   Lemma Exists_relates_exists :
     forall (w : Ctx nat) (ass : Assignment w),
-      (RFree RTy) w ass (Symbolic.exists_Ty w) exists_ty.
+      (RFree RTy) w ass (Symbolic.exists_Ty w) Shallow.exists_ty.
   Proof. firstorder. Qed.
 
-  Check bind.
-  Check Symbolic.bind'.
+  Check Shallow.bind.
+  Check Symbolic.bind.
 
   Lemma Bind_relates_bind {A B a b} (RA : Relation A a) (RB : Relation B b) :
     forall (w : Ctx nat) (ass : Assignment w),
-      ((RFree RA) -> (RBox (RA -> RFree RB)) -> (RFree RB))%R w ass (@Symbolic.bind' A B w) bind.
+      ((RFree RA) -> (RBox (RA -> RFree RB)) -> (RFree RB))%R w ass (@Symbolic.bind A B w) Shallow.bind.
   Proof. cbn. intros w ass. intros X. induction X; intros x rx; destruct x; cbn in rx; try contradiction. admit. Admitted.
 
   (* As an alternative to messing with fixpoint definitions for the RFree, perhaps it makes
@@ -770,17 +765,17 @@ Section Refinement.
 
   Lemma Assert_relates_assert' :
     forall (w : Ctx nat) (ass : Assignment w),
-      (RTy -> RTy -> (RFree' RUnit))%R w ass Symbolic.assert' assert.
+      (RTy -> RTy -> (RFree' RUnit))%R w ass Symbolic.assert Shallow.assert.
   Proof. constructor; assumption. Qed.
 
   Lemma Exists_relates_exists' :
     forall (w : Ctx nat) (ass : Assignment w),
-      (RFree' RTy) w ass (Symbolic.exists_Ty w) exists_ty.
+      (RFree' RTy) w ass (Symbolic.exists_Ty w) Shallow.exists_ty.
   Proof. admit. Admitted.
 
   Lemma Bind_relates_bind' {A B a b} (RA : Relation A a) (RB : Relation B b) :
     forall (w : Ctx nat) (ass : Assignment w),
-      ((RFree' RA) -> (RBox (RA -> RFree' RB)) -> (RFree' RB))%R w ass (@Symbolic.bind' A B w) bind.
+      ((RFree' RA) -> (RBox (RA -> RFree' RB)) -> (RFree' RB))%R w ass (@Symbolic.bind A B w) Shallow.bind.
   Proof. intros w ass ? ? ?. induction H. admit.
     Admitted.
 
