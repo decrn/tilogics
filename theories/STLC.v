@@ -31,9 +31,9 @@ Import ctx.notations.
 (* ===== Typing relation ===== *)
 
   Inductive freeM (A : Type) : Type :=
-    | bind_assert_free : ty -> ty -> freeM A -> freeM A
     | ret_free : A -> freeM A
     | fail_free : freeM A
+    | bind_assert_free : ty -> ty -> freeM A -> freeM A
     | bind_exists_free : (ty -> freeM A) -> freeM A.
 
   (* Context/environment of term variables and their types *)

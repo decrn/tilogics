@@ -607,8 +607,6 @@ Section Refinement.
     forall (w : Ctx nat) (ass : Assignment w),
     A w -> a -> Prop.
 
-  Check Relation.
-
   (* To start, we define a relation between deeply-embedded object-language types `Ty`
      and shallowly-embedded object-language types `ty` *)
   (* These two are related if, given a world and an assignment (or valuation) from unification variables
@@ -653,6 +651,8 @@ Section Refinement.
      since τ₀ has a different assignment.
      *)
 
+
+  (*
   Check Symbolic.transient.
   Check @env.lookup.
   Check env.tabulate.
@@ -667,9 +667,16 @@ Section Refinement.
     Check env.lookup ass xIn.
     exact (env.lookup ass xIn).
     Show Proof.
-    Defined.
+    Abort. *)
 
-    Eval cbv [compose] in @compose.
+  Definition compose {w0 w1} (ω : Symbolic.Accessibility w0 w1) : Assignment w1 -> Assignment w0 :=
+    fun ass => env.tabulate (fun x xIn => env.lookup ass (Symbolic.transient w0 w1 x ω xIn)).
+
+    (* Eval cbv [compose] in @compose. *)
+
+  Lemma composing_refl : forall w ass,
+      compose (Symbolic.refl w) ass = ass.
+  Proof. unfold compose. cbn. induction ass; cbn; try congruence. Qed.
 
   Definition RBox {A a} (RA : Relation A a) : Relation (Symbolic.Box A) a :=
     fun (w : Ctx nat) (ass : Assignment w) (x : Symbolic.Box A w) (y : a) =>
@@ -677,14 +684,11 @@ Section Refinement.
         ass = compose ω ass' ->
         RA _ ass' (x w' ω) y.
 
-  Check RBox.
-
   (* For functions/impl: related inputs go to related outputs *)
   Definition RArr {A a B b} (RA : Relation A a) (RB : Relation B b) : Relation (Symbolic.Impl A B) (a -> b) :=
     fun w ass fS fs => forall (V : A w) (v : a),
       RA w ass V v -> RB w ass (fS V) (fs v).
 
-  Check Symbolic.Unit.
   Definition RUnit : Relation Symbolic.Unit unit :=
     fun w ass _ _ => True.
 
@@ -696,22 +700,20 @@ Section Refinement.
   Lemma Pure_relates_pure {A a} (RA : Relation A a) :
     forall (w : Ctx nat) (ass : Assignment w),
       (RA -> (RFree RA))%R w ass (C_val A w) (ret_free a).
-  Proof.
-    unfold RArr. unfold RFree. auto.
-  Qed.
+  Proof. unfold RArr. unfold RFree. auto. Qed.
 
   Lemma False_relates_false {A a} (RA : Relation A a) :
     forall (w : Ctx nat) (ass : Assignment w),
       RFree RA w ass (C_fls A w) (@fail_free a).
-  Proof.
-    unfold RArr. unfold RFree. auto.
-  Qed.
+  Proof. unfold RArr. unfold RFree. auto. Qed.
 
+  (*
   Check C_eqc.
 
   Check RUnit.
   Check Shallow.assert.
   Check Symbolic.assert.
+   *)
 
   (* RTy -> RTy -> RFree RUnit *)
   Lemma Assert_relates_assert :
@@ -719,16 +721,20 @@ Section Refinement.
       (RTy -> RTy -> (RFree RUnit))%R w ass Symbolic.assert Shallow.assert.
   Proof. firstorder. Qed.
 
+  (*
   Check Shallow.exists_ty.
   Check Symbolic.exists_Ty.
+  *)
 
   Lemma Exists_relates_exists :
     forall (w : Ctx nat) (ass : Assignment w),
       (RFree RTy) w ass (Symbolic.exists_Ty w) Shallow.exists_ty.
   Proof. firstorder. Qed.
 
+  (*
   Check Shallow.bind.
   Check Symbolic.bind.
+  *)
 
   Lemma Bind_relates_bind {A B a b} (RA : Relation A a) (RB : Relation B b) :
     forall (w : Ctx nat) (ass : Assignment w),
@@ -736,7 +742,7 @@ Section Refinement.
   Proof. cbn. intros w ass. intros X. induction X; intros x rx; destruct x; cbn in rx; try contradiction. admit. Admitted.
 
   (* As an alternative to messing with fixpoint definitions for the RFree, perhaps it makes
-     more sense to define it as an inductive proposition. *)
+     more sense to define RFree as an inductive relation. *)
   Section WithInductive.
 
     Inductive RFree' {A a} (RA : Relation A a) (w : Ctx nat)
@@ -778,26 +784,39 @@ Section Refinement.
         (RFree' RTy) w ass (Symbolic.exists_Ty w) Shallow.exists_ty.
     Proof. repeat constructor. Qed.
 
+    Check Symbolic.bind.
+    Check Shallow.bind.
     Lemma Bind_relates_bind' {A B a b} (RA : Relation A a) (RB : Relation B b) :
       forall (w : Ctx nat) (ass : Assignment w),
         ((RFree' RA) -> (RBox (RA -> RFree' RB)) -> (RFree' RB))%R w ass (@Symbolic.bind A B w) Shallow.bind.
-    Proof. intros w ass ? ? ?. induction H;  cbn.
-           - intros F f HF. unfold Symbolic.T. unfold RBox in HF. unfold RArr in HF. apply HF.
-             + admit.
-             + assumption.
-           - admit.
-           - admit.
-           - admit.
+    Proof. intros w ass ? ? ?. induction H;  cbn; intros F f HF; try constructor; try assumption.
+           - unfold Symbolic.T. unfold RBox in HF. unfold RArr in HF. apply HF.
+             symmetry. apply composing_refl. assumption.
+           - apply IHRFree'. assumption.
+           - intro. unfold Symbolic._4. apply H0. clear H0 H. unfold RBox.
+             intros. apply HF. clear HF. admit.
     Admitted.
 
-    End WithInductive.
+  End WithInductive.
 
+  (*
   Check Symbolic.infer.
   Check Shallow.infer.
+  Check RTy.
+  *)
+
+  (* TODO: define REnv inductively *)
+  Definition REnv : Relation Env env :=
+    fun (w : Ctx nat) (ass : Assignment w) (Γ : Env w) (γ : env) => forall (pvar : string),
+      match (value pvar Γ), (value pvar γ) with
+      | Some T, Some t => RTy w ass T t
+      | None, None => True
+      | _, _ => False
+      end.
 
   Axiom infer_no_elab : expr -> env -> freeM ty.
-  Axiom REnv : Relation Env env.
 
+  (*
   Lemma infers_are_related (e : expr) (w : Ctx nat) (ass : Assignment w) : Prop.
     Check Symbolic.infer e.
     Check infer_no_elab e.
@@ -813,6 +832,7 @@ Section Refinement.
     Restart.
     apply (RArr REnv (RFree' RTy) w ass (Symbolic.infer e) (infer_no_elab e)).
   Abort.
+  *)
 
   Lemma infers_are_related (e : expr) (w : Ctx nat) (ass : Assignment w)
     : (RArr REnv (RFree' RTy) w ass (Symbolic.infer e) (infer_no_elab e)).
