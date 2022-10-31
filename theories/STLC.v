@@ -99,9 +99,9 @@ Section Symbolic.
   Definition Env Σ := list (string * Ty Σ).
 
   Inductive Cstr (A : Ctx nat -> Type) (Σ : Ctx nat) : Type :=
-    | C_eqc : Ty Σ -> Ty Σ -> Cstr A Σ -> Cstr A Σ
     | C_val : A Σ -> Cstr A Σ
     | C_fls : Cstr A Σ
+    | C_eqc : Ty Σ -> Ty Σ -> Cstr A Σ -> Cstr A Σ
     | C_exi : forall (i : nat), Cstr A (Σ ▻ i) -> Cstr A Σ.
 
   (* Data types for constraints in prenex form *)

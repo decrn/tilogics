@@ -377,20 +377,17 @@ Module Symbolic.
     Show Proof. (* Something <>< *)
   Defined.
 
-  Definition T {A} := fun (Σ : Ctx nat) (a : Box A Σ) => a Σ (refl Σ).
-
-  Check T.
-
   Definition trans {Σ₁ Σ₂ Σ₃} (w12 : Accessibility Σ₁ Σ₂) (w23 : Accessibility Σ₂ Σ₃) : Accessibility Σ₁ Σ₃.
   Proof. induction w23. apply w12. apply fresh. apply IHw23. Defined.
 
-  Definition _4 {A} : Valid (Impl (Box A) (Box (Box A))).
-  Proof. cbv in *. intros.  apply X. eapply trans. apply H. apply H0. Show Proof. Defined.
+  Definition T {A} := fun (Σ : Ctx nat) (a : Box A Σ) => a Σ (refl Σ).
 
-  Check _4.
+  Definition _4 {A} : Valid (Impl (Box A) (Box (Box A))).
+  Proof. cbv in *. intros.  apply X. eapply trans. apply H. apply H0. Defined.
 
   Print Scopes.
 
+  (*
   Fixpoint bind [A B] {Σ} (m : Cstr A Σ) (f : Box (Impl A (Cstr B)) Σ) {struct m} : Cstr B Σ.
   refine (
     match m with
@@ -408,7 +405,20 @@ Module Symbolic.
       + apply C.
       + apply _4 in f. cbv in *. intros. apply (f _ (fresh _ _ _ (refl Σ)) _ H X).
   Show Proof.
-  Defined.
+  Abort.
+  *)
+
+  Fixpoint bind [A B] {Σ} (m : Cstr A Σ) (f : Box (Impl A (Cstr B)) Σ) : Cstr B Σ :=
+    match m with
+    | C_eqc _ _ t1 t2 C1 => C_eqc B Σ t1 t2 (bind C1 f)
+    | C_val _ _ v => (T Σ f) v (* removing the box *)
+    | C_fls _ _ => C_fls B Σ
+    | C_exi _ _ i C =>
+        C_exi B Σ i
+          (bind (* (Σ ▻ i) *) C
+              (fun Σ' (ω : Accessibility (Σ ▻ i) Σ') (V : A Σ') =>
+                 (_4 Σ f) (Σ ▻ i) (fresh Σ i Σ (refl Σ)) Σ' ω V))
+    end.
 
   Eval cbv [bind] in @bind.
 
@@ -438,9 +448,9 @@ Module Symbolic.
   Check Cstr Ty _.
 
   Print ctx.In.
-  (* Valid *)
-  Definition exists_Ty : forall GS, Cstr Ty GS :=
-    fun GS => let i := ctx.length GS in C_exi Ty GS i (C_val _ _ (Ty_hole _ i ctx.in_zero)).
+
+  Definition exists_Ty : forall Σ, Cstr Ty Σ :=
+    fun Σ => let i := ctx.length Σ in C_exi Ty Σ i (C_val _ _ (Ty_hole _ i ctx.in_zero)).
 
   Check exists_Ty.
 
@@ -482,78 +492,36 @@ Module Symbolic.
           C_val Ty _ (Ty_func _ <{ t_var ~ w2 }> t_e)
     end.
 
-  (* Submitting a generated constraint to the unifier requires
-     converting the constraint into prenex normal form.
-     We could do this while generating the constraints,
-     but instead we choose to do it afterwards.
-     See theories/STLC.v for the datatype *)
-  Section PrenexNormalForm.
+  Section RunTI.
 
-    (* Insert a given type equality in front of the first non-quantifier.
-       This essentially only requires finding the first non quantifier,
-       and then weakening the world in which the type equality lives to
-       match the current world *)
-    Fixpoint insert_tyeq [A] {Σ} (t1 t2 : Ty Σ) (c : Prenex A Σ) : Prenex A Σ :=
-      match c with
-      | P_Constraint _ _ l => P_Constraint _ _ (C_Equal _ _ t1 t2 l)
-      | P_Exist _ _ i cont =>
-          P_Exist _ _ i (insert_tyeq <{ t1 ~ (fresh _ i _ (refl _)) }>
-                                     <{ t2 ~ (fresh _ i _ (refl _)) }>
-                                     cont)
-      end.
+    (* To run the type inferencer, we must submit a generated
+       constraint to the unifier. In turn, this requires
+       converting the constraint into prenex normal form.
+       We could do this while generating the constraints,
+       but instead we choose to do it afterwards. *)
 
-    (* Turns a given constraint into prenex normal form *)
-    Fixpoint pnf [A] {Σ} (c : Cstr A Σ) : Prenex A Σ :=
-      match c with
-      | C_val _ _ val => P_Constraint _ _ (L_Value _ _ val)
-      | C_fls _ _ => P_Constraint _ _ (L_False _ _)
-      | C_eqc _ _ t1 t2 cont =>
-          insert_tyeq t1 t2 (pnf cont)
-      | C_exi _ _ i cont => P_Exist _ _ i (pnf cont)
-      end.
-
-    Compute infer (e_if v_true (e_absu "x" (e_var "x")) (e_absu "x" (e_var "x"))) nil.
-    Compute pnf (infer (e_if v_true (e_absu "x" (e_var "x")) (e_absu "x" (e_var "x"))) nil).
-
-    Definition Prenex' A Σ : Type :=
+    Definition Prenex A Σ : Type :=
       option { Σ' : Ctx nat & Accessibility Σ Σ' * list (Ty Σ' * Ty Σ') * A Σ' }%type.
 
-    Check Prenex'.
-
-    Fixpoint pnf_conv [A] {Σ} (cstr : Cstr A Σ) : Prenex' A Σ.
-    Admitted.
-
-    Fixpoint prenex_convert [A] {Σ} (pnf : Prenex A Σ) : Prenex' A Σ.
-    Proof.
-      refine(
-      match pnf with
-      | P_Constraint _ _ c =>
-          match c with
-          | L_Value _ _ v =>
-              _
-          | L_False _ _ =>
-              None
-          | C_Equal _ _ σ τ k =>
-              _
+    Fixpoint pnf [A] {Σ} (c : Cstr A Σ) {struct c} : Prenex A Σ :=
+      match c with
+      | C_val _ _ V       =>
+          Some (existT _ _ (refl Σ, nil, V))
+      | C_fls _ _         =>
+          None
+      | C_eqc _ _ T1 T2 K =>
+          match pnf K with
+          | None => None
+          | Some (existT _ Σ' (a, b, c)) =>
+              Some (existT _ _ (a, (<{ T1 ~ a }>, <{ T2 ~ a }>) :: b, c))
           end
-      | P_Exist _ _ i c =>
-          let t := prenex_convert _ _ c in
-          _
-      end).
-      - (* L_Value *)
-        apply Some. exists Σ. repeat apply pair.
-        apply refl.  apply nil.  apply v.
-      - (* C_Equal *)
-        apply Some. exists Σ. repeat apply pair.
-        apply refl. eapply cons. apply (pair σ τ).
-        admit. admit.
-      - (* P_Exist *)
-        destruct t. destruct s. destruct p. destruct p.
-        apply Some. exists (Σ ▻ i). repeat apply pair.
-        Search refl.
-        apply fresh. apply refl. admit. admit. admit. (* apply Box in l. apply nil. admit. *)
-    Show Proof.
-    Admitted.
+      | C_exi _ _ i K     =>
+          match pnf K with
+          | None => None
+          | Some (existT _ Σ' (a, b, c)) =>
+              Some (existT _ _ ((trans (fresh _ i _ (refl Σ)) a), b, c))
+          end
+      end.
 
     Fixpoint ground {Σ} : Unification.Assignment Σ :=
       match Σ with
@@ -563,7 +531,7 @@ Module Symbolic.
 
     Definition solve_constraints {AT AV Σ}
       (Aassign : forall Σ, Unification.Assignment Σ -> AT Σ -> AV) :
-      Prenex' AT Σ -> option AV.
+      Prenex AT Σ -> option AV.
     Proof.
       intros pn.
       apply (Prelude.option.bind pn).
@@ -582,8 +550,11 @@ Module Symbolic.
       refine (@solve_constraints Ty ty [] _ _).
       intros ? ass T.
       apply (Unification.applyassign T ass).
-      revert e.
-    Admitted.
+      apply pnf.
+      apply (infer e []%list).
+    Defined.
+
+    Compute runTI (e_app (e_absu "x" (e_var "x")) (e_absu "x" v_true)).
 
   End PrenexNormalForm.
 
