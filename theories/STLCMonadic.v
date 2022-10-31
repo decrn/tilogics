@@ -562,7 +562,8 @@ End Symbolic.
 
 Section Refinement.
 
-  (* The refinement proof, relating the deeply-embedded or symbolic `infer` to the shallowly-embedded `infer` is accomplished
+  (* The refinement proof, relating the deeply-embedded or symbolic `infer`
+     to the shallowly-embedded `infer` is accomplished
      using a logical relation similar to [Keuchel22]. *)
 
   Definition Assignment : Ctx nat -> Type :=
@@ -760,12 +761,15 @@ Section Refinement.
     Lemma Bind_relates_bind' {A B a b} (RA : Relation A a) (RB : Relation B b) :
       forall (w : Ctx nat) (ass : Assignment w),
         ((RFree' RA) -> (RBox (RA -> RFree' RB)) -> (RFree' RB))%R w ass (@Symbolic.bind A B w) Shallow.bind.
-    Proof. intros w ass ? ? ?. induction H;  cbn; intros F f HF; try constructor; try assumption.
-           - unfold Symbolic.T. unfold RBox in HF. unfold RArr in HF. apply HF.
-             symmetry. apply composing_refl. assumption.
-           - apply IHRFree'. assumption.
-           - intro. unfold Symbolic._4. apply H0. clear H0 H. unfold RBox.
-             intros. apply HF. clear HF. admit.
+    Proof. intros w ass ? ? ?.
+           induction H;  cbn; intros F f HF; try constructor; try assumption.
+           - unfold RBox in HF. unfold RArr in HF. apply HF.
+             symmetry. apply composing_refl. apply H.
+           - unfold RBox in IHRFree'. unfold RArr in IHRFree'. apply IHRFree'.
+             unfold RBox in HF. unfold RArr in HF. apply HF.
+           - intro. apply H0. unfold RBox.
+             intros. apply HF. clear HF H0 H.
+             inversion ω.
     Admitted.
 
   End WithInductive.
