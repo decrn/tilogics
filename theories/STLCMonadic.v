@@ -556,7 +556,7 @@ Module Symbolic.
 
     Compute runTI (e_app (e_absu "x" (e_var "x")) (e_absu "x" v_true)).
 
-  End PrenexNormalForm.
+  End RunTI.
 
 End Symbolic.
 
