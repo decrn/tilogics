@@ -1,14 +1,8 @@
 Require Import List.
-Require Import Relation_Definitions.
-Import ListNotations.
 Require Import String.
-From Em Require Import
-     Context Environment.
+Import ListNotations.
 From Em Require Import
      STLC.
-From Em Require
-  Prelude Unification.
-Import ctx.notations.
 
 (* This module implements type inference for STLC
    using a shallow representation of constraints.
@@ -288,4 +282,3 @@ Import ctx.notations.
     compute. repeat eexists.
     Unshelve. apply ty_bool.
   Qed.
-

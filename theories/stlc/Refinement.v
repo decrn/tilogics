@@ -1,15 +1,8 @@
-Require Import List.
-Require Import Relation_Definitions.
-Import ListNotations.
-Require Import String.
+Require Import Relation_Definitions String.
 From Em Require Import
-     Context Environment.
-From Em Require Import
-     STLC.
-From Em Require Symbolic Shallow.
-From Em Require
-  Prelude Unification.
+     Context Environment STLC.
 Import ctx.notations.
+From Em Require Symbolic Shallow.
 
   (* The refinement proof, relating the deeply-embedded or symbolic `infer`
      to the shallowly-embedded `infer` is accomplished
@@ -263,4 +256,3 @@ Import ctx.notations.
     : (RArr REnv (RFree' RTy) w ass (Symbolic.infer e) (infer_no_elab e)).
   Proof.
   Admitted.
-

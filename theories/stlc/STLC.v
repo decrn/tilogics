@@ -1,4 +1,3 @@
-
 Require Import List.
 Import ListNotations.
 Require Import String.

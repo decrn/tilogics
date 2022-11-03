@@ -1,14 +1,12 @@
 Require Import List.
-Require Import Relation_Definitions.
 Import ListNotations.
-Require Import String.
 From Em Require Import
      Context Environment.
+Import ctx.notations.
 From Em Require Import
      STLC.
 From Em Require
-  Prelude Unification.
-Import ctx.notations.
+  Unification.
 
   (* Adapted from Katamaran: Symbolic/Worlds.v *)
 
