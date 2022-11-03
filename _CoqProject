@@ -1,9 +1,11 @@
 -Q theories Em
-theories/AELetMonadic.v
-theories/Context.v
-theories/Environment.v
+theories/aelet/AELetMonadic.v
+theories/common/Context.v
+theories/common/Environment.v
 theories/Example.v
 theories/Prelude.v
-theories/STLC.v
-theories/STLCMonadic.v
-theories/Unification.v
+theories/stlc/STLC.v
+theories/stlc/Shallow.v
+theories/stlc/Symbolic.v
+theories/stlc/Refinement.v
+theories/unification/Unification.v

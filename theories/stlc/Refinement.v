@@ -6,6 +6,7 @@ From Em Require Import
      Context Environment.
 From Em Require Import
      STLC.
+From Em Require Symbolic Shallow.
 From Em Require
   Prelude Unification.
 Import ctx.notations.
