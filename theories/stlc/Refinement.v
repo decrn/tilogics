@@ -282,7 +282,8 @@ Proof. Set Printing Depth 15.
     admit. (* Have to reason abt relatedness of envs with changes to world *)
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind'. cbn. apply Assert_relates_assert'; cbn. admit. admit.
     intros ? ? ? ? ? ? ?. eapply Pure_relates_pure'. admit.
-  - intros Γ γ RΓ. admit.
+  - intros Γ γ RΓ. unfold REnv in RΓ. specialize (RΓ s).
+    destruct (value s Γ), (value s γ); cbn in *; try contradiction; now constructor.
   - intros Γ γ RΓ. eapply Bind_relates_bind'. apply Exists_relates_exists'.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind'. apply IHe. admit.
     intros ? ? ? ? ? ? ?. constructor. admit.

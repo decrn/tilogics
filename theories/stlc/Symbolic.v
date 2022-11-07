@@ -38,17 +38,17 @@ Proof. intros. induction H. apply H0. apply IHAccessibility. apply ctx.in_succ. 
 Eval cbv [transient Accessibility_rec Accessibility_rect] in @transient.
 
 Class Persistent (A : Ctx nat -> Type) : Type :=
-{ persist : Valid (Impl A (Box A)) }.
+  persist : Valid (Impl A (Box A)).
 
 Local Notation "<{ A ~ w }>" := (persist _ A _ w).
 
-#[refine] Instance Persistent_Ty : Persistent Ty := { persist := _ }.
-Proof. cbv in *. intros. induction H.
-  - constructor 1.
-  - constructor 2. apply IHTy1. apply IHTy2.
-  - constructor 3 with i. apply transient with Σ. apply H0. apply i0.
-Show Proof.
-Defined.
+Instance Persistent_Ty : Persistent Ty :=
+  fix F {Σ} (t : Ty Σ) {Σ'} (r : Accessibility Σ Σ') : Ty Σ' :=
+    match t with
+    | Ty_bool _ => Ty_bool Σ'
+    | Ty_func _ t0 t1 => Ty_func Σ' (F t0 r) (F t1 r)
+    | Ty_hole _ i i0 => Ty_hole Σ' i (transient Σ Σ' i r i0)
+    end.
 
 #[refine] Instance Persistent_Env : Persistent Env := { persist := _ }.
 Proof. cbv in *. intro Σ. refine (fix F E := _). intros. destruct E.
