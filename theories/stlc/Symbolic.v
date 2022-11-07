@@ -42,21 +42,22 @@ Class Persistent (A : Ctx nat -> Type) : Type :=
 
 Local Notation "<{ A ~ w }>" := (persist _ A _ w).
 
-Instance Persistent_Ty : Persistent Ty :=
+#[refine] Instance Persistent_Ty : Persistent Ty :=
   fix F {Σ} (t : Ty Σ) {Σ'} (r : Accessibility Σ Σ') : Ty Σ' :=
     match t with
     | Ty_bool _ => Ty_bool Σ'
     | Ty_func _ t0 t1 => Ty_func Σ' (F t0 r) (F t1 r)
     | Ty_hole _ i i0 => Ty_hole Σ' i (transient Σ Σ' i r i0)
     end.
+Defined.
 
-#[refine] Instance Persistent_Env : Persistent Env := { persist := _ }.
-Proof. cbv in *. intro Σ. refine (fix F E := _). intros. destruct E.
-- apply nil.
-- destruct p. apply cons. apply pair. apply s.
-  apply persist in t. apply t. apply H.
-  apply F. apply E. apply H.
-Show Proof. (* Something <>< *)
+#[refine] Instance Persistent_Env : Persistent Env :=
+  fix F {Σ} (l : list (String.string * Ty Σ)) {Σ'} (ω : Accessibility Σ Σ') :
+           list (String.string * Ty Σ') :=
+    match l with
+    | []%list => []%list
+    | (a0, b) :: l => (a0, <{ b ~ ω}>) :: F l ω
+    end.
 Defined.
 
 Definition trans {Σ₁ Σ₂ Σ₃} (w12 : Accessibility Σ₁ Σ₂) (w23 : Accessibility Σ₂ Σ₃) : Accessibility Σ₁ Σ₃.
