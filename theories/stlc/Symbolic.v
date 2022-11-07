@@ -12,8 +12,8 @@ From Em Require
 
 Inductive Accessibility (Σ₁ : Ctx nat) : Ctx nat -> Type :=
   | refl    : Accessibility Σ₁ Σ₁
-  | fresh α : forall Σ₂, Accessibility Σ₁ Σ₂ ->
-                         Accessibility Σ₁ (Σ₂ ▻ α).
+  | fresh α : forall Σ₂, Accessibility (Σ₁ ▻ α) Σ₂ ->
+                          Accessibility Σ₁ Σ₂.
 
 (* ⊢ A *)
 Definition Valid (A : Ctx nat -> Type) := forall Σ, A Σ.
@@ -26,19 +26,14 @@ Definition Impl (A B : Ctx nat -> Type) : Ctx nat -> Type :=
 Definition Box A (Σ : Ctx nat) :=
   forall Σ', Accessibility Σ Σ' -> A Σ'.
 
-Lemma empty_is_initial : forall Σ, Accessibility ctx.nil Σ.
-Proof. intros. induction Σ. apply refl. apply fresh. apply IHΣ. Defined.
+(* Lemma empty_is_initial : forall Σ, Accessibility ctx.nil Σ. *)
+(* Proof. intros. induction Σ. apply refl. apply fresh. apply IHΣ. Defined. *)
 
 (* _[_] *)
 Definition transient : forall (Σ Σ' : Ctx nat) (i : nat),
     Accessibility Σ Σ' ->
-    i ∈ Σ ->
-    i ∈ Σ'.
-Proof.
-  intros. induction H.
-  - apply H0.
-  - Search "x ∈ y". apply ctx.in_succ. apply IHAccessibility.
-Defined.
+    i ∈ Σ -> i ∈ Σ'.
+Proof. intros. induction H. apply H0. apply IHAccessibility. apply ctx.in_succ.  apply H0. Defined.
 
 Eval cbv [transient Accessibility_rec Accessibility_rect] in @transient.
 
@@ -65,7 +60,7 @@ Show Proof. (* Something <>< *)
 Defined.
 
 Definition trans {Σ₁ Σ₂ Σ₃} (w12 : Accessibility Σ₁ Σ₂) (w23 : Accessibility Σ₂ Σ₃) : Accessibility Σ₁ Σ₃.
-Proof. induction w23. apply w12. apply fresh. apply IHw23. Defined.
+Proof. induction w12. apply w23.  apply (fresh Σ₁ α). apply IHw12. apply w23. Defined.
 
 Local Notation "w1 .> w2" := (trans w1 w2) (at level 80).
 
@@ -86,13 +81,13 @@ refine (
   | C_exi _ _ i C => _
   end).
 Proof.
+  - apply T in f. unfold Impl in f. apply f. apply v.
   - apply C_eqc. apply t1. apply t2. eapply bind.
     + apply C1.
     + apply f.
-  - apply T in f. unfold Impl in f. apply f. apply v.
   - eapply C_exi. eapply bind.
     + apply C.
-    + apply _4 in f. cbv in *. intros. apply (f _ (fresh _ _ _ (refl Σ)) _ H X).
+    + apply _4 in f. cbv in *. intros. apply (f _ (fresh _ _ _ (refl _) ) _ H X).
 Show Proof.
 Abort.
 *)
@@ -106,7 +101,7 @@ Fixpoint bind [A B] {Σ} (m : Cstr A Σ) (f : Box (Impl A (Cstr B)) Σ) : Cstr B
       C_exi B Σ i
         (bind (* (Σ ▻ i) *) C
             (fun Σ' (ω : Accessibility (Σ ▻ i) Σ') (V : A Σ') =>
-               (_4 Σ f) (Σ ▻ i) (fresh Σ i Σ (refl Σ)) Σ' ω V))
+               (_4 Σ f) (Σ ▻ i) (fresh Σ i (Σ ▻ i) (refl (Σ ▻ i))) Σ' ω V))
   end.
 
 Local Notation "[ ω ] x <- ma ;; mb" :=
@@ -147,19 +142,19 @@ Fixpoint infer (e : expr) {Σ : Ctx nat} (Γ : Env Σ) : Cstr Ty Σ :=
       | None => C_fls Ty Σ
       end
   | e_app f a =>
-      [ w1 ] t_co <- exists_Ty Σ ;;
-      [ w2 ] t_do <- infer a <{ Γ ~ w1 }> ;;
-      [ w3 ] t_fn <- infer f <{ Γ ~ w1 .> w2 }> ;;
-      [ w4 ] _    <- assert t_fn <{ (Ty_func _ t_do <{ t_co ~ w2 }> ) ~ w3 }> ;;
-         C_val Ty _ <{ t_co ~ w2 .> w3 .> w4 }>
+      [ ω1 ] t_co <- exists_Ty Σ ;;
+      [ ω2 ] t_do <- infer a <{ Γ ~ ω1 }> ;;
+      [ ω3 ] t_fn <- infer f <{ Γ ~ ω1 .> ω2 }> ;;
+      [ ω4 ] _    <- assert t_fn <{ (Ty_func _ t_do <{ t_co ~ ω2 }> ) ~ ω3 }> ;;
+         C_val Ty _ <{ t_co ~ ω2 .> ω3 .> ω4 }>
   | e_abst var t_var e =>
       let t_var' := (world_index t_var Σ) in (* t_var lives in ty, not in (Ty w) *)
-      [ w1 ] t_e <- infer e ((var, t_var') :: Γ) ;;
-        C_val Ty _ (Ty_func _ <{ t_var' ~ w1 }> t_e)
+      [ ω1 ] t_e <- infer e ((var, t_var') :: Γ) ;;
+        C_val Ty _ (Ty_func _ <{ t_var' ~ ω1 }> t_e)
   | e_absu var e =>
-      [ w1 ] t_var <- exists_Ty Σ ;;
-      [ w2 ] t_e <- infer e ((var, t_var) :: <{ Γ ~ w1 }>) ;;
-        C_val Ty _ (Ty_func _ <{ t_var ~ w2 }> t_e)
+      [ ω1 ] t_var <- exists_Ty Σ ;;
+      [ ω2 ] t_e <- infer e ((var, t_var) :: <{ Γ ~ ω1 }>) ;;
+        C_val Ty _ (Ty_func _ <{ t_var ~ ω2 }> t_e)
   end.
 
 Section RunTI.
@@ -189,7 +184,7 @@ Section RunTI.
         match pnf K with
         | None => None
         | Some (existT _ Σ' (a, b, c)) =>
-            Some (existT _ _ ((trans (fresh _ i _ (refl Σ)) a), b, c))
+            Some (existT _ _ (fresh Σ i (Σ ▻ i) (refl (Σ ▻ i)) .> a, b, c))
         end
     end.
 
