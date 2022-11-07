@@ -33,22 +33,22 @@ Definition RTy : Relation Ty ty :=
    This is parametric in the relation of values `A` and `a` in their respective free monads *)
 (* i.e., RFree : Relation A a -> Relation (Cstr A) (freeM a) *)
 
-Inductive RFree' {A a} (RA : Relation A a) (w : Ctx nat)
+Inductive RFree {A a} (RA : Relation A a) (w : Ctx nat)
                  (ass : Assignment w) : Cstr A w -> freeM a -> Prop :=
 | RPure : forall (V : A w) (v : a),
     RA w ass V v ->
-    RFree' RA w ass (C_val _ _ V) (ret_free _ v)
+    RFree RA w ass (C_val _ _ V) (ret_free _ v)
 | RFalse :
-    RFree' RA w ass (C_fls _ _) (fail_free _)
+    RFree RA w ass (C_fls _ _) (fail_free _)
 | RAssert : forall T1 T2 t1 t2 Cont cont,
     RTy w ass T1 t1 ->
     RTy w ass T2 t2 ->
-    RFree' RA w ass Cont cont ->
-    RFree' RA w ass (C_eqc _ _ T1 T2 Cont) (bind_assert_free _ t1 t2 cont)
+    RFree RA w ass Cont cont ->
+    RFree RA w ass (C_eqc _ _ T1 T2 Cont) (bind_assert_free _ t1 t2 cont)
 | RExists : forall i Cont cont,
     (forall (t : ty),
-     RFree' RA (w ▻ i) (env.snoc ass i t) Cont (cont t)) ->
-    RFree' RA w ass (C_exi _ _ i Cont) (bind_exists_free _ cont).
+      RFree RA (w ▻ i) (env.snoc ass i t) Cont (cont t)) ->
+      RFree RA w ass (C_exi _ _ i Cont) (bind_exists_free _ cont).
 
 Definition compose {w0 w1} (ω : Symbolic.Accessibility w0 w1) : Assignment w1 -> Assignment w0 :=
   fun ass => env.tabulate (fun x xIn => env.lookup ass (Symbolic.transient w0 w1 x ω xIn)).
@@ -105,39 +105,39 @@ Definition REnv : Relation Env env :=
 (* Using our relation on functions, we can now prove
    relatedness of operations in both free monads *)
 
-  Lemma Pure_relates_pure' {A a} (RA : Relation A a) :
+  Lemma Pure_relates_pure {A a} (RA : Relation A a) :
   forall (w : Ctx nat) (ass : Assignment w),
-      (RA -> (RFree' RA))%R w ass (C_val A w) (ret_free a).
+      (RA -> (RFree RA))%R w ass (C_val A w) (ret_free a).
   Proof.  constructor. assumption. Qed.
 
-  Lemma False_relates_false' {A a} (RA : Relation A a) :
+  Lemma False_relates_false {A a} (RA : Relation A a) :
   forall (w : Ctx nat) (ass : Assignment w),
-      RFree' RA w ass (C_fls A w) (@fail_free a).
+      RFree RA w ass (C_fls A w) (@fail_free a).
   Proof.  constructor. Qed.
 
-  Lemma Assert_relates_assert' :
+  Lemma Assert_relates_assert :
     forall (w : Ctx nat) (ass : Assignment w),
-      (RTy -> RTy -> (RFree' RUnit))%R w ass Symbolic.assert Shallow.assert.
+      (RTy -> RTy -> (RFree RUnit))%R w ass Symbolic.assert Shallow.assert.
     Proof. repeat (constructor; try assumption). Qed.
 
-  Lemma Exists_relates_exists' :
+  Lemma Exists_relates_exists :
     forall (w : Ctx nat) (ass : Assignment w),
-      (RFree' RTy) w ass (Symbolic.exists_Ty w) Shallow.exists_ty.
+      (RFree RTy) w ass (Symbolic.exists_Ty w) Shallow.exists_ty.
   Proof. repeat constructor. Qed.
 
   Lemma pointwise_equal {w : Ctx nat} (a1 a2 : Assignment w) (e : a1 = a2) :
     forall x (xIn : x ∈ w), env.lookup a1 xIn = env.lookup a2 xIn.
   Proof. now subst. Qed.
 
-  Lemma Bind_relates_bind' {A B a b} (RA : Relation A a) (RB : Relation B b) :
+  Lemma Bind_relates_bind {A B a b} (RA : Relation A a) (RB : Relation B b) :
     forall (w : Ctx nat) (ass : Assignment w),
-      ((RFree' RA) -> (RBox (RA -> RFree' RB)) -> (RFree' RB))%R w ass (@Symbolic.bind A B w) Shallow.bind.
+      ((RFree RA) -> (RBox (RA -> RFree RB)) -> (RFree RB))%R w ass (@Symbolic.bind A B w) Shallow.bind.
   Proof.
     intros w ass ? ? ?.
     induction H;  cbn; intros F f HF; try constructor; try assumption.
     - unfold RBox in HF. unfold RArr in HF. apply HF.
       symmetry. apply composing_refl. apply H.
-    - unfold RBox in IHRFree'. unfold RArr in IHRFree'. apply IHRFree'.
+    - unfold RBox in IHRFree. unfold RArr in IHRFree. apply IHRFree.
       unfold RBox in HF. unfold RArr in HF. apply HF.
     - intro. apply H0. unfold RBox.
       intros. apply HF. clear HF H0 H. subst. cbn.
@@ -177,32 +177,32 @@ Check Symbolic.T.
 Lemma refine_T {AT A} (RA : Relation AT A) :
   forall (w : Ctx nat) (ass : Assignment w) bv v,
     ass = compose (Symbolic.refl w) ass ->
-    RBox (RFree' RA)%R w ass bv v ->
-    RFree' RA w ass (Symbolic.T _ bv) v.
+    RBox (RFree RA)%R w ass bv v ->
+    RFree RA w ass (Symbolic.T _ bv) v.
 Proof. intros ? ? ? ? ? ?. apply H0. apply H. Qed.
 
 Lemma infers_are_related (e : expr) (w : Ctx nat) (ass : Assignment w)
-  : (RArr REnv (RFree' RTy) w ass (Symbolic.infer e) (Shallow.infer_no_elab e)).
+  : (RArr REnv (RFree RTy) w ass (Symbolic.infer e) (Shallow.infer_no_elab e)).
 Proof. Set Printing Depth 15.
   revert ass. revert w. induction e; intros w ass; cbn.
   - intros Γ γ RΓ. repeat constructor.
   - intros Γ γ RΓ. repeat constructor.
-  - intros Γ γ RΓ. eapply Bind_relates_bind'.
+  - intros Γ γ RΓ. eapply Bind_relates_bind.
     apply IHe1. apply RΓ. clear IHe1.
     intros w1 ? ? ? ? ? ?. constructor. apply H0. constructor.
     (* eapply refine_T. *)
-    unfold Symbolic.T. eapply Bind_relates_bind'. cbn. apply IHe2.
+    unfold Symbolic.T. eapply Bind_relates_bind. cbn. apply IHe2.
     admit. (* Have to reason about extensions to the env *)
-    intros ? ? ? ? ? ? ?. eapply Bind_relates_bind'. cbn. apply IHe3.
+    intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. cbn. apply IHe3.
     admit. (* Have to reason abt relatedness of envs with changes to world *)
-    intros ? ? ? ? ? ? ?. eapply Bind_relates_bind'. cbn. apply Assert_relates_assert'; cbn. admit. admit.
-    intros ? ? ? ? ? ? ?. eapply Pure_relates_pure'. admit.
+    intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. cbn. apply Assert_relates_assert; cbn. admit. admit.
+    intros ? ? ? ? ? ? ?. eapply Pure_relates_pure. admit.
   - intros Γ γ RΓ. unfold REnv in RΓ. specialize (RΓ s).
     destruct (value s Γ), (value s γ); cbn in *; try contradiction; now constructor.
-  - intros Γ γ RΓ. eapply Bind_relates_bind'. apply Exists_relates_exists'.
-    intros ? ? ? ? ? ? ?. eapply Bind_relates_bind'. apply IHe. admit.
+  - intros Γ γ RΓ. eapply Bind_relates_bind. apply Exists_relates_exists.
+    intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. apply IHe. admit.
     intros ? ? ? ? ? ? ?. constructor. admit.
-  - intros Γ γ RΓ. eapply Bind_relates_bind'. apply IHe. admit.
+  - intros Γ γ RΓ. eapply Bind_relates_bind. apply IHe. admit.
     intros ? ? ? ? ? ? ?. admit.
   - admit.
 Admitted.
