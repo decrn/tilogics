@@ -10,11 +10,18 @@ Import ctx.notations.
 (*      extended with Booleans         *)
 (* =================================== *)
 
-(* ===== Language ===== *)
+(* ===== Types ===== *)
 
   Inductive ty : Type :=
     | ty_bool : ty
     | ty_func : ty -> ty -> ty.
+
+  Inductive Ty (Σ : Ctx nat) : Type :=
+    | Ty_bool : Ty Σ
+    | Ty_func : Ty Σ -> Ty Σ -> Ty Σ
+    | Ty_hole : forall (i : nat), i ∈ Σ -> Ty Σ.
+
+(* ===== Terms / Expressions ===== *)
 
   Inductive expr : Type :=
     (* values *)
@@ -89,11 +96,6 @@ Import ctx.notations.
   Qed.
 
 Section Symbolic.
-
-  Inductive Ty (Σ : Ctx nat) : Type :=
-    | Ty_bool : Ty Σ
-    | Ty_func : Ty Σ -> Ty Σ -> Ty Σ
-    | Ty_hole : forall (i : nat), i ∈ Σ -> Ty Σ.
 
   Definition Env Σ := list (string * Ty Σ).
 

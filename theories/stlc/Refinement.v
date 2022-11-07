@@ -223,7 +223,6 @@ Check Shallow.infer.
 Check RTy.
 *)
 
-(* TODO: define REnv inductively *)
 Definition REnv : Relation Env env :=
   fun (w : Ctx nat) (ass : Assignment w) (Γ : Env w) (γ : env) => forall (pvar : string),
     match (value pvar Γ), (value pvar γ) with
@@ -231,8 +230,6 @@ Definition REnv : Relation Env env :=
     | None, None => True
     | _, _ => False
     end.
-
-Axiom infer_no_elab : expr -> env -> freeM ty.
 
 (*
 Lemma infers_are_related (e : expr) (w : Ctx nat) (ass : Assignment w) : Prop.
@@ -252,7 +249,41 @@ Lemma infers_are_related (e : expr) (w : Ctx nat) (ass : Assignment w) : Prop.
 Abort.
 *)
 
+Arguments Symbolic.assert : simpl never.
+Arguments Shallow.assert : simpl never.
+Arguments Symbolic.exists_Ty : simpl never.
+Arguments  Shallow.exists_ty : simpl never.
+
+Check Symbolic.T.
+
+Lemma refine_T {AT A} (RA : Relation AT A) :
+  forall (w : Ctx nat) (ass : Assignment w) bv v,
+    ass = compose (Symbolic.refl w) ass ->
+    RBox (RFree' RA)%R w ass bv v ->
+    RFree' RA w ass (Symbolic.T _ bv) v.
+Proof. intros ? ? ? ? ? ?. apply H0. apply H. Qed.
+
 Lemma infers_are_related (e : expr) (w : Ctx nat) (ass : Assignment w)
-  : (RArr REnv (RFree' RTy) w ass (Symbolic.infer e) (infer_no_elab e)).
-Proof.
+  : (RArr REnv (RFree' RTy) w ass (Symbolic.infer e) (Shallow.infer_no_elab e)).
+Proof. Set Printing Depth 15.
+  revert ass. revert w. induction e; intros w ass; cbn.
+  - intros Γ γ RΓ. repeat constructor.
+  - intros Γ γ RΓ. repeat constructor.
+  - intros Γ γ RΓ. eapply Bind_relates_bind'.
+    apply IHe1. apply RΓ. clear IHe1.
+    intros w1 ? ? ? ? ? ?. constructor. apply H0. constructor.
+    (*eapply refine_T. *)
+    unfold Symbolic.T. eapply Bind_relates_bind'. cbn. apply IHe2.
+    admit. (* Have to reason about extensions to the env *)
+    intros ? ? ? ? ? ? ?. eapply Bind_relates_bind'. cbn. apply IHe3.
+    admit. (* Have to reason abt relatedness of envs with changes to world *)
+    intros ? ? ? ? ? ? ?. eapply Bind_relates_bind'. cbn. apply Assert_relates_assert'; cbn. admit. admit.
+    intros ? ? ? ? ? ? ?. eapply Pure_relates_pure'. admit.
+  - intros Γ γ RΓ. admit.
+  - intros Γ γ RΓ. eapply Bind_relates_bind'. apply Exists_relates_exists'.
+    intros ? ? ? ? ? ? ?. eapply Bind_relates_bind'. apply IHe. admit.
+    intros ? ? ? ? ? ? ?. constructor. admit.
+  - intros Γ γ RΓ. eapply Bind_relates_bind'. apply IHe. admit.
+    intros ? ? ? ? ? ? ?. admit.
+  - admit.
 Admitted.

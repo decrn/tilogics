@@ -282,3 +282,35 @@ Proof.
   compute. repeat eexists.
   Unshelve. apply ty_bool.
 Qed.
+
+
+Fixpoint infer_no_elab {m} `{TypeCheckM m} (expression : expr) (ctx : env) : m ty :=
+  match expression with
+  | v_false => ret ty_bool
+  | v_true  => ret ty_bool
+  | e_if cnd coq alt =>
+      Tcnd <- infer_no_elab cnd ctx  ;;
+      assert Tcnd ty_bool            ;;
+      Tcoq <- infer_no_elab coq ctx  ;;
+      Talt <- infer_no_elab alt ctx  ;;
+      assert Tcoq Talt               ;;
+      ret Tcoq
+  | e_var var =>
+      match (value var ctx) with
+      | Some Tvar => ret Tvar
+      | None      => fail
+      end
+  | e_app e1 e2 =>
+      T0 <- exists_ty            ;;
+      T1 <- infer_no_elab e1 ctx ;;
+      T2 <- infer_no_elab e2 ctx ;;
+      assert T1 (ty_func T2 T0)  ;;
+      ret T0
+  | e_abst var Tvar e =>
+      T <- infer_no_elab e (cons (var, Tvar) ctx) ;;
+      ret (ty_func Tvar T)
+  | e_absu var e =>
+      Tvar <- exists_ty ;;
+      T <- infer_no_elab e (cons (var, Tvar) ctx) ;;
+      ret (ty_func Tvar T)
+  end.
