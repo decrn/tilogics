@@ -93,6 +93,13 @@ Declare Scope rel_scope.
 Delimit Scope rel_scope with R.
 Notation "A -> B" := (RArr A B) : rel_scope.
 
+Definition REnv : Relation Env env :=
+  fun (w : Ctx nat) (ass : Assignment w) (Γ : Env w) (γ : env) => forall (pvar : string),
+    match (value pvar Γ), (value pvar γ) with
+    | Some T, Some t => RTy w ass T t
+    | None, None => True
+    | _, _ => False
+    end.
   (* Binary parametricity translation *)
 
 (* Using our relation on functions, we can now prove
