@@ -87,6 +87,9 @@ refine (
 Definition compose {w0 w1} (ω : Symbolic.Accessibility w0 w1) : Assignment w1 -> Assignment w0 :=
   fun ass => env.tabulate (fun x xIn => env.lookup ass (Symbolic.transient w0 w1 x ω xIn)).
 
+Definition compose' {w0 w1} (ω : Symbolic.Accessibility w0 w1) : Assignment w1 -> Assignment w0.
+Proof. intros. inversion ω. Admitted.
+
   (* Eval cbv [compose] in @compose. *)
 
 Lemma composing_refl : forall w ass,
@@ -211,8 +214,8 @@ Section WithInductive.
          - unfold RBox in IHRFree'. unfold RArr in IHRFree'. apply IHRFree'.
            unfold RBox in HF. unfold RArr in HF. apply HF.
          - intro. apply H0. unfold RBox.
-           intros. apply HF. clear HF H0 H.
-           inversion ω.
+           intros. apply HF. clear HF H0 H. subst. cbn.
+           apply (f_equal (compose (Symbolic.fresh _ _ _ (Symbolic.refl _)))) in H1. unfold compose in H1. unfold compose in *. cbn in *.
   Admitted.
 
 End WithInductive.
