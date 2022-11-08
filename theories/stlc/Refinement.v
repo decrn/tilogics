@@ -147,38 +147,30 @@ Proof.
     intros. apply HF. clear HF H0 H. eapply compose_trans. cbn. admit. (* todo for later, ran out of time *)
     apply H1.
 Admitted.
-
-(*
-Lemma infers_are_related (e : expr) (w : Ctx nat) (ass : Assignment w) : Prop.
-  Check Symbolic.infer e.
-  Check infer_no_elab e.
-  Check RArr REnv (RFree' _).
-  Check RArr REnv (RFree' RTy).
-  Check (RArr REnv (RFree' RTy)) w ass.
-  apply (RArr REnv (RFree' RTy) w ass).
-  unfold Symbolic.Impl.
-  Check Symbolic.infer.
-  apply (Symbolic.infer e).
-  Check infer_no_elab.
-  apply (infer_no_elab e).
-  Restart.
-  apply (RArr REnv (RFree' RTy) w ass (Symbolic.infer e) (infer_no_elab e)).
-Abort.
-*)
-
 Arguments Symbolic.assert : simpl never.
 Arguments Shallow.assert : simpl never.
 Arguments Symbolic.exists_Ty : simpl never.
 Arguments  Shallow.exists_ty : simpl never.
 
-(* Lemma refine_persist {A a} `{Persistent A} (RA : Relation A a) : *)
-(*   forall (w1 w2 : Ctx nat) (r12 : Symbolic.Accessibility w1 w2) *)
-(*          (ass1 : Assignment w1) (ass2 : Assignment w2) *)
-(*          V v, *)
-(*     ass1 = compose r12 ass2 -> *)
-(*     RA w1 ass1 V v -> *)
-(*     RA w2 ass2 (Symbolic.persist w1 V w2 r12) v. *)
-(* Proof. intros * -> X. Admitted. *)
+(* Singleton method or not? *)
+Class PersistLaws (A : Ctx nat -> Type) `{Symbolic.Persistent A} : Type :=
+  { refine_persist a w1 w2 r12 ass1 ass2 V v
+    (RA : Relation A a)
+    (H : ass1 = compose r12 ass2)
+    (R : RA w1 ass1 V v) :
+    RA w2 ass2 (Symbolic.persist w1 V w2 r12) v }.
+
+Instance PersistLaws_Ty : PersistLaws Ty.
+Proof.
+  constructor.
+  intros * -> X.
+Admitted.
+
+Instance PersistLaws_Env : PersistLaws Env.
+Proof.
+  constructor.
+  intros * -> X.
+Admitted.
 
 Lemma refine_persist_Ty :
   forall (w1 w2 : Ctx nat) (r12 : Symbolic.Accessibility w1 w2)
