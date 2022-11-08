@@ -60,10 +60,19 @@ Defined.
     end.
 Defined.
 
+
 Definition trans {Σ₁ Σ₂ Σ₃} (w12 : Accessibility Σ₁ Σ₂) (w23 : Accessibility Σ₂ Σ₃) : Accessibility Σ₁ Σ₃.
 Proof. induction w12. apply w23.  apply (fresh Σ₁ α). apply IHw12. apply w23. Defined.
 
 Local Notation "w1 .> w2" := (trans w1 w2) (at level 80).
+
+Lemma trans_refl : forall (w1 w2 : Ctx nat) w12,
+  (@trans w1 w2 w2 w12 (refl w2)) = w12.
+Proof. intros. induction w12. easy. simpl. now rewrite IHw12. Qed.
+
+Lemma persist_assoc : forall w1 w2 w3 r12 r23 V,
+    persist w2 (persist w1 V w2 r12) w3 r23 = persist w1 V w3 (trans r12 r23).
+Proof. Admitted.
 
 Definition T {A} := fun (Σ : Ctx nat) (a : Box A Σ) => a Σ (refl Σ).
 

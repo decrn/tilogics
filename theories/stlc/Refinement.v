@@ -7,7 +7,6 @@ From Em Require Symbolic Shallow.
 (* The refinement proof, relating the deeply-embedded or symbolic `infer`
    to the shallowly-embedded `infer` is accomplished
    using a logical relation similar to [Keuchel22]. *)
-
 Definition Assignment : Ctx nat -> Type :=
   env.Env (fun _ => ty).
 
@@ -54,13 +53,22 @@ Definition compose {w0 w1} (ω : Symbolic.Accessibility w0 w1) : Assignment w1 -
   fun ass => env.tabulate (fun x xIn => env.lookup ass (Symbolic.transient w0 w1 x ω xIn)).
 
 Definition compose' {w0 w1} (ω : Symbolic.Accessibility w0 w1) : Assignment w1 -> Assignment w0.
-Proof. intros. inversion ω. Restart. intros. induction X. inversion ω. Abort.
+Proof.
+  intros. inversion X.
+Restart.
+  intros. unfold Assignment in *. inversion X. subst.
+intros.
+Abort.
 
-  (* Eval cbv [compose] in @compose. *)
-
-Lemma composing_refl : forall w ass,
+Lemma compose_refl : forall w ass,
     compose (Symbolic.refl w) ass = ass.
 Proof. unfold compose. cbn. induction ass; cbn; try congruence. Qed.
+
+Lemma compose_trans : forall w1 w2 w3 ass1 ass2 ass3 r12 r23,
+  ass1 = compose r12 ass2 ->
+  ass2 = compose r23 ass3 ->
+  ass1 = compose (@Symbolic.trans w1 w2 w3 r12 r23) ass3.
+Proof. intros * -> ->. Admitted.
 
 (* Relating boxed symbolic values is more interesting, since the accessibility witness
    can now contain an arbitrary amount of new unification variables.
@@ -73,7 +81,7 @@ Proof. unfold compose. cbn. induction ass; cbn; try congruence. Qed.
    But
    { τ₀ -> Bool ; } is NOT subsumed by { τ₀ -> Nat ; τ₁ -> Arrow τ₀ τ₀ }
    since τ₀ has a different assignment.
-   *)
+ *)
 
 Definition RBox {A a} (RA : Relation A a) : Relation (Symbolic.Box A) a :=
   fun (w : Ctx nat) (ass : Assignment w) (x : Symbolic.Box A w) (y : a) =>
@@ -136,7 +144,7 @@ Definition REnv : Relation Env env :=
     intros w ass ? ? ?.
     induction H;  cbn; intros F f HF; try constructor; try assumption.
     - unfold RBox in HF. unfold RArr in HF. apply HF.
-      symmetry. apply composing_refl. apply H.
+      symmetry. apply compose_refl. apply H.
     - unfold RBox in IHRFree. unfold RArr in IHRFree. apply IHRFree.
       unfold RBox in HF. unfold RArr in HF. apply HF.
     - intro. apply H0. unfold RBox.
@@ -172,7 +180,32 @@ Arguments Shallow.assert : simpl never.
 Arguments Symbolic.exists_Ty : simpl never.
 Arguments  Shallow.exists_ty : simpl never.
 
-Check Symbolic.T.
+(* Lemma refine_persist {A a} `{Persistent A} (RA : Relation A a) : *)
+(*   forall (w1 w2 : Ctx nat) (r12 : Symbolic.Accessibility w1 w2) *)
+(*          (ass1 : Assignment w1) (ass2 : Assignment w2) *)
+(*          V v, *)
+(*     ass1 = compose r12 ass2 -> *)
+(*     RA w1 ass1 V v -> *)
+(*     RA w2 ass2 (Symbolic.persist w1 V w2 r12) v. *)
+(* Proof. intros * -> X. Admitted. *)
+
+Lemma refine_persist_Ty :
+  forall (w1 w2 : Ctx nat) (r12 : Symbolic.Accessibility w1 w2)
+         (ass1 : Assignment w1) (ass2 : Assignment w2)
+         V v,
+    ass1 = compose r12 ass2 ->
+    RTy w1 ass1 V v ->
+    RTy w2 ass2 (Symbolic.persist w1 V w2 r12) v.
+Proof. intros * -> X. Admitted.
+
+Lemma refine_persist_Env :
+  forall (w1 w2 : Ctx nat) (r12 : Symbolic.Accessibility w1 w2)
+         (ass1 : Assignment w1) (ass2 : Assignment w2)
+         V v,
+    ass1 = compose r12 ass2 ->
+    REnv w1 ass1 V v ->
+    REnv w2 ass2 (Symbolic.persist w1 V w2 r12) v.
+Proof. intros * -> X. Admitted.
 
 Lemma refine_T {AT A} (RA : Relation AT A) :
   forall (w : Ctx nat) (ass : Assignment w) bv v,
@@ -181,8 +214,12 @@ Lemma refine_T {AT A} (RA : Relation AT A) :
     RFree RA w ass (Symbolic.T _ bv) v.
 Proof. intros ? ? ? ? ? ?. apply H0. apply H. Qed.
 
+Lemma persist_refl : forall w1 V,
+  Symbolic.persist w1 V w1 (Symbolic.refl w1) = V.
+Proof. Admitted.
+
 Lemma infers_are_related (e : expr) (w : Ctx nat) (ass : Assignment w)
-  : (RArr REnv (RFree RTy) w ass (Symbolic.infer e) (Shallow.infer_no_elab e)).
+  : (REnv -> (RFree RTy))%R w ass (Symbolic.infer e) (Shallow.infer_no_elab e).
 Proof. Set Printing Depth 15.
   revert ass. revert w. induction e; intros w ass; cbn.
   - intros Γ γ RΓ. repeat constructor.
@@ -190,19 +227,33 @@ Proof. Set Printing Depth 15.
   - intros Γ γ RΓ. eapply Bind_relates_bind.
     apply IHe1. apply RΓ. clear IHe1.
     intros w1 ? ? ? ? ? ?. constructor. apply H0. constructor.
-    (* eapply refine_T. *)
     unfold Symbolic.T. eapply Bind_relates_bind. cbn. apply IHe2.
-    admit. (* Have to reason about extensions to the env *)
+    rewrite Symbolic.trans_refl.
+    hnf. intro.
+    apply (refine_persist_Env w w1 ω ass ass'). apply H. apply RΓ.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. cbn. apply IHe3.
-    admit. (* Have to reason abt relatedness of envs with changes to world *)
-    intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. cbn. apply Assert_relates_assert; cbn. admit. admit.
-    intros ? ? ? ? ? ? ?. eapply Pure_relates_pure. admit.
+    rewrite Symbolic.trans_refl. apply (refine_persist_Env w w' _ ass).
+    eapply compose_trans. apply H. apply H1. apply RΓ.
+    intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. cbn. apply Assert_relates_assert; cbn.
+    apply (refine_persist_Ty w' w'0 ω1 ass'0). apply H3. apply H2.
+    apply (refine_persist_Ty w'0 w'0 _ ass'1). rewrite compose_refl. reflexivity.
+    apply H4.
+    intros ? ? ? ? ? ? ?. eapply Pure_relates_pure.
+    apply (refine_persist_Ty w' w'1 _ ass'0). eapply compose_trans.
+    apply H3. apply H5. apply H2.
   - intros Γ γ RΓ. unfold REnv in RΓ. specialize (RΓ s).
     destruct (value s Γ), (value s γ); cbn in *; try contradiction; now constructor.
   - intros Γ γ RΓ. eapply Bind_relates_bind. apply Exists_relates_exists.
-    intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. apply IHe. admit.
+    intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. apply IHe.
+    admit.
     intros ? ? ? ? ? ? ?. constructor. admit.
   - intros Γ γ RΓ. eapply Bind_relates_bind. apply IHe. admit.
-    intros ? ? ? ? ? ? ?. admit.
-  - admit.
+    intros ? ? ? ? ? ? ?. eapply Pure_relates_pure. admit.
+  - intros Γ γ RΓ. eapply Bind_relates_bind. apply Exists_relates_exists.
+    intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. admit.
+    intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. admit.
+    intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. eapply Assert_relates_assert. admit.
+    admit. admit.
+
+
 Admitted.
