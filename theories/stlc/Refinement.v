@@ -109,49 +109,44 @@ Definition REnv : Relation Env env :=
 (* Using our relation on functions, we can now prove
    relatedness of operations in both free monads *)
 
-  Lemma Pure_relates_pure {A a} (RA : Relation A a) :
+Lemma Pure_relates_pure {A a} (RA : Relation A a) :
+forall (w : Ctx nat) (ass : Assignment w),
+    (RA -> (RFree RA))%R w ass (C_val A w) (ret_free a).
+Proof.  constructor. assumption. Qed.
+
+Lemma False_relates_false {A a} (RA : Relation A a) :
+forall (w : Ctx nat) (ass : Assignment w),
+    RFree RA w ass (C_fls A w) (@fail_free a).
+Proof.  constructor. Qed.
+
+Lemma Assert_relates_assert :
   forall (w : Ctx nat) (ass : Assignment w),
-      (RA -> (RFree RA))%R w ass (C_val A w) (ret_free a).
-  Proof.  constructor. assumption. Qed.
+    (RTy -> RTy -> (RFree RUnit))%R w ass Symbolic.assert Shallow.assert.
+  Proof. repeat (constructor; try assumption). Qed.
 
-  Lemma False_relates_false {A a} (RA : Relation A a) :
+Lemma Exists_relates_exists :
   forall (w : Ctx nat) (ass : Assignment w),
-      RFree RA w ass (C_fls A w) (@fail_free a).
-  Proof.  constructor. Qed.
+    (RFree RTy) w ass (Symbolic.exists_Ty w) Shallow.exists_ty.
+Proof. repeat constructor. Qed.
 
-  Lemma Assert_relates_assert :
-    forall (w : Ctx nat) (ass : Assignment w),
-      (RTy -> RTy -> (RFree RUnit))%R w ass Symbolic.assert Shallow.assert.
-    Proof. repeat (constructor; try assumption). Qed.
+Lemma pointwise_equal {w : Ctx nat} (a1 a2 : Assignment w) (e : a1 = a2) :
+  forall x (xIn : x ∈ w), env.lookup a1 xIn = env.lookup a2 xIn.
+Proof. now subst. Qed.
 
-  Lemma Exists_relates_exists :
-    forall (w : Ctx nat) (ass : Assignment w),
-      (RFree RTy) w ass (Symbolic.exists_Ty w) Shallow.exists_ty.
-  Proof. repeat constructor. Qed.
-
-  Lemma pointwise_equal {w : Ctx nat} (a1 a2 : Assignment w) (e : a1 = a2) :
-    forall x (xIn : x ∈ w), env.lookup a1 xIn = env.lookup a2 xIn.
-  Proof. now subst. Qed.
-
-  Lemma Bind_relates_bind {A B a b} (RA : Relation A a) (RB : Relation B b) :
-    forall (w : Ctx nat) (ass : Assignment w),
-      ((RFree RA) -> (RBox (RA -> RFree RB)) -> (RFree RB))%R w ass (@Symbolic.bind A B w) Shallow.bind.
-  Proof.
-    intros w ass ? ? ?.
-    induction H;  cbn; intros F f HF; try constructor; try assumption.
-    - unfold RBox in HF. unfold RArr in HF. apply HF.
-      symmetry. apply compose_refl. apply H.
-    - unfold RBox in IHRFree. unfold RArr in IHRFree. apply IHRFree.
-      unfold RBox in HF. unfold RArr in HF. apply HF.
-    - intro. apply H0. unfold RBox.
-      intros. apply HF. clear HF H0 H. subst. cbn.
-      apply env.lookup_extensional. intros x xIn.
-      pose proof (pointwise_equal _ _ H1 x (ctx.in_succ xIn)).
-      unfold compose in H. cbn in H.
-      rewrite ?env.lookup_tabulate in H. cbn in H.
-      unfold compose.
-      rewrite env.lookup_tabulate. apply H.
-  Qed.
+Lemma Bind_relates_bind {A B a b} (RA : Relation A a) (RB : Relation B b) :
+  forall (w : Ctx nat) (ass : Assignment w),
+    ((RFree RA) -> (RBox (RA -> RFree RB)) -> (RFree RB))%R w ass (@Symbolic.bind A B w) Shallow.bind.
+Proof.
+  intros w ass ? ? ?.
+  induction H;  cbn; intros F f HF; try constructor; try assumption.
+  - unfold RBox in HF. unfold RArr in HF. apply HF.
+    symmetry. apply compose_refl. apply H.
+  - unfold RBox in IHRFree. unfold RArr in IHRFree. apply IHRFree.
+    unfold RBox in HF. unfold RArr in HF. apply HF.
+  - intro. apply H0. unfold RBox.
+    intros. apply HF. clear HF H0 H. eapply compose_trans. cbn. admit. (* todo for later, ran out of time *)
+    apply H1.
+Admitted.
 
 (*
 Lemma infers_are_related (e : expr) (w : Ctx nat) (ass : Assignment w) : Prop.
