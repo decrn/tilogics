@@ -49,20 +49,16 @@ Inductive RFree {A a} (RA : Relation A a) (w : Ctx nat)
       RFree RA (w ▻ i) (env.snoc ass i t) Cont (cont t)) ->
       RFree RA w ass (C_exi _ _ i Cont) (bind_exists_free _ cont).
 
-Definition compose {w0 w1} (ω : Symbolic.Accessibility w0 w1) : Assignment w1 -> Assignment w0 :=
-  fun ass => env.tabulate (fun x xIn => env.lookup ass (Symbolic.transient w0 w1 x ω xIn)).
-
-Definition compose' {w0 w1} (ω : Symbolic.Accessibility w0 w1) : Assignment w1 -> Assignment w0.
+Definition compose {w0 w1} (ω : Symbolic.Accessibility w0 w1) : Assignment w1 -> Assignment w0.
 Proof.
-  intros. inversion X.
-Restart.
-  intros. unfold Assignment in *. inversion X. subst.
-intros.
-Abort.
+  intros. induction ω. auto.
+  apply IHω in X. apply env.tail in X. (* TODO: use snocView *)
+  fold Assignment in X. apply X.
+Defined.
 
 Lemma compose_refl : forall w ass,
     compose (Symbolic.refl w) ass = ass.
-Proof. unfold compose. cbn. induction ass; cbn; try congruence. Qed.
+Proof. easy. Qed.
 
 Lemma compose_trans : forall w1 w2 w3 ass1 ass2 ass3 r12 r23,
   ass1 = compose r12 ass2 ->
