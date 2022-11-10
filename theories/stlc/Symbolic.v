@@ -61,18 +61,28 @@ Defined.
 Defined.
 
 
-Definition trans {Σ₁ Σ₂ Σ₃} (w12 : Accessibility Σ₁ Σ₂) (w23 : Accessibility Σ₂ Σ₃) : Accessibility Σ₁ Σ₃.
-Proof. induction w12. apply w23.  apply (fresh Σ₁ α). apply IHw12. apply w23. Defined.
+(* Definition trans {Σ₁ Σ₂ Σ₃} (w12 : Accessibility Σ₁ Σ₂) (w23 : Accessibility Σ₂ Σ₃) : Accessibility Σ₁ Σ₃. *)
+(* Proof. induction w12. apply w23.  apply (fresh Σ₁ α). apply IHw12. apply w23. Defined. *)
+
+(* Eval cbv [trans Accessibility_rec Accessibility_rect] in @trans. *)
+
+Fixpoint trans {w1 w2 w3} (w12 : Accessibility w1 w2) : Accessibility w2 w3 -> Accessibility w1 w3 :=
+  match w12 with
+  | refl _ => fun w13 : Accessibility w1 w3 => w13
+  | fresh _ α w ω =>
+      fun ω' : Accessibility w w3  => fresh w1 α w3 (trans ω ω')
+  end.
 
 Local Notation "w1 .> w2" := (trans w1 w2) (at level 80).
 
 Lemma trans_refl : forall (w1 w2 : Ctx nat) w12,
   (@trans w1 w2 w2 w12 (refl w2)) = w12.
-Proof. intros. induction w12. easy. simpl. now rewrite IHw12. Qed.
+Proof. intros. induction w12. auto. cbn. now rewrite IHw12. Qed.
 
+(* Move to PersistLaws, induction V *)
 Lemma persist_assoc : forall w1 w2 w3 r12 r23 V,
     persist w2 (persist w1 V w2 r12) w3 r23 = persist w1 V w3 (trans r12 r23).
-Proof. Admitted.
+Proof. intros. induction V as [|[]]; cbn; repeat f_equal; auto. Admitted.
 
 Definition T {A} := fun (Σ : Ctx nat) (a : Box A Σ) => a Σ (refl Σ).
 

@@ -49,22 +49,26 @@ Inductive RFree {A a} (RA : Relation A a) (w : Ctx nat)
       RFree RA (w ▻ i) (env.snoc ass i t) Cont (cont t)) ->
       RFree RA w ass (C_exi _ _ i Cont) (bind_exists_free _ cont).
 
-Definition compose {w0 w1} (ω : Symbolic.Accessibility w0 w1) : Assignment w1 -> Assignment w0.
-Proof.
-  intros. induction ω. auto.
-  apply IHω in X. apply env.tail in X. (* TODO: use snocView *)
-  fold Assignment in X. apply X.
-Defined.
+Fixpoint compose {Σ₁ c : Ctx nat} (a : Symbolic.Accessibility Σ₁ c) {struct a} :
+  Assignment c -> Assignment Σ₁ :=
+  match a in (Symbolic.Accessibility _ c0) return (Assignment c0 -> Assignment Σ₁) with
+  | Symbolic.refl _ => fun X0 : Assignment Σ₁ => X0
+  | Symbolic.fresh _ α Σ₂ a0 =>
+      fun X0 : Assignment Σ₂ =>
+        match env.snocView (compose a0 X0) with
+        | env.isSnoc E _ => E
+        end
+  end.
 
 Lemma compose_refl : forall w ass,
     compose (Symbolic.refl w) ass = ass.
 Proof. easy. Qed.
 
-Lemma compose_trans : forall w1 w2 w3 ass1 ass2 ass3 r12 r23,
-  ass1 = compose r12 ass2 ->
-  ass2 = compose r23 ass3 ->
-  ass1 = compose (@Symbolic.trans w1 w2 w3 r12 r23) ass3.
-Proof. intros * -> ->. Admitted.
+Print Symbolic.trans.
+
+Lemma compose_trans {w1 w2 w3 : Ctx nat} : forall ass r12 r23,
+  compose r12 (compose r23 ass) = compose (@Symbolic.trans w1 w2 w3 r12 r23) ass.
+Proof. intros. induction r12. auto. cbn. rewrite IHr12. reflexivity. Qed.
 
 (* Relating boxed symbolic values is more interesting, since the accessibility witness
    can now contain an arbitrary amount of new unification variables.
@@ -144,9 +148,9 @@ Proof.
   - unfold RBox in IHRFree. unfold RArr in IHRFree. apply IHRFree.
     unfold RBox in HF. unfold RArr in HF. apply HF.
   - intro. apply H0. unfold RBox.
-    intros. apply HF. clear HF H0 H. eapply compose_trans. cbn. admit. (* todo for later, ran out of time *)
-    apply H1.
-Admitted.
+    intros. apply HF. clear HF H0 H. rewrite <- compose_trans. cbn. now rewrite <- H1.
+Qed.
+
 Arguments Symbolic.assert : simpl never.
 Arguments Shallow.assert : simpl never.
 Arguments Symbolic.exists_Ty : simpl never.
@@ -156,87 +160,92 @@ Arguments  Shallow.exists_ty : simpl never.
 Class PersistLaws (A : Ctx nat -> Type) `{Symbolic.Persistent A} : Type :=
   { refine_persist a w1 w2 r12 ass1 ass2 V v
     (RA : Relation A a)
-    (H : ass1 = compose r12 ass2)
+    (A : ass1 = compose r12 ass2)
     (R : RA w1 ass1 V v) :
     RA w2 ass2 (Symbolic.persist w1 V w2 r12) v }.
 
 Instance PersistLaws_Ty : PersistLaws Ty.
 Proof.
   constructor.
-  intros * -> X.
+  intros * R.
 Admitted.
 
 Instance PersistLaws_Env : PersistLaws Env.
 Proof.
   constructor.
-  intros * -> X.
+  intros * R.
 Admitted.
 
-Lemma refine_persist_Ty :
-  forall (w1 w2 : Ctx nat) (r12 : Symbolic.Accessibility w1 w2)
-         (ass1 : Assignment w1) (ass2 : Assignment w2)
-         V v,
-    ass1 = compose r12 ass2 ->
-    RTy w1 ass1 V v ->
-    RTy w2 ass2 (Symbolic.persist w1 V w2 r12) v.
-Proof. intros * -> X. Admitted.
-
-Lemma refine_persist_Env :
-  forall (w1 w2 : Ctx nat) (r12 : Symbolic.Accessibility w1 w2)
-         (ass1 : Assignment w1) (ass2 : Assignment w2)
-         V v,
-    ass1 = compose r12 ass2 ->
-    REnv w1 ass1 V v ->
-    REnv w2 ass2 (Symbolic.persist w1 V w2 r12) v.
-Proof. intros * -> X. Admitted.
-
-Lemma refine_T {AT A} (RA : Relation AT A) :
-  forall (w : Ctx nat) (ass : Assignment w) bv v,
-    ass = compose (Symbolic.refl w) ass ->
-    RBox (RFree RA)%R w ass bv v ->
-    RFree RA w ass (Symbolic.T _ bv) v.
-Proof. intros ? ? ? ? ? ?. apply H0. apply H. Qed.
+(* Lemma refine_T {AT A} (RA : Relation AT A) : *)
+(*   forall (w : Ctx nat) (ass : Assignment w) bv v, *)
+(*     ass = compose (Symbolic.refl w) ass -> *)
+(*     RBox (RFree RA)%R w ass bv v -> *)
+(*     RFree RA w ass (Symbolic.T _ bv) v. *)
+(* Proof. intros ? ? ? ? ? ?. apply H0. apply H. Qed. *)
 
 Lemma persist_refl : forall w1 V,
   Symbolic.persist w1 V w1 (Symbolic.refl w1) = V.
 Proof. Admitted.
 
+Lemma persist_cons :
+  forall w ass k V v Γ γ,
+    RTy w ass V v ->
+    REnv w ass ((k, V) :: Γ)%list ((k, v) :: γ)%list.
+Proof. Admitted.
+
+Lemma Func_relates_func :
+  forall (w : Ctx nat) (ass : Assignment w) D d C c,
+    RTy w ass D d ->
+    RTy w ass C c ->
+    RTy w ass (Ty_func w D C) (ty_func d c).
+Proof. Admitted.
+
+Lemma lift_preserves_relatedness :
+  forall w ass t,
+    RTy w ass (Symbolic.world_index t w) t.
+Proof. Admitted.
+
+(* TODO: implicit args for refine_persist *)
+(* TODO: some kind of Const relatedness ? See Katamaran, ask Steven *)
+
 Lemma infers_are_related (e : expr) (w : Ctx nat) (ass : Assignment w)
   : (REnv -> (RFree RTy))%R w ass (Symbolic.infer e) (Shallow.infer_no_elab e).
 Proof. Set Printing Depth 15.
-  revert ass. revert w. induction e; intros w ass; cbn.
+  revert ass. revert w. induction e; intros w ass; cbn -[Symbolic.persist].
   - intros Γ γ RΓ. repeat constructor.
   - intros Γ γ RΓ. repeat constructor.
   - intros Γ γ RΓ. eapply Bind_relates_bind.
     apply IHe1. apply RΓ. clear IHe1.
     intros w1 ? ? ? ? ? ?. constructor. apply H0. constructor.
     unfold Symbolic.T. eapply Bind_relates_bind. cbn. apply IHe2.
-    rewrite Symbolic.trans_refl.
-    hnf. intro.
-    apply (refine_persist_Env w w1 ω ass ass'). apply H. apply RΓ.
+    rewrite Symbolic.trans_refl. eapply refine_persist; eauto.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. cbn. apply IHe3.
-    rewrite Symbolic.trans_refl. apply (refine_persist_Env w w' _ ass).
-    eapply compose_trans. apply H. apply H1. apply RΓ.
+    rewrite Symbolic.trans_refl. eapply refine_persist.
+    eapply compose_trans. rewrite <- H1. rewrite <- H. apply RΓ.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. cbn. apply Assert_relates_assert; cbn.
-    apply (refine_persist_Ty w' w'0 ω1 ass'0). apply H3. apply H2.
-    apply (refine_persist_Ty w'0 w'0 _ ass'1). rewrite compose_refl. reflexivity.
-    apply H4.
+    eapply refine_persist. apply H3. apply H2. eapply refine_persist.
+    rewrite compose_refl. reflexivity. apply H4.
     intros ? ? ? ? ? ? ?. eapply Pure_relates_pure.
-    apply (refine_persist_Ty w' w'1 _ ass'0). eapply compose_trans.
-    apply H3. apply H5. apply H2.
+    eapply refine_persist. rewrite <- compose_trans. rewrite <- H5. apply H3. apply H2.
   - intros Γ γ RΓ. unfold REnv in RΓ. specialize (RΓ s).
     destruct (value s Γ), (value s γ); cbn in *; try contradiction; now constructor.
   - intros Γ γ RΓ. eapply Bind_relates_bind. apply Exists_relates_exists.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. apply IHe.
-    admit.
-    intros ? ? ? ? ? ? ?. constructor. admit.
-  - intros Γ γ RΓ. eapply Bind_relates_bind. apply IHe. admit.
-    intros ? ? ? ? ? ? ?. eapply Pure_relates_pure. admit.
+    apply persist_cons. apply H0.
+    intros ? ? ? ? ? ? ?. constructor. subst. hnf. DepElim.hnf_eq. f_equal; auto.
+    refine (refine_persist _ _ _ _ _ _ _ _ _ _ H0). reflexivity.
+  - intros Γ γ RΓ. eapply Bind_relates_bind. apply IHe.
+    apply persist_cons. apply lift_preserves_relatedness.
+    intros ? ? ? ? ? ? ?. eapply Pure_relates_pure. apply Func_relates_func.
+    eapply refine_persist. apply H. apply lift_preserves_relatedness. apply H0.
   - intros Γ γ RΓ. eapply Bind_relates_bind. apply Exists_relates_exists.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. admit.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. admit.
-    intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. eapply Assert_relates_assert. admit.
-    admit. admit.
-
-
+    intros ? ? ? ? ? ? ?. eapply Bind_relates_bind.
+    eapply Assert_relates_assert. admit.
+    eapply refine_persist. apply H3. apply Func_relates_func. admit.
+    eapply refine_persist. apply H1. apply H0.
+    intros ? ? ? ? ? ? ?. apply Pure_relates_pure. eapply refine_persist.
+    repeat rewrite <- compose_trans. rewrite <- H5. rewrite <- H3. apply H1.
+    apply H0.
 Admitted.
