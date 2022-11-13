@@ -302,8 +302,8 @@ Fixpoint infer_no_elab {m} `{TypeCheckM m} (expression : expr) (ctx : env) : m t
       end
   | e_app e1 e2 =>
       T0 <- exists_ty            ;;
-      T1 <- infer_no_elab e1 ctx ;;
       T2 <- infer_no_elab e2 ctx ;;
+      T1 <- infer_no_elab e1 ctx ;;
       assert T1 (ty_func T2 T0)  ;;
       ret T0
   | e_abst var Tvar e =>

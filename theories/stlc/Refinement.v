@@ -228,24 +228,29 @@ Proof. Set Printing Depth 15.
     intros ? ? ? ? ? ? ?. eapply Pure_relates_pure.
     eapply refine_persist. rewrite <- compose_trans. rewrite <- H5. apply H3. apply H2.
   - intros Γ γ RΓ. unfold REnv in RΓ. specialize (RΓ s).
-    destruct (value s Γ), (value s γ); cbn in *; try contradiction; now constructor.
+    destruct (value s Γ), (value s γ); cbn in *;
+      try contradiction; now constructor.
   - intros Γ γ RΓ. eapply Bind_relates_bind. apply Exists_relates_exists.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. apply IHe.
     apply persist_cons. apply H0.
-    intros ? ? ? ? ? ? ?. constructor. subst. hnf. DepElim.hnf_eq. f_equal; auto.
+    intros ? ? ? ? ? ? ?. constructor. subst. hnf.
+    DepElim.hnf_eq. f_equal; auto.
     refine (refine_persist _ _ _ _ _ _ _ _ _ _ H0). reflexivity.
   - intros Γ γ RΓ. eapply Bind_relates_bind. apply IHe.
     apply persist_cons. apply lift_preserves_relatedness.
     intros ? ? ? ? ? ? ?. eapply Pure_relates_pure. apply Func_relates_func.
     eapply refine_persist. apply H. apply lift_preserves_relatedness. apply H0.
   - intros Γ γ RΓ. eapply Bind_relates_bind. apply Exists_relates_exists.
-    intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. admit.
-    intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. admit.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind.
-    eapply Assert_relates_assert. admit.
-    eapply refine_persist. apply H3. apply Func_relates_func. admit.
+    eapply IHe2. eapply refine_persist. apply H. apply RΓ.
+    intros ? ? ? ? ? ? ?. eapply Bind_relates_bind.
+    eapply IHe1. eapply refine_persist. apply compose_trans. subst.
+    apply RΓ.
+    intros ? ? ? ? ? ? ?. eapply Bind_relates_bind.
+    eapply Assert_relates_assert. apply H4.
+    eapply refine_persist. apply H3. apply Func_relates_func. apply H2.
     eapply refine_persist. apply H1. apply H0.
     intros ? ? ? ? ? ? ?. apply Pure_relates_pure. eapply refine_persist.
     repeat rewrite <- compose_trans. rewrite <- H5. rewrite <- H3. apply H1.
     apply H0.
-Admitted.
+Qed.
