@@ -26,16 +26,14 @@ Definition Impl (A B : Ctx nat -> Type) : Ctx nat -> Type :=
 Definition Box A (Σ : Ctx nat) :=
   forall Σ', Accessibility Σ Σ' -> A Σ'.
 
-(* Lemma empty_is_initial : forall Σ, Accessibility ctx.nil Σ. *)
-(* Proof. intros. induction Σ. apply refl. apply fresh. apply IHΣ. Defined. *)
-
 (* _[_] *)
 Definition transient : forall (Σ Σ' : Ctx nat) (i : nat),
     Accessibility Σ Σ' ->
     i ∈ Σ -> i ∈ Σ'.
-Proof. intros. induction H. apply H0. apply IHAccessibility. apply ctx.in_succ.  apply H0. Defined.
+Proof. induction 1. auto.
+       intro. apply IHAccessibility. now apply ctx.in_succ. Defined.
 
-Eval cbv [transient Accessibility_rec Accessibility_rect] in @transient.
+(* Eval cbv [transient Accessibility_rec Accessibility_rect] in @transient. *)
 
 Class Persistent (A : Ctx nat -> Type) : Type :=
   persist : Valid (Impl A (Box A)).
@@ -60,12 +58,6 @@ Defined.
     end.
 Defined.
 
-
-(* Definition trans {Σ₁ Σ₂ Σ₃} (w12 : Accessibility Σ₁ Σ₂) (w23 : Accessibility Σ₂ Σ₃) : Accessibility Σ₁ Σ₃. *)
-(* Proof. induction w12. apply w23.  apply (fresh Σ₁ α). apply IHw12. apply w23. Defined. *)
-
-(* Eval cbv [trans Accessibility_rec Accessibility_rect] in @trans. *)
-
 Fixpoint trans {w1 w2 w3} (w12 : Accessibility w1 w2) : Accessibility w2 w3 -> Accessibility w1 w3 :=
   match w12 with
   | refl _ => fun w13 : Accessibility w1 w3 => w13
@@ -79,44 +71,18 @@ Lemma trans_refl : forall (w1 w2 : Ctx nat) w12,
   (@trans w1 w2 w2 w12 (refl w2)) = w12.
 Proof. intros. induction w12. auto. cbn. now rewrite IHw12. Qed.
 
-(* Move to PersistLaws, induction V *)
-Lemma persist_assoc : forall w1 w2 w3 r12 r23 V,
-    persist w2 (persist w1 V w2 r12) w3 r23 = persist w1 V w3 (trans r12 r23).
-Proof. intros. induction V as [|[]]; cbn; repeat f_equal; auto. Admitted.
-
 Definition T {A} := fun (Σ : Ctx nat) (a : Box A Σ) => a Σ (refl Σ).
 
 Definition _4 {A} : Valid (Impl (Box A) (Box (Box A))).
 Proof. cbv in *. intros.  apply X. eapply trans. apply H. apply H0. Defined.
 
-Print Scopes.
-
-(*
-Fixpoint bind [A B] {Σ} (m : FreeM A Σ) (f : Box (Impl A (FreeM B)) Σ) {struct m} : FreeM B Σ.
-refine (
+Fixpoint bind [A B] {Σ} (m : FreeM A Σ) (f : Box (Impl A (FreeM B)) Σ)
+  : FreeM B Σ :=
   match m with
-  | Bind_AssertEq_Free _ _ t1 t2 C1 => _
-  | Ret_Free _ _ v => _
-  | Fail_Free _ _ => Fail_Free _ _ (* we just fail *)
-  | Bind_Exists_Free _ _ i C => _
-  end).
-Proof.
-  - apply T in f. unfold Impl in f. apply f. apply v.
-  - apply Bind_AssertEq_Free. apply t1. apply t2. eapply bind.
-    + apply C1.
-    + apply f.
-  - eapply Bind_Exists_Free. eapply bind.
-    + apply C.
-    + apply _4 in f. cbv in *. intros. apply (f _ (fresh _ _ _ (refl _) ) _ H X).
-Show Proof.
-Abort.
-*)
-
-Fixpoint bind [A B] {Σ} (m : FreeM A Σ) (f : Box (Impl A (FreeM B)) Σ) : FreeM B Σ :=
-  match m with
-  | Bind_AssertEq_Free _ _ t1 t2 C1 => Bind_AssertEq_Free B Σ t1 t2 (bind C1 f)
   | Ret_Free _ _ v => (T Σ f) v (* removing the box *)
   | Fail_Free _ _ => Fail_Free B Σ
+  | Bind_AssertEq_Free _ _ t1 t2 C1 =>
+      Bind_AssertEq_Free B Σ t1 t2 (bind C1 f)
   | Bind_Exists_Free _ _ i C =>
       Bind_Exists_Free B Σ i
         (bind (* (Σ ▻ i) *) C
@@ -132,14 +98,14 @@ Local Notation "[ ω ] x <- ma ;; mb" :=
 
 Definition Unit (Σ : Ctx nat) := unit.
 
-Definition assert {Σ} t1 t2 := Bind_AssertEq_Free Unit Σ t1 t2 (Ret_Free Unit Σ tt).
+Definition assert {Σ} t1 t2 :=
+  Bind_AssertEq_Free Unit Σ t1 t2 (Ret_Free Unit Σ tt).
 
 Definition exists_Ty : forall Σ, FreeM Ty Σ :=
   fun Σ => let i := ctx.length Σ in
            Bind_Exists_Free Ty Σ i (Ret_Free _ _ (Ty_hole _ i ctx.in_zero)).
 
-(* Conveniently indexes a given ty with a world Σ *)
-(* call it lift *)
+(* Indexes a given ty by a world Σ *)
 Fixpoint lift (t : ty) (Σ : Ctx nat) : Ty Σ :=
   match t with
   | ty_bool => Ty_bool Σ
@@ -187,7 +153,9 @@ Section RunTI.
      but instead we choose to do it afterwards. *)
 
   Definition Prenex A Σ : Type :=
-    option { Σ' : Ctx nat & Accessibility Σ Σ' * list (Ty Σ' * Ty Σ') * A Σ' }%type.
+    option { Σ' : Ctx nat & Accessibility Σ Σ'
+                            * list (Ty Σ' * Ty Σ')
+                            * A Σ' }%type.
 
   Fixpoint pnf [A] {Σ} (c : FreeM A Σ) {struct c} : Prenex A Σ :=
     match c with
@@ -208,6 +176,9 @@ Section RunTI.
             Some (existT _ _ (fresh Σ i (Σ ▻ i) (refl (Σ ▻ i)) .> a, b, c))
         end
     end.
+
+  (* After unification, some variables might still be quantified.
+     For now, we simply ground them to `bool`. *)
 
   Fixpoint ground {Σ} : Unification.Assignment Σ :=
     match Σ with
