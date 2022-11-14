@@ -37,8 +37,8 @@ Fixpoint freeM_bind [T1 T2 : Type] (m : freeM T1) (f : T1 -> freeM T2) : freeM T
   match m with
   | ret_free _ a => f a
   | fail_free _ => fail_free T2
-  | bind_assert_free _ t1 t2 k =>
-      bind_assert_free T2 t1 t2 (freeM_bind k f)
+  | bind_asserteq_free _ t1 t2 k =>
+      bind_asserteq_free T2 t1 t2 (freeM_bind k f)
   | bind_exists_free _ tf =>
       bind_exists_free T2 (fun t : ty => freeM_bind (tf t) f)
   end.
@@ -46,7 +46,7 @@ Fixpoint freeM_bind [T1 T2 : Type] (m : freeM T1) (f : T1 -> freeM T2) : freeM T
 #[global] Instance TC_free : TypeCheckM freeM :=
   { bind         := freeM_bind ;
     ret T u      := ret_free T u ;
-    assert t1 t2 := bind_assert_free _ t1 t2 (ret_free _ tt);
+    assert t1 t2 := bind_asserteq_free _ t1 t2 (ret_free _ tt);
     fail T       := fail_free T;
     exists_ty    := bind_exists_free _ (fun t => ret_free _ t);
   }.
@@ -95,7 +95,7 @@ Compute (infer KKI nil).
 Fixpoint wlp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) : Prop :=
   match m with
   | ret_free _ a => Q a
-  | bind_assert_free _ t1 t2 k => t1 = t2 ->
+  | bind_asserteq_free _ t1 t2 k => t1 = t2 ->
       wlp_freeM k Q
   | fail_free _ => True
   | bind_exists_free _ tf => forall t : ty, wlp_freeM (tf t) Q
@@ -104,7 +104,7 @@ Fixpoint wlp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) : Prop :=
 Fixpoint wp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
   match m with
   | ret_free _ a => Q a
-  | bind_assert_free _ t1 t2 k => t1 = t2 /\
+  | bind_asserteq_free _ t1 t2 k => t1 = t2 /\
       wp_freeM k Q
   | fail_free _ => False
   | bind_exists_free _ tf => exists t : ty, wp_freeM (tf t) Q
@@ -171,7 +171,7 @@ Qed.
 Fixpoint gen [A : Type] (m : freeM A) : Type :=
   match m with
   | ret_free _ a => unit (* equiv. True in Prop *)
-  | bind_assert_free _ t1 t2 k => (t1 = t2) * gen k
+  | bind_asserteq_free _ t1 t2 k => (t1 = t2) * gen k
   | fail_free _ => Empty_set (* equiv. False in Prop *)
   | bind_exists_free _ tf => { τ : ty & gen (tf τ)}
   end%type.

@@ -92,33 +92,33 @@ Proof. cbv in *. intros.  apply X. eapply trans. apply H. apply H0. Defined.
 Print Scopes.
 
 (*
-Fixpoint bind [A B] {Σ} (m : Cstr A Σ) (f : Box (Impl A (Cstr B)) Σ) {struct m} : Cstr B Σ.
+Fixpoint bind [A B] {Σ} (m : FreeM A Σ) (f : Box (Impl A (FreeM B)) Σ) {struct m} : FreeM B Σ.
 refine (
   match m with
-  | C_eqc _ _ t1 t2 C1 => _
-  | C_val _ _ v => _
-  | C_fls _ _ => C_fls _ _ (* we just fail *)
-  | C_exi _ _ i C => _
+  | Bind_AssertEq_Free _ _ t1 t2 C1 => _
+  | Ret_Free _ _ v => _
+  | Fail_Free _ _ => Fail_Free _ _ (* we just fail *)
+  | Bind_Exists_Free _ _ i C => _
   end).
 Proof.
   - apply T in f. unfold Impl in f. apply f. apply v.
-  - apply C_eqc. apply t1. apply t2. eapply bind.
+  - apply Bind_AssertEq_Free. apply t1. apply t2. eapply bind.
     + apply C1.
     + apply f.
-  - eapply C_exi. eapply bind.
+  - eapply Bind_Exists_Free. eapply bind.
     + apply C.
     + apply _4 in f. cbv in *. intros. apply (f _ (fresh _ _ _ (refl _) ) _ H X).
 Show Proof.
 Abort.
 *)
 
-Fixpoint bind [A B] {Σ} (m : Cstr A Σ) (f : Box (Impl A (Cstr B)) Σ) : Cstr B Σ :=
+Fixpoint bind [A B] {Σ} (m : FreeM A Σ) (f : Box (Impl A (FreeM B)) Σ) : FreeM B Σ :=
   match m with
-  | C_eqc _ _ t1 t2 C1 => C_eqc B Σ t1 t2 (bind C1 f)
-  | C_val _ _ v => (T Σ f) v (* removing the box *)
-  | C_fls _ _ => C_fls B Σ
-  | C_exi _ _ i C =>
-      C_exi B Σ i
+  | Bind_AssertEq_Free _ _ t1 t2 C1 => Bind_AssertEq_Free B Σ t1 t2 (bind C1 f)
+  | Ret_Free _ _ v => (T Σ f) v (* removing the box *)
+  | Fail_Free _ _ => Fail_Free B Σ
+  | Bind_Exists_Free _ _ i C =>
+      Bind_Exists_Free B Σ i
         (bind (* (Σ ▻ i) *) C
             (fun Σ' (ω : Accessibility (Σ ▻ i) Σ') (V : A Σ') =>
                (_4 Σ f) (Σ ▻ i) (fresh Σ i (Σ ▻ i) (refl (Σ ▻ i))) Σ' ω V))
@@ -132,49 +132,50 @@ Local Notation "[ ω ] x <- ma ;; mb" :=
 
 Definition Unit (Σ : Ctx nat) := unit.
 
-Definition assert {Σ} t1 t2 := C_eqc Unit Σ t1 t2 (C_val Unit Σ tt).
+Definition assert {Σ} t1 t2 := Bind_AssertEq_Free Unit Σ t1 t2 (Ret_Free Unit Σ tt).
 
-Definition exists_Ty : forall Σ, Cstr Ty Σ :=
+Definition exists_Ty : forall Σ, FreeM Ty Σ :=
   fun Σ => let i := ctx.length Σ in
-           C_exi Ty Σ i (C_val _ _ (Ty_hole _ i ctx.in_zero)).
+           Bind_Exists_Free Ty Σ i (Ret_Free _ _ (Ty_hole _ i ctx.in_zero)).
 
 (* Conveniently indexes a given ty with a world Σ *)
-Fixpoint world_index (t : ty) (Σ : Ctx nat) : Ty Σ :=
+(* call it lift *)
+Fixpoint lift (t : ty) (Σ : Ctx nat) : Ty Σ :=
   match t with
   | ty_bool => Ty_bool Σ
-  | ty_func do co => Ty_func Σ (world_index do Σ) (world_index co Σ)
+  | ty_func do co => Ty_func Σ (lift do Σ) (lift co Σ)
   end.
 
-Fixpoint infer (e : expr) {Σ : Ctx nat} (Γ : Env Σ) : Cstr Ty Σ :=
+Fixpoint infer (e : expr) {Σ : Ctx nat} (Γ : Env Σ) : FreeM Ty Σ :=
   match e with
-  | v_true => C_val Ty Σ (Ty_bool Σ)
-  | v_false => C_val Ty Σ (Ty_bool Σ)
+  | v_true => Ret_Free Ty Σ (Ty_bool Σ)
+  | v_false => Ret_Free Ty Σ (Ty_bool Σ)
   | e_if cnd coq alt =>
       [ ω₁ ] t_cnd <- infer cnd Γ ;;
       [ ω₂ ] _     <- assert t_cnd (Ty_bool _) ;;
       [ ω₃ ] t_coq <- infer coq <{ Γ ~ ω₁ .> ω₂ }> ;;
       [ ω₄ ] t_alt <- infer alt <{ Γ ~ ω₁ .> ω₂ .> ω₃ }> ;;
       [ ω₅ ] _     <- assert <{ t_coq ~ ω₄ }>  <{ t_alt ~ (refl _) }> ;;
-         C_val Ty _ <{ t_coq ~ ω₄ .> ω₅ }>
+         Ret_Free Ty _ <{ t_coq ~ ω₄ .> ω₅ }>
   | e_var var =>
       match (value var Γ) with
-      | Some t_var => C_val Ty _ t_var
-      | None => C_fls Ty Σ
+      | Some t_var => Ret_Free Ty _ t_var
+      | None => Fail_Free Ty Σ
       end
   | e_app f a =>
       [ ω1 ] t_co <- exists_Ty Σ ;;
       [ ω2 ] t_do <- infer a <{ Γ ~ ω1 }> ;;
       [ ω3 ] t_fn <- infer f <{ Γ ~ ω1 .> ω2 }> ;;
       [ ω4 ] _    <- assert t_fn <{ (Ty_func _ t_do <{ t_co ~ ω2 }> ) ~ ω3 }> ;;
-         C_val Ty _ <{ t_co ~ ω2 .> ω3 .> ω4 }>
+         Ret_Free Ty _ <{ t_co ~ ω2 .> ω3 .> ω4 }>
   | e_abst var t_var e =>
-      let t_var' := (world_index t_var Σ) in (* t_var lives in ty, not in (Ty w) *)
+      let t_var' := (lift t_var Σ) in (* t_var lives in ty, not in (Ty w) *)
       [ ω1 ] t_e <- infer e ((var, t_var') :: Γ) ;;
-        C_val Ty _ (Ty_func _ <{ t_var' ~ ω1 }> t_e)
+        Ret_Free Ty _ (Ty_func _ <{ t_var' ~ ω1 }> t_e)
   | e_absu var e =>
       [ ω1 ] t_var <- exists_Ty Σ ;;
       [ ω2 ] t_e <- infer e ((var, t_var) :: <{ Γ ~ ω1 }>) ;;
-        C_val Ty _ (Ty_func _ <{ t_var ~ ω2 }> t_e)
+        Ret_Free Ty _ (Ty_func _ <{ t_var ~ ω2 }> t_e)
   end.
 
 Section RunTI.
@@ -188,19 +189,19 @@ Section RunTI.
   Definition Prenex A Σ : Type :=
     option { Σ' : Ctx nat & Accessibility Σ Σ' * list (Ty Σ' * Ty Σ') * A Σ' }%type.
 
-  Fixpoint pnf [A] {Σ} (c : Cstr A Σ) {struct c} : Prenex A Σ :=
+  Fixpoint pnf [A] {Σ} (c : FreeM A Σ) {struct c} : Prenex A Σ :=
     match c with
-    | C_val _ _ V       =>
+    | Ret_Free _ _ V =>
         Some (existT _ _ (refl Σ, nil, V))
-    | C_fls _ _         =>
+    | Fail_Free _ _  =>
         None
-    | C_eqc _ _ T1 T2 K =>
+    | Bind_AssertEq_Free _ _ T1 T2 K =>
         match pnf K with
         | None => None
         | Some (existT _ Σ' (a, b, c)) =>
             Some (existT _ _ (a, (<{ T1 ~ a }>, <{ T2 ~ a }>) :: b, c))
         end
-    | C_exi _ _ i K     =>
+    | Bind_Exists_Free _ _ i K =>
         match pnf K with
         | None => None
         | Some (existT _ Σ' (a, b, c)) =>

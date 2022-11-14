@@ -28,26 +28,26 @@ Definition RTy : Relation Ty ty :=
   fun (w : Ctx nat) (ass : Assignment w) (T : Ty w) (t : ty) =>
     Unification.applyassign T ass = t.
 
-(* We can also relate deeply-embedded free computations `Cstr` to shallowly-embedded free computations `freeM`.
+(* We can also relate deeply-embedded free computations `FreeM` to shallowly-embedded free computations `freeM`.
    This is parametric in the relation of values `A` and `a` in their respective free monads *)
-(* i.e., RFree : Relation A a -> Relation (Cstr A) (freeM a) *)
+(* i.e., RFree : Relation A a -> Relation (FreeM A) (freeM a) *)
 
 Inductive RFree {A a} (RA : Relation A a) (w : Ctx nat)
-                 (ass : Assignment w) : Cstr A w -> freeM a -> Prop :=
-| RPure : forall (V : A w) (v : a),
+                 (ass : Assignment w) : FreeM A w -> freeM a -> Prop :=
+| RRet : forall (V : A w) (v : a),
     RA w ass V v ->
-    RFree RA w ass (C_val _ _ V) (ret_free _ v)
+    RFree RA w ass (Ret_Free _ _ V) (ret_free _ v)
 | RFalse :
-    RFree RA w ass (C_fls _ _) (fail_free _)
+    RFree RA w ass (Fail_Free _ _) (fail_free _)
 | RAssert : forall T1 T2 t1 t2 Cont cont,
     RTy w ass T1 t1 ->
     RTy w ass T2 t2 ->
     RFree RA w ass Cont cont ->
-    RFree RA w ass (C_eqc _ _ T1 T2 Cont) (bind_assert_free _ t1 t2 cont)
+    RFree RA w ass (Bind_AssertEq_Free _ _ T1 T2 Cont) (bind_asserteq_free _ t1 t2 cont)
 | RExists : forall i Cont cont,
     (forall (t : ty),
       RFree RA (w ▻ i) (env.snoc ass i t) Cont (cont t)) ->
-      RFree RA w ass (C_exi _ _ i Cont) (bind_exists_free _ cont).
+      RFree RA w ass (Bind_Exists_Free _ _ i Cont) (bind_exists_free _ cont).
 
 Fixpoint compose {Σ₁ c : Ctx nat} (a : Symbolic.Accessibility Σ₁ c) {struct a} :
   Assignment c -> Assignment Σ₁ :=
@@ -113,14 +113,14 @@ Definition REnv : Relation Env env :=
 (* Using our relation on functions, we can now prove
    relatedness of operations in both free monads *)
 
-Lemma Pure_relates_pure {A a} (RA : Relation A a) :
+Lemma Ret_relates_ret {A a} (RA : Relation A a) :
 forall (w : Ctx nat) (ass : Assignment w),
-    (RA -> (RFree RA))%R w ass (C_val A w) (ret_free a).
+    (RA -> (RFree RA))%R w ass (Ret_Free A w) (ret_free a).
 Proof.  constructor. assumption. Qed.
 
 Lemma False_relates_false {A a} (RA : Relation A a) :
 forall (w : Ctx nat) (ass : Assignment w),
-    RFree RA w ass (C_fls A w) (@fail_free a).
+    RFree RA w ass (Fail_Free A w) (@fail_free a).
 Proof.  constructor. Qed.
 
 Lemma Assert_relates_assert :
@@ -156,24 +156,36 @@ Arguments Shallow.assert : simpl never.
 Arguments Symbolic.exists_Ty : simpl never.
 Arguments  Shallow.exists_ty : simpl never.
 
+Lemma Func_relates_func :
+  forall (w : Ctx nat) (ass : Assignment w) D d C c,
+    RTy w ass D d ->
+    RTy w ass C c ->
+    RTy w ass (Ty_func w D C) (ty_func d c).
+Proof. Admitted.
+
 (* Singleton method or not? *)
 Class PersistLaws (A : Ctx nat -> Type) `{Symbolic.Persistent A} : Type :=
   { refine_persist a w1 w2 r12 ass1 ass2 V v
     (RA : Relation A a)
     (A : ass1 = compose r12 ass2)
     (R : RA w1 ass1 V v) :
-    RA w2 ass2 (Symbolic.persist w1 V w2 r12) v }.
+      RA w2 ass2 (Symbolic.persist w1 V w2 r12) v
+  ; assoc_persist w1 w2 w3 r12 r23 V :
+      Symbolic.persist w2 (Symbolic.persist w1 V w2 r12) w3 r23
+    = Symbolic.persist w1 V w3 (Symbolic.trans r12 r23) }.
 
 Instance PersistLaws_Ty : PersistLaws Ty.
-Proof.
-  constructor.
-  intros * R.
+Proof. constructor.
+  - intros * R RX. admit.
+  - intros. induction V; cbn. auto. f_equal. apply IHV1. apply IHV2.
+    f_equal. induction r12. f_equal. apply IHr12.
 Admitted.
 
 Instance PersistLaws_Env : PersistLaws Env.
-Proof.
-  constructor.
-  intros * R.
+Proof. constructor.
+  - intros * R. admit.
+  - intros. induction V as [|[]]; cbn; repeat f_equal; auto.
+    induction r12. f_equal.
 Admitted.
 
 (* Lemma refine_T {AT A} (RA : Relation AT A) : *)
@@ -193,17 +205,10 @@ Lemma persist_cons :
     REnv w ass ((k, V) :: Γ)%list ((k, v) :: γ)%list.
 Proof. Admitted.
 
-Lemma Func_relates_func :
-  forall (w : Ctx nat) (ass : Assignment w) D d C c,
-    RTy w ass D d ->
-    RTy w ass C c ->
-    RTy w ass (Ty_func w D C) (ty_func d c).
-Proof. Admitted.
-
 Lemma lift_preserves_relatedness :
   forall w ass t,
-    RTy w ass (Symbolic.world_index t w) t.
-Proof. Admitted.
+    RTy w ass (Symbolic.lift t w) t.
+Proof. induction t. constructor. now apply Func_relates_func. Qed.
 
 (* TODO: implicit args for refine_persist *)
 (* TODO: some kind of Const relatedness ? See Katamaran, ask Steven *)
@@ -225,7 +230,7 @@ Proof. Set Printing Depth 15.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. cbn. apply Assert_relates_assert; cbn.
     eapply refine_persist. apply H3. apply H2. eapply refine_persist.
     rewrite compose_refl. reflexivity. apply H4.
-    intros ? ? ? ? ? ? ?. eapply Pure_relates_pure.
+    intros ? ? ? ? ? ? ?. eapply Ret_relates_ret.
     eapply refine_persist. rewrite <- compose_trans. rewrite <- H5. apply H3. apply H2.
   - intros Γ γ RΓ. unfold REnv in RΓ. specialize (RΓ s).
     destruct (value s Γ), (value s γ); cbn in *;
@@ -238,7 +243,7 @@ Proof. Set Printing Depth 15.
     refine (refine_persist _ _ _ _ _ _ _ _ _ _ H0). reflexivity.
   - intros Γ γ RΓ. eapply Bind_relates_bind. apply IHe.
     apply persist_cons. apply lift_preserves_relatedness.
-    intros ? ? ? ? ? ? ?. eapply Pure_relates_pure. apply Func_relates_func.
+    intros ? ? ? ? ? ? ?. eapply Ret_relates_ret. apply Func_relates_func.
     eapply refine_persist. apply H. apply lift_preserves_relatedness. apply H0.
   - intros Γ γ RΓ. eapply Bind_relates_bind. apply Exists_relates_exists.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind.
@@ -250,7 +255,7 @@ Proof. Set Printing Depth 15.
     eapply Assert_relates_assert. apply H4.
     eapply refine_persist. apply H3. apply Func_relates_func. apply H2.
     eapply refine_persist. apply H1. apply H0.
-    intros ? ? ? ? ? ? ?. apply Pure_relates_pure. eapply refine_persist.
+    intros ? ? ? ? ? ? ?. apply Ret_relates_ret. eapply refine_persist.
     repeat rewrite <- compose_trans. rewrite <- H5. rewrite <- H3. apply H1.
     apply H0.
 Qed.
