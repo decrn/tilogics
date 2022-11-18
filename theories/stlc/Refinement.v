@@ -151,10 +151,10 @@ Proof.
     intros. apply HF. clear HF H0 H. rewrite <- compose_trans. cbn. now rewrite <- H1.
 Qed.
 
-Arguments Symbolic.assert : simpl never.
-Arguments Shallow.assert : simpl never.
+Arguments Symbolic.assert    : simpl never.
+Arguments Shallow.assert     : simpl never.
 Arguments Symbolic.exists_Ty : simpl never.
-Arguments  Shallow.exists_ty : simpl never.
+Arguments Shallow.exists_ty  : simpl never.
 
 Lemma Func_relates_func :
   forall (w : Ctx nat) (ass : Assignment w) D d C c,
@@ -163,41 +163,41 @@ Lemma Func_relates_func :
     RTy w ass (Ty_func w D C) (ty_func d c).
 Proof. Admitted.
 
-(* Singleton method or not? *)
-Class PersistLaws (A : Ctx nat -> Type) `{Symbolic.Persistent A} : Type :=
-  { refine_persist a w1 w2 r12 ass1 ass2 V v
-    (RA : Relation A a)
-    (A : ass1 = compose r12 ass2)
-    (R : RA w1 ass1 V v) :
-      RA w2 ass2 (Symbolic.persist w1 V w2 r12) v
-  ; assoc_persist w1 w2 w3 r12 r23 V :
-      Symbolic.persist w2 (Symbolic.persist w1 V w2 r12) w3 r23
-    = Symbolic.persist w1 V w3 (Symbolic.trans r12 r23) }.
+Class PersistLaws A `{Symbolic.Persistent A} : Type :=
+  { refl_persist w (V : A w) :
+        Symbolic.persist w V w (Symbolic.refl w) = V
+  ; assoc_persist w1 w2 w3 r12 r23 (V : A w1) :
+        Symbolic.persist w2 (Symbolic.persist w1 V w2 r12) w3 r23
+      = Symbolic.persist w1 V w3 (Symbolic.trans r12 r23) }.
 
 Instance PersistLaws_Ty : PersistLaws Ty.
 Proof. constructor.
-  - intros * R RX. admit.
+  - intros. induction V; cbn; now try (rewrite IHV1; rewrite IHV2).
   - intros. induction V; cbn. auto. f_equal. apply IHV1. apply IHV2.
     f_equal. induction r12. f_equal. apply IHr12.
-Admitted.
+Qed.
 
 Instance PersistLaws_Env : PersistLaws Env.
 Proof. constructor.
-  - intros * R. admit.
+  - intros. induction V; cbn; now try (destruct a; rewrite IHV; rewrite refl_persist).
   - intros. induction V as [|[]]; cbn; repeat f_equal; auto.
-    induction r12. f_equal.
+    induction r12; cbn. now rewrite refl_persist. now rewrite assoc_persist.
+Qed.
+
+Class RefinePersist {A a} `{Symbolic.Persistent A} (RA : Relation A a) : Type :=
+  { refine_persist w1 w2 r12 ass V v :
+      RA w1 (compose r12 ass) V v ->
+      RA w2 ass (Symbolic.persist w1 V w2 r12) v }.
+
+Instance RefinePersist_Ty : RefinePersist RTy.
+Proof. constructor.
+  intros. induction r12. rewrite compose_refl in H. rewrite refl_persist. apply H.
 Admitted.
 
-(* Lemma refine_T {AT A} (RA : Relation AT A) : *)
-(*   forall (w : Ctx nat) (ass : Assignment w) bv v, *)
-(*     ass = compose (Symbolic.refl w) ass -> *)
-(*     RBox (RFree RA)%R w ass bv v -> *)
-(*     RFree RA w ass (Symbolic.T _ bv) v. *)
-(* Proof. intros ? ? ? ? ? ?. apply H0. apply H. Qed. *)
-
-Lemma persist_refl : forall w1 V,
-  Symbolic.persist w1 V w1 (Symbolic.refl w1) = V.
-Proof. Admitted.
+Instance RefinePersist_Env : RefinePersist REnv.
+Proof. constructor.
+  intros * R. induction V. cbn. admit.
+Admitted.
 
 Lemma persist_cons :
   forall w ass k V v Γ γ,
@@ -224,14 +224,14 @@ Proof. Set Printing Depth 15.
     intros w1 ? ? ? ? ? ?. constructor. apply H0. constructor.
     unfold Symbolic.T. eapply Bind_relates_bind. cbn. apply IHe2.
     rewrite Symbolic.trans_refl. eapply refine_persist; eauto.
+    subst. apply RΓ.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. cbn. apply IHe3.
     rewrite Symbolic.trans_refl. eapply refine_persist.
-    eapply compose_trans. rewrite <- H1. rewrite <- H. apply RΓ.
+    subst. rewrite <- compose_trans. apply RΓ.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. cbn. apply Assert_relates_assert; cbn.
-    eapply refine_persist. apply H3. apply H2. eapply refine_persist.
-    rewrite compose_refl. reflexivity. apply H4.
+    eapply refine_persist. subst. apply H2. now rewrite refl_persist.
     intros ? ? ? ? ? ? ?. eapply Ret_relates_ret.
-    eapply refine_persist. rewrite <- compose_trans. rewrite <- H5. apply H3. apply H2.
+    eapply refine_persist. rewrite <- compose_trans. rewrite <- H5. subst. apply H2.
   - intros Γ γ RΓ. unfold REnv in RΓ. specialize (RΓ s).
     destruct (value s Γ), (value s γ); cbn in *;
       try contradiction; now constructor.
@@ -240,22 +240,20 @@ Proof. Set Printing Depth 15.
     apply persist_cons. apply H0.
     intros ? ? ? ? ? ? ?. constructor. subst. hnf.
     DepElim.hnf_eq. f_equal; auto.
-    refine (refine_persist _ _ _ _ _ _ _ _ _ _ H0). reflexivity.
+    refine (refine_persist _ _ _ _ _ _ H0).
   - intros Γ γ RΓ. eapply Bind_relates_bind. apply IHe.
     apply persist_cons. apply lift_preserves_relatedness.
     intros ? ? ? ? ? ? ?. eapply Ret_relates_ret. apply Func_relates_func.
-    eapply refine_persist. apply H. apply lift_preserves_relatedness. apply H0.
+    eapply refine_persist. apply lift_preserves_relatedness. apply H0.
   - intros Γ γ RΓ. eapply Bind_relates_bind. apply Exists_relates_exists.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind.
-    eapply IHe2. eapply refine_persist. apply H. apply RΓ.
+    eapply IHe2. eapply refine_persist. subst. apply RΓ.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind.
-    eapply IHe1. eapply refine_persist. apply compose_trans. subst.
-    apply RΓ.
+    eapply IHe1. eapply refine_persist. rewrite <- compose_trans. subst. apply RΓ.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind.
     eapply Assert_relates_assert. apply H4.
-    eapply refine_persist. apply H3. apply Func_relates_func. apply H2.
-    eapply refine_persist. apply H1. apply H0.
+    eapply refine_persist. apply Func_relates_func. subst. apply H2.
+    eapply refine_persist. subst. apply H0.
     intros ? ? ? ? ? ? ?. apply Ret_relates_ret. eapply refine_persist.
-    repeat rewrite <- compose_trans. rewrite <- H5. rewrite <- H3. apply H1.
-    apply H0.
+    repeat rewrite <- compose_trans. rewrite <- H5. rewrite <- H3. subst. apply H0.
 Qed.
