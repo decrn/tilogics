@@ -26,14 +26,9 @@ Definition Impl (A B : Ctx nat -> Type) : Ctx nat -> Type :=
 Definition Box A (Σ : Ctx nat) :=
   forall Σ', Accessibility Σ Σ' -> A Σ'.
 
-(* _[_] *)
-Definition transient : forall (Σ Σ' : Ctx nat) (i : nat),
-    Accessibility Σ Σ' ->
+Fixpoint transient  (Σ Σ' : Ctx nat) (i : nat) (r : Accessibility Σ Σ') :
     i ∈ Σ -> i ∈ Σ'.
-Proof. induction 1. auto.
-       intro. apply IHAccessibility. now apply ctx.in_succ. Defined.
-
-(* Eval cbv [transient Accessibility_rec Accessibility_rect] in @transient. *)
+Proof. destruct r. auto. intro. eapply transient. apply r. constructor. apply H. Defined.
 
 Class Persistent (A : Ctx nat -> Type) : Type :=
   persist : Valid (Impl A (Box A)).

@@ -49,7 +49,7 @@ Inductive RFree {A a} (RA : Relation A a) (w : Ctx nat)
       RFree RA (w ▻ i) (env.snoc ass i t) Cont (cont t)) ->
       RFree RA w ass (Bind_Exists_Free _ _ i Cont) (bind_exists_free _ cont).
 
-Fixpoint compose {Σ₁ c : Ctx nat} (a : Symbolic.Accessibility Σ₁ c) {struct a} :
+Fixpoint compose {Σ₁ c : Ctx nat} (a : Symbolic.Accessibility Σ₁ c) :
   Assignment c -> Assignment Σ₁ :=
   match a in (Symbolic.Accessibility _ c0) return (Assignment c0 -> Assignment Σ₁) with
   | Symbolic.refl _ => fun X0 : Assignment Σ₁ => X0
@@ -63,8 +63,6 @@ Fixpoint compose {Σ₁ c : Ctx nat} (a : Symbolic.Accessibility Σ₁ c) {struc
 Lemma compose_refl : forall w ass,
     compose (Symbolic.refl w) ass = ass.
 Proof. easy. Qed.
-
-Print Symbolic.trans.
 
 Lemma compose_trans {w1 w2 w3 : Ctx nat} : forall ass r12 r23,
   compose r12 (compose r23 ass) = compose (@Symbolic.trans w1 w2 w3 r12 r23) ass.
@@ -102,7 +100,8 @@ Delimit Scope rel_scope with R.
 Notation "A -> B" := (RArr A B) : rel_scope.
 
 Definition REnv : Relation Env env :=
-  fun (w : Ctx nat) (ass : Assignment w) (Γ : Env w) (γ : env) => forall (pvar : string),
+  fun (w : Ctx nat) (ass : Assignment w) (Γ : Env w) (γ : env) =>
+    forall (pvar : string),
     match (value pvar Γ), (value pvar γ) with
     | Some T, Some t => RTy w ass T t
     | None, None => True
@@ -170,14 +169,14 @@ Class PersistLaws A `{Symbolic.Persistent A} : Type :=
         Symbolic.persist w2 (Symbolic.persist w1 V w2 r12) w3 r23
       = Symbolic.persist w1 V w3 (Symbolic.trans r12 r23) }.
 
-Instance PersistLaws_Ty : PersistLaws Ty.
+#[export] Instance PersistLaws_Ty : PersistLaws Ty.
 Proof. constructor.
   - intros. induction V; cbn; now try (rewrite IHV1; rewrite IHV2).
   - intros. induction V; cbn. auto. f_equal. apply IHV1. apply IHV2.
     f_equal. induction r12. f_equal. apply IHr12.
 Qed.
 
-Instance PersistLaws_Env : PersistLaws Env.
+#[export] Instance PersistLaws_Env : PersistLaws Env.
 Proof. constructor.
   - intros. induction V; cbn; now try (destruct a; rewrite IHV; rewrite refl_persist).
   - intros. induction V as [|[]]; cbn; repeat f_equal; auto.
@@ -189,17 +188,17 @@ Class RefinePersist {A a} `{Symbolic.Persistent A} (RA : Relation A a) : Type :=
       RA w1 (compose r12 ass) V v ->
       RA w2 ass (Symbolic.persist w1 V w2 r12) v }.
 
-Instance RefinePersist_Ty : RefinePersist RTy.
+#[export] Instance RefinePersist_Ty : RefinePersist RTy.
 Proof. constructor.
   intros. induction r12. rewrite compose_refl in H. rewrite refl_persist. apply H.
 Admitted.
 
-Instance RefinePersist_Env : RefinePersist REnv.
+#[export] Instance RefinePersist_Env : RefinePersist REnv.
 Proof. constructor.
   intros * R. induction V. cbn. admit.
 Admitted.
 
-Lemma persist_cons :
+Lemma env_cons :
   forall w ass k V v Γ γ,
     RTy w ass V v ->
     REnv w ass ((k, V) :: Γ)%list ((k, v) :: γ)%list.
@@ -238,11 +237,13 @@ Proof. Set Printing Depth 15.
   - intros Γ γ RΓ. eapply Bind_relates_bind. apply Exists_relates_exists.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. apply IHe.
     apply persist_cons. apply H0.
+    apply env_cons. apply H0.
+    apply refine_persist. subst. apply RΓ.
     intros ? ? ? ? ? ? ?. constructor. subst. hnf.
     DepElim.hnf_eq. f_equal; auto.
     refine (refine_persist _ _ _ _ _ _ H0).
   - intros Γ γ RΓ. eapply Bind_relates_bind. apply IHe.
-    apply persist_cons. apply lift_preserves_relatedness.
+    apply env_cons. apply lift_preserves_relatedness. apply RΓ.
     intros ? ? ? ? ? ? ?. eapply Ret_relates_ret. apply Func_relates_func.
     eapply refine_persist. apply lift_preserves_relatedness. apply H0.
   - intros Γ γ RΓ. eapply Bind_relates_bind. apply Exists_relates_exists.
