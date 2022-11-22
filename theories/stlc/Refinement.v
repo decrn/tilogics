@@ -155,12 +155,13 @@ Arguments Shallow.assert     : simpl never.
 Arguments Symbolic.exists_Ty : simpl never.
 Arguments Shallow.exists_ty  : simpl never.
 
+(* Should probably generalize this to any constructor *)
 Lemma Func_relates_func :
   forall (w : Ctx nat) (ass : Assignment w) D d C c,
     RTy w ass D d ->
     RTy w ass C c ->
     RTy w ass (Ty_func w D C) (ty_func d c).
-Proof. Admitted.
+Proof. intros. inversion H. inversion H0. constructor. Qed.
 
 Class PersistLaws A `{Symbolic.Persistent A} : Type :=
   { refl_persist w (V : A w) :
@@ -190,19 +191,29 @@ Class RefinePersist {A a} `{Symbolic.Persistent A} (RA : Relation A a) : Type :=
 
 #[export] Instance RefinePersist_Ty : RefinePersist RTy.
 Proof. constructor.
-  intros. induction r12. rewrite compose_refl in H. rewrite refl_persist. apply H.
-Admitted.
+  intros. revert v H. unfold RTy. induction V; cbn; intros. apply H. subst.
+  f_equal; auto. subst.
+  induction r12. auto. cbn. rewrite IHr12. now destruct env.snocView.
+Qed.
 
+(* TODO: retry proof after inductive definition of REnv, will need
+         the induction principle to correctly reason about removing
+         cons from the environment *)
 #[export] Instance RefinePersist_Env : RefinePersist REnv.
 Proof. constructor.
-  intros * R. induction V. cbn. admit.
+  intros. revert v H. unfold REnv. intros. specialize (H pvar). revert v H. induction V. induction r12. (* Looks hairy, redefine REnv inductively *)
 Admitted.
 
+(* This becomes a constructor of the REnv inductive *)
 Lemma env_cons :
   forall w ass k V v Γ γ,
     RTy w ass V v ->
+    REnv w ass Γ γ ->
     REnv w ass ((k, V) :: Γ)%list ((k, v) :: γ)%list.
-Proof. Admitted.
+Proof.
+  intros. intro. cbn. destruct (string_dec pvar k). apply H.
+  apply H0.
+Qed.
 
 Lemma lift_preserves_relatedness :
   forall w ass t,
@@ -236,7 +247,6 @@ Proof. Set Printing Depth 15.
       try contradiction; now constructor.
   - intros Γ γ RΓ. eapply Bind_relates_bind. apply Exists_relates_exists.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. apply IHe.
-    apply persist_cons. apply H0.
     apply env_cons. apply H0.
     apply refine_persist. subst. apply RΓ.
     intros ? ? ? ? ? ? ?. constructor. subst. hnf.
