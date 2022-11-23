@@ -148,11 +148,6 @@ Proof.
     intros. apply HF. clear HF H0 H. rewrite <- compose_trans. cbn. now rewrite <- H1.
 Qed.
 
-Arguments Symbolic.assert    : simpl never.
-Arguments Shallow.assert     : simpl never.
-Arguments Symbolic.exists_Ty : simpl never.
-Arguments Shallow.exists_ty  : simpl never.
-
 (* Should probably generalize this to any constructor *)
 Lemma Func_relates_func :
   forall (w : Ctx nat) (ass : Assignment w) D d C c,
@@ -194,21 +189,21 @@ Proof. constructor.
   induction r12. auto. cbn. rewrite IHr12. now destruct env.snocView.
 Qed.
 
-(* TODO: retry proof after inductive definition of REnv, will need
-         the induction principle to correctly reason about removing
-         cons from the environment *)
 #[export] Instance RefinePersist_Env : RefinePersist REnv.
 Proof. constructor.
-  intros. revert v H. induction V.
-  - intros. inversion H. constructor.
-  - intros. inversion H. subst. cbn.
-    constructor. now apply refine_persist. now apply IHV.
+  intros. revert v H. induction V; intros; inversion H; subst; cbn; try constructor.
+  now apply refine_persist. now apply IHV.
 Qed.
 
 Lemma lift_preserves_relatedness :
   forall w ass t,
     RTy w ass (Symbolic.lift t w) t.
 Proof. induction t. constructor. now apply Func_relates_func. Qed.
+
+Arguments Symbolic.assert    : simpl never.
+Arguments Shallow.assert     : simpl never.
+Arguments Symbolic.exists_Ty : simpl never.
+Arguments Shallow.exists_ty  : simpl never.
 
 (* TODO: implicit args for refine_persist *)
 (* TODO: some kind of Const relatedness ? See Katamaran, ask Steven *)
