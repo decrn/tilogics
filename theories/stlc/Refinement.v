@@ -99,15 +99,13 @@ Declare Scope rel_scope.
 Delimit Scope rel_scope with R.
 Notation "A -> B" := (RArr A B) : rel_scope.
 
-Definition REnv : Relation Env env :=
-  fun (w : Ctx nat) (ass : Assignment w) (Γ : Env w) (γ : env) =>
-    forall (pvar : string),
-    match (value pvar Γ), (value pvar γ) with
-    | Some T, Some t => RTy w ass T t
-    | None, None => True
-    | _, _ => False
-    end.
-  (* Binary parametricity translation *)
+Inductive REnv w ass : Env w -> env -> Prop :=
+| RPair : forall k V v Γ γ,
+    RTy w ass V v ->
+    REnv w ass Γ γ ->
+    REnv w ass ((k, V) :: Γ)%list ((k, v) :: γ)%list
+| RNil :
+    REnv w ass nil%list nil%list.
 
 (* Using our relation on functions, we can now prove
    relatedness of operations in both free monads *)
@@ -201,18 +199,10 @@ Qed.
          cons from the environment *)
 #[export] Instance RefinePersist_Env : RefinePersist REnv.
 Proof. constructor.
-  intros. revert v H. unfold REnv. intros. specialize (H pvar). revert v H. induction V. induction r12. (* Looks hairy, redefine REnv inductively *)
-Admitted.
-
-(* This becomes a constructor of the REnv inductive *)
-Lemma env_cons :
-  forall w ass k V v Γ γ,
-    RTy w ass V v ->
-    REnv w ass Γ γ ->
-    REnv w ass ((k, V) :: Γ)%list ((k, v) :: γ)%list.
-Proof.
-  intros. intro. cbn. destruct (string_dec pvar k). apply H.
-  apply H0.
+  intros. revert v H. induction V.
+  - intros. inversion H. constructor.
+  - intros. inversion H. subst. cbn.
+    constructor. now apply refine_persist. now apply IHV.
 Qed.
 
 Lemma lift_preserves_relatedness :
@@ -242,18 +232,18 @@ Proof. Set Printing Depth 15.
     eapply refine_persist. subst. apply H2. now rewrite refl_persist.
     intros ? ? ? ? ? ? ?. eapply Ret_relates_ret.
     eapply refine_persist. rewrite <- compose_trans. rewrite <- H5. subst. apply H2.
-  - intros Γ γ RΓ. unfold REnv in RΓ. specialize (RΓ s).
-    destruct (value s Γ), (value s γ); cbn in *;
-      try contradiction; now constructor.
+  - intros ? ? ?. induction H. cbn.
+    destruct (string_dec s k). now constructor. apply IHREnv.
+    cbn. constructor.
   - intros Γ γ RΓ. eapply Bind_relates_bind. apply Exists_relates_exists.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. apply IHe.
-    apply env_cons. apply H0.
+    constructor. apply H0.
     apply refine_persist. subst. apply RΓ.
     intros ? ? ? ? ? ? ?. constructor. subst. hnf.
     DepElim.hnf_eq. f_equal; auto.
     refine (refine_persist _ _ _ _ _ _ H0).
   - intros Γ γ RΓ. eapply Bind_relates_bind. apply IHe.
-    apply env_cons. apply lift_preserves_relatedness. apply RΓ.
+    constructor. apply lift_preserves_relatedness. apply RΓ.
     intros ? ? ? ? ? ? ?. eapply Ret_relates_ret. apply Func_relates_func.
     eapply refine_persist. apply lift_preserves_relatedness. apply H0.
   - intros Γ γ RΓ. eapply Bind_relates_bind. apply Exists_relates_exists.
