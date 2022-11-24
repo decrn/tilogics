@@ -141,56 +141,22 @@ Fixpoint generate (e : expr) {Σ : Ctx nat} (Γ : Env Σ) : FreeM Ty Σ :=
 
 Section RunTI.
 
-  (* To run the type inferencer, we must submit a generated
-     constraint to the unifier. In turn, this requires
-     converting the constraint into prenex normal form.
-     We could do this while generating the constraints,
-     but instead we choose to do it afterwards. *)
+  (* infer_ng defines inference without grounding
+     of remaining unification variables. *)
+  Definition infer_ng (e : expr) : SolvedM Ty [] :=
+    Unification.Variant1.solve_ng (@generate e ctx.nil []%list).
 
-  (* Definition Prenex A Σ : Type := *)
-  (*   option { Σ' : Ctx nat & Accessibility Σ Σ' *)
-  (*                           * list (Ty Σ' * Ty Σ') *)
-  (*                           * A Σ' }%type. *)
-
-  (* Fixpoint pnf [A] {Σ} (c : FreeM A Σ) {struct c} : Prenex A Σ := *)
-  (*   match c with *)
-  (*   | Ret_Free _ _ V => *)
-  (*       Some (existT _ _ (refl Σ, nil, V)) *)
-  (*   | Fail_Free _ _  => *)
-  (*       None *)
-  (*   | Bind_AssertEq_Free _ _ T1 T2 K => *)
-  (*       match pnf K with *)
-  (*       | None => None *)
-  (*       | Some (existT _ Σ' (a, b, c)) => *)
-  (*           Some (existT _ _ (a, (<{ T1 ~ a }>, <{ T2 ~ a }>) :: b, c)) *)
-  (*       end *)
-  (*   | Bind_Exists_Free _ _ i K => *)
-  (*       match pnf K with *)
-  (*       | None => None *)
-  (*       | Some (existT _ Σ' (a, b, c)) => *)
-  (*           Some (existT _ _ (fresh Σ i (Σ ▻ i) (refl (Σ ▻ i)) .> a, b, c)) *)
-  (*       end *)
-  (*   end. *)
-
-  (* infer_ng defines inference without grounding of remaining unification variables. *)
-  Definition infer_ng : expr -> SolvedM Ty [].
-  Proof.
-    intros e.
-    pose (@generate e ctx.nil []%list) as res.
-    now apply Unification.Variant1.solve_ng in res.
-  Defined.
-
-  Fixpoint ground (w : Ctx nat) (ass : Unification.Assignment w)
-                 (s : SolvedM Ty w) {struct s} : option ty.
-  Proof.
-    destruct s.
+  Fixpoint ground (w: Ctx nat) (ass : Unification.Assignment w)
+                  (s: SolvedM Ty w) : option ty.
+  Proof. destruct s.
     - (* value  *) apply Some. apply (Unification.applyassign t ass).
     - (* fail   *) apply None.
-    - (* exists *) specialize (ground (w ▻ i)).
-      apply ground.
+    - (* exists *) apply (ground (w ▻ i)).
       + constructor. apply ass. constructor 1. (* ground remaining to Bool *)
       + apply s.
   Defined.
 
+  Definition runTI (e : expr) : option ty :=
+    ground ctx.nil env.nil (infer_ng e).
 
 End RunTI.

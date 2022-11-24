@@ -290,7 +290,8 @@ Lemma symbolic_generate_sound : forall (e : expr),
  | None   => True
  end.
 Proof.
-  intros. unfold Symbolic.runTI.
-  pose proof (generates_are_related e ctx.nil env.nil).
+  intros.
+  pose proof (generate_fns_are_related e ctx.nil env.nil).
   Set Printing Depth 55.
+  unfold Symbolic.infer_ng.
 Admitted.
