@@ -253,3 +253,26 @@ Proof. Set Printing Depth 15.
     intros ? ? ? ? ? ? ?. apply Ret_relates_ret. eapply refine_persist.
     repeat rewrite <- compose_trans. rewrite <- H5. rewrite <- H3. subst. apply H0.
 Qed.
+
+Inductive RSolved {A a} (RA : Relation A a) (w : Ctx nat) (ass : Assignment w)
+  : SolvedM A w -> solvedM a -> Prop :=
+| RRetS : forall (V : A w) (v : a),
+    RA w ass V v ->
+    RSolved RA w ass (Ret_Solved _ _ V) (ret_solved _ v)
+| RExistsS : forall i Cont cont,
+    (forall (t : ty),
+      RSolved RA (w ▻ i) (env.snoc ass i t) Cont (cont t)) ->
+      RSolved RA w ass (Bind_Exists_Solved _ _ i Cont) (bind_exists_solved _ cont).
+
+Definition ROption {A a} (RA : Relation A a) (w : Ctx nat) (ass : Assignment w)
+  : option (A w) -> option a -> Prop :=
+  fun O o =>
+    match O, o with
+    | Some V, Some v => RA w ass V v
+    | None, none => True
+    | _, _ => False
+    end.
+
+Definition RInterface {A a} (RA : Relation A a)
+  : Relation (Interface A) (interface a) := ROption (RSolved RA).
+
