@@ -2,10 +2,10 @@ Require Import Relation_Definitions String.
 From Em Require Import
      Context Environment STLC.
 Import ctx.notations.
-From Em Require Symbolic Shallow.
+From Em Require Symbolic Shallow Unification.
 
-(* The refinement proof, relating the deeply-embedded or symbolic `infer`
-   to the shallowly-embedded `infer` is accomplished
+(* The refinement proof, relating the deeply-embedded or symbolic `generate`
+   to the shallowly-embedded `generate` is accomplished
    using a logical relation similar to [Keuchel22]. *)
 Definition Assignment : Ctx nat -> Type :=
   env.Env (fun _ => ty).
@@ -205,11 +205,8 @@ Arguments Shallow.assert     : simpl never.
 Arguments Symbolic.exists_Ty : simpl never.
 Arguments Shallow.exists_ty  : simpl never.
 
-(* TODO: implicit args for refine_persist *)
-(* TODO: some kind of Const relatedness ? See Katamaran, ask Steven *)
-
-Lemma infers_are_related (e : expr) (w : Ctx nat) (ass : Assignment w)
-  : (REnv -> (RFree RTy))%R w ass (Symbolic.infer e) (Shallow.infer_no_elab e).
+Lemma generate_fns_are_related (e : expr) (w : Ctx nat) (ass : Assignment w)
+  : (REnv -> (RFree RTy))%R w ass (Symbolic.generate e) (Shallow.generate_no_elab e).
 Proof. Set Printing Depth 15.
   revert ass. revert w. induction e; intros w ass; cbn -[Symbolic.persist].
   - intros Γ γ RΓ. repeat constructor.
@@ -259,6 +256,8 @@ Inductive RSolved {A a} (RA : Relation A a) (w : Ctx nat) (ass : Assignment w)
 | RRetS : forall (V : A w) (v : a),
     RA w ass V v ->
     RSolved RA w ass (Ret_Solved _ _ V) (ret_solved _ v)
+| RFailS :
+    RSolved RA w ass (Fail_Solved _ _) (fail_solved _)
 | RExistsS : forall i Cont cont,
     (forall (t : ty),
       RSolved RA (w ▻ i) (env.snoc ass i t) Cont (cont t)) ->
@@ -273,6 +272,25 @@ Definition ROption {A a} (RA : Relation A a) (w : Ctx nat) (ass : Assignment w)
     | _, _ => False
     end.
 
-Definition RInterface {A a} (RA : Relation A a)
-  : Relation (Interface A) (interface a) := ROption (RSolved RA).
+Lemma solves_are_related {A a} (RA : Relation A a) (w : Ctx nat) (ass : Assignment w)
+  : (RFree RA -> (RSolved RA))%R w ass (@Unification.Variant1.solve_ng _ w) (@Shallow.solve a).
+Proof. Admitted.
 
+Lemma infers_are_related (e : expr)
+  : (RSolved RTy)%R ctx.nil env.nil (Symbolic.infer_ng e) (Shallow.infer_ng e).
+Proof.
+  unfold Symbolic.infer_ng, Shallow.infer_ng.
+  apply solves_are_related. apply generate_fns_are_related.
+  constructor.
+Qed.
+
+Lemma symbolic_generate_sound : forall (e : expr),
+ match (Symbolic.ground _ env.nil (Symbolic.infer_ng e)) with
+ | Some t => exists ee, nil |-- e ; t ~> ee
+ | None   => True
+ end.
+Proof.
+  intros. unfold Symbolic.runTI.
+  pose proof (generates_are_related e ctx.nil env.nil).
+  Set Printing Depth 55.
+Admitted.

@@ -21,6 +21,9 @@ Inductive Ty (Σ : Ctx nat) : Type :=
   | Ty_func : Ty Σ -> Ty Σ -> Ty Σ
   | Ty_hole : forall (i : nat), i ∈ Σ -> Ty Σ.
 
+Definition ty_eqb (a b : ty) : {a = b} + {a <> b}.
+Proof. decide equality. Defined.
+
 (* ===== Terms / Expressions ===== *)
 
 Inductive expr : Type :=
@@ -98,12 +101,10 @@ Inductive FreeM (A : Ctx nat -> Type) (Σ : Ctx nat) : Type :=
 
 Inductive SolvedM (A : Ctx nat -> Type) (Σ : Ctx nat) : Type :=
   | Ret_Solved           : A Σ -> SolvedM A Σ
+  | Fail_Solved          : SolvedM A Σ
   | Bind_Exists_Solved   : forall (i : nat), SolvedM A (Σ ▻ i) -> SolvedM A Σ.
 
 Inductive solvedM (A : Type) : Type :=
   | ret_solved           : A -> solvedM A
+  | fail_solved          : solvedM A
   | bind_exists_solved   : (ty -> solvedM A) -> solvedM A.
-
-Definition Interface A w := option (SolvedM A w).
-
-Definition interface a := option (solvedM a).

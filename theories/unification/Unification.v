@@ -1557,7 +1557,7 @@ Module Variant1.
   Definition solve : ⊢ List (Prod Ty Ty) -> ◆Unit :=
     fun w cs => boxsolve cs Tri.refl.
 
-  Definition solve_ng {A} : ⊢ FreeM A -> Interface A.
+  Definition solve_ng {A} : ⊢ FreeM A -> SolvedM A.
   Admitted.
 
 End Variant1.

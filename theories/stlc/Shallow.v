@@ -51,14 +51,14 @@ Fixpoint freeM_bind [T1 T2 : Type] (m : freeM T1) (f : T1 -> freeM T2) : freeM T
     exists_ty    := bind_exists_free _ (fun t => ret_free _ t);
   }.
 
-Fixpoint infer {m} `{TypeCheckM m} (expression : expr) (ctx : env) : m (prod ty expr) :=
+Fixpoint generate {m} `{TypeCheckM m} (expression : expr) (ctx : env) : m (prod ty expr) :=
   match expression with
   | v_false => ret (ty_bool, expression)
   | v_true  => ret (ty_bool, expression)
   | e_if cnd coq alt =>
-      '(Tcnd, Ecnd) <- infer cnd ctx ;;
-      '(Tcoq, Ecoq) <- infer coq ctx ;;
-      '(Talt, Ealt) <- infer alt ctx ;;
+      '(Tcnd, Ecnd) <- generate cnd ctx ;;
+      '(Tcoq, Ecoq) <- generate coq ctx ;;
+      '(Talt, Ealt) <- generate alt ctx ;;
       assert Tcnd ty_bool            ;;
       assert Tcoq Talt               ;;
       ret (Tcoq, e_if Ecnd Ecoq Ealt)
@@ -68,29 +68,29 @@ Fixpoint infer {m} `{TypeCheckM m} (expression : expr) (ctx : env) : m (prod ty 
       | None => fail
       end
   | e_app e1 e2 =>
-      '(T1, E1) <- infer e1 ctx ;;
-      '(T2, E2) <- infer e2 ctx ;;
+      '(T1, E1) <- generate e1 ctx ;;
+      '(T2, E2) <- generate e2 ctx ;;
       T0 <- exists_ty           ;;
       assert T1 (ty_func T2 T0) ;;
       ret (T0, e_app E1 E2)
   | e_absu var e =>
       Tvar <- exists_ty ;;
-      '(T, E) <- infer e (cons (var, Tvar) ctx) ;;
+      '(T, E) <- generate e (cons (var, Tvar) ctx) ;;
       ret (ty_func Tvar T, e_abst var Tvar E)
   | e_abst var Tvar e =>
-      '(T, E) <- infer e (cons (var, Tvar) ctx) ;;
+      '(T, E) <- generate e (cons (var, Tvar) ctx) ;;
       ret (ty_func Tvar T, e_abst var Tvar E)
   end.
 
-Compute (infer (e_app (e_abst "x" ty_bool (e_var "x")) v_true) nil).
-Compute (infer (e_app (e_absu "x" (e_var "x")) v_true) nil).
+Compute (generate (e_app (e_abst "x" ty_bool (e_var "x")) v_true) nil).
+Compute (generate (e_app (e_absu "x" (e_var "x")) v_true) nil).
 
 Example K1 := (e_absu "k1" (e_absu "l" (e_var "k1"))).
 Example K2 := (e_absu "k2" (e_absu "l" (e_var "k2"))).
 Example I := (e_absu "i" (e_var "i")).
 
 Example KKI := (e_app K1 (e_app K2 I)).
-Compute (infer KKI nil).
+Compute (generate KKI nil).
 
 Fixpoint wlp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) : Prop :=
   match m with
@@ -191,7 +191,7 @@ Print extract.
 Eval compute [extract] in extract. (* normalised *)
 
 Lemma test : forall (τ : ty),
-  gen (infer
+  gen (generate
   (e_app (e_absu "x" (e_var "x")) (e_absu "y" (e_var "y"))) nil).
 Proof.
   repeat eexists; eauto.
@@ -202,14 +202,14 @@ Qed.
 Eval compute in fun t => extract (test t).
 *)
 
-Lemma infer_sound : forall (G : env) (e : expr),
- wlp_freeM (infer e G) (fun '(t,ee) => G |-- e ; t ~> ee).
+Lemma generate_sound : forall (G : env) (e : expr),
+ wlp_freeM (generate e G) (fun '(t,ee) => G |-- e ; t ~> ee).
 Proof.
-  intros. generalize dependent G. induction e; cbn [infer]; intro;
+  intros. generalize dependent G. induction e; cbn [generate]; intro;
   repeat (rewrite ?wlp_exists_type, ?wlp_bind, ?wlp_ty_eqb, ?wlp_ret, ?wlp_fail; try destruct o;
       try match goal with
-      | IHe : forall G, wlp_freeM (infer ?e G) _
-        |- wlp_freeM (infer ?e ?g) _ =>
+      | IHe : forall G, wlp_freeM (generate ?e G) _
+        |- wlp_freeM (generate ?e ?g) _ =>
           specialize (IHe g); revert IHe; apply wlp_monotone; intros
       | |- tpb _ _ _ _ =>
           constructor
@@ -223,15 +223,15 @@ Proof.
       end; try firstorder).
 Qed.
 
-Lemma infer_complete : forall  (G : env) (e ee : expr) (t : ty),
+Lemma generate_complete : forall  (G : env) (e ee : expr) (t : ty),
   (G |-- e ; t ~> ee) ->
-  wp_freeM (infer e G) (fun '(t',ee') => t = t' /\ ee = ee').
+  wp_freeM (generate e G) (fun '(t',ee') => t = t' /\ ee = ee').
 Proof.
   intros. induction H; cbn;
     repeat (rewrite ?wp_bind, ?wp_ty_eqb, ?wp_ret, ?wp_fail;
             try destruct o; cbn; try rewrite H;
       try match goal with
-      | IH : wp_freeM (infer ?e ?g) _ |- wp_freeM (infer ?e ?g) _ =>
+      | IH : wp_freeM (generate ?e ?g) _ |- wp_freeM (generate ?e ?g) _ =>
           revert IH; apply wp_monotone; intros; subst
       | |- ?x = ?y /\ _ =>
           split
@@ -284,15 +284,15 @@ Proof.
 Qed.
 
 
-Fixpoint infer_no_elab {m} `{TypeCheckM m} (expression : expr) (ctx : env) : m ty :=
+Fixpoint generate_no_elab {m} `{TypeCheckM m} (expression : expr) (ctx : env) : m ty :=
   match expression with
   | v_false => ret ty_bool
   | v_true  => ret ty_bool
   | e_if cnd coq alt =>
-      Tcnd <- infer_no_elab cnd ctx  ;;
+      Tcnd <- generate_no_elab cnd ctx  ;;
       assert Tcnd ty_bool            ;;
-      Tcoq <- infer_no_elab coq ctx  ;;
-      Talt <- infer_no_elab alt ctx  ;;
+      Tcoq <- generate_no_elab coq ctx  ;;
+      Talt <- generate_no_elab alt ctx  ;;
       assert Tcoq Talt               ;;
       ret Tcoq
   | e_var var =>
@@ -302,15 +302,39 @@ Fixpoint infer_no_elab {m} `{TypeCheckM m} (expression : expr) (ctx : env) : m t
       end
   | e_app e1 e2 =>
       T0 <- exists_ty            ;;
-      T2 <- infer_no_elab e2 ctx ;;
-      T1 <- infer_no_elab e1 ctx ;;
+      T2 <- generate_no_elab e2 ctx ;;
+      T1 <- generate_no_elab e1 ctx ;;
       assert T1 (ty_func T2 T0)  ;;
       ret T0
   | e_abst var Tvar e =>
-      T <- infer_no_elab e (cons (var, Tvar) ctx) ;;
+      T <- generate_no_elab e (cons (var, Tvar) ctx) ;;
       ret (ty_func Tvar T)
   | e_absu var e =>
       Tvar <- exists_ty ;;
-      T <- infer_no_elab e (cons (var, Tvar) ctx) ;;
+      T <- generate_no_elab e (cons (var, Tvar) ctx) ;;
       ret (ty_func Tvar T)
   end.
+
+Fixpoint solve a (m : freeM a) : solvedM a :=
+  match m with
+  | fail_free _ => fail_solved _
+  | ret_free _ a => ret_solved _ a
+  | bind_asserteq_free _ t1 t2 k => if ty_eqb t1 t2 then solve a k else fail_solved _
+  | bind_exists_free _ k => bind_exists_solved a (fun t => solve a (k t))
+  end.
+
+Definition infer_ng : expr -> solvedM ty.
+Proof.
+  intros e.
+  pose (generate_no_elab e []%list) as res.
+  now apply solve in res.
+Defined.
+
+Lemma generate_no_elab_sound : forall (G : env) (e : expr),
+  exists ee, wlp_freeM (generate_no_elab e G) (fun '(t) => G |-- e ; t ~> ee).
+Admitted.
+
+Lemma generate_no_elab_complete : forall  (G : env) (e ee : expr) (t : ty),
+  (G |-- e ; t ~> ee) ->
+  wp_freeM (generate_no_elab e G) (fun '(t') => t = t').
+Admitted.

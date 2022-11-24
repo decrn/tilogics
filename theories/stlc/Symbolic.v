@@ -107,15 +107,15 @@ Fixpoint lift (t : ty) (Σ : Ctx nat) : Ty Σ :=
   | ty_func do co => Ty_func Σ (lift do Σ) (lift co Σ)
   end.
 
-Fixpoint infer (e : expr) {Σ : Ctx nat} (Γ : Env Σ) : FreeM Ty Σ :=
+Fixpoint generate (e : expr) {Σ : Ctx nat} (Γ : Env Σ) : FreeM Ty Σ :=
   match e with
   | v_true => Ret_Free Ty Σ (Ty_bool Σ)
   | v_false => Ret_Free Ty Σ (Ty_bool Σ)
   | e_if cnd coq alt =>
-      [ ω₁ ] t_cnd <- infer cnd Γ ;;
+      [ ω₁ ] t_cnd <- generate cnd Γ ;;
       [ ω₂ ] _     <- assert t_cnd (Ty_bool _) ;;
-      [ ω₃ ] t_coq <- infer coq <{ Γ ~ ω₁ .> ω₂ }> ;;
-      [ ω₄ ] t_alt <- infer alt <{ Γ ~ ω₁ .> ω₂ .> ω₃ }> ;;
+      [ ω₃ ] t_coq <- generate coq <{ Γ ~ ω₁ .> ω₂ }> ;;
+      [ ω₄ ] t_alt <- generate alt <{ Γ ~ ω₁ .> ω₂ .> ω₃ }> ;;
       [ ω₅ ] _     <- assert <{ t_coq ~ ω₄ }>  <{ t_alt ~ (refl _) }> ;;
          Ret_Free Ty _ <{ t_coq ~ ω₄ .> ω₅ }>
   | e_var var =>
@@ -125,17 +125,17 @@ Fixpoint infer (e : expr) {Σ : Ctx nat} (Γ : Env Σ) : FreeM Ty Σ :=
       end
   | e_app f a =>
       [ ω1 ] t_co <- exists_Ty Σ ;;
-      [ ω2 ] t_do <- infer a <{ Γ ~ ω1 }> ;;
-      [ ω3 ] t_fn <- infer f <{ Γ ~ ω1 .> ω2 }> ;;
+      [ ω2 ] t_do <- generate a <{ Γ ~ ω1 }> ;;
+      [ ω3 ] t_fn <- generate f <{ Γ ~ ω1 .> ω2 }> ;;
       [ ω4 ] _    <- assert t_fn <{ (Ty_func _ t_do <{ t_co ~ ω2 }> ) ~ ω3 }> ;;
          Ret_Free Ty _ <{ t_co ~ ω2 .> ω3 .> ω4 }>
   | e_abst var t_var e =>
       let t_var' := (lift t_var Σ) in (* t_var lives in ty, not in (Ty w) *)
-      [ ω1 ] t_e <- infer e ((var, t_var') :: Γ) ;;
+      [ ω1 ] t_e <- generate e ((var, t_var') :: Γ) ;;
         Ret_Free Ty _ (Ty_func _ <{ t_var' ~ ω1 }> t_e)
   | e_absu var e =>
       [ ω1 ] t_var <- exists_Ty Σ ;;
-      [ ω2 ] t_e <- infer e ((var, t_var) :: <{ Γ ~ ω1 }>) ;;
+      [ ω2 ] t_e <- generate e ((var, t_var) :: <{ Γ ~ ω1 }>) ;;
         Ret_Free Ty _ (Ty_func _ <{ t_var ~ ω2 }> t_e)
   end.
 
@@ -147,63 +147,50 @@ Section RunTI.
      We could do this while generating the constraints,
      but instead we choose to do it afterwards. *)
 
-  Definition Prenex A Σ : Type :=
-    option { Σ' : Ctx nat & Accessibility Σ Σ'
-                            * list (Ty Σ' * Ty Σ')
-                            * A Σ' }%type.
+  (* Definition Prenex A Σ : Type := *)
+  (*   option { Σ' : Ctx nat & Accessibility Σ Σ' *)
+  (*                           * list (Ty Σ' * Ty Σ') *)
+  (*                           * A Σ' }%type. *)
 
-  Fixpoint pnf [A] {Σ} (c : FreeM A Σ) {struct c} : Prenex A Σ :=
-    match c with
-    | Ret_Free _ _ V =>
-        Some (existT _ _ (refl Σ, nil, V))
-    | Fail_Free _ _  =>
-        None
-    | Bind_AssertEq_Free _ _ T1 T2 K =>
-        match pnf K with
-        | None => None
-        | Some (existT _ Σ' (a, b, c)) =>
-            Some (existT _ _ (a, (<{ T1 ~ a }>, <{ T2 ~ a }>) :: b, c))
-        end
-    | Bind_Exists_Free _ _ i K =>
-        match pnf K with
-        | None => None
-        | Some (existT _ Σ' (a, b, c)) =>
-            Some (existT _ _ (fresh Σ i (Σ ▻ i) (refl (Σ ▻ i)) .> a, b, c))
-        end
-    end.
+  (* Fixpoint pnf [A] {Σ} (c : FreeM A Σ) {struct c} : Prenex A Σ := *)
+  (*   match c with *)
+  (*   | Ret_Free _ _ V => *)
+  (*       Some (existT _ _ (refl Σ, nil, V)) *)
+  (*   | Fail_Free _ _  => *)
+  (*       None *)
+  (*   | Bind_AssertEq_Free _ _ T1 T2 K => *)
+  (*       match pnf K with *)
+  (*       | None => None *)
+  (*       | Some (existT _ Σ' (a, b, c)) => *)
+  (*           Some (existT _ _ (a, (<{ T1 ~ a }>, <{ T2 ~ a }>) :: b, c)) *)
+  (*       end *)
+  (*   | Bind_Exists_Free _ _ i K => *)
+  (*       match pnf K with *)
+  (*       | None => None *)
+  (*       | Some (existT _ Σ' (a, b, c)) => *)
+  (*           Some (existT _ _ (fresh Σ i (Σ ▻ i) (refl (Σ ▻ i)) .> a, b, c)) *)
+  (*       end *)
+  (*   end. *)
 
-  (* After unification, some variables might still be quantified.
-     For now, we simply ground them to `bool`. *)
-
-  Fixpoint ground {Σ} : Unification.Assignment Σ :=
-    match Σ with
-    | ctx.nil => env.nil
-    | Γ ▻ b   => env.snoc ground b ty_bool
-    end.
-
-  Definition solve_constraints {AT AV Σ}
-    (Aassign : forall Σ, Unification.Assignment Σ -> AT Σ -> AV) :
-    Prenex AT Σ -> option AV.
-  Proof.
-    intros pn.
-    apply (Prelude.option.bind pn).
-    intros (Σ' & (_ & cs) & a).
-    apply (Prelude.option.bind (Unification.Variant1.solve cs)).
-    intros (Σrest & ζ & _).
-    apply Some.
-    revert a. apply Aassign.
-    apply (Unification.compose ζ).
-    apply ground.
-  Defined.
-
-  Definition runTI : expr -> option ty.
+  (* infer_ng defines inference without grounding of remaining unification variables. *)
+  Definition infer_ng : expr -> SolvedM Ty [].
   Proof.
     intros e.
-    refine (@solve_constraints Ty ty [] _ _).
-    intros ? ass T.
-    apply (Unification.applyassign T ass).
-    apply pnf.
-    apply (infer e []%list).
+    pose (@generate e ctx.nil []%list) as res.
+    now apply Unification.Variant1.solve_ng in res.
   Defined.
+
+  Fixpoint ground (w : Ctx nat) (ass : Unification.Assignment w)
+                 (s : SolvedM Ty w) {struct s} : option ty.
+  Proof.
+    destruct s.
+    - (* value  *) apply Some. apply (Unification.applyassign t ass).
+    - (* fail   *) apply None.
+    - (* exists *) specialize (ground (w ▻ i)).
+      apply ground.
+      + constructor. apply ass. constructor 1. (* ground remaining to Bool *)
+      + apply s.
+  Defined.
+
 
 End RunTI.
