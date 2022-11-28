@@ -49,10 +49,18 @@ Inductive RFree {A a} (RA : Relation A a) (w : Ctx nat)
       RFree RA (w ▻ i) (env.snoc ass i t) Cont (cont t)) ->
       RFree RA w ass (Bind_Exists_Free _ _ i Cont) (bind_exists_free _ cont).
 
-Fixpoint compose {Σ₁ c : Ctx nat} (a : Symbolic.Accessibility Σ₁ c) :
-  Assignment c -> Assignment Σ₁ :=
-  match a in (Symbolic.Accessibility _ c0) return (Assignment c0 -> Assignment Σ₁) with
-  | Symbolic.refl _ => fun X0 : Assignment Σ₁ => X0
+Inductive REnv w ass : Env w -> env -> Prop :=
+| RPair : forall k V v Γ γ,
+    RTy w ass V v ->
+    REnv w ass Γ γ ->
+    REnv w ass ((k, V) :: Γ)%list ((k, v) :: γ)%list
+| RNil :
+    REnv w ass nil%list nil%list.
+
+Fixpoint compose {w1 w2 : Ctx nat} (r12 : Symbolic.Accessibility w1 w2)
+  : Assignment w2 -> Assignment w1 :=
+  match r12 in (Symbolic.Accessibility _ c0) return (Assignment c0 -> Assignment w1) with
+  | Symbolic.refl _ => fun X0 : Assignment w1 => X0
   | Symbolic.fresh _ α Σ₂ a0 =>
       fun X0 : Assignment Σ₂ =>
         match env.snocView (compose a0 X0) with
@@ -98,14 +106,6 @@ Definition RUnit : Relation Symbolic.Unit unit :=
 Declare Scope rel_scope.
 Delimit Scope rel_scope with R.
 Notation "A -> B" := (RArr A B) : rel_scope.
-
-Inductive REnv w ass : Env w -> env -> Prop :=
-| RPair : forall k V v Γ γ,
-    RTy w ass V v ->
-    REnv w ass Γ γ ->
-    REnv w ass ((k, V) :: Γ)%list ((k, v) :: γ)%list
-| RNil :
-    REnv w ass nil%list nil%list.
 
 (* Using our relation on functions, we can now prove
    relatedness of operations in both free monads *)
@@ -263,14 +263,14 @@ Inductive RSolved {A a} (RA : Relation A a) (w : Ctx nat) (ass : Assignment w)
       RSolved RA (w ▻ i) (env.snoc ass i t) Cont (cont t)) ->
       RSolved RA w ass (Bind_Exists_Solved _ _ i Cont) (bind_exists_solved _ cont).
 
-Definition ROption {A a} (RA : Relation A a) (w : Ctx nat) (ass : Assignment w)
-  : option (A w) -> option a -> Prop :=
-  fun O o =>
-    match O, o with
-    | Some V, Some v => RA w ass V v
-    | None, none => True
-    | _, _ => False
-    end.
+(* Definition ROption {A a} (RA : Relation A a) (w : Ctx nat) (ass : Assignment w) *)
+(*   : option (A w) -> option a -> Prop := *)
+(*   fun O o => *)
+(*     match O, o with *)
+(*     | Some V, Some v => RA w ass V v *)
+(*     | None, none => True *)
+(*     | _, _ => False *)
+(*     end. *)
 
 Lemma solves_are_related {A a} (RA : Relation A a) (w : Ctx nat) (ass : Assignment w)
   : (RFree RA -> (RSolved RA))%R w ass (@Unification.Variant1.solve_ng _ w) (@Shallow.solve a).
