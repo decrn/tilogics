@@ -276,6 +276,18 @@ Lemma solves_are_related {A a} (RA : Relation A a) (w : Ctx nat) (ass : Assignme
   : (RFree RA -> (RSolved RA))%R w ass (@Unification.Variant1.solve_ng _ w) (@Shallow.solve a).
 Proof. Admitted.
 
+Definition WLP {w} (V : SolvedM Ty w) (Post : ty -> Prop) (gnd : Assignment w) : Prop :=
+  match Symbolic.ground _ gnd V with
+  | Some t => Post t
+  | None => True
+  end.
+
+Fixpoint wlp (v : solvedM ty) (Post : ty -> Prop) {struct v} : Prop :=
+  match v with
+  | ret_solved _ v => Post v
+  | fail_solved _ => True
+  | bind_exists_solved _ k => forall t, wlp (k t) Post
+  end.
 Lemma infers_are_related (e : expr)
   : (RSolved RTy)%R ctx.nil env.nil (Symbolic.infer_ng e) (Shallow.infer_ng e).
 Proof.
