@@ -276,10 +276,11 @@ Lemma solves_are_related {A a} (RA : Relation A a) (w : Ctx nat) (ass : Assignme
   : (RFree RA -> (RSolved RA))%R w ass (@Unification.Variant1.solve_ng _ w) (@Shallow.solve a).
 Proof. Admitted.
 
-Definition WLP {w} (V : SolvedM Ty w) (Post : ty -> Prop) (gnd : Assignment w) : Prop :=
-  match Symbolic.ground _ gnd V with
-  | Some t => Post t
-  | None => True
+Fixpoint WLP {w} (V : SolvedM Ty w) (Post : ty -> Prop) (gnd : Assignment w) : Prop :=
+  match V with
+  | Ret_Solved _ _ r => Post (Unification.applyassign r gnd)
+  | Fail_Solved _ _ => True
+  | Bind_Exists_Solved _ _ i k => forall t, WLP k Post (env.snoc gnd i t)
   end.
 
 Fixpoint wlp (v : solvedM ty) (Post : ty -> Prop) {struct v} : Prop :=
@@ -288,6 +289,16 @@ Fixpoint wlp (v : solvedM ty) (Post : ty -> Prop) {struct v} : Prop :=
   | fail_solved _ => True
   | bind_exists_solved _ k => forall t, wlp (k t) Post
   end.
+
+Lemma wlps_are_related : forall ctx gnd V v (R : (RSolved RTy)%R ctx gnd V v) Post,
+    (WLP V Post gnd) <-> (wlp v Post).
+Proof.
+  intros. revert Post. induction R; cbn; subst.
+    + cbn in *. now destruct H.
+    + easy.
+    + firstorder.
+Qed.
+
 Lemma infers_are_related (e : expr)
   : (RSolved RTy)%R ctx.nil env.nil (Symbolic.infer_ng e) (Shallow.infer_ng e).
 Proof.
@@ -296,14 +307,39 @@ Proof.
   constructor.
 Qed.
 
-Lemma symbolic_generate_sound : forall (e : expr),
- match (Symbolic.ground _ env.nil (Symbolic.infer_ng e)) with
- | Some t => exists ee, nil |-- e ; t ~> ee
- | None   => True
- end.
+Lemma combined : forall e P,
+    WLP (Symbolic.infer_ng e) P env.nil <-> wlp (Shallow.infer_ng e) P.
+Proof. intros. apply wlps_are_related. apply infers_are_related. Qed.
+
+Lemma shallow_infer_ng_sound : forall e,
+    wlp (Shallow.infer_ng e) (fun t => exists ee, nil |-- e ; t ~> ee).
+Proof.
+Admitted.
+
+Lemma symbolic_infer_ng_sound : forall (e : expr),
+    WLP (Symbolic.infer_ng e) (fun t => exists ee, nil |-- e ; t ~> ee) env.nil.
 Proof.
   intros.
-  pose proof (generate_fns_are_related e ctx.nil env.nil).
-  Set Printing Depth 55.
-  unfold Symbolic.infer_ng.
+  apply combined. apply shallow_infer_ng_sound.
+Qed.
+
+Lemma ground_is_sound : forall w (s : SolvedM Ty w) (gnd : Assignment w) P,
+    match Symbolic.ground w gnd s with
+    | Some t => P t
+    | None   => True
+    end <-> WLP s P gnd.
+Proof.
 Admitted.
+
+Lemma runTI_sound : forall e,
+  match Symbolic.runTI e with
+  | Some t => exists ee, nil |-- e ; t ~> ee
+  | None => True
+  end.
+Proof.
+  unfold Symbolic.runTI. intro.
+  pose proof (symbolic_infer_ng_sound e).
+  revert H. apply ground_is_sound.
+Qed.
+
+Print Assumptions runTI_sound.

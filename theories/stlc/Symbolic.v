@@ -146,6 +146,8 @@ Section RunTI.
   Definition infer_ng (e : expr) : SolvedM Ty [] :=
     Unification.Variant1.solve_ng (@generate e ctx.nil []%list).
 
+  Fixpoint applyassign {w} (s: SolvedM Ty w) (ass : Unification.Assignment w) : solvedM ty. Admitted.
+
   Fixpoint ground (w: Ctx nat) (ass : Unification.Assignment w)
                   (s: SolvedM Ty w) : option ty.
   Proof. destruct s.

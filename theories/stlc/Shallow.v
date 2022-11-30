@@ -331,7 +331,7 @@ Proof.
 Defined.
 
 Lemma generate_no_elab_sound : forall (G : env) (e : expr),
-  exists ee, wlp_freeM (generate_no_elab e G) (fun '(t) => G |-- e ; t ~> ee).
+  wlp_freeM (generate_no_elab e G) (fun '(t) => exists ee, G |-- e ; t ~> ee).
 Admitted.
 
 Lemma generate_no_elab_complete : forall  (G : env) (e ee : expr) (t : ty),
