@@ -166,46 +166,59 @@ End RunTI.
 Section TypeReconstruction.
 
   Definition Prod A B : Ctx nat -> Type := fun w => prod (A w) (B w).
-  Definition Expr : Ctx nat -> Type := fun _ => expr.
+
+  Definition Expr : Ctx nat -> Type := fun w => Unification.Assignment w -> expr.
+  (* TODO: define reader applicative to use ctor of expr to create Expr *)
 
   Instance Persistent_Prod : forall A B, Persistent A -> Persistent B -> Persistent (Prod A B).
   Proof. firstorder. Qed.
 
+  Instance Persistent_Expr : Persistent Expr.
+  Proof.
+    unfold Persistent, Valid, Impl, Box, Expr. intros. induction H. auto.
+    apply IHAccessibility. intro. apply env.tail in X1. apply X. apply X1. apply X0.
+  Qed.
+
   Definition ret {w} := Ret_Free (Prod Ty Expr) w.
   Definition fail {w} := Fail_Free (Prod Ty Expr) w.
 
-Fixpoint generate' (e : expr) {Σ : Ctx nat} (Γ : Env Σ) : FreeM (Prod Ty Expr) Σ.
-refine (
+Fixpoint generate' (e : expr) {Σ : Ctx nat} (Γ : Env Σ) : FreeM (Prod Ty Expr) Σ :=
   match e with
-  | v_true  => ret (Ty_bool Σ, v_true)
-  | v_false => ret (Ty_bool Σ, v_false)
+  | v_true  => ret (Ty_bool Σ, (fun _ => v_true))
+  | v_false => ret (Ty_bool Σ, (fun _ => v_false))
   | e_if cnd coq alt =>
-      [ ω1 ] r_cnd <- generate' cnd _ Γ ;;
+      [ ω1 ] r_cnd <- generate' cnd Γ ;;
       [ ω2 ] _     <- assert (fst r_cnd) (Ty_bool _) ;;
-      [ ω3 ] r_coq <- generate' coq _ <{ Γ ~ ω1 .> ω2 }> ;;
-      [ ω4 ] r_alt <- generate' alt _ <{ Γ ~ ω1 .> ω2 .> ω3 }> ;;
+      [ ω3 ] r_coq <- generate' coq <{ Γ ~ ω1 .> ω2 }> ;;
+      [ ω4 ] r_alt <- generate' alt <{ Γ ~ ω1 .> ω2 .> ω3 }> ;;
       [ ω5 ] _     <- assert <{ (fst r_coq) ~ ω4 }>  <{ (fst r_alt) ~ (refl _) }> ;;
-         ret (<{ fst r_coq ~ ω4 .> ω5 }>, e_if (snd r_cnd) (snd r_coq) (snd r_alt))
+         let e_cnd := <{ (snd r_cnd) ~ ω2 .> ω3 .> ω4 .> ω5 }> in
+         let e_coq := <{ (snd r_coq) ~ ω4 .> ω5 }> in
+         let t_coq := <{ (fst r_coq) ~ ω4 .> ω5 }> in
+         let e_alt := <{ (snd r_alt) ~ ω5 }> in
+         ret (t_coq, fun a => (e_if (e_cnd a) (e_coq a) (e_alt a)))
   | e_var var =>
       match (value var Γ) with
-      | Some t_var => ret (t_var, e_var var)
+      | Some t_var => ret (t_var, fun a => e_var var)
       | None => fail
       end
   | e_app f a =>
-      [ ω1 ] t_co <- exists_Ty Σ ;;
-      [ ω2 ] t_do <- generate' a _ <{ Γ ~ ω1 }> ;;
-      [ ω3 ] t_fn <- generate' f _ <{ Γ ~ ω1 .> ω2 }> ;;
-      [ ω4 ] _    <- assert (fst t_fn) <{ (Ty_func _ (fst t_do) <{ t_co ~ ω2 }> ) ~ ω3 }> ;;
-          ret (<{ t_co ~ ω2 .> (ω3 .> ω4) }>, e_app (snd t_fn) (snd t_do))
+      [ ω1 ] T_cod <- exists_Ty Σ ;;
+      [ ω2 ] r_dom <- generate' a <{ Γ ~ ω1 }> ;;
+      [ ω3 ] r_fun <- generate' f <{ Γ ~ ω1 .> ω2 }> ;;
+      [ ω4 ] _    <- assert (fst r_fun) <{ (Ty_func _ (fst r_dom) <{ T_cod ~ ω2 }> ) ~ ω3 }> ;;
+         let e_fun := <{ (snd r_fun) ~ ω4 }> in
+         let t_cod := <{ T_cod ~ ω2 .> ω3 .> ω4 }> in
+         let e_dom := <{ (snd r_dom) ~ ω3 .> ω4 }> in
+          ret ( t_cod , fun a => e_app (e_fun a) (e_dom a))
   | e_abst var t_var e =>
       let t_var' := (lift t_var Σ) in (* t_var lives in ty, not in (Ty w) *)
-      [ ω1 ] t_e <- generate' e _ ((var, t_var') :: Γ) ;;
-        ret (Ty_func _ <{ t_var' ~ ω1 }> (fst t_e), e_abst var t_var (snd t_e))
+      [ ω1 ] t_e <- generate' e ((var, t_var') :: Γ) ;;
+        ret (Ty_func _ <{ t_var' ~ ω1 }> (fst t_e), fun a => e_abst var t_var (snd t_e a))
   | e_absu var e =>
       [ ω1 ] t_var <- exists_Ty Σ ;;
-      [ ω2 ] t_e <- generate' e _ ((var, t_var) :: <{ Γ ~ ω1 }>) ;;
-        ret (Ty_func _ <{ t_var ~ ω2 }> (fst t_e), e_abst var _ (snd t_e))
-  end).
-Proof. Admitted.
+      [ ω2 ] t_e <- generate' e ((var, t_var) :: <{ Γ ~ ω1 }>) ;;
+        ret (Ty_func _ <{ t_var ~ ω2 }> (fst t_e), fun a => e_abst var (Unification.applyassign <{ t_var ~ ω2 }> a) (snd t_e a))
+  end.
 
 End TypeReconstruction.
