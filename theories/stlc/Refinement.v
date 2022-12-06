@@ -311,10 +311,19 @@ Lemma combined : forall e P,
     WLP (Symbolic.infer_ng e) P env.nil <-> wlp (Shallow.infer_ng e) P.
 Proof. intros. apply wlps_are_related. apply infers_are_related. Qed.
 
+Lemma wlps_iff : forall m P,
+    Shallow.wlp_freeM m P <-> wlp (Shallow.solve m) P.
+Proof.
+  intro. induction m; cbn; intros; try easy.
+  destruct ty_eqb. intuition. intuition. cbn. easy.
+  firstorder.
+Qed.
+
 Lemma shallow_infer_ng_sound : forall e,
     wlp (Shallow.infer_ng e) (fun t => exists ee, nil |-- e ; t ~> ee).
 Proof.
-Admitted.
+  unfold Shallow.infer_ng. intro. apply wlps_iff. apply Shallow.generate_no_elab_sound.
+Qed.
 
 Lemma symbolic_infer_ng_sound : forall (e : expr),
     WLP (Symbolic.infer_ng e) (fun t => exists ee, nil |-- e ; t ~> ee) env.nil.
@@ -324,12 +333,14 @@ Proof.
 Qed.
 
 Lemma ground_is_sound : forall w (s : SolvedM Ty w) (gnd : Assignment w) P,
+    WLP s P gnd ->
     match Symbolic.ground w gnd s with
     | Some t => P t
     | None   => True
-    end <-> WLP s P gnd.
+    end.
 Proof.
-Admitted.
+  induction s; cbn; intros; try easy. apply IHs. apply H.
+Qed.
 
 Lemma runTI_sound : forall e,
   match Symbolic.runTI e with

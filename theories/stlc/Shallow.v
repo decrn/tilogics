@@ -283,7 +283,6 @@ Proof.
   Unshelve. apply ty_bool.
 Qed.
 
-
 Fixpoint generate_no_elab {m} `{TypeCheckM m} (expression : expr) (ctx : env) : m ty :=
   match expression with
   | v_false => ret ty_bool
@@ -315,12 +314,12 @@ Fixpoint generate_no_elab {m} `{TypeCheckM m} (expression : expr) (ctx : env) : 
       ret (ty_func Tvar T)
   end.
 
-Fixpoint solve a (m : freeM a) : solvedM a :=
+Fixpoint solve {a} (m : freeM a) : solvedM a :=
   match m with
   | fail_free _ => fail_solved _
-  | ret_free _ a => ret_solved _ a
-  | bind_asserteq_free _ t1 t2 k => if ty_eqb t1 t2 then solve a k else fail_solved _
-  | bind_exists_free _ k => bind_exists_solved a (fun t => solve a (k t))
+  | ret_free _ v => ret_solved _ v
+  | bind_asserteq_free _ t1 t2 k => if ty_eqb t1 t2 then solve k else fail_solved _
+  | bind_exists_free _ k => bind_exists_solved a (fun t => solve (k t))
   end.
 
 Definition infer_ng : expr -> solvedM ty.

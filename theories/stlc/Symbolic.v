@@ -206,7 +206,7 @@ Fixpoint generate' (e : expr) {Σ : Ctx nat} (Γ : Env Σ) : FreeM (Prod Ty Expr
       [ ω1 ] T_cod <- exists_Ty Σ ;;
       [ ω2 ] r_dom <- generate' a <{ Γ ~ ω1 }> ;;
       [ ω3 ] r_fun <- generate' f <{ Γ ~ ω1 .> ω2 }> ;;
-      [ ω4 ] _    <- assert (fst r_fun) <{ (Ty_func _ (fst r_dom) <{ T_cod ~ ω2 }> ) ~ ω3 }> ;;
+      [ ω4 ] _     <- assert (fst r_fun) <{ (Ty_func _ (fst r_dom) <{ T_cod ~ ω2 }> ) ~ ω3 }> ;;
          let e_fun := <{ (snd r_fun) ~ ω4 }> in
          let t_cod := <{ T_cod ~ ω2 .> ω3 .> ω4 }> in
          let e_dom := <{ (snd r_dom) ~ ω3 .> ω4 }> in
@@ -218,7 +218,8 @@ Fixpoint generate' (e : expr) {Σ : Ctx nat} (Γ : Env Σ) : FreeM (Prod Ty Expr
   | e_absu var e =>
       [ ω1 ] t_var <- exists_Ty Σ ;;
       [ ω2 ] t_e <- generate' e ((var, t_var) :: <{ Γ ~ ω1 }>) ;;
-        ret (Ty_func _ <{ t_var ~ ω2 }> (fst t_e), fun a => e_abst var (Unification.applyassign <{ t_var ~ ω2 }> a) (snd t_e a))
+        ret (Ty_func _ <{ t_var ~ ω2 }> (fst t_e),
+            fun a => e_abst var (Unification.applyassign <{ t_var ~ ω2 }> a) (snd t_e a))
   end.
 
 End TypeReconstruction.
