@@ -276,29 +276,6 @@ Lemma solves_are_related {A a} (RA : Relation A a) (w : Ctx nat) (ass : Assignme
   : (RFree RA -> (RSolved RA))%R w ass (@Unification.Variant1.solve_ng _ w) (@Shallow.solve a).
 Proof. Admitted.
 
-Fixpoint WLP {w} (V : SolvedM Ty w) (Post : ty -> Prop) (gnd : Assignment w) : Prop :=
-  match V with
-  | Ret_Solved _ _ r => Post (Unification.applyassign r gnd)
-  | Fail_Solved _ _ => True
-  | Bind_Exists_Solved _ _ i k => forall t, WLP k Post (env.snoc gnd i t)
-  end.
-
-Fixpoint wlp (v : solvedM ty) (Post : ty -> Prop) {struct v} : Prop :=
-  match v with
-  | ret_solved _ v => Post v
-  | fail_solved _ => True
-  | bind_exists_solved _ k => forall t, wlp (k t) Post
-  end.
-
-Lemma wlps_are_related : forall ctx gnd V v (R : (RSolved RTy)%R ctx gnd V v) Post,
-    (WLP V Post gnd) <-> (wlp v Post).
-Proof.
-  intros. revert Post. induction R; cbn; subst.
-    + cbn in *. now destruct H.
-    + easy.
-    + firstorder.
-Qed.
-
 Lemma infers_are_related (e : expr)
   : (RSolved RTy)%R ctx.nil env.nil (Symbolic.infer_ng e) (Shallow.infer_ng e).
 Proof.
@@ -307,50 +284,130 @@ Proof.
   constructor.
 Qed.
 
-Lemma combined : forall e P,
-    WLP (Symbolic.infer_ng e) P env.nil <-> wlp (Shallow.infer_ng e) P.
-Proof. intros. apply wlps_are_related. apply infers_are_related. Qed.
+Section Soundness.
 
-Lemma wlps_iff : forall m P,
-    Shallow.wlp_freeM m P <-> wlp (Shallow.solve m) P.
-Proof.
-  intro. induction m; cbn; intros; try easy.
-  destruct ty_eqb. intuition. intuition. cbn. easy.
-  firstorder.
-Qed.
-
-Lemma shallow_infer_ng_sound : forall e,
-    wlp (Shallow.infer_ng e) (fun t => exists ee, nil |-- e ; t ~> ee).
-Proof.
-  unfold Shallow.infer_ng. intro. apply wlps_iff. apply Shallow.generate_no_elab_sound.
-Qed.
-
-Lemma symbolic_infer_ng_sound : forall (e : expr),
-    WLP (Symbolic.infer_ng e) (fun t => exists ee, nil |-- e ; t ~> ee) env.nil.
-Proof.
-  intros.
-  apply combined. apply shallow_infer_ng_sound.
-Qed.
-
-Lemma ground_is_sound : forall w (s : SolvedM Ty w) (gnd : Assignment w) P,
-    WLP s P gnd ->
-    match Symbolic.ground w gnd s with
-    | Some t => P t
-    | None   => True
+  Fixpoint WLP {w} (V : SolvedM Ty w) (Post : ty -> Prop) (gnd : Assignment w) : Prop :=
+    match V with
+    | Ret_Solved _ _ r => Post (Unification.applyassign r gnd)
+    | Fail_Solved _ _ => True
+    | Bind_Exists_Solved _ _ i k => forall t, WLP k Post (env.snoc gnd i t)
     end.
-Proof.
-  induction s; cbn; intros; try easy. apply IHs. apply H.
-Qed.
 
-Lemma runTI_sound : forall e,
-  match Symbolic.runTI e with
-  | Some t => exists ee, nil |-- e ; t ~> ee
-  | None => True
-  end.
-Proof.
-  unfold Symbolic.runTI. intro.
-  pose proof (symbolic_infer_ng_sound e).
-  revert H. apply ground_is_sound.
-Qed.
+  Fixpoint wlp (v : solvedM ty) (Post : ty -> Prop) {struct v} : Prop :=
+    match v with
+    | ret_solved _ v => Post v
+    | fail_solved _ => True
+    | bind_exists_solved _ k => forall t, wlp (k t) Post
+    end.
 
-Print Assumptions runTI_sound.
+  Lemma wlps_are_related : forall ctx gnd V v (R : (RSolved RTy)%R ctx gnd V v) Post,
+      (WLP V Post gnd) <-> (wlp v Post).
+  Proof.
+    intros. revert Post. induction R; cbn; subst.
+      + cbn in *. now destruct H.
+      + easy.
+      + firstorder.
+  Qed.
+
+  Lemma wlps_infer_ng_equiv : forall e P,
+      WLP (Symbolic.infer_ng e) P env.nil <-> wlp (Shallow.infer_ng e) P.
+  Proof. intros. apply wlps_are_related. apply infers_are_related. Qed.
+
+  Lemma wlp_solved_equiv_unsolved : forall m P,
+      Shallow.wlp_freeM m P <-> wlp (Shallow.solve m) P.
+  Proof.
+    intro. induction m; cbn; intros; try easy.
+    destruct ty_eqb. intuition. intuition. cbn. easy.
+    firstorder.
+  Qed.
+
+  Lemma shallow_infer_ng_sound : forall e,
+      wlp (Shallow.infer_ng e) (fun t => exists ee, nil |-- e ; t ~> ee).
+  Proof.
+    unfold Shallow.infer_ng. intro.
+    apply wlp_solved_equiv_unsolved. apply Shallow.generate_no_elab_sound.
+  Qed.
+
+  Lemma symbolic_infer_ng_sound : forall (e : expr),
+      WLP (Symbolic.infer_ng e) (fun t => exists ee, nil |-- e ; t ~> ee) env.nil.
+  Proof.
+    intros.
+    apply wlps_infer_ng_equiv. apply shallow_infer_ng_sound.
+  Qed.
+
+  Lemma ground_is_sound : forall w (s : SolvedM Ty w) (gnd : Assignment w) P,
+      WLP s P gnd ->
+      match Symbolic.ground w gnd s with
+      | Some t => P t
+      | None   => True
+      end.
+  Proof. induction s; cbn; intros; try easy. apply IHs. apply H. Qed.
+
+  Lemma runTI_sound : forall e,
+    match Symbolic.runTI e with
+    | Some t => exists ee, nil |-- e ; t ~> ee
+    | None => True
+    end.
+  Proof.
+    unfold Symbolic.runTI. intro.
+    pose proof (symbolic_infer_ng_sound e).
+    revert H. apply ground_is_sound.
+  Qed.
+
+  Print Assumptions runTI_sound.
+
+End Soundness.
+
+Section Completeness.
+
+  Fixpoint WP {w} (V : SolvedM Ty w) (Post : ty -> Prop) (gnd : Assignment w) : Prop :=
+    match V with
+    | Ret_Solved _ _ r => Post (Unification.applyassign r gnd)
+    | Fail_Solved _ _ => False
+    | Bind_Exists_Solved _ _ i k => exists t, WP k Post (env.snoc gnd i t)
+    end.
+
+  Fixpoint wp (v : solvedM ty) (Post : ty -> Prop) {struct v} : Prop :=
+    match v with
+    | ret_solved _ v => Post v
+    | fail_solved _ => False
+    | bind_exists_solved _ k => exists t, wp (k t) Post
+    end.
+
+  Lemma wps_are_related : forall ctx gnd V v (R : (RSolved RTy)%R ctx gnd V v) Post,
+      (WP V Post gnd) <-> (wp v Post).
+  Proof.
+    intros. revert Post. induction R; cbn; subst.
+      + cbn in *. now destruct H.
+      + easy.
+      + firstorder.
+  Qed.
+
+  Lemma wps_infer_ng_equiv : forall e P,
+      WP (Symbolic.infer_ng e) P env.nil <-> wp (Shallow.infer_ng e) P.
+  Proof. intros. apply wps_are_related. apply infers_are_related. Qed.
+
+  Lemma wp_solved_equiv_unsolved : forall m P,
+      Shallow.wp_freeM m P <-> wp (Shallow.solve m) P.
+  Proof.
+    intro. induction m; cbn; intros; try easy.
+    destruct ty_eqb. intuition. intuition. firstorder.
+  Qed.
+
+  Lemma shallow_infer_ng_complete : forall e t ee,
+      nil |-- e ; t ~> ee -> wp (Shallow.infer_ng e) (fun t' => t = t').
+  Proof.
+    unfold Shallow.infer_ng. intros.
+    apply wp_solved_equiv_unsolved. now apply (Shallow.generate_no_elab_complete _ _ ee).
+  Qed.
+
+  Lemma symbolic_infer_ng_complete : forall (e : expr) t ee,
+      nil |-- e ; t ~> ee -> WP (Symbolic.infer_ng e) (fun t' => t = t') env.nil.
+  Proof.
+    intros.
+    apply wps_infer_ng_equiv. now apply (shallow_infer_ng_complete _ _ ee).
+  Qed.
+
+  Print Assumptions symbolic_infer_ng_complete.
+
+End Completeness.
