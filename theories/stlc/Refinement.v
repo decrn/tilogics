@@ -55,25 +55,6 @@ Inductive REnv w ass : Env w -> env -> Prop :=
 | RNil :
     REnv w ass nil%list nil%list.
 
-Fixpoint compose {w1 w2 : Ctx nat} (r12 : Accessibility w1 w2)
-  : Assignment w2 -> Assignment w1 :=
-  match r12 in (Accessibility _ c0) return (Assignment c0 -> Assignment w1) with
-  | acc.refl _ => fun X0 : Assignment w1 => X0
-  | acc.fresh _ α Σ₂ a0 =>
-      fun X0 : Assignment Σ₂ =>
-        match env.snocView (compose a0 X0) with
-        | env.isSnoc E _ => E
-        end
-  end.
-
-Lemma compose_refl : forall w ass,
-    compose (acc.refl w) ass = ass.
-Proof. easy. Qed.
-
-Lemma compose_trans {w1 w2 w3 : Ctx nat} : forall ass r12 r23,
-  compose r12 (compose r23 ass) = compose (@Symbolic.trans w1 w2 w3 r12 r23) ass.
-Proof. intros. induction r12. auto. cbn. rewrite IHr12. reflexivity. Qed.
-
 (* Relating boxed symbolic values is more interesting, since the accessibility witness
    can now contain an arbitrary amount of new unification variables.
    We say that in every accessible world, i.e. given a witness ω: w ⊑ w',
@@ -156,12 +137,12 @@ Lemma Func_relates_func :
     RTy w ass (Ty_func w D C) (ty_func d c).
 Proof. intros. inversion H. inversion H0. constructor. Qed.
 
-Class PersistLaws A `{Symbolic.Persistent A} : Type :=
+Class PersistLaws A `{Persistent Accessibility A} : Type :=
   { refl_persist w (V : A w) :
-        Symbolic.persist w V w (acc.refl w) = V
+        persist w V w (acc.refl w) = V
   ; assoc_persist w1 w2 w3 r12 r23 (V : A w1) :
-        Symbolic.persist w2 (Symbolic.persist w1 V w2 r12) w3 r23
-      = Symbolic.persist w1 V w3 (Symbolic.trans r12 r23) }.
+        persist w2 (persist w1 V w2 r12) w3 r23
+      = persist w1 V w3 (acc.trans r12 r23) }.
 
 #[export] Instance PersistLaws_Ty : PersistLaws Ty.
 Proof. constructor.
@@ -177,10 +158,10 @@ Proof. constructor.
     induction r12; cbn. now rewrite refl_persist. now rewrite assoc_persist.
 Qed.
 
-Class RefinePersist {A a} `{Symbolic.Persistent A} (RA : Relation A a) : Type :=
+Class RefinePersist {A a} `{Persistent Accessibility A} (RA : Relation A a) : Type :=
   { refine_persist w1 w2 r12 ass V v :
       RA w1 (compose r12 ass) V v ->
-      RA w2 ass (Symbolic.persist w1 V w2 r12) v }.
+      RA w2 ass (persist w1 V w2 r12) v }.
 
 #[export] Instance RefinePersist_Ty : RefinePersist RTy.
 Proof. constructor.
@@ -208,17 +189,17 @@ Arguments Shallow.exists_ty  : simpl never.
 Lemma generate_fns_are_related (e : expr) (w : Ctx nat) (ass : Assignment w)
   : (REnv -> (RFree RTy))%R w ass (Symbolic.generate e) (Shallow.generate_no_elab e).
 Proof. Set Printing Depth 15.
-  revert ass. revert w. induction e; intros w ass; cbn -[Symbolic.persist].
+  revert ass. revert w. induction e; intros w ass; cbn -[persist].
   - intros Γ γ RΓ. repeat constructor.
   - intros Γ γ RΓ. repeat constructor.
   - intros Γ γ RΓ. eapply Bind_relates_bind.
     apply IHe1. apply RΓ. clear IHe1.
     intros w1 ? ? ? ? ? ?. constructor. apply H0. constructor.
     unfold Symbolic.T. eapply Bind_relates_bind. cbn. apply IHe2.
-    rewrite Symbolic.trans_refl. eapply refine_persist; eauto.
+    rewrite acc.trans_refl. eapply refine_persist; eauto.
     subst. apply RΓ.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. cbn. apply IHe3.
-    rewrite Symbolic.trans_refl. eapply refine_persist.
+    rewrite acc.trans_refl. eapply refine_persist.
     subst. rewrite <- compose_trans. apply RΓ.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. cbn. apply Assert_relates_assert; cbn.
     eapply refine_persist. subst. apply H2. now rewrite refl_persist.

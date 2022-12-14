@@ -116,6 +116,26 @@ Inductive solvedM (A : Type) : Type :=
 Definition Assignment : TYPE :=
   env.Env (fun _ => ty).
 
+Fixpoint compose {w1 w2 : Ctx nat} (r12 : Accessibility w1 w2)
+  : Assignment w2 -> Assignment w1 :=
+  match r12 in (Accessibility _ c0) return (Assignment c0 -> Assignment w1) with
+  | acc.refl _ => fun X0 : Assignment w1 => X0
+  | acc.fresh _ α Σ₂ a0 =>
+      fun X0 : Assignment Σ₂ =>
+        match env.snocView (compose a0 X0) with
+        | env.isSnoc E _ => E
+        end
+  end.
+
+Lemma compose_refl : forall w ass,
+    compose (acc.refl w) ass = ass.
+Proof. easy. Qed.
+
+Lemma compose_trans {w1 w2 w3 : Ctx nat} : forall ass r12 r23,
+  compose r12 (compose r23 ass) = compose (@acc.trans w1 w2 w3 r12 r23) ass.
+Proof. intros. induction r12. auto. cbn. rewrite IHr12. reflexivity. Qed.
+
+
 Definition Lifted (A : Type) : TYPE :=
   fun Σ => Assignment Σ -> A.
 

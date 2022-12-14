@@ -53,7 +53,20 @@ Module acc.
     | fresh α : forall Σ₂, Accessibility (Σ₁ ▻ α) Σ₂ ->
                               Accessibility Σ₁ Σ₂.
 
+  Fixpoint trans {w1 w2 w3} (w12 : Accessibility w1 w2) : Accessibility w2 w3 -> Accessibility w1 w3 :=
+    match w12 with
+    | refl _ => fun w13 : Accessibility w1 w3 => w13
+    | fresh _ α w ω =>
+        fun ω' : Accessibility w w3  => fresh w1 α w3 (trans ω ω')
+    end.
+
+  Lemma trans_refl : forall (w1 w2 : World) w12,
+      (@trans w1 w2 w2 w12 (acc.refl w2)) = w12.
+  Proof. intros. induction w12. auto. cbn. now rewrite IHw12. Qed.
+
 End acc.
+
+Notation "w1 .> w2" := (acc.trans w1 w2) (at level 80).
 
 (* Everything is now qualified, except the stuff in paren on the line below *)
 Export acc (Accessibility).
@@ -63,3 +76,11 @@ Export acc (Accessibility).
 
 Notation "◻ A" := (BoxR Accessibility A) (at level 9, format "◻ A", right associativity)
     : indexed_scope.
+
+Class Persistent (R : Relation.relation World) (A : TYPE) : Type :=
+  persist : ⊢ A -> BoxR R A.
+
+Instance Persistent_Prod : forall A B R,
+    Persistent R A -> Persistent R B ->
+    Persistent R (Prod A B).
+Proof. firstorder. Qed.

@@ -10,13 +10,10 @@ Fixpoint transient  (Σ Σ' : World) (i : nat) (r : Accessibility Σ Σ') :
     i ∈ Σ -> i ∈ Σ'.
 Proof. destruct r. auto. intro. eapply transient. apply r. constructor. apply H. Defined.
 
-Class Persistent (A : TYPE) : Type :=
-  persist : ⊢ A -> ◻ A.
-
 
 Local Notation "<{ A ~ w }>" := (persist _ A _ w).
 
-#[refine] Instance Persistent_Ty : Persistent Ty :=
+#[refine] Instance Persistent_Ty : Persistent Accessibility Ty :=
   fix F {Σ} (t : Ty Σ) {Σ'} (r : Accessibility Σ Σ') : Ty Σ' :=
     match t with
     | Ty_bool _ => Ty_bool Σ'
@@ -25,7 +22,7 @@ Local Notation "<{ A ~ w }>" := (persist _ A _ w).
     end.
 Defined.
 
-#[refine] Instance Persistent_Env : Persistent Env :=
+#[refine] Instance Persistent_Env : Persistent Accessibility Env :=
   fix F {Σ} (l : list (String.string * Ty Σ)) {Σ'} (ω : Accessibility Σ Σ') :
            list (String.string * Ty Σ') :=
     match l with
@@ -34,23 +31,10 @@ Defined.
     end.
 Defined.
 
-Fixpoint trans {w1 w2 w3} (w12 : Accessibility w1 w2) : Accessibility w2 w3 -> Accessibility w1 w3 :=
-  match w12 with
-  | acc.refl _ => fun w13 : Accessibility w1 w3 => w13
-  | acc.fresh _ α w ω =>
-      fun ω' : Accessibility w w3  => acc.fresh w1 α w3 (trans ω ω')
-  end.
-
-Local Notation "w1 .> w2" := (trans w1 w2) (at level 80).
-
-Lemma trans_refl : forall (w1 w2 : World) w12,
-  (@trans w1 w2 w2 w12 (acc.refl w2)) = w12.
-Proof. intros. induction w12. auto. cbn. now rewrite IHw12. Qed.
-
 Definition T {A} : ⊢ ◻A -> A := fun w a => a w (acc.refl w).
 
 Definition _4 {A} : ⊢ ◻A -> ◻◻A.
-Proof. cbv in *. intros.  apply X. eapply trans; eauto. Defined.
+Proof. cbv in *. intros.  apply X. eapply acc.trans; eauto. Defined.
 
 Open Scope indexed_scope.
 
@@ -148,19 +132,13 @@ End RunTI.
 
 Section TypeReconstruction.
 
-  Definition Expr := Lifted expr.
+  Notation Expr := (Lifted expr).
   (* TODO: define reader applicative to use ctor of expr to create Expr *)
 
-  Instance Persistent_Prod : forall A B, Persistent A -> Persistent B -> Persistent (Prod A B).
-  Proof. firstorder. Qed.
+#[export] Instance Persistent_Lifted : forall A, Persistent Accessibility (Lifted A).
+  Proof. unfold Persistent, Valid, Impl, Lifted, BoxR. eauto using compose. Qed.
 
-  Instance Persistent_Expr : Persistent Expr.
-  Proof.
-    unfold Persistent, Valid, Impl, BoxR, Expr, Lifted. intros. induction X0. auto.
-    apply IHX0. intro. apply env.tail in X2. apply X. apply X2. apply X1.
-  Qed.
-
-  Definition ret {w} := Ret_Free (Prod Ty Expr) w.
+  Definition ret  {w} := Ret_Free (Prod Ty Expr) w.
   Definition fail {w} := Fail_Free (Prod Ty Expr) w.
 
 Fixpoint generate' (e : expr) {Σ : World} (Γ : Env Σ) : FreeM (Prod Ty Expr) Σ :=
