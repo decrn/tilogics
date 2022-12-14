@@ -20,7 +20,7 @@ Derive NoConfusion for ty.
 (* Print noConfusion_ty_obligation_1. *)
 (* Print NoConfusion_ty. *)
 
-Inductive Ty (Σ : Ctx nat) : Type :=
+Inductive Ty (Σ : World) : Type :=
   | Ty_bool : Ty Σ
   | Ty_func : Ty Σ -> Ty Σ -> Ty Σ
   | Ty_hole : forall (i : nat), i ∈ Σ -> Ty Σ.
@@ -97,13 +97,13 @@ Inductive freeM (A : Type) : Type :=
   | bind_asserteq_free : ty -> ty -> freeM A -> freeM A
   | bind_exists_free   : (ty -> freeM A) -> freeM A.
 
-Inductive FreeM (A : Ctx nat -> Type) (Σ : Ctx nat) : Type :=
+Inductive FreeM (A : TYPE) (Σ : World) : Type :=
   | Ret_Free           : A Σ -> FreeM A Σ
   | Fail_Free          : FreeM A Σ
   | Bind_AssertEq_Free : Ty Σ -> Ty Σ -> FreeM A Σ -> FreeM A Σ
   | Bind_Exists_Free   : forall (i : nat), FreeM A (Σ ▻ i) -> FreeM A Σ.
 
-Inductive SolvedM (A : Ctx nat -> Type) (Σ : Ctx nat) : Type :=
+Inductive SolvedM (A : TYPE) (Σ : World) : Type :=
   | Ret_Solved           : A Σ -> SolvedM A Σ
   | Fail_Solved          : SolvedM A Σ
   | Bind_Exists_Solved   : forall (i : nat), SolvedM A (Σ ▻ i) -> SolvedM A Σ.
@@ -116,7 +116,7 @@ Inductive solvedM (A : Type) : Type :=
 Definition Assignment : TYPE :=
   env.Env (fun _ => ty).
 
-Fixpoint compose {w1 w2 : Ctx nat} (r12 : Accessibility w1 w2)
+Fixpoint compose {w1 w2 : World} (r12 : Accessibility w1 w2)
   : Assignment w2 -> Assignment w1 :=
   match r12 in (Accessibility _ c0) return (Assignment c0 -> Assignment w1) with
   | acc.refl _ => fun X0 : Assignment w1 => X0
@@ -131,7 +131,7 @@ Lemma compose_refl : forall w ass,
     compose (acc.refl w) ass = ass.
 Proof. easy. Qed.
 
-Lemma compose_trans {w1 w2 w3 : Ctx nat} : forall ass r12 r23,
+Lemma compose_trans {w1 w2 w3 : World} : forall ass r12 r23,
   compose r12 (compose r23 ass) = compose (@acc.trans w1 w2 w3 r12 r23) ass.
 Proof. intros. induction r12. auto. cbn. rewrite IHr12. reflexivity. Qed.
 
@@ -139,10 +139,16 @@ Proof. intros. induction r12. auto. cbn. rewrite IHr12. reflexivity. Qed.
 Definition Lifted (A : Type) : TYPE :=
   fun Σ => Assignment Σ -> A.
 
+(* pure  :: a -> f a *)
 Definition pure {A} (a : A) : Valid (Lifted A) := fun _ _ => a.
 
-Definition apply : forall a b, ⊢ (Lifted (a -> b)) -> Lifted a -> Lifted b.
-Proof. intros. unfold Lifted, Valid, Impl. intros. auto. Defined.
+(* app :: f (a -> b) -> f a -> f b *)
+Definition app (A B : Type) : ⊢ (Lifted (A -> B)) -> Lifted A -> Lifted B :=
+  fun w fab fa ass => fab ass (fa ass).
+
+(* <*> : f a -> f b -> f (a * b) *)
+Definition spaceship (A B : Type) : ⊢ (Lifted A) -> (Lifted B) -> (Lifted (A * B)) :=
+  fun w fa fb ass => (fa ass, fb ass).
 
 (* TODO: turn this into the Inst typeclass (See Katamaran) *)
 (* has instances for Lifted, Prod, Ty, Sum, Option, Unit, ... *)

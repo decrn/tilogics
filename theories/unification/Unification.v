@@ -50,28 +50,8 @@ Import SigTNotations.
 
 Set Implicit Arguments.
 
-(* Notation World := (Ctx nat). *)
-(* Definition TYPE : Type := World -> Type. *)
-(* Definition Valid (A : TYPE) : Type := *)
-(*   forall w, A w. *)
-(* Definition Impl (A B : TYPE) : TYPE := *)
-(*   fun w => A w -> B w. *)
-(* Definition Forall {I : Type} (A : I -> TYPE) : TYPE := *)
-(*   fun w => forall i : I, A i w. *)
-
-(* Definition Assignment : TYPE := *)
-(*   env.Env (fun _ => ty). *)
-(* Definition Lifted (A : Type) : TYPE := *)
-(*   fun Σ => Assignment Σ -> A. *)
-
 Notation "⊢ A" := (Valid A) (at level 100).
 Notation "A -> B" := (Impl A B).
-
-(* Definition Unit : TYPE := fun _ => unit. *)
-(* Definition Option (A : TYPE) : TYPE := fun w => option (A w). *)
-(* Definition List (A : TYPE) : TYPE := fun w => list (A w). *)
-(* Definition Prod (A B : TYPE) : TYPE := fun w => prod (A w) (B w). *)
-(* Definition Sum (A B : TYPE) : TYPE := fun w => sum (A w) (B w). *)
 
 Local Arguments Ty_hole {Σ i} xIn.
 Local Arguments Ty_bool {Σ}.
@@ -118,12 +98,6 @@ End DecEquality.
 Reserved Notation "w1 ⊒ w2" (at level 80).
 Reserved Notation "w1 ⊒⁻ w2" (at level 80).
 Reserved Notation "w1 ⊒ˢ w2" (at level 80).
-
-(* Definition BoxR (R : Relation.relation World) (A : TYPE) : TYPE := *)
-(*   fun w0 => forall w1, R w0 w1 -> A w1. *)
-(* Definition DiamondR (R : Relation.relation World) (A : TYPE) : TYPE := *)
-(*   fun w0 => {w1 & R w0 w1 * A w1}%type. *)
-(* Notation "[< R >] A" := (BoxR R A) (at level 9, format "[< R >] A", right associativity). *)
 
 Definition Later (A : TYPE) : TYPE :=
   fun w => forall x (xIn : x ∈ w), A (w - x).

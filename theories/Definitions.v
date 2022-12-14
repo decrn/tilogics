@@ -17,13 +17,6 @@ Definition Impl (A B : TYPE) : TYPE :=
 Definition Forall {I : Type} (A : I -> TYPE) : TYPE :=
   fun w => forall i : I, A i w.
 
-(* pure  :: a -> f a *)
-(* apply :: f (a -> b) -> f a -> f b *)
-
-
-(* η   : Valid (Impl Unit (f unit)) *)
-(* <*> : f a -> f b -> f (a * b) *)
-
 Declare Scope indexed_scope.
 Bind Scope indexed_scope with TYPE.
 
