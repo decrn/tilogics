@@ -87,8 +87,10 @@ Proof. intros. induction r12. auto. cbn. rewrite IHr12. reflexivity. Qed.
    since τ₀ has a different assignment.
  *)
 
-Definition RBox {A a} (RA : Relation A a) : Relation (Box A) a :=
-  fun (w : Ctx nat) (ass : Assignment w) (x : Box A w) (y : a) =>
+Open Scope indexed_scope.
+
+Definition RBox {A a} (RA : Relation A a) : Relation ◻A a :=
+  fun (w : Ctx nat) (ass : Assignment w) (x : ◻A w) (y : a) =>
     forall (w' : Ctx nat) (ω : Accessibility w w') (ass' : Assignment w'),
       ass = compose ω ass' ->
       RA _ ass' (x w' ω) y.

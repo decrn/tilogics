@@ -58,12 +58,8 @@ End acc.
 (* Everything is now qualified, except the stuff in paren on the line below *)
 Export acc (Accessibility).
 
-(* □ A *)
-Definition Box (A : TYPE) : TYPE :=
-  fun w => forall w', Accessibility w w' -> A w'.
-
 (* TODO: switch to superscript *)
 (* \^s \^+ *)
 
-Notation "◻₊ A" := (Box A) (at level 9, format "◻₊ A", right associativity)
+Notation "◻ A" := (BoxR Accessibility A) (at level 9, format "◻ A", right associativity)
     : indexed_scope.

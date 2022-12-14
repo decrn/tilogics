@@ -11,7 +11,8 @@ Fixpoint transient  (Σ Σ' : World) (i : nat) (r : Accessibility Σ Σ') :
 Proof. destruct r. auto. intro. eapply transient. apply r. constructor. apply H. Defined.
 
 Class Persistent (A : TYPE) : Type :=
-  persist : Valid (Impl A (Box A)).
+  persist : ⊢ A -> ◻ A.
+
 
 Local Notation "<{ A ~ w }>" := (persist _ A _ w).
 
@@ -46,12 +47,14 @@ Lemma trans_refl : forall (w1 w2 : World) w12,
   (@trans w1 w2 w2 w12 (acc.refl w2)) = w12.
 Proof. intros. induction w12. auto. cbn. now rewrite IHw12. Qed.
 
-Definition T {A} := fun (Σ : World) (a : Box A Σ) => a Σ (acc.refl Σ).
+Definition T {A} : ⊢ ◻A -> A := fun w a => a w (acc.refl w).
 
-Definition _4 {A} : Valid (Impl (Box A) (Box (Box A))).
+Definition _4 {A} : ⊢ ◻A -> ◻◻A.
 Proof. cbv in *. intros.  apply X. eapply trans; eauto. Defined.
 
-Fixpoint bind [A B] {Σ} (m : FreeM A Σ) (f : Box (Impl A (FreeM B)) Σ)
+Open Scope indexed_scope.
+
+Fixpoint bind [A B] {Σ} (m : FreeM A Σ) (f : ◻ (A -> (FreeM B)) Σ)
   : FreeM B Σ :=
   match m with
   | Ret_Free _ _ v => (T Σ f) v (* removing the box *)
@@ -153,7 +156,7 @@ Section TypeReconstruction.
 
   Instance Persistent_Expr : Persistent Expr.
   Proof.
-    unfold Persistent, Valid, Impl, Box, Expr, Lifted. intros. induction X0. auto.
+    unfold Persistent, Valid, Impl, BoxR, Expr, Lifted. intros. induction X0. auto.
     apply IHX0. intro. apply env.tail in X2. apply X. apply X2. apply X1.
   Qed.
 
@@ -207,8 +210,8 @@ Definition PROP : TYPE :=
 
 Notation "⊢ A" := (Valid A) (at level 100).
 
-Definition wp  {A} : ⊢ Impl (SolvedM A) (Impl (Box (Impl A PROP)) PROP). Admitted.
-Definition wlp {A} : ⊢ Impl (SolvedM A) (Impl (Box (Impl A PROP)) PROP). Admitted.
+Definition wp  {A} : ⊢ (SolvedM A) -> ◻(A -> PROP) -> PROP. Admitted.
+Definition wlp {A} : ⊢ (SolvedM A) -> ◻(A -> PROP) -> PROP. Admitted.
 
 
 Lemma soundness : forall e,
