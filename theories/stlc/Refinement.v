@@ -24,7 +24,7 @@ Definition Relation (A : TYPE) (a : Type) : Type :=
    in the world to concrete object language types, applying the assignment to the `Ty` is equal to `ty` *)
 Definition RTy : Relation Ty ty :=
   fun (w : Ctx nat) (ass : Assignment w) (T : Ty w) (t : ty) =>
-    Unification.applyassign T ass = t.
+    applyassign T ass = t.
 
 (* We can also relate deeply-embedded free computations `FreeM` to shallowly-embedded free computations `freeM`.
    This is parametric in the relation of values `A` and `a` in their respective free monads *)
@@ -269,7 +269,7 @@ Section Soundness.
 
   Fixpoint WLP {w} (V : SolvedM Ty w) (Post : ty -> Prop) (gnd : Assignment w) : Prop :=
     match V with
-    | Ret_Solved _ _ r => Post (Unification.applyassign r gnd)
+    | Ret_Solved _ _ r => Post (applyassign r gnd)
     | Fail_Solved _ _ => True
     | Bind_Exists_Solved _ _ i k => forall t, WLP k Post (env.snoc gnd i t)
     end.
@@ -343,7 +343,7 @@ Section Completeness.
 
   Fixpoint WP {w} (V : SolvedM Ty w) (Post : ty -> Prop) (gnd : Assignment w) : Prop :=
     match V with
-    | Ret_Solved _ _ r => Post (Unification.applyassign r gnd)
+    | Ret_Solved _ _ r => Post (applyassign r gnd)
     | Fail_Solved _ _ => False
     | Bind_Exists_Solved _ _ i k => exists t, WP k Post (env.snoc gnd i t)
     end.

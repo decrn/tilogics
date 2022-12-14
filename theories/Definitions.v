@@ -81,8 +81,7 @@ Class Persistent (R : Relation.relation World) (A : TYPE) : Type :=
   persist : ⊢ A -> BoxR R A.
 
 Instance Persistent_Prod : forall A B R,
-    Persistent R A -> Persistent R B ->
-    Persistent R (Prod A B).
+    Persistent R A -> Persistent R B -> Persistent R (Prod A B).
 Proof. firstorder. Qed.
 
 Definition T {A} : ⊢ ◻A -> A := fun w a => a w (acc.refl w).

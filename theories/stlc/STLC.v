@@ -143,3 +143,15 @@ Definition pure {A} (a : A) : Valid (Lifted A) := fun _ _ => a.
 
 Definition apply : forall a b, ⊢ (Lifted (a -> b)) -> Lifted a -> Lifted b.
 Proof. intros. unfold Lifted, Valid, Impl. intros. auto. Defined.
+
+(* TODO: turn this into the Inst typeclass (See Katamaran) *)
+(* has instances for Lifted, Prod, Ty, Sum, Option, Unit, ... *)
+Fixpoint applyassign {w} (t : Ty w) (ass : Assignment w) : ty :=
+  match t with
+  | Ty_bool _ => ty_bool
+  | Ty_func _ σ τ =>
+      let σ' := applyassign σ ass in
+      let τ' := applyassign τ ass in
+      ty_func σ' τ'
+  | Ty_hole _ _ i => env.lookup ass i
+  end.
