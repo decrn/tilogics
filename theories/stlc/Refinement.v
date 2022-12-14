@@ -195,7 +195,7 @@ Proof. Set Printing Depth 15.
   - intros Γ γ RΓ. eapply Bind_relates_bind.
     apply IHe1. apply RΓ. clear IHe1.
     intros w1 ? ? ? ? ? ?. constructor. apply H0. constructor.
-    unfold Symbolic.T. eapply Bind_relates_bind. cbn. apply IHe2.
+    unfold T. eapply Bind_relates_bind. cbn. apply IHe2.
     rewrite acc.trans_refl. eapply refine_persist; eauto.
     subst. apply RΓ.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. cbn. apply IHe3.

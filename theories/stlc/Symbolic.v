@@ -6,11 +6,6 @@ Import ctx.notations.
 From Em Require
   Unification.
 
-Fixpoint transient  (Σ Σ' : World) (i : nat) (r : Accessibility Σ Σ') :
-    i ∈ Σ -> i ∈ Σ'.
-Proof. destruct r. auto. intro. eapply transient. apply r. constructor. apply H. Defined.
-
-
 Local Notation "<{ A ~ w }>" := (persist _ A _ w).
 
 #[refine] Instance Persistent_Ty : Persistent Accessibility Ty :=
@@ -30,11 +25,6 @@ Defined.
     | (a0, b) :: l => (a0, <{ b ~ ω}>) :: F l ω
     end.
 Defined.
-
-Definition T {A} : ⊢ ◻A -> A := fun w a => a w (acc.refl w).
-
-Definition _4 {A} : ⊢ ◻A -> ◻◻A.
-Proof. cbv in *. intros.  apply X. eapply acc.trans; eauto. Defined.
 
 Open Scope indexed_scope.
 
@@ -58,7 +48,7 @@ Local Notation "[ ω ] x <- ma ;; mb" :=
       ma at next level, mb at level 200,
       right associativity).
 
-Definition Unit (Σ : World) := unit.
+Definition Unit (_ : World) := unit.
 
 Definition assert {Σ} t1 t2 :=
   Bind_AssertEq_Free Unit Σ t1 t2 (Ret_Free Unit Σ tt).
@@ -112,8 +102,6 @@ Section RunTI.
      of remaining unification variables. *)
   Definition infer_ng (e : expr) : SolvedM Ty [] :=
     Unification.Variant1.solve_ng (@generate e ctx.nil []%list).
-
-  Fixpoint applyassign {w} (s: SolvedM Ty w) (ass : Assignment w) : solvedM ty. Admitted.
 
   Fixpoint ground (w: World) (ass : Assignment w)
                   (s: SolvedM Ty w) : option ty.

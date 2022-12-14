@@ -84,3 +84,14 @@ Instance Persistent_Prod : forall A B R,
     Persistent R A -> Persistent R B ->
     Persistent R (Prod A B).
 Proof. firstorder. Qed.
+
+Definition T {A} : ⊢ ◻A -> A := fun w a => a w (acc.refl w).
+
+Definition _4 {A} : ⊢ ◻A -> ◻◻A.
+Proof. cbv in *. intros.  apply X. eapply acc.trans; eauto. Defined.
+
+Fixpoint transient  (Σ Σ' : World) (i : nat) (r : Accessibility Σ Σ') :
+    i ∈ Σ -> i ∈ Σ'.
+Proof.
+  destruct r. auto. intro. eapply transient. apply r. constructor. apply H.
+Defined.
