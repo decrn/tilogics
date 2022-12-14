@@ -1,36 +1,16 @@
 Require Import List.
 Import ListNotations.
 From Em Require Import
-     Context Environment.
+     Definitions Context Environment STLC.
 Import ctx.notations.
-From Em Require Import
-     STLC.
 From Em Require
   Unification.
 
-(* Adapted from Katamaran: Symbolic/Worlds.v *)
-
-Inductive Accessibility (Σ₁ : Ctx nat) : Ctx nat -> Type :=
-  | refl    : Accessibility Σ₁ Σ₁
-  | fresh α : forall Σ₂, Accessibility (Σ₁ ▻ α) Σ₂ ->
-                          Accessibility Σ₁ Σ₂.
-
-(* ⊢ A *)
-Definition Valid (A : Ctx nat -> Type) := forall Σ, A Σ.
-
-(* A → B *)
-Definition Impl (A B : Ctx nat -> Type) : Ctx nat -> Type :=
-  fun Σ => (A Σ) -> (B Σ).
-
-(* □ A *)
-Definition Box A (Σ : Ctx nat) :=
-  forall Σ', Accessibility Σ Σ' -> A Σ'.
-
-Fixpoint transient  (Σ Σ' : Ctx nat) (i : nat) (r : Accessibility Σ Σ') :
+Fixpoint transient  (Σ Σ' : World) (i : nat) (r : Accessibility Σ Σ') :
     i ∈ Σ -> i ∈ Σ'.
 Proof. destruct r. auto. intro. eapply transient. apply r. constructor. apply H. Defined.
 
-Class Persistent (A : Ctx nat -> Type) : Type :=
+Class Persistent (A : TYPE) : Type :=
   persist : Valid (Impl A (Box A)).
 
 Local Notation "<{ A ~ w }>" := (persist _ A _ w).
@@ -55,21 +35,21 @@ Defined.
 
 Fixpoint trans {w1 w2 w3} (w12 : Accessibility w1 w2) : Accessibility w2 w3 -> Accessibility w1 w3 :=
   match w12 with
-  | refl _ => fun w13 : Accessibility w1 w3 => w13
-  | fresh _ α w ω =>
-      fun ω' : Accessibility w w3  => fresh w1 α w3 (trans ω ω')
+  | acc.refl _ => fun w13 : Accessibility w1 w3 => w13
+  | acc.fresh _ α w ω =>
+      fun ω' : Accessibility w w3  => acc.fresh w1 α w3 (trans ω ω')
   end.
 
 Local Notation "w1 .> w2" := (trans w1 w2) (at level 80).
 
-Lemma trans_refl : forall (w1 w2 : Ctx nat) w12,
-  (@trans w1 w2 w2 w12 (refl w2)) = w12.
+Lemma trans_refl : forall (w1 w2 : World) w12,
+  (@trans w1 w2 w2 w12 (acc.refl w2)) = w12.
 Proof. intros. induction w12. auto. cbn. now rewrite IHw12. Qed.
 
-Definition T {A} := fun (Σ : Ctx nat) (a : Box A Σ) => a Σ (refl Σ).
+Definition T {A} := fun (Σ : World) (a : Box A Σ) => a Σ (acc.refl Σ).
 
 Definition _4 {A} : Valid (Impl (Box A) (Box (Box A))).
-Proof. cbv in *. intros.  apply X. eapply trans. apply H. apply H0. Defined.
+Proof. cbv in *. intros.  apply X. eapply trans; eauto. Defined.
 
 Fixpoint bind [A B] {Σ} (m : FreeM A Σ) (f : Box (Impl A (FreeM B)) Σ)
   : FreeM B Σ :=
@@ -82,7 +62,7 @@ Fixpoint bind [A B] {Σ} (m : FreeM A Σ) (f : Box (Impl A (FreeM B)) Σ)
       Bind_Exists_Free B Σ i
         (bind (* (Σ ▻ i) *) C
             (fun Σ' (ω : Accessibility (Σ ▻ i) Σ') (V : A Σ') =>
-               (_4 Σ f) (Σ ▻ i) (fresh Σ i (Σ ▻ i) (refl (Σ ▻ i))) Σ' ω V))
+               (_4 Σ f) (Σ ▻ i) (acc.fresh Σ i (Σ ▻ i) (acc.refl (Σ ▻ i))) Σ' ω V))
   end.
 
 Local Notation "[ ω ] x <- ma ;; mb" :=
@@ -91,7 +71,7 @@ Local Notation "[ ω ] x <- ma ;; mb" :=
       ma at next level, mb at level 200,
       right associativity).
 
-Definition Unit (Σ : Ctx nat) := unit.
+Definition Unit (Σ : World) := unit.
 
 Definition assert {Σ} t1 t2 :=
   Bind_AssertEq_Free Unit Σ t1 t2 (Ret_Free Unit Σ tt).
@@ -101,13 +81,13 @@ Definition exists_Ty : forall Σ, FreeM Ty Σ :=
            Bind_Exists_Free Ty Σ i (Ret_Free _ _ (Ty_hole _ i ctx.in_zero)).
 
 (* Indexes a given ty by a world Σ *)
-Fixpoint lift (t : ty) (Σ : Ctx nat) : Ty Σ :=
+Fixpoint lift (t : ty) (Σ : World) : Ty Σ :=
   match t with
   | ty_bool => Ty_bool Σ
   | ty_func do co => Ty_func Σ (lift do Σ) (lift co Σ)
   end.
 
-Fixpoint generate (e : expr) {Σ : Ctx nat} (Γ : Env Σ) : FreeM Ty Σ :=
+Fixpoint generate (e : expr) {Σ : World} (Γ : Env Σ) : FreeM Ty Σ :=
   match e with
   | v_true => Ret_Free Ty Σ (Ty_bool Σ)
   | v_false => Ret_Free Ty Σ (Ty_bool Σ)
@@ -116,7 +96,7 @@ Fixpoint generate (e : expr) {Σ : Ctx nat} (Γ : Env Σ) : FreeM Ty Σ :=
       [ ω₂ ] _     <- assert t_cnd (Ty_bool _) ;;
       [ ω₃ ] t_coq <- generate coq <{ Γ ~ ω₁ .> ω₂ }> ;;
       [ ω₄ ] t_alt <- generate alt <{ Γ ~ ω₁ .> ω₂ .> ω₃ }> ;;
-      [ ω₅ ] _     <- assert <{ t_coq ~ ω₄ }>  <{ t_alt ~ (refl _) }> ;;
+      [ ω₅ ] _     <- assert <{ t_coq ~ ω₄ }>  <{ t_alt ~ (acc.refl _) }> ;;
          Ret_Free Ty _ <{ t_coq ~ ω₄ .> ω₅ }>
   | e_var var =>
       match (value var Γ) with
@@ -146,9 +126,9 @@ Section RunTI.
   Definition infer_ng (e : expr) : SolvedM Ty [] :=
     Unification.Variant1.solve_ng (@generate e ctx.nil []%list).
 
-  Fixpoint applyassign {w} (s: SolvedM Ty w) (ass : Unification.Assignment w) : solvedM ty. Admitted.
+  Fixpoint applyassign {w} (s: SolvedM Ty w) (ass : Assignment w) : solvedM ty. Admitted.
 
-  Fixpoint ground (w: Ctx nat) (ass : Unification.Assignment w)
+  Fixpoint ground (w: World) (ass : Assignment w)
                   (s: SolvedM Ty w) : option ty.
   Proof. destruct s.
     - (* value  *) apply Some. apply (Unification.applyassign t ass).
@@ -165,9 +145,7 @@ End RunTI.
 
 Section TypeReconstruction.
 
-  Definition Prod A B : Ctx nat -> Type := fun w => prod (A w) (B w).
-
-  Definition Expr : Ctx nat -> Type := fun w => Unification.Assignment w -> expr.
+  Definition Expr := Lifted expr.
   (* TODO: define reader applicative to use ctor of expr to create Expr *)
 
   Instance Persistent_Prod : forall A B, Persistent A -> Persistent B -> Persistent (Prod A B).
@@ -175,14 +153,14 @@ Section TypeReconstruction.
 
   Instance Persistent_Expr : Persistent Expr.
   Proof.
-    unfold Persistent, Valid, Impl, Box, Expr. intros. induction H. auto.
-    apply IHAccessibility. intro. apply env.tail in X1. apply X. apply X1. apply X0.
+    unfold Persistent, Valid, Impl, Box, Expr, Lifted. intros. induction X0. auto.
+    apply IHX0. intro. apply env.tail in X2. apply X. apply X2. apply X1.
   Qed.
 
   Definition ret {w} := Ret_Free (Prod Ty Expr) w.
   Definition fail {w} := Fail_Free (Prod Ty Expr) w.
 
-Fixpoint generate' (e : expr) {Σ : Ctx nat} (Γ : Env Σ) : FreeM (Prod Ty Expr) Σ :=
+Fixpoint generate' (e : expr) {Σ : World} (Γ : Env Σ) : FreeM (Prod Ty Expr) Σ :=
   match e with
   | v_true  => ret (Ty_bool Σ, (fun _ => v_true))
   | v_false => ret (Ty_bool Σ, (fun _ => v_false))
@@ -191,7 +169,7 @@ Fixpoint generate' (e : expr) {Σ : Ctx nat} (Γ : Env Σ) : FreeM (Prod Ty Expr
       [ ω2 ] _     <- assert (fst r_cnd) (Ty_bool _) ;;
       [ ω3 ] r_coq <- generate' coq <{ Γ ~ ω1 .> ω2 }> ;;
       [ ω4 ] r_alt <- generate' alt <{ Γ ~ ω1 .> ω2 .> ω3 }> ;;
-      [ ω5 ] _     <- assert <{ (fst r_coq) ~ ω4 }>  <{ (fst r_alt) ~ (refl _) }> ;;
+      [ ω5 ] _     <- assert <{ (fst r_coq) ~ ω4 }>  <{ (fst r_alt) ~ (acc.refl _) }> ;;
          let e_cnd := <{ (snd r_cnd) ~ ω2 .> ω3 .> ω4 .> ω5 }> in
          let e_coq := <{ (snd r_coq) ~ ω4 .> ω5 }> in
          let t_coq := <{ (fst r_coq) ~ ω4 .> ω5 }> in
@@ -223,3 +201,25 @@ Fixpoint generate' (e : expr) {Σ : Ctx nat} (Γ : Env Σ) : FreeM (Prod Ty Expr
   end.
 
 End TypeReconstruction.
+
+Definition PROP : TYPE :=
+  fun _ => Prop.
+
+Notation "⊢ A" := (Valid A) (at level 100).
+
+Definition wp  {A} : ⊢ Impl (SolvedM A) (Impl (Box (Impl A PROP)) PROP). Admitted.
+Definition wlp {A} : ⊢ Impl (SolvedM A) (Impl (Box (Impl A PROP)) PROP). Admitted.
+
+
+Lemma soundness : forall e,
+  wlp ctx.nil (infer_ng e)
+    (fun w r t => forall (a : Assignment w),
+       exists ee, nil |-- e ; (Unification.applyassign t a) ~> ee).
+Admitted.
+
+Lemma completeness : forall e t,
+    (exists ee, nil |-- e ; t ~> ee) ->
+      wp ctx.nil (infer_ng e)
+        (fun w r s =>
+           exists (a : Assignment w), t = (Unification.applyassign s a)).
+Admitted.

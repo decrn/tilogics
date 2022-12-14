@@ -1,14 +1,12 @@
 Require Import Relation_Definitions String.
 From Em Require Import
-     Context Environment STLC.
+     Definitions Context Environment STLC.
 Import ctx.notations.
 From Em Require Symbolic Shallow Unification.
 
 (* The refinement proof, relating the deeply-embedded or symbolic `generate`
    to the shallowly-embedded `generate` is accomplished
    using a logical relation similar to [Keuchel22]. *)
-Definition Assignment : Ctx nat -> Type :=
-  env.Env (fun _ => ty).
 
 (* A  variation on the definition of `Relations.Relation_Definitions.relation` but now
    relating a World-indexed Type `A` to a regular type `a` *)
@@ -16,8 +14,8 @@ Check relation.
 (* Given a world `w` and an assignment (or valuation) `ass` assigning concrete types to
    each unification variable in the world, we can relate the world-indexed type `A w`
    to the regular type `a` *)
-Definition Relation (A : Ctx nat -> Type) (a : Type) : Type :=
-  forall (w : Ctx nat) (ass : Assignment w),
+Definition Relation (A : TYPE) (a : Type) : Type :=
+  forall (w : World) (ass : Assignment w),
   A w -> a -> Prop.
 
 (* To start, we define a relation between deeply-embedded object-language types `Ty`
@@ -32,7 +30,7 @@ Definition RTy : Relation Ty ty :=
    This is parametric in the relation of values `A` and `a` in their respective free monads *)
 (* i.e., RFree : Relation A a -> Relation (FreeM A) (freeM a) *)
 
-Inductive RFree {A a} (RA : Relation A a) (w : Ctx nat)
+Inductive RFree {A a} (RA : Relation A a) (w : World)
                  (ass : Assignment w) : FreeM A w -> freeM a -> Prop :=
 | RRet : forall (V : A w) (v : a),
     RA w ass V v ->
@@ -57,11 +55,11 @@ Inductive REnv w ass : Env w -> env -> Prop :=
 | RNil :
     REnv w ass nil%list nil%list.
 
-Fixpoint compose {w1 w2 : Ctx nat} (r12 : Symbolic.Accessibility w1 w2)
+Fixpoint compose {w1 w2 : Ctx nat} (r12 : Accessibility w1 w2)
   : Assignment w2 -> Assignment w1 :=
-  match r12 in (Symbolic.Accessibility _ c0) return (Assignment c0 -> Assignment w1) with
-  | Symbolic.refl _ => fun X0 : Assignment w1 => X0
-  | Symbolic.fresh _ α Σ₂ a0 =>
+  match r12 in (Accessibility _ c0) return (Assignment c0 -> Assignment w1) with
+  | acc.refl _ => fun X0 : Assignment w1 => X0
+  | acc.fresh _ α Σ₂ a0 =>
       fun X0 : Assignment Σ₂ =>
         match env.snocView (compose a0 X0) with
         | env.isSnoc E _ => E
@@ -69,7 +67,7 @@ Fixpoint compose {w1 w2 : Ctx nat} (r12 : Symbolic.Accessibility w1 w2)
   end.
 
 Lemma compose_refl : forall w ass,
-    compose (Symbolic.refl w) ass = ass.
+    compose (acc.refl w) ass = ass.
 Proof. easy. Qed.
 
 Lemma compose_trans {w1 w2 w3 : Ctx nat} : forall ass r12 r23,
@@ -89,14 +87,14 @@ Proof. intros. induction r12. auto. cbn. rewrite IHr12. reflexivity. Qed.
    since τ₀ has a different assignment.
  *)
 
-Definition RBox {A a} (RA : Relation A a) : Relation (Symbolic.Box A) a :=
-  fun (w : Ctx nat) (ass : Assignment w) (x : Symbolic.Box A w) (y : a) =>
-    forall (w' : Ctx nat) (ω : Symbolic.Accessibility w w') (ass' : Assignment w'),
+Definition RBox {A a} (RA : Relation A a) : Relation (Box A) a :=
+  fun (w : Ctx nat) (ass : Assignment w) (x : Box A w) (y : a) =>
+    forall (w' : Ctx nat) (ω : Accessibility w w') (ass' : Assignment w'),
       ass = compose ω ass' ->
       RA _ ass' (x w' ω) y.
 
 (* For functions/impl: related inputs go to related outputs *)
-Definition RArr {A a B b} (RA : Relation A a) (RB : Relation B b) : Relation (Symbolic.Impl A B) (a -> b) :=
+Definition RArr {A a B b} (RA : Relation A a) (RB : Relation B b) : Relation (Impl A B) (a -> b) :=
   fun w ass fS fs => forall (V : A w) (v : a),
     RA w ass V v -> RB w ass (fS V) (fs v).
 
@@ -158,7 +156,7 @@ Proof. intros. inversion H. inversion H0. constructor. Qed.
 
 Class PersistLaws A `{Symbolic.Persistent A} : Type :=
   { refl_persist w (V : A w) :
-        Symbolic.persist w V w (Symbolic.refl w) = V
+        Symbolic.persist w V w (acc.refl w) = V
   ; assoc_persist w1 w2 w3 r12 r23 (V : A w1) :
         Symbolic.persist w2 (Symbolic.persist w1 V w2 r12) w3 r23
       = Symbolic.persist w1 V w3 (Symbolic.trans r12 r23) }.

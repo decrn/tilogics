@@ -1,5 +1,6 @@
 Require Import List.
 Require Import String.
+From Equations Require Import Equations.
 Import ListNotations.
 From Em Require Import
      STLC.
@@ -329,11 +330,62 @@ Proof.
   now apply solve in res.
 Defined.
 
+Ltac head t :=
+  match t with
+  | ?t' _ => head t'
+  | _ => t
+  end.
+
+Ltac constructor_congruence :=
+  repeat
+    match goal with
+    | H: ?x = ?y |- _ =>
+        let hx := head x in
+        let hy := head y in
+        is_constructor hx; is_constructor hy;
+        dependent elimination H
+    | |- ?x = ?y =>
+        let hx := head x in
+        let hy := head y in
+        is_constructor hx; is_constructor hy;
+        f_equal
+    end.
+
+
 Lemma generate_no_elab_sound : forall (G : env) (e : expr),
   wlp_freeM (generate_no_elab e G) (fun '(t) => exists ee, G |-- e ; t ~> ee).
-Admitted.
+Proof.
+  intros. generalize dependent G. induction e; cbn [generate_no_elab]; intro;
+  repeat (
+      rewrite ?wlp_exists_type, ?wlp_bind, ?wlp_ty_eqb,
+              ?wlp_ret, ?wlp_fail;
+      subst; try destruct o; try match goal with
+      | H : exists _, _ |- _ => destruct H
+      | IHe : forall G, wlp_freeM (generate_no_elab ?e G) _
+        |- wlp_freeM (generate_no_elab ?e ?g) _ =>
+          specialize (IHe g); revert IHe; apply wlp_monotone; intros
+      | |- tpb _ _ _ _ =>
+          constructor
+      | |- wlp_freeM (match ?t with _ => _ end) _ =>
+          destruct t eqn:?
+      | H : ?g |-- ?e ; ?t ~> ?ee
+        |- ?g' |-- e_app ?e1 ?e2 ; ?t' ~> e_app ?e1' ?e2' =>
+          apply (tpb_app _ _ _ _ _ t0 _)
+      | |- exists ee, ?g |-- ?e ; ?t ~> ?ee' =>
+           eexists ; econstructor; eauto; is_ground goal
+      | H : ?G |-- ?E ; ?T ~> ?EE
+        |- ?G |-- ?E ; ?T ~> ?X => apply H
+      | H : ?x = ?x |- _ => clear H
+      | H : ?x = ?y |- _ => progress constructor_congruence
+      | |- ?x = ?y -> _ => intro
+      | |- forall _, _ => intro
+      end); try discriminate; try (firstorder; fail); eauto.
+(*       dependent elimination H0. *)
+(*  Set Ltac Debug. constructor_congruence. *)
+  Qed.
 
 Lemma generate_no_elab_complete : forall  (G : env) (e ee : expr) (t : ty),
   (G |-- e ; t ~> ee) ->
   wp_freeM (generate_no_elab e G) (fun '(t') => t = t').
+Proof.
 Admitted.

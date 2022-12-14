@@ -342,7 +342,6 @@ Inductive freeM (A : Type) : Type :=
   | bind_assert_free :  ty -> ty -> freeM A -> freeM A
   | fail_free : freeM A.
 
-Print app.
 (* Evaluation of the continuation-based bind of freeM *)
 Fixpoint freeM_bind [T1 T2 : Type] (m : freeM T1) (f: T1 -> freeM T2) : freeM T2 :=
   match m with
@@ -627,4 +626,3 @@ Proof.
                   congruence
               end; try reflexivity; try assumption).
 Qed.
-

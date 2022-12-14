@@ -2,7 +2,7 @@ Require Import List.
 Import ListNotations.
 Require Import String.
 From Em Require Import
-     Context.
+     Definitions Context Environment.
 Import ctx.notations.
 
 (* =================================== *)
@@ -15,6 +15,10 @@ Import ctx.notations.
 Inductive ty : Type :=
   | ty_bool : ty
   | ty_func : ty -> ty -> ty.
+
+Derive NoConfusion for ty.
+(* Print noConfusion_ty_obligation_1. *)
+(* Print NoConfusion_ty. *)
 
 Inductive Ty (Σ : Ctx nat) : Type :=
   | Ty_bool : Ty Σ
@@ -108,3 +112,14 @@ Inductive solvedM (A : Type) : Type :=
   | ret_solved           : A -> solvedM A
   | fail_solved          : solvedM A
   | bind_exists_solved   : (ty -> solvedM A) -> solvedM A.
+
+Definition Assignment : TYPE :=
+  env.Env (fun _ => ty).
+
+Definition Lifted (A : Type) : TYPE :=
+  fun Σ => Assignment Σ -> A.
+
+Definition pure {A} (a : A) : Valid (Lifted A) := fun _ _ => a.
+
+Definition apply : forall a b, ⊢ (Lifted (a -> b)) -> Lifted a -> Lifted b.
+Proof. intros. unfold Lifted, Valid, Impl. intros. auto. Defined.

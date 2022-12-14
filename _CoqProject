@@ -1,4 +1,5 @@
 -Q theories Em
+theories/Definitions.v
 theories/aelet/AELetMonadic.v
 theories/common/Context.v
 theories/common/Environment.v
