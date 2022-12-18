@@ -2,7 +2,7 @@ Require Import Relation_Definitions String.
 From Em Require Import
      Definitions Context Environment STLC.
 Import ctx.notations.
-From Em Require Symbolic Shallow Unification.
+From Em Require Symbolic Shallow.
 
 (* The refinement proof, relating the deeply-embedded or symbolic `generate`
    to the shallowly-embedded `generate` is accomplished
@@ -24,7 +24,7 @@ Definition Relation (A : TYPE) (a : Type) : Type :=
    in the world to concrete object language types, applying the assignment to the `Ty` is equal to `ty` *)
 Definition RTy : Relation Ty ty :=
   fun (w : Ctx nat) (ass : Assignment w) (T : Ty w) (t : ty) =>
-    applyassign T ass = t.
+    inst T ass = t.
 
 (* We can also relate deeply-embedded free computations `FreeM` to shallowly-embedded free computations `freeM`.
    This is parametric in the relation of values `A` and `a` in their respective free monads *)

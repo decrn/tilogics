@@ -135,7 +135,6 @@ Lemma compose_trans {w1 w2 w3 : World} : forall ass r12 r23,
   compose r12 (compose r23 ass) = compose (@acc.trans w1 w2 w3 r12 r23) ass.
 Proof. intros. induction r12. auto. cbn. rewrite IHr12. reflexivity. Qed.
 
-
 Definition Lifted (A : Type) : TYPE :=
   fun Σ => Assignment Σ -> A.
 
@@ -150,14 +149,43 @@ Definition app (A B : Type) : ⊢ (Lifted (A -> B)) -> Lifted A -> Lifted B :=
 Definition spaceship (A B : Type) : ⊢ (Lifted A) -> (Lifted B) -> (Lifted (A * B)) :=
   fun w fa fb ass => (fa ass, fb ass).
 
-(* TODO: turn this into the Inst typeclass (See Katamaran) *)
-(* has instances for Lifted, Prod, Ty, Sum, Option, Unit, ... *)
-Fixpoint applyassign {w} (t : Ty w) (ass : Assignment w) : ty :=
-  match t with
-  | Ty_bool _ => ty_bool
+Class Inst (A : TYPE) (a : Type) : Type :=
+  inst : forall {w}, A w -> Assignment w -> a.
+
+#[export] Instance inst_list {A : TYPE} {a : Type} `{Inst A a} :
+  Inst (List A) (list a) :=
+  fun w xs ass => List.map (fun x => inst x ass) xs.
+
+#[export] Instance inst_const {A} :
+  Inst (Const A) A | 10 :=
+  fun Σ x ι => x.
+
+#[export] Instance inst_unit :
+  Inst Unit unit :=
+  fun _ x ass => x.
+
+#[export] Instance inst_prod {AT BT A B} `{Inst AT A, Inst BT B} :
+  Inst (Prod AT BT) (A * B) :=
+  fun ass '(a , b) ι => (inst a ι, inst b ι).
+
+#[export] Instance inst_option {AT A} `{Inst AT A} :
+  Inst (Option AT) (option A) :=
+  fun w ma ass => option_map (fun a => inst a ass) ma.
+
+#[export] Instance inst_ty `{Inst Ty ty} :
+  Inst Ty ty :=
+  fun _ T ass => match T with
+  | Ty_bool _ =>
+      ty_bool
   | Ty_func _ σ τ =>
-      let σ' := applyassign σ ass in
-      let τ' := applyassign τ ass in
-      ty_func σ' τ'
-  | Ty_hole _ _ i => env.lookup ass i
+      ty_func (inst σ ass) (inst τ ass)
+  | Ty_hole _ _ i =>
+      env.lookup ass i
+  end.
+
+#[export] Instance inst_env `{Hfix : Inst Env env} `{Inst Ty ty} :
+  Inst Env env :=
+  fun w E ass => match E with
+  | []%list      => []%list
+  | (s,T) :: sTs => (s, inst T ass) :: Hfix w sTs ass
   end.
