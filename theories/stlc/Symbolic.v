@@ -106,7 +106,7 @@ Section RunTI.
   Fixpoint ground (w: World) (ass : Assignment w)
                   (s: SolvedM Ty w) : option ty.
   Proof. destruct s.
-    - (* value  *) apply Some. apply (applyassign t ass).
+    - (* value  *) apply Some. apply (inst t ass).
     - (* fail   *) apply None.
     - (* exists *) apply (ground (w ▻ i)).
       + constructor. apply ass. constructor 1. (* ground remaining to Bool *)
@@ -166,7 +166,7 @@ Fixpoint generate' (e : expr) {Σ : World} (Γ : Env Σ) : FreeM (Prod Ty Expr) 
       [ ω1 ] t_var <- exists_Ty Σ ;;
       [ ω2 ] t_e <- generate' e ((var, t_var) :: <{ Γ ~ ω1 }>) ;;
         ret (Ty_func _ <{ t_var ~ ω2 }> (fst t_e),
-            fun a => e_abst var (applyassign <{ t_var ~ ω2 }> a) (snd t_e a))
+            fun a => e_abst var (inst <{ t_var ~ ω2 }> a) (snd t_e a))
   end.
 
 End TypeReconstruction.
@@ -181,19 +181,19 @@ Definition wlp {A} : ⊢ (SolvedM A) -> ◻(A -> PROP) -> PROP. Admitted.
 Lemma soundness : forall e,
   wlp ctx.nil (infer_ng e)
     (fun w r t => forall (a : Assignment w),
-       exists ee, nil |-- e ; (applyassign t a) ~> ee).
+       exists ee, nil |-- e ; (inst t a) ~> ee).
 Admitted.
 
 Lemma completeness : forall e t,
     (exists ee, nil |-- e ; t ~> ee) ->
       wp ctx.nil (infer_ng e)
         (fun w r s =>
-           exists (a : Assignment w), t = (applyassign s a)).
+           exists (a : Assignment w), t = (inst s a)).
 Admitted.
 
 (* Fixpoint WP {w} (V : FreeM Ty w) (Post : ty -> Prop) (gnd : Assignment w) : Prop. *)
 (*   match V with *)
-(*   | Ret_Solved _ _ r => Post (applyassign r gnd) *)
+(*   | Ret_Solved _ _ r => Post (inst r gnd) *)
 (*   | Fail_Solved _ _ => False *)
 (*   | Bind_Exists_Solved _ _ i k => exists t, WP k Post (env.snoc gnd i t) *)
 (*   end. *)

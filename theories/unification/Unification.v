@@ -1592,7 +1592,7 @@ Fixpoint compose {w0 w1} (ζ : w0 ⊒⁻ w1) : Assignment w1 -> Assignment w0 :=
   | @Tri.cons _ w' x xIn t ζ =>
       fun ass  =>
         let ass' := compose ζ ass in
-        env.insert xIn ass' (applyassign t ass')
+        env.insert xIn ass' (inst t ass')
   end.
 
 Definition compose' {w0 w1} (ζ : w0 ⊒⁻ w1) : Assignment w1 -> Assignment w0.
@@ -1600,7 +1600,7 @@ Proof.
   intros ass.
   apply env.tabulate.
   intros x xIn.
-  apply (applyassign (env.lookup (Sub.triangular ζ) xIn) ass).
+  apply (inst (env.lookup (Sub.triangular ζ) xIn) ass).
 Defined.
 
 Definition SubstLifted (A : Type) :

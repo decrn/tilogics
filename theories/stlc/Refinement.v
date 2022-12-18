@@ -269,7 +269,7 @@ Section Soundness.
 
   Fixpoint WLP {w} (V : SolvedM Ty w) (Post : ty -> Prop) (gnd : Assignment w) : Prop :=
     match V with
-    | Ret_Solved _ _ r => Post (applyassign r gnd)
+    | Ret_Solved _ _ r => Post (inst r gnd)
     | Fail_Solved _ _ => True
     | Bind_Exists_Solved _ _ i k => forall t, WLP k Post (env.snoc gnd i t)
     end.
@@ -343,7 +343,7 @@ Section Completeness.
 
   Fixpoint WP {w} (V : SolvedM Ty w) (Post : ty -> Prop) (gnd : Assignment w) : Prop :=
     match V with
-    | Ret_Solved _ _ r => Post (applyassign r gnd)
+    | Ret_Solved _ _ r => Post (inst r gnd)
     | Fail_Solved _ _ => False
     | Bind_Exists_Solved _ _ i k => exists t, WP k Post (env.snoc gnd i t)
     end.
