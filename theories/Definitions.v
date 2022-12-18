@@ -18,11 +18,12 @@ Definition Forall {I : Type} (A : I -> TYPE) : TYPE :=
   fun w => forall i : I, A i w.
 
 Declare Scope indexed_scope.
-Bind Scope indexed_scope with TYPE.
+Bind    Scope indexed_scope with TYPE.
 
 Notation "⊢ A" := (Valid A) (at level 100).
 Notation "A -> B" := (Impl A B) : indexed_scope.
 
+Definition Const (A : Type) (w : World) : Type := A.
 Definition Unit : TYPE := fun _ => unit.
 Definition Option (A : TYPE) : TYPE := fun w => option (A w).
 Definition List (A : TYPE) : TYPE := fun w => list (A w).
@@ -67,7 +68,7 @@ Export acc (Accessibility).
 (* TODO: switch to superscript *)
 (* \^s \^+ *)
 
-Notation "◻ A" := (BoxR Accessibility A) (at level 9, format "◻ A", right associativity)
+Notation "□⁺ A" := (BoxR Accessibility A) (at level 9, format "□⁺ A", right associativity)
     : indexed_scope.
 
 Class Persistent (R : Relation.relation World) (A : TYPE) : Type :=
@@ -77,9 +78,9 @@ Instance Persistent_Prod : forall A B R,
     Persistent R A -> Persistent R B -> Persistent R (Prod A B).
 Proof. firstorder. Qed.
 
-Definition T {A} : ⊢ ◻A -> A := fun w a => a w (acc.refl w).
+Definition T {A} : ⊢ □⁺A -> A := fun w a => a w (acc.refl w).
 
-Definition _4 {A} : ⊢ ◻A -> ◻◻A.
+Definition _4 {A} : ⊢ □⁺A -> □⁺□⁺A.
 Proof. cbv in *. intros.  apply X. eapply acc.trans; eauto. Defined.
 
 Fixpoint transient  (Σ Σ' : World) (i : nat) (r : Accessibility Σ Σ') :
