@@ -1515,9 +1515,6 @@ Module Variant1.
     - now rewrite ?Sub.subst_id.
   Qed.
 
-  Print Assumptions Löb_elim.
-  Print Assumptions bmgu_spec.
-
   Definition boxsolve : ⊢ List (Prod Ty Ty) -> □◆Unit :=
     fix solve {w} cs {struct cs} :=
       match cs with
@@ -1531,8 +1528,31 @@ Module Variant1.
   Definition solve : ⊢ List (Prod Ty Ty) -> ◆Unit :=
     fun w cs => boxsolve cs Tri.refl.
 
-  Definition solve_ng {A} : ⊢ FreeM A -> SolvedM A.
-  Admitted.
+  Import option.notations.
+
+  Definition prenex {A} :
+    ⊢ FreeM A -> ?◇⁺(List (Ty * Ty) * A) :=
+    fix pr {w} m {struct m} :=
+    match m with
+    | Ret_Free _ _ a => Some (w; (acc.refl w, (List.nil, a)))
+    | Fail_Free _ _ => None
+    | Bind_AssertEq_Free _ _ t1 t2 m =>
+        '(w1; (r1, (cs, a))) <- pr m;;
+        let t1' := persist w t1 w1 r1 in
+        let t2' := persist w t2 w1 r1 in
+        let c   := (t1', t2') in
+        Some (w1; (r1, (cons c cs, a)))
+    | Bind_Exists_Free _ _ i m =>
+        '(w1; (r1, csa)) <- pr m ;;
+        Some (w1; (acc.fresh w i w1 r1, csa))
+    end.
+
+  Definition solve_ng {A} {pA : Persistent Tri.Tri A} :
+    FreeM A ctx.nil -> ?◇⁺ A ctx.nil :=
+    fun m =>
+      '(w1; (r, (cs, a))) <- prenex m ;;
+      '(w2; (ζ, tt))      <- solve cs;;
+      Some (w2; (acc.nil_l,persist _ a _ ζ)).
 
 End Variant1.
 Export Variant1.

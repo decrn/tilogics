@@ -70,8 +70,8 @@ Inductive REnv w ass : Env w -> env -> Prop :=
 
 Open Scope indexed_scope.
 
-Definition RBox {A a} (RA : Relation A a) : Relation ◻A a :=
-  fun (w : Ctx nat) (ass : Assignment w) (x : ◻A w) (y : a) =>
+Definition RBox {A a} (RA : Relation A a) : Relation □⁺A a :=
+  fun (w : Ctx nat) (ass : Assignment w) (x : □⁺A w) (y : a) =>
     forall (w' : Ctx nat) (ω : Accessibility w w') (ass' : Assignment w'),
       ass = compose ω ass' ->
       RA _ ass' (x w' ω) y.
@@ -81,7 +81,7 @@ Definition RArr {A a B b} (RA : Relation A a) (RB : Relation B b) : Relation (Im
   fun w ass fS fs => forall (V : A w) (v : a),
     RA w ass V v -> RB w ass (fS V) (fs v).
 
-Definition RUnit : Relation Symbolic.Unit unit :=
+Definition RUnit : Relation Unit unit :=
   fun w ass _ _ => True.
 
 Declare Scope rel_scope.
@@ -137,27 +137,6 @@ Lemma Func_relates_func :
     RTy w ass (Ty_func w D C) (ty_func d c).
 Proof. intros. inversion H. inversion H0. constructor. Qed.
 
-Class PersistLaws A `{Persistent Accessibility A} : Type :=
-  { refl_persist w (V : A w) :
-        persist w V w (acc.refl w) = V
-  ; assoc_persist w1 w2 w3 r12 r23 (V : A w1) :
-        persist w2 (persist w1 V w2 r12) w3 r23
-      = persist w1 V w3 (acc.trans r12 r23) }.
-
-#[export] Instance PersistLaws_Ty : PersistLaws Ty.
-Proof. constructor.
-  - intros. induction V; cbn; now try (rewrite IHV1; rewrite IHV2).
-  - intros. induction V; cbn. auto. f_equal. apply IHV1. apply IHV2.
-    f_equal. induction r12. f_equal. apply IHr12.
-Qed.
-
-#[export] Instance PersistLaws_Env : PersistLaws Env.
-Proof. constructor.
-  - intros. induction V; cbn; now try (destruct a; rewrite IHV; rewrite refl_persist).
-  - intros. induction V as [|[]]; cbn; repeat f_equal; auto.
-    induction r12; cbn. now rewrite refl_persist. now rewrite assoc_persist.
-Qed.
-
 Class RefinePersist {A a} `{Persistent Accessibility A} (RA : Relation A a) : Type :=
   { refine_persist w1 w2 r12 ass V v :
       RA w1 (compose r12 ass) V v ->
@@ -188,7 +167,7 @@ Arguments Shallow.exists_ty  : simpl never.
 
 Lemma generate_fns_are_related (e : expr) (w : Ctx nat) (ass : Assignment w)
   : (REnv -> (RFree RTy))%R w ass (Symbolic.generate e) (Shallow.generate_no_elab e).
-Proof. Set Printing Depth 15.
+Proof.
   revert ass. revert w. induction e; intros w ass; cbn -[persist].
   - intros Γ γ RΓ. repeat constructor.
   - intros Γ γ RΓ. repeat constructor.
@@ -249,23 +228,25 @@ Inductive RSolved {A a} (RA : Relation A a) (w : Ctx nat) (ass : Assignment w)
 (*   fun O o => *)
 (*     match O, o with *)
 (*     | Some V, Some v => RA w ass V v *)
-(*     | None, none => True *)
+(*     | None, None => True *)
 (*     | _, _ => False *)
 (*     end. *)
 
-Lemma solves_are_related {A a} (RA : Relation A a) (w : Ctx nat) (ass : Assignment w)
-  : (RFree RA -> (RSolved RA))%R w ass (@Unification.Variant1.solve_ng _ w) (@Shallow.solve a).
-Proof. Admitted.
+(* Lemma solves_are_related {A a} {pA: Persistent Unification.Tri.Tri A} (RA : Relation A a) *)
+(*   : (RFree RA -> (RSolved RA))%R ctx.nil env.nil (@Unification.Variant1.solve_ng _ _) (@Shallow.solve a). *)
+(* Proof. Admitted. *)
 
-Lemma infers_are_related (e : expr)
-  : (RSolved RTy)%R ctx.nil env.nil (Symbolic.infer_ng e) (Shallow.infer_ng e).
-Proof.
-  unfold Symbolic.infer_ng, Shallow.infer_ng.
-  apply solves_are_related. apply generate_fns_are_related.
-  constructor.
-Qed.
+(* Lemma infers_are_related (e : expr) *)
+(*   : (RSolved RTy)%R ctx.nil env.nil (Symbolic.infer_ng e) (Shallow.infer_ng e). *)
+(* Proof. *)
+(*   unfold Symbolic.infer_ng, Shallow.infer_ng. *)
+(*   apply solves_are_related. apply generate_fns_are_related. *)
+(*   constructor. *)
+(* Qed. *)
 
 Section Soundness.
+
+  Import SigTNotations.
 
   Fixpoint WLP {w} (V : SolvedM Ty w) (Post : ty -> Prop) (gnd : Assignment w) : Prop :=
     match V with
@@ -290,9 +271,9 @@ Section Soundness.
       + firstorder.
   Qed.
 
-  Lemma wlps_infer_ng_equiv : forall e P,
-      WLP (Symbolic.infer_ng e) P env.nil <-> wlp (Shallow.infer_ng e) P.
-  Proof. intros. apply wlps_are_related. apply infers_are_related. Qed.
+  (* Lemma wlps_infer_ng_equiv : forall e P, *)
+  (*     WLP (Symbolic.infer_ng e) P env.nil <-> wlp (Shallow.infer_ng e) P. *)
+  (* Proof. intros. apply wlps_are_related. apply infers_are_related. Qed. *)
 
   Lemma wlp_solved_equiv_unsolved : forall m P,
       Shallow.wlp_freeM m P <-> wlp (Shallow.solve m) P.
@@ -309,37 +290,42 @@ Section Soundness.
     apply wlp_solved_equiv_unsolved. apply Shallow.generate_no_elab_sound.
   Qed.
 
-  Lemma symbolic_infer_ng_sound : forall (e : expr),
-      WLP (Symbolic.infer_ng e) (fun t => exists ee, nil |-- e ; t ~> ee) env.nil.
-  Proof.
-    intros.
-    apply wlps_infer_ng_equiv. apply shallow_infer_ng_sound.
-  Qed.
+  (* Lemma symbolic_infer_ng_sound : forall (e : expr), *)
+  (*     WLP (Symbolic.infer_ng e) (fun t => exists ee, nil |-- e ; t ~> ee) env.nil. *)
+  (* Proof. *)
+  (*   intros. *)
+  (*   apply wlps_infer_ng_equiv. apply shallow_infer_ng_sound. *)
+  (* Qed. *)
 
-  Lemma ground_is_sound : forall w (s : SolvedM Ty w) (gnd : Assignment w) P,
-      WLP s P gnd ->
-      match Symbolic.ground w gnd s with
-      | Some t => P t
-      | None   => True
-      end.
-  Proof. induction s; cbn; intros; try easy. apply IHs. apply H. Qed.
-
-  Lemma runTI_sound : forall e,
-    match Symbolic.runTI e with
-    | Some t => exists ee, nil |-- e ; t ~> ee
-    | None => True
+  Lemma symbolic_infer_schematic_sound (e : expr) :
+    match Symbolic.infer_schematic e with
+    | Some (w; t) => forall ass, exists ee, nil |-- e ; inst t ass ~> ee
+    | None        => True
     end.
   Proof.
-    unfold Symbolic.runTI. intro.
-    pose proof (symbolic_infer_ng_sound e).
-    revert H. apply ground_is_sound.
-  Qed.
+    (* unfold Symbolic.runTI. intro. *)
+    (* pose proof (symbolic_infer_ng_sound e). *)
+    (* revert H. apply ground_is_sound. *)
+  Admitted.
 
-  Print Assumptions runTI_sound.
+  Lemma symbolic_infer_grounded_sound : forall e,
+    match Symbolic.infer_grounded e with
+    | Some t => exists ee, nil |-- e ; t ~> ee
+    | None   => True
+    end.
+  Proof.
+    (* unfold Symbolic.runTI. intro. *)
+    (* pose proof (symbolic_infer_ng_sound e). *)
+    (* revert H. apply ground_is_sound. *)
+  Admitted.
+
+  Print Assumptions symbolic_infer_schematic_sound.
 
 End Soundness.
 
 Section Completeness.
+
+  Import SigTNotations.
 
   Fixpoint WP {w} (V : SolvedM Ty w) (Post : ty -> Prop) (gnd : Assignment w) : Prop :=
     match V with
@@ -364,9 +350,9 @@ Section Completeness.
       + firstorder.
   Qed.
 
-  Lemma wps_infer_ng_equiv : forall e P,
-      WP (Symbolic.infer_ng e) P env.nil <-> wp (Shallow.infer_ng e) P.
-  Proof. intros. apply wps_are_related. apply infers_are_related. Qed.
+  (* Lemma wps_infer_ng_equiv : forall e P, *)
+  (*     WP (Symbolic.infer_ng e) P env.nil <-> wp (Shallow.infer_ng e) P. *)
+  (* Proof. intros. apply wps_are_related. apply infers_are_related. Qed. *)
 
   Lemma wp_solved_equiv_unsolved : forall m P,
       Shallow.wp_freeM m P <-> wp (Shallow.solve m) P.
@@ -382,13 +368,18 @@ Section Completeness.
     apply wp_solved_equiv_unsolved. now apply (Shallow.generate_no_elab_complete _ _ ee).
   Qed.
 
-  Lemma symbolic_infer_ng_complete : forall (e : expr) t ee,
-      nil |-- e ; t ~> ee -> WP (Symbolic.infer_ng e) (fun t' => t = t') env.nil.
+  Lemma symbolic_infer_schematic_complete (e : expr) t ee :
+    nil |-- e ; t ~> ee ->
+    match Symbolic.infer_schematic e with
+    | Some (w; T) => exists ass, inst T ass = t
+    | None        => False
+    end.
   Proof.
-    intros.
-    apply wps_infer_ng_equiv. now apply (shallow_infer_ng_complete _ _ ee).
-  Qed.
+    (* unfold Symbolic.runTI. intro. *)
+    (* pose proof (symbolic_infer_ng_sound e). *)
+    (* revert H. apply ground_is_sound. *)
+  Admitted.
 
-  Print Assumptions symbolic_infer_ng_complete.
+  Print Assumptions symbolic_infer_schematic_complete.
 
 End Completeness.

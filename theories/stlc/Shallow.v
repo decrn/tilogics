@@ -323,12 +323,8 @@ Fixpoint solve {a} (m : freeM a) : solvedM a :=
   | bind_exists_free _ k => bind_exists_solved a (fun t => solve (k t))
   end.
 
-Definition infer_ng : expr -> solvedM ty.
-Proof.
-  intros e.
-  pose (generate_no_elab e []%list) as res.
-  now apply solve in res.
-Defined.
+Definition infer_ng : expr -> solvedM ty :=
+  fun e => solve (generate_no_elab e []).
 
 Ltac head t :=
   match t with

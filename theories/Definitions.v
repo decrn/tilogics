@@ -39,6 +39,10 @@ Definition DiamondR (R : Relation.relation World) (A : TYPE) : TYPE :=
   fun w0 => {w1 & R w0 w1 * A w1}%type.
 
 Notation "[< R >] A" := (BoxR R A) (at level 9, format "[< R >] A", right associativity).
+Notation "<[ R ]> A" := (DiamondR R A) (at level 9, format "<[ R ]> A", right associativity).
+
+Definition Schematic (A : TYPE) : Type :=
+  { w : World & A w }.
 
 Module acc.
 
@@ -58,6 +62,17 @@ Module acc.
       (@trans w1 w2 w2 w12 (acc.refl w2)) = w12.
   Proof. intros. induction w12. auto. cbn. now rewrite IHw12. Qed.
 
+  Lemma snoc_r {w1 w2} (r : Accessibility w1 w2) :
+    forall α, Accessibility w1 (w2 ▻ α).
+  Proof.
+    induction r; cbn; intros β.
+    - econstructor 2; constructor 1.
+    - econstructor 2. apply IHr.
+  Qed.
+
+  Lemma nil_l {w} : Accessibility ctx.nil w.
+  Proof. induction w; [constructor|now apply snoc_r]. Qed.
+
 End acc.
 
 Notation "w1 .> w2" := (acc.trans w1 w2) (at level 80).
@@ -70,21 +85,35 @@ Export acc (Accessibility).
 
 Notation "□⁺ A" := (BoxR Accessibility A) (at level 9, format "□⁺ A", right associativity)
     : indexed_scope.
+Notation "◇⁺ A" := (DiamondR Accessibility A) (at level 9, format "◇⁺ A", right associativity)
+    : indexed_scope.
 
 Class Persistent (R : Relation.relation World) (A : TYPE) : Type :=
   persist : ⊢ A -> BoxR R A.
 
-Instance Persistent_Prod : forall A B R,
-    Persistent R A -> Persistent R B -> Persistent R (Prod A B).
-Proof. firstorder. Qed.
+Class PersistLaws A `{Persistent Accessibility A} : Type :=
+  { refl_persist w (V : A w) :
+        persist w V w (acc.refl w) = V
+  ; assoc_persist w1 w2 w3 r12 r23 (V : A w1) :
+        persist w2 (persist w1 V w2 r12) w3 r23
+      = persist w1 V w3 (acc.trans r12 r23) }.
+
+(* Instance Persistent_Prod : forall A B R, *)
+(*     Persistent R A -> Persistent R B -> Persistent R (Prod A B). *)
+(* Proof. firstorder. Qed. *)
 
 Definition T {A} : ⊢ □⁺A -> A := fun w a => a w (acc.refl w).
 
 Definition _4 {A} : ⊢ □⁺A -> □⁺□⁺A.
 Proof. cbv in *. intros.  apply X. eapply acc.trans; eauto. Defined.
 
-Fixpoint transient  (Σ Σ' : World) (i : nat) (r : Accessibility Σ Σ') :
-    i ∈ Σ -> i ∈ Σ'.
-Proof.
-  destruct r. auto. intro. eapply transient. apply r. constructor. apply H.
-Defined.
+#[export] Instance Persistent_In {x} :
+  Persistent Accessibility (ctx.In x) :=
+  fix transient {w} (xIn : x ∈ w) {w'} (r : Accessibility w w') {struct r} :=
+    match r with
+    | acc.refl _        => xIn
+    | acc.fresh _ α _ r => transient (in_succ xIn) r
+    end.
+
+#[export] Instance PersistLaws_In {x} : PersistLaws (ctx.In x).
+Proof. constructor; [easy|induction r12; cbn; auto]. Qed.

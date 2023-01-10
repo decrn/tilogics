@@ -1,34 +1,19 @@
 Require Import List.
 Import ListNotations.
 From Em Require Import
-     Definitions Context Environment STLC.
+     Definitions Context Environment STLC Prelude.
 Import ctx.notations.
 From Em Require
   Unification.
 
 Local Notation "<{ A ~ w }>" := (persist _ A _ w).
 
-#[refine] Instance Persistent_Ty : Persistent Accessibility Ty :=
-  fix F {Σ} (t : Ty Σ) {Σ'} (r : Accessibility Σ Σ') : Ty Σ' :=
-    match t with
-    | Ty_bool _ => Ty_bool Σ'
-    | Ty_func _ t0 t1 => Ty_func Σ' (F t0 r) (F t1 r)
-    | Ty_hole _ i i0 => Ty_hole Σ' i (transient Σ Σ' i r i0)
-    end.
-Defined.
-
-#[refine] Instance Persistent_Env : Persistent Accessibility Env :=
-  fix F {Σ} (l : list (String.string * Ty Σ)) {Σ'} (ω : Accessibility Σ Σ') :
-           list (String.string * Ty Σ') :=
-    match l with
-    | []%list => []%list
-    | (a0, b) :: l => (a0, <{ b ~ ω}>) :: F l ω
-    end.
-Defined.
+#[export] Instance PersistentTri_Ty : Persistent Unification.Tri.Tri Ty :=
+  fun w1 t w2 ζ => Unification.Sub.subst t (Unification.Sub.triangular ζ).
 
 Open Scope indexed_scope.
 
-Fixpoint bind [A B] {Σ} (m : FreeM A Σ) (f : ◻ (A -> (FreeM B)) Σ)
+Fixpoint bind [A B] {Σ} (m : FreeM A Σ) (f : □⁺ (A -> (FreeM B)) Σ)
   : FreeM B Σ :=
   match m with
   | Ret_Free _ _ v => (T Σ f) v (* removing the box *)
@@ -47,8 +32,6 @@ Local Notation "[ ω ] x <- ma ;; mb" :=
     (at level 80, x at next level,
       ma at next level, mb at level 200,
       right associativity).
-
-Definition Unit (_ : World) := unit.
 
 Definition assert {Σ} t1 t2 :=
   Bind_AssertEq_Free Unit Σ t1 t2 (Ret_Free Unit Σ tt).
@@ -98,23 +81,24 @@ Fixpoint generate (e : expr) {Σ : World} (Γ : Env Σ) : FreeM Ty Σ :=
 
 Section RunTI.
 
-  (* infer_ng defines inference without grounding
+  Import SigTNotations.
+
+  (* infer_schematic defines inference without grounding
      of remaining unification variables. *)
-  Definition infer_ng (e : expr) : SolvedM Ty [] :=
-    Unification.Variant1.solve_ng (@generate e ctx.nil []%list).
+  Definition infer_schematic (e : expr) : option (Schematic Ty) :=
+    match Unification.Variant1.solve_ng (generate e []%list) with
+    | Some (w; (_, t)) => Some (w; t)
+    | None             => None
+    end.
 
-  Fixpoint ground (w: World) (ass : Assignment w)
-                  (s: SolvedM Ty w) : option ty.
-  Proof. destruct s.
-    - (* value  *) apply Some. apply (inst t ass).
-    - (* fail   *) apply None.
-    - (* exists *) apply (ground (w ▻ i)).
-      + constructor. apply ass. constructor 1. (* ground remaining to Bool *)
-      + apply s.
-  Defined.
+  Fixpoint grounding (w : World) : Assignment w :=
+    match w with
+    | ctx.nil      => env.nil
+    | ctx.snoc Γ b => env.snoc (grounding Γ) b ty_bool
+    end%ctx.
 
-  Definition runTI (e : expr) : option ty :=
-    ground ctx.nil env.nil (infer_ng e).
+  Definition infer_grounded (e : expr) : option ty :=
+    option.map (fun '(w; t) => inst t (grounding w)) (infer_schematic e).
 
 End RunTI.
 
@@ -123,7 +107,7 @@ Section TypeReconstruction.
   Notation Expr := (Lifted expr).
   (* TODO: define reader applicative to use ctor of expr to create Expr *)
 
-#[export] Instance Persistent_Lifted : forall A, Persistent Accessibility (Lifted A).
+#[export] Instance Persistent_Lifted {A} : Persistent Accessibility (Lifted A).
   Proof. unfold Persistent, Valid, Impl, Lifted, BoxR. eauto using compose. Qed.
 
   Definition ret  {w} := Ret_Free (Prod Ty Expr) w.
@@ -170,30 +154,3 @@ Fixpoint generate' (e : expr) {Σ : World} (Γ : Env Σ) : FreeM (Prod Ty Expr) 
   end.
 
 End TypeReconstruction.
-
-Definition PROP : TYPE :=
-  fun _ => Prop.
-
-Definition wp  {A} : ⊢ (SolvedM A) -> ◻(A -> PROP) -> PROP. Admitted.
-Definition wlp {A} : ⊢ (SolvedM A) -> ◻(A -> PROP) -> PROP. Admitted.
-
-
-Lemma soundness : forall e,
-  wlp ctx.nil (infer_ng e)
-    (fun w r t => forall (a : Assignment w),
-       exists ee, nil |-- e ; (inst t a) ~> ee).
-Admitted.
-
-Lemma completeness : forall e t,
-    (exists ee, nil |-- e ; t ~> ee) ->
-      wp ctx.nil (infer_ng e)
-        (fun w r s =>
-           exists (a : Assignment w), t = (inst s a)).
-Admitted.
-
-(* Fixpoint WP {w} (V : FreeM Ty w) (Post : ty -> Prop) (gnd : Assignment w) : Prop. *)
-(*   match V with *)
-(*   | Ret_Solved _ _ r => Post (inst r gnd) *)
-(*   | Fail_Solved _ _ => False *)
-(*   | Bind_Exists_Solved _ _ i k => exists t, WP k Post (env.snoc gnd i t) *)
-(*   end. *)

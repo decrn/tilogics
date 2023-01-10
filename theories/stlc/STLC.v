@@ -172,20 +172,54 @@ Class Inst (A : TYPE) (a : Type) : Type :=
   Inst (Option AT) (option A) :=
   fun w ma ass => option_map (fun a => inst a ass) ma.
 
-#[export] Instance inst_ty `{Inst Ty ty} :
+#[export] Instance inst_ty :
   Inst Ty ty :=
-  fun _ T ass => match T with
+  fix inst_ty {w} T ass :=
+  match T with
   | Ty_bool _ =>
       ty_bool
   | Ty_func _ σ τ =>
-      ty_func (inst σ ass) (inst τ ass)
+      ty_func (inst_ty σ ass) (inst_ty τ ass)
   | Ty_hole _ _ i =>
       env.lookup ass i
   end.
 
-#[export] Instance inst_env `{Hfix : Inst Env env} `{Inst Ty ty} :
+#[export] Instance inst_env :
   Inst Env env :=
-  fun w E ass => match E with
+  fix inst_env {w} E ass :=
+  match E with
   | []%list      => []%list
-  | (s,T) :: sTs => (s, inst T ass) :: Hfix w sTs ass
+  | (s,T) :: sTs => (s, inst T ass) :: inst_env sTs ass
   end.
+
+#[export] Instance Persistent_Ty : Persistent Accessibility Ty :=
+  fix per {w} (t : Ty w) {w'} (r : Accessibility w w') : Ty w' :=
+    match t with
+    | Ty_bool _ => Ty_bool w'
+    | Ty_func _ t1 t2 => Ty_func w' (per t1 r) (per t2 r)
+    | Ty_hole _ i i0 => Ty_hole w' i (persist w i0 w' r)
+    end.
+
+#[export] Instance PersistLaws_Ty : PersistLaws Ty.
+Proof.
+  constructor.
+  - induction V; cbn; f_equal; auto.
+  - induction V; cbn; f_equal; auto.
+    apply assoc_persist.
+Qed.
+
+#[export] Instance Persistent_Env : Persistent Accessibility Env :=
+  fix per {w} (E : Env w) {w'} (r : Accessibility w w') : Env w' :=
+    match E with
+    | nil          => nil
+    | cons (x,t) E => cons (x,persist w t w' r) (per E r)
+    end.
+
+#[export] Instance PersistLaws_Env : PersistLaws Env.
+Proof.
+  constructor.
+  - induction V as [|[]]; cbn; f_equal; auto.
+    f_equal. apply refl_persist.
+  - induction V as [|[]]; cbn; f_equal; auto.
+    f_equal. apply assoc_persist.
+Qed.
