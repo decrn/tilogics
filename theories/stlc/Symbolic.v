@@ -154,3 +154,13 @@ Fixpoint generate' (e : expr) {Σ : World} (Γ : Env Σ) : FreeM (Prod Ty Expr) 
   end.
 
 End TypeReconstruction.
+
+Record Acc (w w' : World) : Type := mkAcc
+  { intermediate_world : World
+  ; pos : Accessibility w intermediate_world
+  ; neg : Unification.Tri.Tri intermediate_world w' }.
+
+Lemma acc_refl : forall w, Acc w w.
+Proof. intros. exists w. constructor. constructor. Qed.
+
+Lemma acc_trans : forall w1 w2 w3, Acc w1 w2 -> Acc w2 w3 -> Acc w1 w3.
