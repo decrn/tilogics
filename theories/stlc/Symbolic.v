@@ -167,20 +167,26 @@ Notation "w1 ↓ w2" := (Unification.Tri.Tri w1 w2) (at level 80).
 Lemma acc_refl : forall w, Acc w w.
 Proof. intros. exists w. constructor. constructor. Qed.
 
-Lemma up_down_up_eq_up_down : forall w1 w2 q23,
-    Acc w1 w2 -> Accessibility w2 q23 ->
-    Acc w1 q23.
-Proof. Admitted.
-
 Lemma up_down_down_eq_up_down : forall w1 q23 w3,
     Acc w1 q23 -> Unification.Tri.Tri q23 w3 ->
     Acc w1 w3.
-Proof. Admitted.
+Proof. inversion 1. eexists. apply pos0. now apply (Unification.Tri.trans neg0). Qed.
+
+Lemma up_down_up_eq_up_up_down : forall w1 w2 q23
+    (H1: w1 ↕ w2),
+    w2 ↑ q23 -> Acc w1 q23.
+Proof.
+  intros. inversion H1. clear H1. generalize dependent intermediate_world0. induction X.
+  - intros. now exists intermediate_world0.
+  - intros. specialize (IHX (intermediate_world0 ▻ α)). apply IHX.
+    + eapply acc.trans. apply pos0. eapply acc.fresh. apply acc.refl.
+    + admit. (* Does this hold??? *)
+Admitted.
 
 Lemma acc_trans : forall w1 w2 w3, Acc w1 w2 -> Acc w2 w3 -> Acc w1 w3.
 Proof.
   intros. inversion X. inversion X0.
   apply (up_down_down_eq_up_down _ intermediate_world1).
-  apply (up_down_up_eq_up_down _ w2).
+  apply (up_down_up_eq_up_up_down _ w2).
   easy. easy. easy.
 Qed.
