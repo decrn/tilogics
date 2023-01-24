@@ -190,3 +190,78 @@ Proof.
   apply (up_down_up_eq_up_up_down _ w2).
   easy. easy. easy.
 Qed.
+
+#[export] Instance PersistentAcc_Ty : Persistent Acc Ty :=
+  fun w1 t w2 r =>
+    match r with
+      {| intermediate_world := wi; pos := r1; neg := r2 |} =>
+        <{ <{ t ~ r1 }> ~ r2 }>
+    end.
+
+Module UpDown.
+  #[local] Notation "□↕ A" := (BoxR Acc A) (at level 9, format "□↕ A", right associativity)
+      : indexed_scope.
+  #[local] Notation "w1 .> w2" := (acc_trans _ _ _ w1 w2) (at level 80).
+
+  Definition T {A} : ⊢ □↕A -> A :=
+    fun w a => a w (acc_refl w).
+  Definition _4 {A} : ⊢ □↕A -> □↕□↕A :=
+    fun w a w1 r1 w2 r2 => a w2 (acc_trans _ _ _ r1 r2).
+
+  Definition step {w α} : w ↕ w ▻ α :=
+    {| intermediate_world := w ▻ α;
+       pos := acc.fresh w α (w ▻ α) (acc.refl (w ▻ α));
+       neg := Unification.Tri.refl;
+    |}.
+
+  Definition bind {A B} : ⊢ FreeM A -> □↕(A -> (FreeM B)) -> FreeM B :=
+    fix bind {w} m f :=
+    match m with
+    | Ret_Free _ _ a                  => (T _ f) a
+    | Fail_Free _ _                   =>
+      Fail_Free _ _
+    | Bind_AssertEq_Free _ _ t1 t2 C1 =>
+      Bind_AssertEq_Free _ _ t1 t2 (bind C1 f)
+    | Bind_Exists_Free _ _ i C =>
+      Bind_Exists_Free _ _ i (bind C ((_4 _ f) _ step))
+    end.
+  #[global] Arguments bind {A B} [w] m f.
+  #[local] Notation "[ ω ] x <- ma ;; mb" :=
+    (bind ma (fun _ (ω : Acc _ _) x => mb))
+      (at level 80, x at next level,
+        ma at next level, mb at level 200,
+        right associativity).
+
+  Fixpoint generate (e : expr) {Σ : World} (Γ : Env Σ) : FreeM Ty Σ :=
+    match e with
+    | v_true => Ret_Free Ty Σ (Ty_bool Σ)
+    | v_false => Ret_Free Ty Σ (Ty_bool Σ)
+    | e_if cnd coq alt =>
+        [ ω₁ ] t_cnd <- generate cnd Γ ;;
+        [ ω₂ ] _     <- assert t_cnd (Ty_bool _) ;;
+        [ ω₃ ] t_coq <- generate coq <{ Γ ~ ω₁ .> ω₂ }> ;;
+        [ ω₄ ] t_alt <- generate alt <{ Γ ~ ω₁ .> ω₂ .> ω₃ }> ;;
+        [ ω₅ ] _     <- assert <{ t_coq ~ ω₄ }> t_alt ;;
+           Ret_Free Ty _ <{ t_coq ~ ω₄ .> ω₅ }>
+    | e_var var =>
+        match (value var Γ) with
+        | Some t_var => Ret_Free Ty _ t_var
+        | None => Fail_Free Ty Σ
+        end
+    | e_app f a =>
+        [ ω1 ] t_co <- exists_Ty Σ ;;
+        [ ω2 ] t_do <- generate a <{ Γ ~ ω1 }> ;;
+        [ ω3 ] t_fn <- generate f <{ Γ ~ ω1 .> ω2 }> ;;
+        [ ω4 ] _    <- assert t_fn <{ (Ty_func _ t_do <{ t_co ~ ω2 }> ) ~ ω3 }> ;;
+           Ret_Free Ty _ <{ t_co ~ ω2 .> ω3 .> ω4 }>
+    | e_abst var t_var e =>
+        let t_var' := (lift t_var Σ) in (* t_var lives in ty, not in (Ty w) *)
+        [ ω1 ] t_e <- generate e ((var, t_var') :: Γ) ;;
+          Ret_Free Ty _ (Ty_func _ <{ t_var' ~ ω1 }> t_e)
+    | e_absu var e =>
+        [ ω1 ] t_var <- exists_Ty Σ ;;
+        [ ω2 ] t_e <- generate e ((var, t_var) :: <{ Γ ~ ω1 }>) ;;
+          Ret_Free Ty _ (Ty_func _ <{ t_var ~ ω2 }> t_e)
+    end.
+
+End UpDown.

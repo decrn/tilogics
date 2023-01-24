@@ -208,8 +208,9 @@ Proof.
     apply assoc_persist.
 Qed.
 
-#[export] Instance Persistent_Env : Persistent Accessibility Env :=
-  fix per {w} (E : Env w) {w'} (r : Accessibility w w') : Env w' :=
+#[export] Instance Persistent_Env {R} {PTy : Persistent R Ty} :
+  Persistent R Env :=
+  fix per {w} (E : Env w) {w'} (r : R w w') : Env w' :=
     match E with
     | nil          => nil
     | cons (x,t) E => cons (x,persist w t w' r) (per E r)
