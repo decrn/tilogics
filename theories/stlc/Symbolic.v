@@ -203,7 +203,7 @@ Defined.
 #[export] Instance PersistentAcc_Ty : Persistent Acc Ty :=
   fun w1 t w2 r =>
     match r with
-      {| intermediate_world := wi; pos := r1; neg := r2 |} =>
+      {| iw := wi; pos := r1; neg := r2 |} =>
         <{ <{ t ~ r1 }> ~ r2 }>
     end.
 
@@ -218,7 +218,7 @@ Module UpDown.
     fun w a w1 r1 w2 r2 => a w2 (acc_trans _ _ _ r1 r2).
 
   Definition step {w α} : w ↕ w ▻ α :=
-    {| intermediate_world := w ▻ α;
+    {| iw := w ▻ α;
        pos := acc.fresh w α (w ▻ α) (acc.refl (w ▻ α));
        neg := Unification.Tri.refl;
     |}.
@@ -234,6 +234,7 @@ Module UpDown.
     | Bind_Exists_Free _ _ i C =>
       Bind_Exists_Free _ _ i (bind C ((_4 _ f) _ step))
     end.
+
   #[global] Arguments bind {A B} [w] m f.
   #[local] Notation "[ ω ] x <- ma ;; mb" :=
     (bind ma (fun _ (ω : Acc _ _) x => mb))
