@@ -299,7 +299,8 @@ Section Soundness.
 
   Lemma symbolic_infer_schematic_sound (e : expr) :
     match Symbolic.infer_schematic e with
-    | Some (w; t) => forall ass, exists ee, nil |-- e ; inst t ass ~> ee
+    | Some (w; t) => forall ass : Assignment w,
+                       exists ee, nil |-- e ; inst t ass ~> ee
     | None        => True
     end.
   Proof.
@@ -371,7 +372,7 @@ Section Completeness.
   Lemma symbolic_infer_schematic_complete (e : expr) t ee :
     nil |-- e ; t ~> ee ->
     match Symbolic.infer_schematic e with
-    | Some (w; T) => exists ass, inst T ass = t
+    | Some (w; T) => exists ass : Assignment w, inst T ass = t
     | None        => False
     end.
   Proof.
