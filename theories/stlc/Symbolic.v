@@ -156,9 +156,9 @@ Fixpoint generate' (e : expr) {Σ : World} (Γ : Env Σ) : FreeM (Prod Ty Expr) 
 End TypeReconstruction.
 
 Record Acc (w w' : World) : Type := mkAcc
-  { intermediate_world : World
-  ; pos : Accessibility w intermediate_world
-  ; neg : Unification.Tri.Tri intermediate_world w' }.
+  { iw : World
+  ; pos : Accessibility w iw
+  ; neg : Unification.Tri.Tri iw w' }.
 
 Notation "w1 ↕ w2" := (Acc w1 w2) (at level 80).
 Notation "w1 ↑ w2" := (Accessibility w1 w2) (at level 80).
@@ -167,28 +167,35 @@ Notation "w1 ↓ w2" := (Unification.Tri.Tri w1 w2) (at level 80).
 Lemma acc_refl : forall w, Acc w w.
 Proof. intros. exists w. constructor. constructor. Qed.
 
-Lemma up_down_down_eq_up_down : forall w1 q23 w3,
-    Acc w1 q23 -> Unification.Tri.Tri q23 w3 ->
-    Acc w1 w3.
-Proof. inversion 1. eexists. apply pos0. now apply (Unification.Tri.trans neg0). Qed.
-
-Lemma up_down_up_eq_up_up_down : forall w1 w2 q23
-    (H1: w1 ↕ w2),
-    w2 ↑ q23 -> Acc w1 q23.
+Lemma adding_invariant: forall w1 w2 α,
+    w1     ↓ w2      ->
+    w1 ▻ α ↓ w2 ▻ α.
 Proof.
-  intros. inversion H1. clear H1. generalize dependent intermediate_world0. induction X.
-  - intros. now exists intermediate_world0.
-  - intros. specialize (IHX (intermediate_world0 ▻ α)). apply IHX.
-    + eapply acc.trans. apply pos0. eapply acc.fresh. apply acc.refl.
-    + admit. (* Does this hold??? *)
+  intros. induction H.
+  - constructor 1.
+  - admit.
 Admitted.
 
-Lemma acc_trans : forall w1 w2 w3, Acc w1 w2 -> Acc w2 w3 -> Acc w1 w3.
+Lemma up_down_down_eq_up_down : forall w1 w2 w3,
+    w1 ↕ w2 -> w2 ↓ w3 -> w1 ↕ w3.
+Proof. destruct 1. eexists. apply pos0. now apply (Unification.Tri.trans neg0). Qed.
+
+Lemma up_down_up_eq_up_up_down : forall w1 w2 w3
+    (H1: w1 ↕ w2), w2 ↑ w3 -> w1 ↕ w3.
 Proof.
-  intros. inversion X. inversion X0.
-  apply (up_down_down_eq_up_down _ intermediate_world1).
+  intros. destruct H1. generalize dependent iw0. induction X.
+  - intros. now exists iw0.
+  - intros. specialize (IHX (iw0 ▻ α)). apply IHX.
+    + eapply acc.trans. apply pos0. eapply acc.fresh. apply acc.refl.
+    + apply adding_invariant. apply neg0.
+Qed.
+
+Lemma acc_trans : forall w1 w2 w3, w1 ↕ w2 -> w2 ↕ w3 -> w1 ↕ w3.
+Proof.
+  intros. destruct X. destruct X0.
+  apply (up_down_down_eq_up_down _ iw1).
   apply (up_down_up_eq_up_up_down _ w2).
-  easy. easy. easy.
+  exists iw0; easy. easy. easy.
 Qed.
 
 #[export] Instance PersistentAcc_Ty : Persistent Acc Ty :=
