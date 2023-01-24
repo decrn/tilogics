@@ -165,7 +165,7 @@ Notation "w1 ↑ w2" := (Accessibility w1 w2) (at level 80).
 Notation "w1 ↓ w2" := (Unification.Tri.Tri w1 w2) (at level 80).
 
 Lemma acc_refl : forall w, Acc w w.
-Proof. intros. exists w. constructor. constructor. Qed.
+Proof. intros. exists w. constructor. constructor. Defined.
 
 Lemma adding_invariant: forall w1 w2 α,
     w1     ↓ w2      ->
@@ -173,12 +173,14 @@ Lemma adding_invariant: forall w1 w2 α,
 Proof.
   intros. induction H.
   - constructor 1.
-  - admit.
-Admitted.
+  - constructor 2 with x (ctx.in_succ xIn). cbn.
+    apply (persist _ t _ (acc.fresh _ α _ (acc.refl _))).
+    cbn. apply IHTri.
+Defined.
 
 Lemma up_down_down_eq_up_down : forall w1 w2 w3,
     w1 ↕ w2 -> w2 ↓ w3 -> w1 ↕ w3.
-Proof. destruct 1. eexists. apply pos0. now apply (Unification.Tri.trans neg0). Qed.
+Proof. destruct 1. eexists. apply pos0. now apply (Unification.Tri.trans neg0). Defined.
 
 Lemma up_down_up_eq_up_up_down : forall w1 w2 w3
     (H1: w1 ↕ w2), w2 ↑ w3 -> w1 ↕ w3.
@@ -188,7 +190,7 @@ Proof.
   - intros. specialize (IHX (iw0 ▻ α)). apply IHX.
     + eapply acc.trans. apply pos0. eapply acc.fresh. apply acc.refl.
     + apply adding_invariant. apply neg0.
-Qed.
+Defined.
 
 Lemma acc_trans : forall w1 w2 w3, w1 ↕ w2 -> w2 ↕ w3 -> w1 ↕ w3.
 Proof.
@@ -196,7 +198,7 @@ Proof.
   apply (up_down_down_eq_up_down _ iw1).
   apply (up_down_up_eq_up_up_down _ w2).
   exists iw0; easy. easy. easy.
-Qed.
+Defined.
 
 #[export] Instance PersistentAcc_Ty : Persistent Acc Ty :=
   fun w1 t w2 r =>
