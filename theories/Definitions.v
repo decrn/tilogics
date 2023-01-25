@@ -23,7 +23,8 @@ Bind    Scope indexed_scope with TYPE.
 Notation "⊢ A" := (Valid A) (at level 100).
 Notation "A -> B" := (Impl A B) : indexed_scope.
 
-Definition Const (A : Type) (w : World) : Type := A.
+Definition Const (A : Type) : TYPE := fun _ => A.
+Definition PROP : TYPE := fun _ => Prop.
 Definition Unit : TYPE := fun _ => unit.
 Definition Option (A : TYPE) : TYPE := fun w => option (A w).
 Definition List (A : TYPE) : TYPE := fun w => list (A w).

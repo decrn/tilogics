@@ -683,13 +683,6 @@ Notation "⟨ ζ ⟩ x <- ma ;; mb" :=
 Definition strength {A B} : Hom (□A * ◆B) (◆(□A * B)) :=
   fun w0 '(a0,b0) => bind b0 (fun w1 ζ1 b1 => η (four a0 ζ1, b1)).
 
-(* Definition Lift (A : Type) : TYPE := *)
-(*   fun w => (Assignment w -> A)%type. *)
-Definition Const (A : Type) : TYPE :=
-  fun _ => A.
-Definition PROP : TYPE :=
-  fun _ => Prop.
-
 (* Notation "ζ1 ≽ ζ2" := (Subgeq ζ1 ζ2) (at level 80). *)
 (* Notation "ζ1 ≲ ζ2" := (Subleq ζ1 ζ2) (at level 80). *)
 (* Notation "ζ1 ≼ ζ2" := (Trileq ζ1 ζ2) (at level 80). *)

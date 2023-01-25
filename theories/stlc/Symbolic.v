@@ -47,6 +47,12 @@ Fixpoint lift (t : ty) (Σ : World) : Ty Σ :=
   | ty_func do co => Ty_func Σ (lift do Σ) (lift co Σ)
   end.
 
+Fixpoint liftEnv (E : env) (Σ : World) : Env Σ :=
+  match E with
+  | List.nil               => List.nil
+  | List.cons (pair s t) E => cons (pair s (lift t Σ)) (liftEnv E Σ)
+  end.
+
 Fixpoint generate (e : expr) {Σ : World} (Γ : Env Σ) : FreeM Ty Σ :=
   match e with
   | v_true => Ret_Free Ty Σ (Ty_bool Σ)
@@ -214,6 +220,8 @@ Module UpDown.
 
   Definition T {A} : ⊢ □↕A -> A :=
     fun w a => a w (acc_refl w).
+  Definition K {A B} : ⊢ □↕(A -> B) -> □↕A -> □↕B :=
+    fun w f a w' r => f _ r (a _ r).
   Definition _4 {A} : ⊢ □↕A -> □↕□↕A :=
     fun w a w1 r1 w2 r2 => a w2 (acc_trans _ _ _ r1 r2).
 
@@ -273,5 +281,81 @@ Module UpDown.
         [ ω2 ] t_e <- generate e ((var, t_var) :: <{ Γ ~ ω1 }>) ;;
           Ret_Free Ty _ (Ty_func _ <{ t_var ~ ω2 }> t_e)
     end.
+
+  Module Attempt2.
+
+    Definition wp {A} :
+      ⊢ FreeM A -> □↕(A -> PROP) -> PROP :=
+      fix wp {w} m Q {struct m} :=
+        match m with
+        | Ret_Free _ _ a  => T _ Q a
+        | Fail_Free _ _   => False
+        | Bind_AssertEq_Free _ _ t1 t2 m =>
+            t1 = t2 /\ wp m Q
+        | Bind_Exists_Free _ _ i m =>
+            wp m (_4 w Q (w ▻ i) step)
+        end.
+    #[global] Arguments wp {A} [w].
+
+    Lemma wp_mono {A}
+      {w} (m : FreeM A w) (P Q : □↕(A -> PROP) w)
+      (PQ : forall w' r a, P w' r a -> Q w' r a) :
+      wp m P -> wp m Q.
+    Proof.
+      induction m; cbn [wp].
+      - unfold T. apply PQ.
+      - auto.
+      - intros [H1 H2]; split.
+        exact H1. revert H2. apply IHm; auto.
+      - unfold _4; apply IHm; auto.
+    Qed.
+
+    Lemma wp_equiv {A}
+      {w} (m : FreeM A w) (P Q : □↕(A -> PROP) w)
+      (PQ : forall w' r a, P w' r a <-> Q w' r a) :
+      wp m P <-> wp m Q.
+    Proof. split; apply wp_mono; intuition. Qed.
+
+    Lemma wp_bind {A B} (* `{Persistent Acc A,  Persistent Acc B} *)
+      {w} (m : FreeM A w) (f : □↕(A -> FreeM B) w) (Q : □↕(B -> PROP) w) :
+      wp (bind m f) Q <->
+      wp m (fun _ r a => wp (f _ r a) (_4 _ Q _ r)).
+    Proof.
+      induction m; cbn; unfold T, _4.
+      - apply wp_equiv. intros w1 r1 a1.
+        (* refl is left identity of trans *)
+        admit.
+      - reflexivity.
+      - apply and_iff_compat_l'. intros ?.
+        apply IHm.
+      - rewrite IHm.
+        apply wp_equiv. intros w1 r1 a1.
+        apply wp_equiv. intros w2 r2 b2.
+        unfold _4.
+        (* Need assoc lemma *)
+        admit.
+    Admitted.
+
+    Lemma completeness {G e t ee} (R : G |-- e ; t ~> ee) :
+      forall w,
+        wp (generate e (liftEnv G w))
+          (fun w _ T => exists A : Assignment w, inst T A = t).
+    Proof.
+      induction R; cbn [generate wp]; unfold assert, T; intros w0.
+      - admit.
+      - admit.
+      - rewrite wp_bind; cbn [wp].
+        specialize (IHR1 w0). revert IHR1. apply wp_mono.
+        intros w1 r1 tcnd Hcnd.
+        rewrite wp_bind; cbn [wp].
+        split.
+        { admit. }
+        unfold T.
+        rewrite wp_bind; cbn [wp].
+        specialize (IHR2 w1). revert IHR2.
+        (* need more lemmas first *)
+    Admitted.
+
+  End Attempt2.
 
 End UpDown.
