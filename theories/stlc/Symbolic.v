@@ -166,7 +166,7 @@ Record Acc (w w' : World) : Type := mkAcc
   ; pos : Accessibility w iw
   ; neg : Unification.Tri.Tri iw w' }.
 
-Notation "w1 ↕ w2" := (Acc w1 w2) (at level 80).
+Notation "w1 ⇅ w2" := (Acc w1 w2) (at level 80).
 Notation "w1 ↑ w2" := (Accessibility w1 w2) (at level 80).
 Notation "w1 ↓ w2" := (Unification.Tri.Tri w1 w2) (at level 80).
 
@@ -185,11 +185,11 @@ Proof.
 Defined.
 
 Lemma up_down_down_eq_up_down : forall w1 w2 w3,
-    w1 ↕ w2 -> w2 ↓ w3 -> w1 ↕ w3.
+    w1 ⇅ w2 -> w2 ↓ w3 -> w1 ⇅ w3.
 Proof. destruct 1. eexists. apply pos0. now apply (Unification.Tri.trans neg0). Defined.
 
 Lemma up_down_up_eq_up_up_down : forall w1 w2 w3
-    (H1: w1 ↕ w2), w2 ↑ w3 -> w1 ↕ w3.
+    (H1: w1 ⇅ w2), w2 ↑ w3 -> w1 ⇅ w3.
 Proof.
   intros. destruct H1. generalize dependent iw0. induction X.
   - intros. now exists iw0.
@@ -198,13 +198,19 @@ Proof.
     + apply adding_invariant. apply neg0.
 Defined.
 
-Lemma acc_trans : forall w1 w2 w3, w1 ↕ w2 -> w2 ↕ w3 -> w1 ↕ w3.
+Lemma acc_trans {w1 w2 w3 : World} : w1 ⇅ w2 -> w2 ⇅ w3 -> w1 ⇅ w3.
 Proof.
   intros. destruct X. destruct X0.
   apply (up_down_down_eq_up_down _ iw1).
   apply (up_down_up_eq_up_up_down _ w2).
   exists iw0; easy. easy. easy.
 Defined.
+
+Local Notation "r12 ↻ r23" := (acc_trans r12 r23) (at level 80).
+
+Lemma acc_trans_assoc {w1 w2 w3 w4 : World} : forall (r12 : w1 ⇅ w2) (r23 : w2 ⇅ w3) (r34 : w3 ⇅ w4),
+  (r12 ↻ (r23 ↻ r34)) = ((r12 ↻ r23) ↻ r34).
+Proof. Admitted.
 
 #[export] Instance PersistentAcc_Ty : Persistent Acc Ty :=
   fun w1 t w2 r =>
@@ -213,25 +219,43 @@ Defined.
         <{ <{ t ~ r1 }> ~ r2 }>
     end.
 
+(* unify with PersistLaws about ↑ *)
+Class PersistLaws A `{Persistent Acc A} : Type :=
+  { refl_persist w (V : A w) :
+        persist w V w (acc_refl w) = V }.
+
+Class PersistLift A `{Persistent Acc A} : Type :=
+  { lift_persist (w w': World) t r :
+    persist w (lift t _) w' r = lift t _ }.
+(* TODO: make lift generic (liftEnv is needed for Env) *)
+
+#[export] Instance PersistLift_Ty : PersistLift Ty.
+Proof.
+  constructor. intros. induction r. induction t; cbn. easy. rewrite <- IHt1. rewrite <- IHt2. easy.
+Defined.
+
+#[export] Instance PersistLift_Env : PersistLift Env.
+Proof. Admitted.
+
 Module UpDown.
-  #[local] Notation "□↕ A" := (BoxR Acc A) (at level 9, format "□↕ A", right associativity)
+  #[local] Notation "□⇅ A" := (BoxR Acc A) (at level 9, format "□⇅ A", right associativity)
       : indexed_scope.
-  #[local] Notation "w1 .> w2" := (acc_trans _ _ _ w1 w2) (at level 80).
+  #[local] Notation "w1 .> w2" := (acc_trans w1 w2) (at level 80).
 
-  Definition T {A} : ⊢ □↕A -> A :=
+  Definition T {A} : ⊢ □⇅A -> A :=
     fun w a => a w (acc_refl w).
-  Definition K {A B} : ⊢ □↕(A -> B) -> □↕A -> □↕B :=
+  Definition K {A B} : ⊢ □⇅(A -> B) -> □⇅A -> □⇅B :=
     fun w f a w' r => f _ r (a _ r).
-  Definition _4 {A} : ⊢ □↕A -> □↕□↕A :=
-    fun w a w1 r1 w2 r2 => a w2 (acc_trans _ _ _ r1 r2).
+  Definition _4 {A} : ⊢ □⇅A -> □⇅□⇅A :=
+    fun w a w1 r1 w2 r2 => a w2 (r1 ↻ r2).
 
-  Definition step {w α} : w ↕ w ▻ α :=
+  Definition step {w α} : w ⇅ w ▻ α :=
     {| iw := w ▻ α;
        pos := acc.fresh w α (w ▻ α) (acc.refl (w ▻ α));
        neg := Unification.Tri.refl;
     |}.
 
-  Definition bind {A B} : ⊢ FreeM A -> □↕(A -> (FreeM B)) -> FreeM B :=
+  Definition bind {A B} : ⊢ FreeM A -> □⇅(A -> (FreeM B)) -> FreeM B :=
     fix bind {w} m f :=
     match m with
     | Ret_Free _ _ a                  => (T _ f) a
@@ -285,7 +309,7 @@ Module UpDown.
   Module Attempt2.
 
     Definition wp {A} :
-      ⊢ FreeM A -> □↕(A -> PROP) -> PROP :=
+      ⊢ FreeM A -> □⇅(A -> PROP) -> PROP :=
       fix wp {w} m Q {struct m} :=
         match m with
         | Ret_Free _ _ a  => T _ Q a
@@ -298,7 +322,7 @@ Module UpDown.
     #[global] Arguments wp {A} [w].
 
     Lemma wp_mono {A}
-      {w} (m : FreeM A w) (P Q : □↕(A -> PROP) w)
+      {w} (m : FreeM A w) (P Q : □⇅(A -> PROP) w)
       (PQ : forall w' r a, P w' r a -> Q w' r a) :
       wp m P -> wp m Q.
     Proof.
@@ -311,13 +335,13 @@ Module UpDown.
     Qed.
 
     Lemma wp_equiv {A}
-      {w} (m : FreeM A w) (P Q : □↕(A -> PROP) w)
+      {w} (m : FreeM A w) (P Q : □⇅(A -> PROP) w)
       (PQ : forall w' r a, P w' r a <-> Q w' r a) :
       wp m P <-> wp m Q.
     Proof. split; apply wp_mono; intuition. Qed.
 
     Lemma wp_bind {A B} (* `{Persistent Acc A,  Persistent Acc B} *)
-      {w} (m : FreeM A w) (f : □↕(A -> FreeM B) w) (Q : □↕(B -> PROP) w) :
+      {w} (m : FreeM A w) (f : □⇅(A -> FreeM B) w) (Q : □⇅(B -> PROP) w) :
       wp (bind m f) Q <->
       wp m (fun _ r a => wp (f _ r a) (_4 _ Q _ r)).
     Proof.
@@ -360,11 +384,11 @@ Module UpDown.
 
   Module Attempt3.
 
-    Definition up {w1 w2 α} (r : w1 ↕ w2) : w1 ▻ α ↕ w2 ▻ α.
+    Definition up {w1 w2 α} (r : w1 ⇅ w2) : w1 ▻ α ⇅ w2 ▻ α.
     Admitted.
 
     Definition Property : TYPE :=
-      fun w => forall w', w ↕ w' -> Prop.
+      fun w => forall w', w ⇅ w' -> Prop.
 
     Definition False : ⊢ Property :=
       fun _ _ _ => Logic.False.
@@ -377,7 +401,7 @@ Module UpDown.
     #[global] Arguments And [w].
 
     Definition wp {A} `{Persistent Acc A} :
-      ⊢ FreeM A -> □↕(A -> Property) -> Property :=
+      ⊢ FreeM A -> □⇅(A -> Property) -> Property :=
       fix wp {w} m Q {struct m} :=
         match m with
         | Ret_Free _ _ a => T w Q a
@@ -389,7 +413,7 @@ Module UpDown.
     #[global] Arguments wp {A _} [w].
 
     Lemma wp_mono {A} `{Persistent Acc A}
-      {w} (m : FreeM A w) (P Q : □↕(A -> Property) w)
+      {w} (m : FreeM A w) (P Q : □⇅(A -> Property) w)
       (PQ : forall w1 r1 a w2 r2, P w1 r1 a w2 r2 -> Q w1 r1 a w2 r2) :
       forall w' r,
         wp m P w' r -> wp m Q w' r.
@@ -403,14 +427,14 @@ Module UpDown.
     Qed.
 
     Lemma wp_equiv {A} `{Persistent Acc A}
-      {w} (m : FreeM A w) (P Q : □↕(A -> Property) w)
+      {w} (m : FreeM A w) (P Q : □⇅(A -> Property) w)
       (PQ : forall w1 r1 a w2 r2, P w1 r1 a w2 r2 <-> Q w1 r1 a w2 r2) :
       forall w' r,
         wp m P w' r <-> wp m Q w' r.
     Proof. split; apply wp_mono; intuition. Qed.
 
     Lemma wp_bind {A B} `{Persistent Acc A, Persistent Acc B}
-      {w} (m : FreeM A w) (f : □↕(A -> FreeM B) w) (Q : □↕(B -> Property) w) :
+      {w} (m : FreeM A w) (f : □⇅(A -> FreeM B) w) (Q : □⇅(B -> Property) w) :
       forall w' r,
         wp (bind m f) Q w' r <->
           wp m (fun _ r a => wp (f _ r a) (_4 _ Q _ r)) w' r.
@@ -418,7 +442,7 @@ Module UpDown.
     Admitted.
 
     Lemma completeness {G e t ee} (R : G |-- e ; t ~> ee) :
-      forall w1 w2 (r : w1 ↕ w2),
+      forall w1 w2 (r : w1 ⇅ w2),
         wp (generate e (liftEnv G w1))
           (fun w1 r1 T => Eq T (lift t _)
           ) w2 r.
