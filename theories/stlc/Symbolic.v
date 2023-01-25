@@ -358,4 +358,84 @@ Module UpDown.
 
   End Attempt2.
 
+  Module Attempt3.
+
+    Definition up {w1 w2 α} (r : w1 ↕ w2) : w1 ▻ α ↕ w2 ▻ α.
+    Admitted.
+
+    Definition Property : TYPE :=
+      fun w => forall w', w ↕ w' -> Prop.
+
+    Definition False : ⊢ Property :=
+      fun _ _ _ => Logic.False.
+    #[global] Arguments False {w}.
+    Definition Eq : ⊢ Ty -> Ty -> Property :=
+      fun w t1 t2 w' r => persist _ t1 _ r = persist _ t2 _ r.
+    #[global] Arguments Eq [w].
+    Definition And : ⊢ Property -> Property -> Property :=
+      fun w P Q w' r => P _ r /\ Q _ r.
+    #[global] Arguments And [w].
+
+    Definition wp {A} `{Persistent Acc A} :
+      ⊢ FreeM A -> □↕(A -> Property) -> Property :=
+      fix wp {w} m Q {struct m} :=
+        match m with
+        | Ret_Free _ _ a => T w Q a
+        | Fail_Free _ _ => False
+        | Bind_AssertEq_Free _ _ t1 t2 f => And (Eq t1 t2) (wp f Q)
+        | Bind_Exists_Free _ _ i f =>
+            fun w1 r1 => wp f (_4 _ Q _ step) _ (up r1)
+        end.
+    #[global] Arguments wp {A _} [w].
+
+    Lemma wp_mono {A} `{Persistent Acc A}
+      {w} (m : FreeM A w) (P Q : □↕(A -> Property) w)
+      (PQ : forall w1 r1 a w2 r2, P w1 r1 a w2 r2 -> Q w1 r1 a w2 r2) :
+      forall w' r,
+        wp m P w' r -> wp m Q w' r.
+    Proof.
+      induction m; cbn [wp]; intros w1 r1.
+      - unfold T. apply PQ.
+      - auto.
+      - unfold And, Eq. intros [H1 H2]; split.
+        exact H1. revert H2. apply IHm; auto.
+      - unfold _4. apply IHm; auto.
+    Qed.
+
+    Lemma wp_equiv {A} `{Persistent Acc A}
+      {w} (m : FreeM A w) (P Q : □↕(A -> Property) w)
+      (PQ : forall w1 r1 a w2 r2, P w1 r1 a w2 r2 <-> Q w1 r1 a w2 r2) :
+      forall w' r,
+        wp m P w' r <-> wp m Q w' r.
+    Proof. split; apply wp_mono; intuition. Qed.
+
+    Lemma wp_bind {A B} `{Persistent Acc A, Persistent Acc B}
+      {w} (m : FreeM A w) (f : □↕(A -> FreeM B) w) (Q : □↕(B -> Property) w) :
+      forall w' r,
+        wp (bind m f) Q w' r <->
+          wp m (fun _ r a => wp (f _ r a) (_4 _ Q _ r)) w' r.
+    Proof.
+    Admitted.
+
+    Lemma completeness {G e t ee} (R : G |-- e ; t ~> ee) :
+      forall w1 w2 (r : w1 ↕ w2),
+        wp (generate e (liftEnv G w1))
+          (fun w1 r1 T => Eq T (lift t _)
+          ) w2 r.
+    Proof.
+      induction R; cbn; unfold T, _4, K; intros w1 w2 r; cbn.
+      - reflexivity.
+      - reflexivity.
+      - rewrite wp_bind; cbn [wp].
+        specialize (IHR1 w1 w2 r). revert IHR1.
+        apply wp_mono.
+        intros w3 r3 tcnd w4 r4 Hcnd. cbn in Hcnd.
+        unfold T, _4, And; cbn [wp].
+        split. auto.
+        rewrite wp_bind; cbn [wp].
+        specialize (IHR2 w3 w3 (acc_refl _)). revert IHR2.
+    Admitted.
+
+  End Attempt3.
+
 End UpDown.
