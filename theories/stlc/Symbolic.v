@@ -212,6 +212,10 @@ Lemma acc_trans_assoc {w1 w2 w3 w4 : World} : forall (r12 : w1 ⇅ w2) (r23 : w2
   (r12 ↻ (r23 ↻ r34)) = ((r12 ↻ r23) ↻ r34).
 Proof. Admitted.
 
+Lemma acc_trans_refl {w1 w2 : World} (r : w1 ⇅ w2) :
+  (r ↻ acc_refl w2) = r.
+Proof. Admitted.
+
 #[export] Instance PersistentAcc_Ty : Persistent Acc Ty :=
   fun w1 t w2 r =>
     match r with
@@ -228,6 +232,10 @@ Class PersistLift A `{Persistent Acc A} : Type :=
   { lift_persist (w w': World) t r :
     persist w (lift t _) w' r = lift t _ }.
 (* TODO: make lift generic (liftEnv is needed for Env) *)
+
+Lemma persist_liftEnv (w w': World) E r :
+  persist w (liftEnv E _) w' r = liftEnv E _.
+Proof. Admitted.
 
 #[export] Instance PersistLift_Ty : PersistLift Ty.
 Proof.
@@ -426,7 +434,7 @@ Module UpDown.
       fun w P Q w' r => P _ r /\ Q _ r.
     #[global] Arguments And [w].
 
-    Definition wp {A} `{Persistent Acc A} :
+    Definition wp {A} :
       ⊢ FreeM A -> □⇅(A -> Property) -> Property :=
       fix wp {w} m Q {struct m} :=
         match m with
@@ -436,9 +444,9 @@ Module UpDown.
         | Bind_Exists_Free _ _ i f =>
             fun w1 r1 => wp f (_4 _ Q _ step) _ (up r1)
         end.
-    #[global] Arguments wp {A _} [w].
+    #[global] Arguments wp {A} [w].
 
-    Lemma wp_mono {A} `{Persistent Acc A}
+    Lemma wp_mono {A}
       {w} (m : FreeM A w) (P Q : □⇅(A -> Property) w)
       (PQ : forall w1 r1 a w2 r2, P w1 r1 a w2 r2 -> Q w1 r1 a w2 r2) :
       forall w' r,
@@ -452,7 +460,7 @@ Module UpDown.
       - unfold _4. apply IHm; auto.
     Qed.
 
-    Lemma wp_equiv {A} `{Persistent Acc A}
+    Lemma wp_equiv {A}
       {w} (m : FreeM A w) (P Q : □⇅(A -> Property) w)
       (PQ : forall w1 r1 a w2 r2, P w1 r1 a w2 r2 <-> Q w1 r1 a w2 r2) :
       forall w' r,
@@ -484,6 +492,7 @@ Module UpDown.
         split. auto.
         rewrite wp_bind; cbn [wp].
         specialize (IHR2 w3 w3 (acc_refl _)). revert IHR2.
+        rewrite persist_liftEnv.
     Admitted.
 
   End Attempt3.
