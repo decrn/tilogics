@@ -255,6 +255,35 @@ Module UpDown.
        neg := Unification.Tri.refl;
     |}.
 
+  Fixpoint up_aux {w1 wi β} (p : w1 ↑ wi) {struct p} :
+    forall w2, wi ↓ w2 -> Acc (w1 ▻ β) (w2 ▻ β) :=
+    match p with
+    | acc.refl _ =>
+        fun w2 n =>
+          {| pos := acc.refl _;
+            neg := adding_invariant _ _ _ n
+          |}
+    | acc.fresh _ α wi p =>
+        fun w2 n =>
+          acc_trans
+            {| iw := w1 ▻ β ▻ α ▻ β;
+              pos := acc.fresh _ _ _ (acc.fresh _ _ _ (acc.refl _));
+              neg :=
+                let βIn := ctx.in_succ (ctx.in_succ ctx.in_zero) in
+                Unification.Tri.cons β
+                  (xIn := βIn)
+                  (Ty_hole ((w1 ▻ β ▻ α ▻ β) - β) β ctx.in_zero)
+                  Unification.Tri.refl
+            |}
+            (up_aux p w2 n)
+    end.
+
+  Definition up {w1 w2 β} (r : w1 ⇅ w2) :
+    w1 ▻ β ⇅ w2 ▻ β :=
+    match r with
+      mkAcc _ _ iw pos neg => up_aux pos w2 neg
+    end.
+
   Definition bind {A B} : ⊢ FreeM A -> □⇅(A -> (FreeM B)) -> FreeM B :=
     fix bind {w} m f :=
     match m with
@@ -383,9 +412,6 @@ Module UpDown.
   End Attempt2.
 
   Module Attempt3.
-
-    Definition up {w1 w2 α} (r : w1 ⇅ w2) : w1 ▻ α ⇅ w2 ▻ α.
-    Admitted.
 
     Definition Property : TYPE :=
       fun w => forall w', w ⇅ w' -> Prop.
