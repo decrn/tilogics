@@ -216,12 +216,29 @@ Lemma acc_trans_refl {w1 w2 : World} (r : w1 ⇅ w2) :
   (r ↻ acc_refl w2) = r.
 Proof. Admitted.
 
+Definition sub_acc {w1 w2 : World} (r : w1 ⇅ w2) : Unification.Sub.Sub w1 w2 :=
+  match r with
+  | {| pos := p; neg := n |} =>
+      Unification.Sub.comp
+        (env.tabulate (fun x xIn => <{ Ty_hole w1 x xIn ~ p }>))
+        (Unification.Sub.triangular n)
+  end.
+
 #[export] Instance PersistentAcc_Ty : Persistent Acc Ty :=
   fun w1 t w2 r =>
     match r with
       {| iw := wi; pos := r1; neg := r2 |} =>
         <{ <{ t ~ r1 }> ~ r2 }>
     end.
+
+Lemma persist_bool {w1 w2} (r : Acc w1 w2) :
+  persist _ (Ty_bool _) _ r = Ty_bool _.
+Proof. destruct r; reflexivity. Qed.
+
+Lemma persist_func {w1 w2} (r : Acc w1 w2) (t1 t2 : Ty _) :
+  persist _ (Ty_func _ t1 t2) _ r =
+  Ty_func _ (persist _ t1 _ r) (persist _ t2 _ r).
+Proof. destruct r; reflexivity. Qed.
 
 (* unify with PersistLaws about ↑ *)
 Class PersistLaws A `{Persistent Acc A} : Type :=
@@ -291,6 +308,121 @@ Module UpDown.
     match r with
       mkAcc _ _ iw pos neg => up_aux pos w2 neg
     end.
+
+  Module EagerSolving.
+
+    Import option.notations.
+
+    Definition M (A : TYPE) : TYPE :=
+      Option (DiamondR Acc A).
+
+    Definition pure {A} : ⊢ A -> M A :=
+      fun w a => Some (existT _ w (acc_refl w, a)).
+
+    Definition bind {A B} : ⊢ M A -> □⇅(A -> (M B)) -> M B :=
+      fun w m f =>
+        '(existT _ w1 (r1,a1)) <- m;;
+        '(existT _ w2 (r2,b2)) <- f w1 r1 a1;;
+        Some (existT _ w2 (r1 .> r2, b2)).
+
+    Fixpoint infer (e : expr) : ⊢ Env -> M Ty :=
+      fun w G =>
+        match e with
+        | v_true => pure w (Ty_bool w)
+        | v_false => pure w (Ty_bool w)
+        | e_if e1 e2 e3 =>
+            '(existT _ w1 (r1 , t1)) <- infer e1 w G;;
+            '(existT _ w2 (r2' , _)) <- Unification.Variant1.mgu t1 (Ty_bool w1);;
+            let r2 := {| pos := acc.refl _; neg := r2' |} in
+            let G2 := <{ G ~ r1 .> r2 }> in
+            '(existT _ w3 (r3, t2)) <- infer e2 w2 G2;;
+            let G3 := <{ G2 ~ r3 }> in
+            '(existT _ w4 (r4, t3)) <- infer e3 w3 G3;;
+            '(existT _ w5 (r5' , _)) <- Unification.Variant1.mgu <{ t2 ~ r4 }> t3;;
+            let r5 := {| pos := acc.refl _; neg := r5'; |} in
+            Some (existT _ w5 (r1 .> (r2 .> (r3 .> (r4 .> r5))), <{ t3 ~ r5 }>))
+        | e_var s => match value s G with
+                     | Some t => pure w t
+                     | None => None
+                     end
+        | e_absu s e =>
+            let w1 := w ▻ 0 in
+            let r1 := step in
+            let t1 := Ty_hole w1 0 ctx.in_zero in
+            '(existT _ w2 (r2,t2)) <- infer e w1 ((s, t1) :: <{ G ~ r1 }>);;
+            Some (existT _ w2 (r1 .> r2, Ty_func _ <{ t1 ~ r2 }> t2))
+        | e_abst s t e =>
+            let t1 := lift t w in
+            '(existT _ w1 (r1,t2)) <- infer e w ((s, t1) :: G);;
+            Some (existT _ w1 (r1, Ty_func _ <{ t1 ~ r1 }> t2))
+        | e_app e1 e2 =>
+            let w1 := w ▻ 0 in
+            let r1 := step in
+            let ti := Ty_hole w1 0 ctx.in_zero in
+            let G1 := <{ G ~ r1 }> in
+            '(existT _ w2 (r2,t1)) <- infer e1 w1 G1;;
+            let G2 := <{ G1 ~ r2 }> in
+            '(existT _ w3 (r3,t2)) <- infer e2 w2 G2;;
+            '(existT _ w4 (r4', _)) <- Unification.Variant1.mgu <{ t1 ~ r3 }> (Ty_func _ t2 <{ ti ~ r2 .> r3 }>);;
+            let r4 := {| pos := acc.refl _; neg := r4' |} in
+            Some (existT _ w4 (r1 .> (r2 .> (r3 .> r4)), <{ ti ~ (r2 .> r3) .> r4 }>))
+        end.
+
+    Lemma completeness {G e t ee} (R : G |-- e ; t ~> ee) :
+      forall w : World,
+        option.wp
+          (fun '(existT _ w1 (r1, b)) =>
+             exists w2 (r2 : w1 ⇅ w2), <{ b ~ r2 }> = lift t w2)
+          (infer e w (liftEnv G w)).
+    Proof.
+      induction R; cbn; intros w; unfold pure.
+      - constructor. exists w. exists (acc_refl _). reflexivity.
+      - constructor. exists w. exists (acc_refl _). reflexivity.
+      - rewrite option.wp_bind.
+        specialize (IHR1 w). revert IHR1.
+        apply option.wp_monotonic.
+        intros (w1 & r1 & t1) H1.
+        rewrite option.wp_bind.
+        destruct (Unification.Variant1.mgu_spec t1 (Ty_bool w1)) as [(w2 & r2 & [])|].
+        2: {
+          exfalso.
+          destruct H1 as (w2 & r2 & Heq).
+          eapply (H w2); clear H.
+          Unshelve.
+          2: {
+            apply env.tabulate. intros x xIn.
+            refine (persist _ (Ty_hole _ x xIn) _ r2).
+          }
+          cbn.
+          destruct t1; cbn in *.
+          + reflexivity.
+          + rewrite persist_func in Heq. discriminate Heq.
+          + hnf; cbn. now rewrite env.lookup_tabulate.
+        }
+        constructor.
+        rewrite option.wp_bind.
+        specialize (IHR2 w2). revert IHR2.
+        rewrite persist_liftEnv.
+        apply option.wp_monotonic.
+        intros (w3 & r3 & t2) H2.
+        rewrite option.wp_bind.
+        specialize (IHR3 w3). revert IHR3.
+        rewrite persist_liftEnv.
+        apply option.wp_monotonic.
+        intros (w4 & r4 & t3) H3.
+        rewrite option.wp_bind.
+        destruct (Unification.Variant1.mgu_spec <{ t2 ~ r4 }> t3) as [(w5 & r5 & [])|].
+        2: {
+          exfalso.
+          admit.
+        }
+        constructor.
+        constructor.
+        rewrite Definitions.refl_persist.
+        admit.
+    Admitted.
+
+  End EagerSolving.
 
   Definition bind {A B} : ⊢ FreeM A -> □⇅(A -> (FreeM B)) -> FreeM B :=
     fix bind {w} m f :=
