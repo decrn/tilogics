@@ -1,8 +1,14 @@
-Require Import List.
-Import ListNotations.
-Require Import String.
+From Coq Require Import
+     Lists.List
+     Relations.Relation_Definitions
+     Strings.String.
+From Equations Require Import
+     Equations.
 From Em Require Import
-     Definitions Context Environment.
+     Definitions Context Environment Prelude.
+
+Import ListNotations.
+Import SigTNotations.
 Import ctx.notations.
 
 (* =================================== *)
@@ -27,6 +33,40 @@ Inductive Ty (Σ : World) : Type :=
 
 Definition ty_eqb (a b : ty) : {a = b} + {a <> b}.
 Proof. decide equality. Defined.
+
+Section DecEquality.
+
+  #[local] Set Implicit Arguments.
+  #[local] Set Equations With UIP.
+
+  Derive NoConfusion Subterm for Ty.
+
+  #[export] Instance In_eqdec {w} : EqDec (sigT (fun x : nat => ctx.In x w)).
+  Proof.
+    intros [x xIn] [y yIn].
+    induction xIn; cbn; destruct (ctx.snocView yIn) as [|y yIn].
+    - left. reflexivity.
+    - right. abstract discriminate.
+    - right. abstract discriminate.
+    - destruct (IHxIn yIn); clear IHxIn; [left|right].
+      + abstract (now dependent elimination e).
+      + abstract (intros e; apply n; clear n;
+                  now dependent elimination e).
+  Defined.
+
+  #[export] Instance Ty_eqdec {w} : EqDec (Ty w).
+  Proof.
+    change_no_check (forall x y : Ty w, dec_eq x y).
+    induction x; destruct y; cbn; try (right; abstract discriminate).
+    - left. auto.
+    - apply f_equal2_dec; auto.
+      now intros H%noConfusion_inv.
+    - destruct (eq_dec (i; i0) (i1; i2)).
+      + left. abstract now dependent elimination e.
+      + right. abstract (intros H; apply n; clear n; inversion H; auto).
+  Defined.
+
+End DecEquality.
 
 (* ===== Terms / Expressions ===== *)
 

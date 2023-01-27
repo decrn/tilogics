@@ -50,50 +50,10 @@ Import SigTNotations.
 
 Set Implicit Arguments.
 
-Notation "⊢ A" := (Valid A) (at level 100).
-Notation "A -> B" := (Impl A B).
-
-Local Arguments Ty_hole {Σ i} xIn.
-Local Arguments Ty_bool {Σ}.
-Local Arguments Ty_func {Σ}.
-
-Derive NoConfusion Subterm for Ty.
-
-Definition Ty_subterm_refl {w} :=
-  Relation_Operators.clos_refl (Ty w) (Ty_subterm (Σ:=w)).
-
-Section DecEquality.
-
-  Local Set Equations With UIP.
-
-  Instance In_eqdec {w} : EqDec (sigT (fun x : nat => In x w)).
-  Proof.
-    intros [x xIn] [y yIn].
-    induction xIn; cbn; destruct (ctx.snocView yIn) as [|y yIn].
-    - left. reflexivity.
-    - right. abstract discriminate.
-    - right. abstract discriminate.
-    - destruct (IHxIn yIn); clear IHxIn; [left|right].
-      + abstract (now dependent elimination e).
-      + abstract (intros e; apply n; clear n;
-                  now dependent elimination e).
-  Defined.
-
-  Instance Ty_eqdec {w} : EqDec (Ty w).
-  Proof.
-    change_no_check (forall x y : Ty w, dec_eq x y).
-    induction x; destruct y; cbn; try (right; abstract discriminate).
-    - left. auto.
-    - apply f_equal2_dec; auto.
-      now intros H%noConfusion_inv.
-    - destruct (eq_dec (i; i0) (i1; i2)).
-      + left. abstract now dependent elimination e.
-      + right. abstract (intros H; apply n; clear n; inversion H; auto).
-  Defined.
-
-End DecEquality.
-#[export] Existing Instance In_eqdec.
-#[export] Existing Instance Ty_eqdec.
+#[local] Arguments Ty_hole {Σ i} xIn.
+#[local] Arguments Ty_bool {Σ}.
+#[local] Arguments Ty_func {Σ}.
+#[local] Open Scope indexed_scope.
 
 Reserved Notation "w1 ⊒ w2" (at level 80).
 Reserved Notation "w1 ⊒⁻ w2" (at level 80).
