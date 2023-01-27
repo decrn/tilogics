@@ -1,7 +1,7 @@
 Require Import List.
 Import ListNotations.
 From Em Require Import
-     Definitions Context Environment STLC Prelude Triangular.
+     Definitions Context Environment STLC Prelude Substitution Triangular.
 Import ctx.notations.
 From Em Require
   Unification.
@@ -9,7 +9,7 @@ From Em Require
 Local Notation "<{ A ~ w }>" := (persist _ A _ w).
 
 #[export] Instance PersistentTri_Ty : Persistent Tri Ty :=
-  fun w1 t w2 ζ => Unification.Sub.subst t (Unification.Sub.triangular ζ).
+  fun w1 t w2 ζ => Sub.subst t (Sub.triangular ζ).
 
 Open Scope indexed_scope.
 
@@ -216,12 +216,12 @@ Lemma acc_trans_refl {w1 w2 : World} (r : w1 ⇅ w2) :
   (r ↻ acc_refl w2) = r.
 Proof. Admitted.
 
-Definition sub_acc {w1 w2 : World} (r : w1 ⇅ w2) : Unification.Sub.Sub w1 w2 :=
+Definition sub_acc {w1 w2 : World} (r : w1 ⇅ w2) : Sub.Sub w1 w2 :=
   match r with
   | {| pos := p; neg := n |} =>
-      Unification.Sub.comp
+      Sub.comp
         (env.tabulate (fun x xIn => <{ Ty_hole w1 x xIn ~ p }>))
-        (Unification.Sub.triangular n)
+        (Sub.triangular n)
   end.
 
 #[export] Instance PersistentAcc_Ty : Persistent Acc Ty :=

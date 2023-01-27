@@ -9,5 +9,6 @@ theories/stlc/STLC.v
 theories/stlc/Shallow.v
 theories/stlc/Symbolic.v
 theories/stlc/Refinement.v
+theories/stlc/Substitution.v
 theories/stlc/Triangular.v
 theories/unification/Unification.v

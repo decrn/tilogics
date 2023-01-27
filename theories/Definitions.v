@@ -22,6 +22,9 @@ Bind    Scope indexed_scope with TYPE.
 
 Notation "⊢ A" := (Valid A) (at level 100).
 Notation "A -> B" := (Impl A B) : indexed_scope.
+Notation "'∀' x .. y , P " :=
+  (Forall (fun x => .. (Forall (fun y => P)) ..))
+    (at level 99, x binder, y binder, right associativity) : indexed_scope.
 
 Definition Const (A : Type) : TYPE := fun _ => A.
 Definition PROP : TYPE := fun _ => Prop.
