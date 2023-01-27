@@ -43,7 +43,7 @@ From Equations.Type Require
 From Equations.Prop Require
      Classes.
 From Em Require Import
-     Definitions Context Environment Prelude STLC.
+     Definitions Context Environment Prelude STLC Triangular.
 Import ctx.
 Import ctx.notations.
 Import SigTNotations.
@@ -56,170 +56,7 @@ Set Implicit Arguments.
 #[local] Open Scope indexed_scope.
 
 Reserved Notation "w1 ⊒ w2" (at level 80).
-Reserved Notation "w1 ⊒⁻ w2" (at level 80).
 Reserved Notation "w1 ⊒ˢ w2" (at level 80).
-
-Definition Later (A : TYPE) : TYPE :=
-  fun w => forall x (xIn : x ∈ w), A (w - x).
-Definition LaterTm (A : TYPE) : TYPE :=
-  fun w => forall x (xIn : x ∈ w), Ty (w - x) -> A (w - x).
-Notation "▻ A" := (Later A) (at level 9, right associativity).
-Notation "► A" := (LaterTm A) (at level 9, right associativity).
-Definition Sooner (A : TYPE) : TYPE :=
-  fun w => sigT (fun x => sigT (fun (xIn : x ∈ w) => A (w - x))).
-Definition SoonerTm (A : TYPE) : TYPE :=
-  fun w => sigT (fun x => sigT (fun (xIn : x ∈ w) => Ty (w - x) * A (w - x)))%type.
-Notation "◅ A" := (Sooner A) (at level 9, right associativity).
-Notation "◄ A" := (SoonerTm A) (at level 9, right associativity).
-
-Section Thick.
-
-  Definition thickIn {w x} (xIn : x ∈ w) (s : Ty (w - x)) :
-    forall y, y ∈ w -> Ty (w - x) :=
-    fun y yIn =>
-      match occurs_check_view xIn yIn with
-      | Same _     => s
-      | Diff _ yIn => Ty_hole yIn
-      end.
-
-  Definition thick : ⊢ Ty -> ►Ty :=
-    fun w =>
-      fix thick (S : Ty w) (x : nat) (xIn : x ∈ w) (T : Ty (w - x)) {struct S} : Ty (w - x) :=
-      match S with
-      | Ty_hole σIn   => thickIn xIn T σIn
-      | Ty_bool       => Ty_bool
-      | Ty_func S1 S2 => Ty_func (thick S1 x xIn T) (thick S2 x xIn T)
-      end.
-
-End Thick.
-
-Section Thin.
-
-  Fixpoint thin {w x} (xIn : x ∈ w) (T : Ty (w - x)) : Ty w :=
-    match T with
-    | Ty_hole yIn => Ty_hole (in_thin xIn yIn)
-    | Ty_bool => Ty_bool
-    | Ty_func T1 T2 => Ty_func (thin xIn T1) (thin xIn T2)
-    end.
-
-  Definition fancy_thin : ⊢ ◅Ty -> Ty :=
-    fun w '(x; (xIn; T)) => thin xIn T.
-
-End Thin.
-
-Module Tri.
-
-  Import Coq.Classes.CRelationClasses.
-
-  Inductive Tri (w : World) : World -> Set :=
-  | refl      : w ⊒⁻ w
-  | cons {w' x} (xIn : x ∈ w) (t : Ty (w - x)) (ζ : w - x ⊒⁻ w') : w ⊒⁻ w'
-  where "w1 ⊒⁻ w2" := (Tri w1 w2).
-  Global Arguments refl {_}.
-  Global Arguments cons {_ _} x {_} t ζ.
-
-  Fixpoint trans [w0 w1 w2] (ζ1 : w0 ⊒⁻ w1) {struct ζ1} : w1 ⊒⁻ w2 -> w0 ⊒⁻ w2 :=
-    match ζ1 with
-    | refl        => fun ζ2 => ζ2
-    | cons x t ζ1 => fun ζ2 => cons x t (trans ζ1 ζ2)
-    end.
-  Local Infix "⊙" := trans (at level 60, right associativity).
-  #[export] Instance preorder_tri : PreOrder Tri :=
-    {| PreOrder_Reflexive w := refl;
-       PreOrder_Transitive  := trans
-    |}.
-
-  Definition single {w} x {xIn : x ∈ w} (t : Ty (w - x)) : w ⊒⁻ w - x :=
-    cons x t refl.
-  Global Arguments single {w} x {xIn} t.
-
-  Lemma trans_refl {w1 w2} (ζ : w1 ⊒⁻ w2) : ζ ⊙ refl = ζ.
-  Proof. induction ζ; cbn; congruence. Qed.
-
-  Lemma trans_assoc {w0 w1 w2 w3} (ζ1 : w0 ⊒⁻ w1) (ζ2 : w1 ⊒⁻ w2) (ζ3 : w2 ⊒⁻ w3) :
-    (ζ1 ⊙ ζ2) ⊙ ζ3 = ζ1 ⊙ (ζ2 ⊙ ζ3).
-  Proof. induction ζ1; cbn; congruence. Qed.
-
-  (* Definition geq {w0 w1} (ζ1 : w0 ⊒⁻ w1) [w2] (ζ2 : w0 ⊒⁻ w2) : Prop := *)
-  (*   exists ζ12 : w1 ⊒⁻ w2, ζ2 = ζ1 ⊙ ζ12. *)
-  (* Notation "ζ1 ≽ ζ2" := (geq ζ1 ζ2) (at level 80). *)
-
-  (* Lemma geq_refl {w1 w2} (ζ : w1 ⊒⁻ w2) : ζ ≽ ζ. *)
-  (* Proof. exists refl. symmetry. apply trans_refl. Qed. *)
-
-  (* Lemma geq_trans {w0 w1 w2 w3} (ζ1 : w0 ⊒⁻ w1) (ζ2 : w0 ⊒⁻ w2) (ζ3 : w0 ⊒⁻ w3) : *)
-  (*   ζ1 ≽ ζ2 -> ζ2 ≽ ζ3 -> ζ1 ≽ ζ3. *)
-  (* Proof. *)
-  (*   intros [ζ12 H12] [ζ23 H23]. exists (ζ12 ⊙ ζ23). *)
-  (*   rewrite H23, H12. apply trans_assoc. *)
-  (* Qed. *)
-
-  (* Lemma geq_precom {w0 w1 w2 w3} (ζ1 : w0 ⊒⁻ w1) (ζ2 : w1 ⊒⁻ w2) (ζ3 : w1 ⊒⁻ w3) : *)
-  (*   ζ2 ≽ ζ3 -> ζ1 ⊙ ζ2 ≽ ζ1 ⊙ ζ3. *)
-  (* Proof. intros [ζ23 ->]. exists ζ23. symmetry. apply trans_assoc. Qed. *)
-
-  (* Lemma geq_max {w1 w2} (ζ : w1 ⊒⁻ w2) : refl ≽ ζ. *)
-  (* Proof. exists ζ. reflexivity. Qed. *)
-
-  (* Lemma geq_extend {w0 w1 w2} (ζ1 : w0 ⊒⁻ w1) (ζ2 : w1 ⊒⁻ w2) : ζ1 ≽ ζ1 ⊙ ζ2. *)
-  (* Proof. now exists ζ2. Qed. *)
-
-  (* Definition geqb1 [w0 z] (zIn : z ∈ w0) (tz : Ty (w0 - z)) [w1] (ζ : w0 ⊒⁻ w1) : *)
-  (*   option (w0 - z ⊒⁻ w1). *)
-  (* Proof. *)
-  (*   rename w1 into wend. *)
-  (*   induction ζ. *)
-  (*   + apply None. *)
-  (*   + rename w' into wend. rename t into tx. *)
-  (*     destruct (occurs_check_view xIn zIn). *)
-  (*     * refine (if Ty_eqdec tx tz then Some ζ else None). *)
-  (*     * rename y into z. rename yIn into zIn. *)
-  (*       specialize (IHζ zIn). *)
-  (*       Check (thick (thin _ tz) _ tx). *)
-  (* Admitted. *)
-
-  (* Fixpoint geqb (w0 w1 : World) (ζ1 : w0 ⊒⁻ w1) {w2} (ζ2 : w0 ⊒⁻ w2) {struct ζ1} : *)
-  (*   option (w1 ⊒⁻ w2) := *)
-  (*   match ζ1 with *)
-  (*   | refl => Some ζ2 *)
-  (*   | cons x t__X ζ1' => *)
-  (*       option.bind (geqb1 _ t__X ζ2) (geqb ζ1') *)
-  (*   end. *)
-
-  (* Lemma geqb_spec {w0 w1} (ζ1 : w0 ⊒⁻ w1) : *)
-  (*   forall [w2] (ζ2 : w0 ⊒ˢ w2), *)
-  (*     Bool.reflect (triangular ζ1 ≽ ζ2) (ζ1 ≽? ζ2). *)
-  (* Proof. *)
-  (*   induction ζ1; cbn [geqb triangular]; intros w2 ζ2. *)
-  (*   - constructor. apply geq_max. *)
-  (*   - destruct Ty_eqdec. *)
-  (*     + destruct (IHζ1 _ (thin xIn ⊙ˢ ζ2)); constructor; clear IHζ1. *)
-  (*       * destruct g as [ζ2']. exists ζ2'. *)
-  (*         rewrite comp_assoc. rewrite <- H. clear - e. *)
-  (*         apply env.lookup_extensional. *)
-  (*         intros y yIn. *)
-  (*         rewrite lookup_comp. *)
-  (*         rewrite lookup_thick. unfold thickIn. *)
-  (*         destruct (occurs_check_view xIn yIn). apply e. *)
-  (*         cbn. rewrite lookup_comp. unfold thin. *)
-  (*         now rewrite env.lookup_tabulate. *)
-  (*       * intros [ζ2' ->]. apply n. clear n. exists ζ2'. *)
-  (*         rewrite <- ?comp_assoc. *)
-  (*         rewrite comp_thin_thick. *)
-  (*         rewrite comp_id_left. *)
-  (*         reflexivity. *)
-  (*     + constructor. intros [ζ2' ->]. apply n. clear n. *)
-  (*       rewrite <- ?comp_assoc. *)
-  (*       rewrite comp_thin_thick. *)
-  (*       rewrite comp_id_left. *)
-  (*       cbn. rewrite ?lookup_comp, lookup_thick. *)
-  (*       unfold thickIn. rewrite occurs_check_view_refl. *)
-  (*       now rewrite subst_comp. *)
-  (* Qed. *)
-
-End Tri.
-Notation "w1 ⊒⁻ w2" := (Tri.Tri w1 w2) (at level 80).
-Infix "⊙" := Tri.trans (at level 60, right associativity).
 
 Definition Box (A : TYPE) : TYPE :=
   fun w0 => forall w1, w0 ⊒⁻ w1 -> A w1.
@@ -240,7 +77,7 @@ Notation "'∀' x .. y , P " :=
 
 Section Löb.
 
-  Context (A : TYPE) (step : ⊢ ▻A -> A).
+  Context (A : TYPE) (step : ⊢ ▷A -> A).
 
   Obligation Tactic := auto using Nat.eq_le_incl, length_remove.
   Equations Löbaux {w : World} : A w by wf (length w) :=
@@ -275,19 +112,19 @@ Global Arguments four : simpl never.
 Definition D {A} : ⊢ □A -> ◇A :=
   fun w a => existT _ w (Tri.refl, T a).
 
-Definition box2later {A} : ⊢ □A -> ►A.
+Definition box2later {A} : ⊢ □A -> ▶A.
   intros w a x xIn t. apply a. econstructor.
   apply t. constructor.
 Defined.
 
-Definition sooner2diamond {A} : ⊢ ◄A -> ◇A :=
+Definition sooner2diamond {A} : ⊢ ◀A -> ◇A :=
   fun w a =>
     match a with
       existT _ x (existT _ xIn (t , a)) =>
       existT _ (w - x) (pair (Tri.single x t) a)
     end.
 
-Definition sooner2diamondtm {A} : ⊢ ◄A -> ◆A.
+Definition sooner2diamondtm {A} : ⊢ ◀A -> ◆A.
   intros w a. destruct a as [σ [σIn [t a]]].
   constructor.
   econstructor. split; try eassumption.
@@ -413,7 +250,7 @@ Module Sub.
   Qed.
 
   Lemma subst_thin {w x} (xIn : x ∈ w) (T : Ty (w - x)) :
-    Unification.thin xIn T = subst T (thin xIn).
+    Triangular.thin xIn T = subst T (thin xIn).
   Proof. induction T; cbn; f_equal; now rewrite ?lookup_thin. Qed.
 
   Definition geq {w0 w1} (ζ1 : w0 ⊒ˢ w1) [w2] (ζ2 : w0 ⊒ˢ w2) : Prop :=
@@ -494,14 +331,14 @@ Infix "≽ˢ" := Sub.geq (at level 80).
 Section OccursCheck.
   Import option.notations.
 
-  Definition occurs_check_in : ⊢ ∀ x, In x -> ▻(Option (In x)) :=
+  Definition occurs_check_in : ⊢ ∀ x, In x -> ▷(Option (In x)) :=
     fun w x xIn y yIn =>
       match occurs_check_view yIn xIn with
       | Same _      => None
       | Diff _ xIn' => Some xIn'
       end.
 
-  Definition occurs_check : ⊢ Ty -> ▻(Option Ty) :=
+  Definition occurs_check : ⊢ Ty -> ▷(Option Ty) :=
     fun w =>
       fix oc (t : Ty w) (y : nat) (yIn : y ∈ w) {struct t} :=
       match t with
@@ -557,7 +394,7 @@ Section OccursCheck.
 End OccursCheck.
 
 Definition box_intro_split {A} :
-  ⊢ A -> ►□A -> □A :=
+  ⊢ A -> ▶□A -> □A :=
   fun w0 a la w1 ζ =>
     match ζ with
     | Tri.refl => a
@@ -567,7 +404,7 @@ Definition box_intro_split {A} :
 Definition SUBST : TYPE := Ty -> □Ty.
 Section Subst.
 
-  Context [w] (lsubst : ▻(Ty -> □Ty) w).
+  Context [w] (lsubst : ▷(Ty -> □Ty) w).
 
   Definition subst_in {x} (xIn : In x w) : □Ty w :=
     box_intro_split
@@ -620,7 +457,7 @@ Section Mult.
   Import option.notations.
 
   Definition acc {A} {w0 w1} (ζ1 : w0 ⊒⁻ w1) : ◆A w1 -> ◆A w0 :=
-    option.map (fun '(existT _ w2 (ζ2 , a)) => existT _ w2 (ζ1 ⊙ ζ2, a)).
+    option.map (fun '(existT _ w2 (ζ2 , a)) => existT _ w2 (ζ1 ⊙⁻ ζ2, a)).
 
   Definition μ {A} : Hom ◆◆A ◆A :=
     fun w0 a0 => '(w1; (ζ1 , a1)) <- a0;; acc ζ1 a1.
@@ -1270,7 +1107,7 @@ Module Variant1.
 
   Section MguO.
 
-    Context [w] (lmgu : ▻BoxUnifier w).
+    Context [w] (lmgu : ▷BoxUnifier w).
     Context (lmgu_spec : forall x (xIn : x ∈ w),
                 BoxUnifierSpec (lmgu xIn)).
 
@@ -1389,7 +1226,7 @@ Module Variant1.
         destruct a as [w2 [ζ2 []]]. apply unifies_sym. apply H.
       - rewrite wlp_μ. generalize (H _ ζ1). clear H.
         apply option.wlp_monotonic. intros [w2 [ζ2 _]] ?.
-        rewrite wlp_μ. generalize (H0 _ (ζ1 ⊙ ζ2)).
+        rewrite wlp_μ. generalize (H0 _ (ζ1 ⊙⁻ ζ2)).
         apply option.wlp_monotonic. intros [w3 [ζ3 _]] ?.
         constructor. unfold four. cbn.
         rewrite ?Sub.triangular_trans. cbn.
@@ -1420,11 +1257,11 @@ Module Variant1.
       - apply P.unifiesX_equiv in H1. destruct H1 as [HU1 HU2].
         rewrite wp_μ. generalize (H _ ζ0 _ ζ1 HU1). clear H.
         apply option.wp_monotonic. intros [mgw1 [mgζ1 _]] [ζ1' ->].
-        assert (P.unifies s2[ζ0 ⊙ mgζ1] t2[ζ0 ⊙ mgζ1] ζ1') as HU2'.
+        assert (P.unifies s2[ζ0 ⊙⁻ mgζ1] t2[ζ0 ⊙⁻ mgζ1] ζ1') as HU2'.
         { revert HU2. unfold unifies.
           now rewrite ?Sub.triangular_trans, ?Sub.subst_comp.
         }
-        rewrite wp_μ. generalize (H0 _ (ζ0 ⊙ mgζ1) _ ζ1' HU2').
+        rewrite wp_μ. generalize (H0 _ (ζ0 ⊙⁻ mgζ1) _ ζ1' HU2').
         apply option.wp_monotonic. intros [mgw2 [mgζ2 _]] [ζ2' ->].
         constructor. unfold four.
         rewrite ?Sub.triangular_trans.
@@ -1475,7 +1312,7 @@ Module Variant1.
       | List.cons (t1,t2) cs =>
           fun w1 ζ1 =>
             ⟨ ζ2 ⟩ _ <- bmgu t1 t2 ζ1 ;;
-            solve cs _ (ζ1 ⊙ ζ2)
+            solve cs _ (ζ1 ⊙⁻ ζ2)
          end.
 
   Definition solve : ⊢ List (Prod Ty Ty) -> ◆Unit :=
@@ -1532,7 +1369,7 @@ Module Variant2.
 
   Section MguO.
 
-    Context [w] (lmgu : ▻BoxUnifier w).
+    Context [w] (lmgu : ▷BoxUnifier w).
 
     Definition boxflex {x} (xIn : x ∈ w) (t : Ty w) : □◆Ty w :=
       box_intro_split

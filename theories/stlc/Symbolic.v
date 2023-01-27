@@ -1,14 +1,14 @@
 Require Import List.
 Import ListNotations.
 From Em Require Import
-     Definitions Context Environment STLC Prelude.
+     Definitions Context Environment STLC Prelude Triangular.
 Import ctx.notations.
 From Em Require
   Unification.
 
 Local Notation "<{ A ~ w }>" := (persist _ A _ w).
 
-#[export] Instance PersistentTri_Ty : Persistent Unification.Tri.Tri Ty :=
+#[export] Instance PersistentTri_Ty : Persistent Tri Ty :=
   fun w1 t w2 ζ => Unification.Sub.subst t (Unification.Sub.triangular ζ).
 
 Open Scope indexed_scope.
@@ -164,11 +164,11 @@ End TypeReconstruction.
 Record Acc (w w' : World) : Type := mkAcc
   { iw : World
   ; pos : Accessibility w iw
-  ; neg : Unification.Tri.Tri iw w' }.
+  ; neg : Tri iw w' }.
 
 Notation "w1 ⇅ w2" := (Acc w1 w2) (at level 80).
 Notation "w1 ↑ w2" := (Accessibility w1 w2) (at level 80).
-Notation "w1 ↓ w2" := (Unification.Tri.Tri w1 w2) (at level 80).
+Notation "w1 ↓ w2" := (Tri w1 w2) (at level 80).
 
 Lemma acc_refl : forall w, Acc w w.
 Proof. intros. exists w. constructor. constructor. Defined.
@@ -186,7 +186,7 @@ Defined.
 
 Lemma up_down_down_eq_up_down : forall w1 w2 w3,
     w1 ⇅ w2 -> w2 ↓ w3 -> w1 ⇅ w3.
-Proof. destruct 1. eexists. apply pos0. now apply (Unification.Tri.trans neg0). Defined.
+Proof. destruct 1. eexists. apply pos0. now apply (Tri.trans neg0). Defined.
 
 Lemma up_down_up_eq_up_up_down : forall w1 w2 w3
     (H1: w1 ⇅ w2), w2 ↑ w3 -> w1 ⇅ w3.
@@ -277,7 +277,7 @@ Module UpDown.
   Definition step {w α} : w ⇅ w ▻ α :=
     {| iw := w ▻ α;
        pos := acc.fresh w α (w ▻ α) (acc.refl (w ▻ α));
-       neg := Unification.Tri.refl;
+       neg := Tri.refl;
     |}.
 
   Fixpoint up_aux {w1 wi β} (p : w1 ↑ wi) {struct p} :
@@ -295,10 +295,10 @@ Module UpDown.
               pos := acc.fresh _ _ _ (acc.fresh _ _ _ (acc.refl _));
               neg :=
                 let βIn := ctx.in_succ (ctx.in_succ ctx.in_zero) in
-                Unification.Tri.cons β
+                Tri.cons β
                   (xIn := βIn)
                   (Ty_hole ((w1 ▻ β ▻ α ▻ β) - β) β ctx.in_zero)
-                  Unification.Tri.refl
+                  Tri.refl
             |}
             (up_aux p w2 n)
     end.
