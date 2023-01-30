@@ -170,10 +170,10 @@ Notation "w1 ⇅ w2" := (Acc w1 w2) (at level 80).
 Notation "w1 ↑ w2" := (Accessibility w1 w2) (at level 80).
 Notation "w1 ↓ w2" := (Tri w1 w2) (at level 80).
 
-Lemma acc_refl : forall w, Acc w w.
-Proof. intros. exists w. constructor. constructor. Defined.
+Definition acc_refl w : Acc w w :=
+  {| iw := w; pos := acc.refl w; neg := Tri.refl |}.
 
-Lemma adding_invariant: forall w1 w2 α,
+Lemma down_add: forall w1 w2 α,
     w1     ↓ w2      ->
     w1 ▻ α ↓ w2 ▻ α.
 Proof.
@@ -184,36 +184,40 @@ Proof.
     cbn. apply IHTri.
 Defined.
 
-Lemma up_down_down_eq_up_down : forall w1 w2 w3,
-    w1 ⇅ w2 -> w2 ↓ w3 -> w1 ⇅ w3.
-Proof. destruct 1. eexists. apply pos0. now apply (Tri.trans neg0). Defined.
+Definition up_down_down_eq_up_down {w1 w2 w3} (r12 : w1 ⇅ w2) (down : w2 ↓ w3) : w1 ⇅ w3 :=
+  match r12 with
+  | {| iw := iw; pos := pos; neg := neg |} =>
+        mkAcc _ _ _ pos (neg ⊙⁻ down)
+  end.
 
-Lemma up_down_up_eq_up_up_down : forall w1 w2 w3
-    (H1: w1 ⇅ w2), w2 ↑ w3 -> w1 ⇅ w3.
-Proof.
-  intros. destruct H1. generalize dependent iw0. induction X.
-  - intros. now exists iw0.
-  - intros. specialize (IHX (iw0 ▻ α)). apply IHX.
-    + eapply acc.trans. apply pos0. eapply acc.fresh. apply acc.refl.
-    + apply adding_invariant. apply neg0.
-Defined.
+Definition up_down_up_eq_up_up_down {w1 w2 w3} (r12: w1 ⇅ w2) (up : w2 ↑ w3) : w1 ⇅ w3 :=
+ match r12 with
+ | {| iw := iw; pos := pos; neg := neg |} =>
+      acc.Accessibility_rect
+        (fun (w w' : World) (up : w ↑ w') => forall iw : World, w1 ↑ iw -> iw ↓ w -> w1 ⇅ w')
+        (mkAcc _)
+        (fun w α w' up IH iw pos neg =>
+           IH (iw ▻ α) (pos .> acc.fresh iw α (iw ▻ α) (acc.refl (iw ▻ α))) (down_add _ _ _ neg))
+        w2 w3 up iw pos neg
+ end.
 
-Lemma acc_trans {w1 w2 w3 : World} : w1 ⇅ w2 -> w2 ⇅ w3 -> w1 ⇅ w3.
-Proof.
-  intros. destruct X. destruct X0.
-  apply (up_down_down_eq_up_down _ iw1).
-  apply (up_down_up_eq_up_up_down _ w2).
-  exists iw0; easy. easy. easy.
-Defined.
+Definition acc_trans {w1 w2 w3 : World} (r12 : w1 ⇅ w2) (r23 : w2 ⇅ w3) : w1 ⇅ w3 :=
+ match r23 with
+ | {| iw := iw; pos := pos; neg := neg |} =>
+    up_down_down_eq_up_down (up_down_up_eq_up_up_down r12 pos) neg
+ end.
+
+Notation "A ⇅↓ B" := (up_down_down_eq_up_down A B) (at level 80).
+Notation "A ⇅↑ B" := (up_down_up_eq_up_up_down A B) (at level 80).
 
 Local Notation "r12 ↻ r23" := (acc_trans r12 r23) (at level 80).
 
-Lemma acc_trans_assoc {w1 w2 w3 w4 : World} : forall (r12 : w1 ⇅ w2) (r23 : w2 ⇅ w3) (r34 : w3 ⇅ w4),
-  (r12 ↻ (r23 ↻ r34)) = ((r12 ↻ r23) ↻ r34).
-Proof. Admitted.
-
 Lemma acc_trans_refl {w1 w2 : World} (r : w1 ⇅ w2) :
   (r ↻ acc_refl w2) = r.
+Proof. destruct r. cbn. now rewrite Tri.trans_refl. Defined.
+
+Lemma acc_trans_assoc {w1 w2 w3 w4} (r12 : w1 ⇅ w2) (r23 : w2 ⇅ w3) (r34 : w3 ⇅ w4) :
+   ((r12 ↻ r23) ↻ r34) = (r12 ↻ (r23 ↻ r34)).
 Proof. Admitted.
 
 Definition sub_acc {w1 w2 : World} (r : w1 ⇅ w2) : Sub.Sub w1 w2 :=
@@ -245,22 +249,27 @@ Class PersistLaws A `{Persistent Acc A} : Type :=
   { refl_persist w (V : A w) :
         persist w V w (acc_refl w) = V }.
 
-Class PersistLift A `{Persistent Acc A} : Type :=
-  { lift_persist (w w': World) t r :
-    persist w (lift t _) w' r = lift t _ }.
-(* TODO: make lift generic (liftEnv is needed for Env) *)
+(* Class PersistLift A `{Persistent Acc A} : Type := *)
+(*   { lift_persist (w w': World) t r : *)
+(*     persist w (lift t _) w' r = lift t _ }. *)
+(* (* TODO: make lift generic (liftEnv is needed for Env) *) *)
 
-Lemma persist_liftEnv (w w': World) E r :
-  persist w (liftEnv E _) w' r = liftEnv E _.
-Proof. Admitted.
+Lemma persist_liftTy : forall (w w' : World) t r,
+    persist w (lift t _) w' r = lift t _.
+Proof. induction r. induction t; cbn. easy. now rewrite <- IHt1, <- IHt2. Defined.
 
-#[export] Instance PersistLift_Ty : PersistLift Ty.
+(* Lemma persist_split : forall w w' iw (pos : w ↑ iw) (neg : iw ↓ w') x, *)
+(*   persist w  x iw pos -> *)
+(*   persist iw x w' neg -> *)
+(*   persist w  x w' {| iw := iw; pos := pos; neg := neg |}. *)
+
+Lemma persist_liftEnv : forall (w w' : World) e r,
+    persist w (liftEnv e _) w' r = liftEnv e _.
 Proof.
-  constructor. intros. induction r. induction t; cbn. easy. rewrite <- IHt1. rewrite <- IHt2. easy.
-Defined.
-
-#[export] Instance PersistLift_Env : PersistLift Env.
-Proof. Admitted.
+  induction e. now cbn.
+  destruct a. cbn. intro r. rewrite IHe.
+  now rewrite persist_liftTy.
+Qed.
 
 Module UpDown.
   #[local] Notation "□⇅ A" := (BoxR Acc A) (at level 9, format "□⇅ A", right associativity)
@@ -286,7 +295,7 @@ Module UpDown.
     | acc.refl _ =>
         fun w2 n =>
           {| pos := acc.refl _;
-            neg := adding_invariant _ _ _ n
+            neg := down_add _ _ _ n
           |}
     | acc.fresh _ α wi p =>
         fun w2 n =>
