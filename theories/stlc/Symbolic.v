@@ -377,6 +377,85 @@ Module UpDown.
             Some (existT _ w4 (r1 .> (r2 .> (r3 .> r4)), <{ ti ~ (r2 .> r3) .> r4 }>))
         end.
 
+    Lemma soundness e :
+      forall (w : World) G,
+        option.wlp
+          (fun '(existT _ w1 (r1, b)) =>
+             forall ι : Assignment w1,
+               exists ee, inst <{ G ~ r1 }> ι |-- e ; inst b ι ~> ee)
+          (infer e w G).
+    Proof.
+      induction e; cbn; intros w G; unfold pure.
+      - constructor; intros ι. exists v_true; cbn. constructor.
+      - constructor; intros ι. exists v_false; cbn. constructor.
+      - rewrite option.wlp_bind.
+        specialize (IHe1 w G). revert IHe1.
+        apply option.wlp_monotonic.
+        intros (w1 & r1 & t1) H1.
+        rewrite option.wlp_bind.
+        destruct (Unification.Variant1.mgu_spec t1 (Ty_bool w1)) as [(w2 & r2 & [])|]; [|constructor].
+        constructor.
+        rewrite option.wlp_bind.
+        specialize (IHe2 w2 (persist w G w2 (up_down_down_eq_up_down (up_down_up_eq_up_up_down r1 (acc.refl w1)) r2))).
+        revert IHe2.
+        apply option.wlp_monotonic.
+        intros (w3 & r3 & t2) H2.
+        rewrite option.wlp_bind.
+        specialize (IHe3 w3 (persist w2 (persist w G w2 (up_down_down_eq_up_down (up_down_up_eq_up_up_down r1 (acc.refl w1)) r2)) w3 r3)).
+        revert IHe3.
+        apply option.wlp_monotonic.
+        intros (w4 & r4 & t3) H3.
+        rewrite option.wlp_bind.
+        destruct (Unification.Variant1.mgu_spec (persist w3 t2 w4 r4) t3) as [(w5 & r5 & [])|]; [|constructor].
+        constructor. constructor. intros ι.
+        (* Need composition of assignments with new Kripke frame. *)
+        admit.
+      - destruct value eqn:?.
+        + constructor. intros. exists (e_var s).
+          constructor. cbn.
+          (* need value inst lemma *)
+          admit.
+        + constructor.
+      - rewrite option.wlp_bind.
+        specialize (IHe (w ▻ 0) (cons (pair s (Ty_hole (ctx.snoc w 0) 0 ctx.in_zero)) (persist w G (ctx.snoc w 0) step))).
+        revert IHe.
+        apply option.wlp_monotonic.
+        intros (w1 & r1 & t1) H1.
+        constructor.
+        intros ι. specialize (H1 ι). destruct H1 as [e' HT1].
+        cbn. eexists. constructor. cbn in *.
+        (* need persist acc_trans lemma *)
+        admit.
+      - rewrite option.wlp_bind.
+        specialize (IHe w (cons (pair s (lift t w)) G)).
+        revert IHe.
+        apply option.wlp_monotonic.
+        intros (w1 & r1 & t1) H1.
+        constructor.
+        intros ι. specialize (H1 ι). destruct H1 as [e' HT1].
+        cbn. eexists.
+        (* need inst lift lemma *)
+        admit.
+      - rewrite option.wlp_bind.
+        specialize (IHe1 (w ▻ 0) (persist _ G _ step)).
+        revert IHe1.
+        apply option.wlp_monotonic.
+        intros (w1 & r1 & t1) H1.
+        rewrite option.wlp_bind.
+        specialize (IHe2 w1 (persist _ (persist _ G _ step) _ r1)).
+        revert IHe2.
+        apply option.wlp_monotonic.
+        intros (w2 & r2 & t2) H2.
+        rewrite option.wlp_bind.
+        destruct (Unification.Variant1.mgu_spec
+                    (persist w1 t1 w2 r2)
+                    (Ty_func w2 t2 (persist (ctx.snoc w 0) (Ty_hole (ctx.snoc w 0) 0 ctx.in_zero) w2 (acc_trans r1 r2))))
+          as [(w3 & r3 & [])|]; [|constructor].
+        constructor. constructor. intros ι.
+        (* Need composition of assignments with new Kripke frame. *)
+        admit.
+    Admitted.
+
     Lemma completeness {G e t ee} (R : G |-- e ; t ~> ee) :
       forall w : World,
         option.wp
