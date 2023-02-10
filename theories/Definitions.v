@@ -55,6 +55,9 @@ Module acc.
     | fresh α : forall Σ₂, Accessibility (Σ₁ ▻ α) Σ₂ ->
                               Accessibility Σ₁ Σ₂.
 
+  Definition step {w α} : Accessibility w (w ▻ α) :=
+    fresh w α (w ▻ α) (refl (w ▻ α)).
+
   Fixpoint trans {w1 w2 w3} (w12 : Accessibility w1 w2) : Accessibility w2 w3 -> Accessibility w1 w3 :=
     match w12 with
     | refl _ => fun w13 : Accessibility w1 w3 => w13

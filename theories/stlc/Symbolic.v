@@ -10,7 +10,8 @@ Local Notation "<{ A ~ w }>" := (persist _ A _ w).
 
 #[export] Instance PersistentTri_Ty : Persistent Tri Ty :=
   fun w1 t w2 ζ => Sub.subst t (Sub.triangular ζ).
-
+#[export] Instance PersistentSub_Ty : Persistent Sub Ty :=
+  fun w1 t w2 ζ => Sub.subst t ζ.
 Open Scope indexed_scope.
 
 Fixpoint bind [A B] {Σ} (m : FreeM A Σ) (f : □⁺ (A -> (FreeM B)) Σ)
@@ -173,16 +174,12 @@ Notation "w1 ↓ w2" := (Tri w1 w2) (at level 80).
 Definition acc_refl w : Acc w w :=
   {| iw := w; pos := acc.refl w; neg := Tri.refl |}.
 
-Lemma down_add: forall w1 w2 α,
-    w1     ↓ w2      ->
-    w1 ▻ α ↓ w2 ▻ α.
-Proof.
-  intros. induction H.
-  - constructor 1.
-  - constructor 2 with x (ctx.in_succ xIn). cbn.
-    apply (persist _ t _ (acc.fresh _ α _ (acc.refl _))).
-    cbn. apply IHTri.
-Defined.
+Fixpoint down_add {α w1 w2} (t : Tri w1 w2) {struct t} : Tri (w1 ▻ α) (w2 ▻ α) :=
+  match t with
+  | Tri.refl => Tri.refl
+  | @Tri.cons _ _ x _ t r =>
+    @Tri.cons _ _ x (ctx.in_succ _) (persist _ t _ acc.step) (down_add r)
+  end.
 
 Definition up_down_down_eq_up_down {w1 w2 w3} (r12 : w1 ⇅ w2) (down : w2 ↓ w3) : w1 ⇅ w3 :=
   match r12 with
@@ -197,20 +194,24 @@ Definition up_down_up_eq_up_up_down {w1 w2 w3} (r12: w1 ⇅ w2) (up : w2 ↑ w3)
         (fun (w w' : World) (up : w ↑ w') => forall iw : World, w1 ↑ iw -> iw ↓ w -> w1 ⇅ w')
         (mkAcc _)
         (fun w α w' up IH iw pos neg =>
-           IH (iw ▻ α) (pos .> acc.fresh iw α (iw ▻ α) (acc.refl (iw ▻ α))) (down_add _ _ _ neg))
+           IH (iw ▻ α) (pos .> acc.fresh iw α (iw ▻ α) (acc.refl (iw ▻ α))) (down_add neg))
         w2 w3 up iw pos neg
  end.
 
 Definition acc_trans {w1 w2 w3 : World} (r12 : w1 ⇅ w2) (r23 : w2 ⇅ w3) : w1 ⇅ w3 :=
  match r23 with
  | {| iw := iw; pos := pos; neg := neg |} =>
-    up_down_down_eq_up_down (up_down_up_eq_up_up_down r12 pos) neg
+     up_down_down_eq_up_down (up_down_up_eq_up_up_down r12 pos) neg
  end.
 
 Notation "A ⇅↓ B" := (up_down_down_eq_up_down A B) (at level 80).
 Notation "A ⇅↑ B" := (up_down_up_eq_up_up_down A B) (at level 80).
 
 Local Notation "r12 ↻ r23" := (acc_trans r12 r23) (at level 80).
+
+Lemma acc_refl_trans {w1 w2 : World} (r : w1 ⇅ w2) :
+  (acc_refl w1 ↻  r) = r.
+Proof. Admitted.
 
 Lemma acc_trans_refl {w1 w2 : World} (r : w1 ⇅ w2) :
   (r ↻ acc_refl w2) = r.
@@ -254,16 +255,19 @@ Class PersistLaws A `{Persistent Acc A} : Type :=
 (*     persist w (lift t _) w' r = lift t _ }. *)
 (* (* TODO: make lift generic (liftEnv is needed for Env) *) *)
 
-Lemma persist_liftTy : forall (w w' : World) t r,
+Lemma persist_liftTy : forall (w w' : World) t (r : Sub w w'),
     persist w (lift t _) w' r = lift t _.
-Proof. induction r. induction t; cbn. easy. now rewrite <- IHt1, <- IHt2. Defined.
+Proof.
+  intros w w' t. revert w'.
+  induction t; cbn; intros; now f_equal.
+Qed.
 
 (* Lemma persist_split : forall w w' iw (pos : w ↑ iw) (neg : iw ↓ w') x, *)
 (*   persist w  x iw pos -> *)
 (*   persist iw x w' neg -> *)
 (*   persist w  x w' {| iw := iw; pos := pos; neg := neg |}. *)
 
-Lemma persist_liftEnv : forall (w w' : World) e r,
+Lemma persist_liftEnv : forall (w w' : World) e (r : Sub w w'),
     persist w (liftEnv e _) w' r = liftEnv e _.
 Proof.
   induction e. now cbn.
@@ -271,8 +275,37 @@ Proof.
   now rewrite persist_liftTy.
 Qed.
 
+Lemma subst_lift (t : ty) :
+  forall w1 w2 (r : w1 ⊒ˢ w2),
+    Sub.subst (lift t w1) r = lift t w2.
+Proof.
+  induction t; intros w1 w2 r; cbn; now f_equal.
+Qed.
+
+Lemma value_lift (g : env) (x : String.string) (w : World) :
+  value x (liftEnv g w) =
+    option.map (fun t => lift t w) (value x g).
+Proof.
+  induction g as [|[y t]]; cbn.
+  - reflexivity.
+  - now destruct String.string_dec.
+Qed.
+
+Lemma value_inst (w : World) (g : Env w) (x : String.string) (ι : Assignment w) :
+  value x (inst g ι) =
+    option.map (fun t => inst t ι) (value x g).
+Proof.
+  induction g as [|[y t]]; cbn.
+  - reflexivity.
+  - now destruct String.string_dec.
+Qed.
+
 Module UpDown.
   #[local] Notation "□⇅ A" := (BoxR Acc A) (at level 9, format "□⇅ A", right associativity)
+      : indexed_scope.
+  #[local] Notation "□ˢ A" :=
+    (BoxR Sub A)
+      (at level 9, format "□ˢ A", right associativity)
       : indexed_scope.
   #[local] Notation "w1 .> w2" := (acc_trans w1 w2) (at level 80).
 
@@ -295,7 +328,7 @@ Module UpDown.
     | acc.refl _ =>
         fun w2 n =>
           {| pos := acc.refl _;
-            neg := down_add _ _ _ n
+            neg := down_add n
           |}
     | acc.fresh _ α wi p =>
         fun w2 n =>
@@ -318,21 +351,26 @@ Module UpDown.
       mkAcc _ _ iw pos neg => up_aux pos w2 neg
     end.
 
+  (* Remove phase separation and all abstractions to get
+     a base line. *)
   Module EagerSolving.
 
     Import option.notations.
+    Import Unification.
+
+    #[local] Arguments Sub.thin : simpl never.
 
     Definition M (A : TYPE) : TYPE :=
-      Option (DiamondR Acc A).
+      Option (DiamondR Sub A).
 
     Definition pure {A} : ⊢ A -> M A :=
-      fun w a => Some (existT _ w (acc_refl w, a)).
+      fun w a => Some (existT _ w (Sub.id, a)).
 
-    Definition bind {A B} : ⊢ M A -> □⇅(A -> (M B)) -> M B :=
+    Definition bind {A B} : ⊢ M A -> □ˢ(A -> (M B)) -> M B :=
       fun w m f =>
         '(existT _ w1 (r1,a1)) <- m;;
         '(existT _ w2 (r2,b2)) <- f w1 r1 a1;;
-        Some (existT _ w2 (r1 .> r2, b2)).
+        Some (existT _ w2 (r1 ⊙ˢ r2, b2)).
 
     Fixpoint infer (e : expr) : ⊢ Env -> M Ty :=
       fun w G =>
@@ -341,40 +379,43 @@ Module UpDown.
         | v_false => pure w (Ty_bool w)
         | e_if e1 e2 e3 =>
             '(existT _ w1 (r1 , t1)) <- infer e1 w G;;
-            '(existT _ w2 (r2' , _)) <- Unification.Variant1.mgu t1 (Ty_bool w1);;
-            let r2 := {| pos := acc.refl _; neg := r2' |} in
-            let G2 := <{ G ~ r1 .> r2 }> in
+            '(existT _ w2 (r2' , _)) <- mgu t1 (Ty_bool w1);;
+            let r2 := Sub.triangular r2' in
+            let G2 := <{ G ~ r1 ⊙ˢ r2 }> in
             '(existT _ w3 (r3, t2)) <- infer e2 w2 G2;;
             let G3 := <{ G2 ~ r3 }> in
             '(existT _ w4 (r4, t3)) <- infer e3 w3 G3;;
-            '(existT _ w5 (r5' , _)) <- Unification.Variant1.mgu <{ t2 ~ r4 }> t3;;
-            let r5 := {| pos := acc.refl _; neg := r5'; |} in
-            Some (existT _ w5 (r1 .> (r2 .> (r3 .> (r4 .> r5))), <{ t3 ~ r5 }>))
+            '(existT _ w5 (r5' , _)) <- mgu <{ t2 ~ r4 }> t3;;
+            let r5 := Sub.triangular r5' in
+            Some (existT _ w5 (r1 ⊙ˢ (r2 ⊙ˢ (r3 ⊙ˢ (r4 ⊙ˢ r5))), <{ t3 ~ r5 }>))
         | e_var s => match value s G with
                      | Some t => pure w t
                      | None => None
                      end
         | e_absu s e =>
             let w1 := w ▻ 0 in
-            let r1 := step in
+            let r1 := Sub.step in
             let t1 := Ty_hole w1 0 ctx.in_zero in
             '(existT _ w2 (r2,t2)) <- infer e w1 ((s, t1) :: <{ G ~ r1 }>);;
-            Some (existT _ w2 (r1 .> r2, Ty_func _ <{ t1 ~ r2 }> t2))
+            Some (existT _ w2 (r1 ⊙ˢ r2, Ty_func _ <{ t1 ~ r2 }> t2))
         | e_abst s t e =>
             let t1 := lift t w in
             '(existT _ w1 (r1,t2)) <- infer e w ((s, t1) :: G);;
             Some (existT _ w1 (r1, Ty_func _ <{ t1 ~ r1 }> t2))
         | e_app e1 e2 =>
-            let w1 := w ▻ 0 in
-            let r1 := step in
-            let ti := Ty_hole w1 0 ctx.in_zero in
+            '(existT _ w1 (r1,t1)) <- infer e1 w G;;
             let G1 := <{ G ~ r1 }> in
-            '(existT _ w2 (r2,t1)) <- infer e1 w1 G1;;
-            let G2 := <{ G1 ~ r2 }> in
-            '(existT _ w3 (r3,t2)) <- infer e2 w2 G2;;
-            '(existT _ w4 (r4', _)) <- Unification.Variant1.mgu <{ t1 ~ r3 }> (Ty_func _ t2 <{ ti ~ r2 .> r3 }>);;
-            let r4 := {| pos := acc.refl _; neg := r4' |} in
-            Some (existT _ w4 (r1 .> (r2 .> (r3 .> r4)), <{ ti ~ (r2 .> r3) .> r4 }>))
+            '(existT _ w2 (r2,t2)) <- infer e2 w1 G1;;
+            let w3 := w2 ▻ 0 in
+            let r3 := Sub.step in
+            let ti := Ty_hole w3 0 ctx.in_zero in
+            let G3 := <{ G1 ~ r2 ⊙ˢ r3 }> in
+            '(existT _ w4 (r4', _)) <-
+               mgu
+                 <{ t1 ~ r2 ⊙ˢ r3 }>
+                 (Ty_func _ <{ t2 ~ r3 }> ti);;
+            let r4 := Sub.triangular r4' in
+            Some (existT _ w4 (r1 ⊙ˢ (r2 ⊙ˢ (r3 ⊙ˢ r4)), <{ ti ~ r4 }>))
         end.
 
     Lemma soundness e :
@@ -393,31 +434,31 @@ Module UpDown.
         apply option.wlp_monotonic.
         intros (w1 & r1 & t1) H1.
         rewrite option.wlp_bind.
-        destruct (Unification.Variant1.mgu_spec t1 (Ty_bool w1)) as [(w2 & r2 & [])|]; [|constructor].
+        destruct (mgu_spec t1 (Ty_bool w1)) as [(w2 & r2 & [])|]; [|constructor].
         constructor.
         rewrite option.wlp_bind.
-        specialize (IHe2 w2 (persist w G w2 (up_down_down_eq_up_down (up_down_up_eq_up_up_down r1 (acc.refl w1)) r2))).
+        specialize (IHe2 w2 (persist w G w2 (r1 ⊙ˢ Sub.triangular r2))).
         revert IHe2.
         apply option.wlp_monotonic.
         intros (w3 & r3 & t2) H2.
         rewrite option.wlp_bind.
-        specialize (IHe3 w3 (persist w2 (persist w G w2 (up_down_down_eq_up_down (up_down_up_eq_up_up_down r1 (acc.refl w1)) r2)) w3 r3)).
+        specialize (IHe3 w3 (persist w2 (persist w G w2 (r1 ⊙ˢ Sub.triangular r2)) w3 r3)).
         revert IHe3.
         apply option.wlp_monotonic.
         intros (w4 & r4 & t3) H3.
         rewrite option.wlp_bind.
-        destruct (Unification.Variant1.mgu_spec (persist w3 t2 w4 r4) t3) as [(w5 & r5 & [])|]; [|constructor].
+        destruct (mgu_spec (persist w3 t2 w4 r4) t3) as [(w5 & r5 & [])|]; [|constructor].
         constructor. constructor. intros ι.
-        (* Need composition of assignments with new Kripke frame. *)
+        (* Need composition of assignments with Subs. *)
         admit.
       - destruct value eqn:?.
         + constructor. intros. exists (e_var s).
-          constructor. cbn.
-          (* need value inst lemma *)
+          constructor.
+          (* need value inst lemma, and persist_subid *)
           admit.
         + constructor.
       - rewrite option.wlp_bind.
-        specialize (IHe (w ▻ 0) (cons (pair s (Ty_hole (ctx.snoc w 0) 0 ctx.in_zero)) (persist w G (ctx.snoc w 0) step))).
+        specialize (IHe (w ▻ 0) (cons (pair s (Ty_hole (ctx.snoc w 0) 0 ctx.in_zero)) (persist w G (ctx.snoc w 0) Sub.step))).
         revert IHe.
         apply option.wlp_monotonic.
         intros (w1 & r1 & t1) H1.
@@ -437,22 +478,22 @@ Module UpDown.
         (* need inst lift lemma *)
         admit.
       - rewrite option.wlp_bind.
-        specialize (IHe1 (w ▻ 0) (persist _ G _ step)).
+        specialize (IHe1 w G).
         revert IHe1.
         apply option.wlp_monotonic.
         intros (w1 & r1 & t1) H1.
         rewrite option.wlp_bind.
-        specialize (IHe2 w1 (persist _ (persist _ G _ step) _ r1)).
+        specialize (IHe2 w1 (persist _ G _ r1)).
         revert IHe2.
         apply option.wlp_monotonic.
         intros (w2 & r2 & t2) H2.
         rewrite option.wlp_bind.
-        destruct (Unification.Variant1.mgu_spec
-                    (persist w1 t1 w2 r2)
-                    (Ty_func w2 t2 (persist (ctx.snoc w 0) (Ty_hole (ctx.snoc w 0) 0 ctx.in_zero) w2 (acc_trans r1 r2))))
+        destruct (mgu_spec
+                    <{ t1 ~ r2 ⊙ˢ Sub.step }>
+                    (Ty_func (w2 ▻ 0) <{ t2 ~ Sub.step }> (Ty_hole (w2 ▻ 0) 0 ctx.in_zero)))
           as [(w3 & r3 & [])|]; [|constructor].
         constructor. constructor. intros ι.
-        (* Need composition of assignments with new Kripke frame. *)
+        (* Need composition of assignments with Subs *)
         admit.
     Admitted.
 
@@ -460,32 +501,26 @@ Module UpDown.
       forall w : World,
         option.wp
           (fun '(existT _ w1 (r1, b)) =>
-             exists w2 (r2 : w1 ⇅ w2), <{ b ~ r2 }> = lift t w2)
+             forall w2 (r2 : w1 ⊒ˢ w2),
+             exists w3 (r3 : w2 ⊒ˢ w3), <{ b ~ r2 ⊙ˢ r3 }> = lift t w3)
           (infer e w (liftEnv G w)).
     Proof.
-      induction R; cbn; intros w; unfold pure.
-      - constructor. exists w. exists (acc_refl _). reflexivity.
-      - constructor. exists w. exists (acc_refl _). reflexivity.
+      induction R; cbn - [Sub.step Sub.subst persist]; intros w; unfold pure.
+      - constructor. intros w2 r2. exists w2. exists Sub.id. reflexivity.
+      - constructor. intros w2 r2. exists w2. exists Sub.id. reflexivity.
+
       - rewrite option.wp_bind.
         specialize (IHR1 w). revert IHR1.
         apply option.wp_monotonic.
         intros (w1 & r1 & t1) H1.
         rewrite option.wp_bind.
-        destruct (Unification.Variant1.mgu_spec t1 (Ty_bool w1)) as [(w2 & r2 & [])|].
+        destruct (mgu_spec t1 (Ty_bool w1)) as [(w2 & r2 & [])|].
         2: {
           exfalso.
-          destruct H1 as (w2 & r2 & Heq).
-          eapply (H w2); clear H.
-          Unshelve.
-          2: {
-            apply env.tabulate. intros x xIn.
-            refine (persist _ (Ty_hole _ x xIn) _ r2).
-          }
-          cbn.
-          destruct t1; cbn in *.
-          + reflexivity.
-          + rewrite persist_func in Heq. discriminate Heq.
-          + hnf; cbn. now rewrite env.lookup_tabulate.
+          destruct (H1 w1 Sub.id) as (w2 & r2 & Heq).
+          rewrite Sub.comp_id_left in Heq.
+          eapply (H w2 r2); clear H.
+          apply Heq.
         }
         constructor.
         rewrite option.wp_bind.
@@ -499,15 +534,102 @@ Module UpDown.
         apply option.wp_monotonic.
         intros (w4 & r4 & t3) H3.
         rewrite option.wp_bind.
-        destruct (Unification.Variant1.mgu_spec <{ t2 ~ r4 }> t3) as [(w5 & r5 & [])|].
+        destruct (mgu_spec <{ t2 ~ r4 }> t3) as [(w5 & r5 & [])|].
         2: {
           exfalso.
-          admit.
+          specialize (H3 w4 Sub.id). destruct H3 as (w5 & r5 & H3).
+          rewrite Sub.comp_id_left in H3.
+          specialize (H2 w5 (r4 ⊙ˢ r5)). destruct H2 as (w6 & r6 & H2).
+          apply (H0 w6 (r5 ⊙ˢ r6)). clear - H2 H3.
+          cbv [P.max P.unifies persist PersistentSub_Ty] in *.
+          repeat rewrite Sub.subst_comp in *.
+          rewrite H2, H3. rewrite subst_lift. easy.
+        }
+
+        constructor.
+        constructor.
+        intros w6 r6. specialize (H3 w6 (Sub.triangular r5 ⊙ˢ r6)).
+        destruct H3 as (w7 & r7 & H3).
+        exists w7. exists r7. clear - H3.
+        cbv [P.max P.unifies persist PersistentSub_Ty] in *.
+        now repeat rewrite Sub.subst_comp in *.
+
+      - rewrite value_lift. rewrite H.
+        constructor. intros. exists w2. exists Sub.id.
+        now rewrite persist_liftTy.
+
+      - rewrite option.wp_bind.
+        specialize (IHR (w ▻ 0)). revert IHR.
+        rewrite persist_liftEnv. cbn.
+        rename v into x.
+        admit.
+
+      - rewrite option.wp_bind.
+        specialize (IHR w). revert IHR.
+        apply option.wp_monotonic.
+        intros (w1 & r1 & t1) H1.
+        constructor.
+        intros w2 r2.
+        specialize (H1 w2 r2). destruct H1 as (w3 & r3 & H1).
+        exists w3, r3. cbn. f_equal.
+        + now rewrite persist_liftTy, subst_lift.
+        + apply H1.
+
+      - rewrite option.wp_bind.
+        specialize (IHR1 w). revert IHR1.
+        apply option.wp_monotonic.
+        intros (w1 & r1 & tf) H1.
+        rewrite option.wp_bind.
+        specialize (IHR2 w1). revert IHR2.
+        rewrite persist_liftEnv.
+        apply option.wp_monotonic.
+        intros (w2 & r2 & ta) H2.
+        rewrite option.wp_bind.
+        destruct
+          (mgu_spec
+             <{ tf ~ r2 ⊙ˢ Sub.step }>
+             (Ty_func (w2 ▻ 0) <{ ta ~ Sub.step }> (Ty_hole (w2 ▻ 0) 0 ctx.in_zero)))
+          as [(w3 & r3' & [])|].
+        2: {
+          exfalso.
+          specialize (H1 w2 r2).
+          destruct H1 as (w3 & r3 & H1).
+          specialize (H2 w3 r3). destruct H2 as (w4 & r4 & H2).
+          apply (H w4 (Sub.thick ctx.in_zero (lift t1 _) ⊙ˢ r3 ⊙ˢ r4)).
+          cbv [P.max P.unifies persist PersistentSub_Ty Sub.step] in *.
+          cbn - [Sub.thin Sub.thick].
+          repeat rewrite Sub.subst_comp in *.
+          rewrite
+            (Sub.thin_thick_pointful
+              ctx.in_zero
+              (lift t1 w2)
+              (Sub.subst tf r2)).
+          rewrite
+            (Sub.thin_thick_pointful
+              ctx.in_zero
+              (lift t1 w2)
+              ta).
+          cbn. now rewrite H1, H2, ?subst_lift.
         }
         constructor.
         constructor.
-        rewrite Definitions.refl_persist.
-        admit.
+        destruct H as [Hu _].
+        cbv [P.max P.unifies persist PersistentSub_Ty Sub.step] in *.
+        remember (Sub.triangular r3') as r3.
+        clear r3' Heqr3.
+        intros w4 r4.
+        specialize (H1 w4 (r2 ⊙ˢ Sub.thin ctx.in_zero ⊙ˢ r3 ⊙ˢ r4)).
+        destruct H1 as (w5 & r5 & H1).
+        specialize (H2 w5 (Sub.thin ctx.in_zero ⊙ˢ r3 ⊙ˢ r4 ⊙ˢ r5)).
+        destruct H2 as (w6 & r6 & H2).
+        cbn - [Sub.thin Sub.thick] in *.
+        exists w6, (r5 ⊙ˢ r6).
+        rewrite ?Sub.subst_comp in *.
+        rewrite Hu in H1. clear Hu.
+        cbn - [Sub.thin] in H1.
+        injection H1. intros H11 H12. clear H1.
+        now rewrite H11, subst_lift.
+
     Admitted.
 
   End EagerSolving.
@@ -712,7 +834,7 @@ Module UpDown.
         split. auto.
         rewrite wp_bind; cbn [wp].
         specialize (IHR2 w3 w3 (acc_refl _)). revert IHR2.
-        rewrite persist_liftEnv.
+        (* rewrite persist_liftEnv. *)
     Admitted.
 
   End Attempt3.

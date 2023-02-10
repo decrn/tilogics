@@ -67,6 +67,8 @@ Module Sub.
     env.tabulate (thickIn xIn s).
   Definition thin {w x} (xIn : x ∈ w) : w - x ⊒ˢ w :=
     env.tabulate (fun y yIn => Ty_hole (ctx.in_thin xIn yIn)).
+  Definition step {w x} : w ⊒ˢ w ▻ x :=
+    thin ctx.in_zero.
   Definition comp {w0 w1 w2} (ζ1 : w0 ⊒ˢ w1) (ζ2 : w1 ⊒ˢ w2) : w0 ⊒ˢ w2 :=
     env.map (fun _ t => subst t ζ2) ζ1.
   Local Infix "⊙ˢ" := comp (at level 60, right associativity).
@@ -130,14 +132,18 @@ Module Sub.
     - now rewrite comp_assoc, IHζ01.
   Qed.
 
-  Lemma comp_thin_thick {w x} (xIn : x ∈ w) (t : Ty (w - x)) :
-    comp (thin xIn) (thick xIn t) = id.
+  Lemma comp_thin_thick {w x} (xIn : x ∈ w) (s : Ty (w - x)) :
+    comp (thin xIn) (thick xIn s) = id.
   Proof.
     apply env.lookup_extensional. intros y yIn.
     rewrite lookup_comp, lookup_id, lookup_thin. cbn.
     rewrite lookup_thick. unfold thickIn.
     now rewrite ctx.occurs_check_view_thin.
   Qed.
+
+  Lemma thin_thick_pointful {w x} (xIn : x ∈ w) (s : Ty (w - x)) (t : Ty (w - x)) :
+    subst (subst t (thin xIn)) (thick xIn s) = t.
+  Proof. now rewrite <- subst_comp, comp_thin_thick, subst_id. Qed.
 
   Lemma subst_thin {w x} (xIn : x ∈ w) (T : Ty (w - x)) :
     Triangular.thin xIn T = subst T (thin xIn).
@@ -210,6 +216,7 @@ Module Sub.
   Qed.
 
 End Sub.
+Export Sub (Sub).
 Infix "⊒ˢ" := Sub.Sub.
 Infix "⊙ˢ" := Sub.comp (at level 60, right associativity).
 Infix "≽ˢ" := Sub.geq (at level 80).
