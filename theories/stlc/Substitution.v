@@ -71,6 +71,8 @@ Module Sub.
     thin ctx.in_zero.
   Definition comp {w0 w1 w2} (ζ1 : w0 ⊒ˢ w1) (ζ2 : w1 ⊒ˢ w2) : w0 ⊒ˢ w2 :=
     env.map (fun _ t => subst t ζ2) ζ1.
+  Definition up1 {w0 w1} (r01 : Sub w0 w1) {n} : Sub (w0 ▻ n) (w1 ▻ n) :=
+    env.snoc (env.map (fun _ t => subst t step) r01) n (Ty_hole ctx.in_zero).
   Local Infix "⊙ˢ" := comp (at level 60, right associativity).
 
   Fixpoint triangular {w1 w2} (ζ : w1 ⊒⁻ w2) : w1 ⊒ˢ w2 :=
