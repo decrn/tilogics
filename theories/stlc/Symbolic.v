@@ -1387,11 +1387,39 @@ Module ConstraintsOnly.
       econstructor; eauto.
   Admitted.
 
-  Lemma completeness G e t ee (T : G |-- e ; t ~> ee) :
-    forall w,
-      exists (ι : Assignment w),
-        C.denote (check e (liftEnv G _) (lift t _)) ι.
+  Lemma completeness_aux {G e t ee} (T : G |-- e; t ~> ee) :
+    forall (w0 : World) (ι0 : Assignment w0) (G0 : Env w0) (t0 : Ty w0),
+      G = inst G0 ι0 -> t = inst t0 ι0 -> C.denote (check e G0 t0) ι0.
   Proof.
+    induction T; cbn; intros w0 ι0 G0 t0 ? ?; subst.
+    - auto.
+    - auto.
+    - intuition.
+    - rewrite value_inst in H.
+      destruct value; [|discriminate].
+      now injection H.
+    - exists vt. exists t. rewrite H0.
+      split. admit.
+      apply IHT; cbn. f_equal. admit.
+      reflexivity.
+    - exists t. rewrite inst_lift. rewrite H0.
+      split. admit.
+      apply IHT; cbn. rewrite inst_lift.
+      f_equal. admit.
+      reflexivity.
+    - exists t2. split.
+      apply IHT1; cbn. admit.
+      f_equal. admit.
+      apply IHT2; cbn. admit.
+      reflexivity.
+  Admitted.
+
+  Lemma completeness G e t ee (T : G |-- e ; t ~> ee) :
+    C.denote (check e (liftEnv G _) (lift t _)) env.nil.
+  Proof.
+    eapply completeness_aux; eauto.
+    - admit.
+    - now rewrite inst_lift.
   Admitted.
 
 End ConstraintsOnly.
