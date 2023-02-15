@@ -300,6 +300,10 @@ Proof.
   - now destruct String.string_dec.
 Qed.
 
+Lemma inst_lift (w : World) (t : ty) (ι : Assignment w) :
+  inst (lift t w) ι = t.
+Proof. Admitted.
+
 Module UpDown.
   #[local] Notation "□⇅ A" := (BoxR Acc A) (at level 9, format "□⇅ A", right associativity)
       : indexed_scope.
@@ -1259,3 +1263,135 @@ Module EagerSolving.
   Admitted.
 
 End EagerSolving.
+
+(* Focus on the constraint generation only, forget about solving constraints
+   and any semantic values. Also try to pass the type as an input instead of
+   an output, i.e. checking instead of synthesizing. *)
+Module ConstraintsOnly.
+
+  Import option.notations.
+  Import Unification.
+
+  #[local] Set Implicit Arguments.
+  #[local] Arguments Sub.step : simpl never.
+
+  Module C.
+
+    Inductive CStr (w : World) : Type :=
+    | False
+    | Eq (t1 t2 : Ty w)
+    | And (C1 C2 : CStr w)
+    | Ex {x} (C : CStr (w ▻ x)).
+    #[global] Arguments False {w}.
+    #[global] Arguments Ex [w] x C.
+
+    Definition denote : ⊢ CStr -> Lifted Prop :=
+      fix den {w} C ι {struct C} : Prop :=
+        match C with
+        | False     => Logic.False
+        | Eq t1 t2  => inst t1 ι = inst t2 ι
+        | And C1 C2 => den C1 ι /\ den C2 ι
+        | Ex x C    => exists t, den C (env.snoc ι x t)
+        end.
+
+  End C.
+  Export C (CStr).
+
+  Notation "C1 /\ C2" := (C.And C1 C2).
+  Notation "t1 == t2" := (C.Eq t1 t2) (at level 80).
+  Notation "∃ n , C" := (C.Ex n C) (at level 80, right associativity, format "∃ n ,  C").
+
+  Fixpoint check (e : expr) : ⊢ Env -> Ty -> CStr :=
+    fun (w : World) (G : Env w) (tr : Ty w) =>
+      match e with
+      | e_if e1 e2 e3 =>
+          check e1 G (Ty_bool w) /\
+          check e2 G tr /\
+          check e3 G tr
+      | e_var s =>
+          match value s G with
+          | Some a => tr == a
+          | None => C.False
+          end
+      | e_absu x e =>
+          ∃1, ∃2,
+            let G'  := <{ G ~ Sub.step ⊙ˢ Sub.step }> in
+            let tr' := <{ tr ~ Sub.step ⊙ˢ Sub.step }> in
+            let α1  := Ty_hole (w ▻ 1 ▻ 2) 1 (ctx.in_succ ctx.in_zero) in
+            let α2  := Ty_hole (w ▻ 1 ▻ 2) 2 ctx.in_zero in
+            (tr' == Ty_func _ α1 α2) /\
+            check e ((x, α1) :: G') α2
+      | e_abst x xt e =>
+          ∃2,
+            let G'  := <{ G ~ Sub.step }> in
+            let tr' := <{ tr ~ Sub.step }> in
+            let α1  := lift xt _ in
+            let α2  := Ty_hole (w ▻ 2) 2 ctx.in_zero in
+            (tr' == Ty_func _ α1 α2) /\
+            check e ((x, α1) :: G') α2
+      | e_app e1 e2 =>
+          ∃0,
+            let G'  := <{ G ~ Sub.step }> in
+            let tr' := <{ tr ~ Sub.step }> in
+            let α   := Ty_hole (w ▻ 0) 0 ctx.in_zero in
+            check e1 G' (Ty_func _ α tr') /\
+            check e2 G' α
+      | _ => tr == Ty_bool w
+      end.
+
+  Lemma soundness e :
+    forall (w : World) G t (ι : Assignment w),
+      C.denote (check e G t) ι ->
+      exists ee, inst G ι |-- e ; inst t ι ~> ee.
+  Proof.
+    induction e; cbn; intros w G tr ι.
+    - intros ->. eexists. constructor.
+    - intros ->. eexists. constructor.
+    - intros (H1 & H2 & H3).
+      specialize (IHe1 _ _ _ _ H1). clear H1. destruct IHe1 as (e1' & HT1).
+      specialize (IHe2 _ _ _ _ H2). clear H2. destruct IHe2 as (e2' & HT2).
+      specialize (IHe3 _ _ _ _ H3). clear H3. destruct IHe3 as (e3' & HT3).
+      eexists. constructor; eauto.
+    - destruct value eqn:?; cbn; intros Heq; [|contradiction].
+      eexists. constructor. now rewrite value_inst, Heqo, Heq.
+    - intros (t1 & t2 & H1 & H2).
+      specialize (IHe _ _ _ _ H2). clear H2.
+      destruct IHe as (e1' & HT). cbn in HT.
+      assert (inst (persist _ G _ (Sub.step ⊙ˢ Sub.step)) (env.snoc (env.snoc ι 1 t1) 2 t2) = inst G ι).
+      { clear. admit. }.
+      rewrite H in HT. clear H.
+      assert (inst <{ tr ~ Sub.step ⊙ˢ Sub.step }> (env.snoc (env.snoc ι 1 t1) 2 t2) = inst tr ι).
+      { clear. admit. }.
+      rewrite H in H1. clear H. rewrite H1. clear H1.
+      eexists. constructor. eauto.
+    - intros (t1 & H1 & H2).
+      specialize (IHe _ _ _ _ H2). clear H2.
+      destruct IHe as (e' & HT). cbn in HT.
+      assert (inst (persist _ G _ Sub.step) (env.snoc ι 2 t1) = inst G ι).
+      { clear. admit. }.
+      rewrite H in HT. clear H.
+      assert (inst (persist _ tr _ Sub.step) (env.snoc ι 2 t1) = inst tr ι).
+      { clear. admit. }.
+      rewrite H in H1. clear H. rewrite H1. clear H1.
+      rewrite inst_lift in HT. rewrite inst_lift.
+      eexists. constructor. eauto.
+    - intros (t1 & H1 & H2).
+      specialize (IHe1 _ _ _ _ H1). clear H1. destruct IHe1 as (e1' & HT1).
+      specialize (IHe2 _ _ _ _ H2). clear H2. destruct IHe2 as (e2' & HT2).
+      exists (e_app e1' e2').
+      cbn in HT1, HT2.
+      assert (inst <{ G ~ Sub.step }> (env.snoc ι 0 t1) = inst G ι) by admit.
+      rewrite H in *. clear H.
+      assert (inst <{ tr ~ Sub.step }> (env.snoc ι 0 t1) = inst tr ι) by admit.
+      rewrite H in *. clear H.
+      econstructor; eauto.
+  Admitted.
+
+  Lemma completeness G e t ee (T : G |-- e ; t ~> ee) :
+    forall w,
+      exists (ι : Assignment w),
+        C.denote (check e (liftEnv G _) (lift t _)) ι.
+  Proof.
+  Admitted.
+
+End ConstraintsOnly.
