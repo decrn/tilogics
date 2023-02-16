@@ -304,6 +304,29 @@ Lemma inst_lift (w : World) (t : ty) (ι : Assignment w) :
   inst (lift t w) ι = t.
 Proof. Admitted.
 
+Lemma inst_lift_env (w : World) (G : env) (ι : Assignment w) :
+  inst (liftEnv G w) ι = G.
+Proof. Admitted.
+
+#[export] Instance InstSub {w} : Inst (Sub w) (Assignment w).
+Admitted.
+
+Lemma inst_persist_ty {w0 w1} (t : Ty w0) (r : Sub w0 w1) (ι : Assignment w1) :
+  inst (persist _ t _ r) ι = inst t (inst r ι).
+Admitted.
+
+Lemma inst_persist_env {w0 w1} (G : Env w0) (r : Sub w0 w1) (ι : Assignment w1) :
+  inst (persist _ G _ r) ι = inst G (inst r ι).
+Admitted.
+
+Lemma inst_comp {w0 w1 w2} (r1 : Sub w0 w1) (r2 : Sub w1 w2) (ι : Assignment w2) :
+  inst (r1 ⊙ˢ r2) ι = inst r1 (inst r2 ι).
+Admitted.
+
+Lemma inst_step {w n} (ι : Assignment w) (t : ty) :
+  inst Sub.step (env.snoc ι n t) = ι.
+Admitted.
+
 Module UpDown.
   #[local] Notation "□⇅ A" := (BoxR Acc A) (at level 9, format "□⇅ A", right associativity)
       : indexed_scope.
@@ -1357,35 +1380,23 @@ Module ConstraintsOnly.
     - intros (t1 & t2 & H1 & H2).
       specialize (IHe _ _ _ _ H2). clear H2.
       destruct IHe as (e1' & HT). cbn in HT.
-      assert (inst (persist _ G _ (Sub.step ⊙ˢ Sub.step)) (env.snoc (env.snoc ι 1 t1) 2 t2) = inst G ι).
-      { clear. admit. }.
-      rewrite H in HT. clear H.
-      assert (inst <{ tr ~ Sub.step ⊙ˢ Sub.step }> (env.snoc (env.snoc ι 1 t1) 2 t2) = inst tr ι).
-      { clear. admit. }.
-      rewrite H in H1. clear H. rewrite H1. clear H1.
+      rewrite ?inst_lift, ?inst_persist_env, ?inst_persist_ty, ?inst_comp, ?inst_step in *.
+      rewrite H1. clear H1.
       eexists. constructor. eauto.
     - intros (t1 & H1 & H2).
       specialize (IHe _ _ _ _ H2). clear H2.
       destruct IHe as (e' & HT). cbn in HT.
-      assert (inst (persist _ G _ Sub.step) (env.snoc ι 2 t1) = inst G ι).
-      { clear. admit. }.
-      rewrite H in HT. clear H.
-      assert (inst (persist _ tr _ Sub.step) (env.snoc ι 2 t1) = inst tr ι).
-      { clear. admit. }.
-      rewrite H in H1. clear H. rewrite H1. clear H1.
-      rewrite inst_lift in HT. rewrite inst_lift.
+      rewrite ?inst_lift, ?inst_persist_env, ?inst_persist_ty, ?inst_comp, ?inst_step in *.
+      rewrite H1. clear H1.
       eexists. constructor. eauto.
     - intros (t1 & H1 & H2).
       specialize (IHe1 _ _ _ _ H1). clear H1. destruct IHe1 as (e1' & HT1).
       specialize (IHe2 _ _ _ _ H2). clear H2. destruct IHe2 as (e2' & HT2).
       exists (e_app e1' e2').
       cbn in HT1, HT2.
-      assert (inst <{ G ~ Sub.step }> (env.snoc ι 0 t1) = inst G ι) by admit.
-      rewrite H in *. clear H.
-      assert (inst <{ tr ~ Sub.step }> (env.snoc ι 0 t1) = inst tr ι) by admit.
-      rewrite H in *. clear H.
+      rewrite ?inst_lift, ?inst_persist_env, ?inst_persist_ty, ?inst_comp, ?inst_step in *.
       econstructor; eauto.
-  Admitted.
+  Qed.
 
   Lemma completeness_aux {G e t ee} (T : G |-- e; t ~> ee) :
     forall (w0 : World) (ι0 : Assignment w0) (G0 : Env w0) (t0 : Ty w0),
@@ -1398,28 +1409,30 @@ Module ConstraintsOnly.
     - rewrite value_inst in H.
       destruct value; [|discriminate].
       now injection H.
-    - exists vt. exists t. rewrite H0.
-      split. admit.
-      apply IHT; cbn. f_equal. admit.
-      reflexivity.
-    - exists t. rewrite inst_lift. rewrite H0.
-      split. admit.
-      apply IHT; cbn. rewrite inst_lift.
-      f_equal. admit.
-      reflexivity.
+    - exists vt, t. rewrite H0. split.
+      + now rewrite inst_persist_ty, inst_comp, !inst_step.
+      + apply IHT; cbn; [|easy].
+        now rewrite inst_persist_env, inst_comp, !inst_step.
+    - exists t. split.
+      + now rewrite inst_lift, inst_persist_ty, inst_step.
+      + apply IHT; cbn; [|easy].
+        now rewrite inst_lift, inst_persist_env, inst_step.
     - exists t2. split.
-      apply IHT1; cbn. admit.
-      f_equal. admit.
-      apply IHT2; cbn. admit.
-      reflexivity.
-  Admitted.
+      + apply IHT1; cbn.
+        * now rewrite inst_persist_env, inst_step.
+        * now rewrite inst_persist_ty, inst_step.
+      + apply IHT2; cbn; [|easy].
+        now rewrite inst_persist_env, inst_step.
+  Qed.
 
-  Lemma completeness G e t ee (T : G |-- e ; t ~> ee) :
+  Corollary completeness G e t ee (T : G |-- e ; t ~> ee) :
     C.denote (check e (liftEnv G _) (lift t _)) env.nil.
   Proof.
     eapply completeness_aux; eauto.
-    - admit.
+    - now rewrite inst_lift_env.
     - now rewrite inst_lift.
-  Admitted.
+  Qed.
 
 End ConstraintsOnly.
+
+Module
