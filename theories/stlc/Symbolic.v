@@ -1507,28 +1507,27 @@ Module CandidateType.
                     check e1 <{ G ~ step .> r1 }> <{ α ~ r1 }>
   end.
 
-  Definition WP {A} : ⊢ FreeM A -> □⁺(A -> Assignment -> PROP) -> Assignment -> PROP. refine (
-      fix WP w m POST ı {struct m} :=
-        match m with
-        | Ret_Free _ _ v => POST w refl v ı
-        | Fail_Free _ _ => False
-        | Bind_AssertEq_Free _ _ t1 t2 k =>
-            t1 = t2 /\ WP _ k POST ı
-        | Bind_Exists_Free _ _ i k =>
-            WP _ k (_4 w POST (w ▻ i) (acc.fresh _ i _ refl)) (env.snoc ı _ _)
-        end).
-                                                                                 Proof. constructor 1. Defined. (* TODO *)
+  Definition WP {A} : ⊢ FreeM A -> □⁺(A -> Assignment -> PROP) -> Assignment -> PROP :=
+    fix WP w m POST ı {struct m} :=
+      match m with
+      | Ret_Free _ _ v => POST w refl v ı
+      | Fail_Free _ _ => False
+      | Bind_AssertEq_Free _ _ t1 t2 k =>
+          t1 = t2 /\ WP _ k POST ı
+      | Bind_Exists_Free _ _ i k =>
+          exists t, WP _ k (_4 w POST (w ▻ i) (acc.fresh _ i _ refl)) (env.snoc ı i t)
+      end.
 
   Lemma wp_monotonic {A w} (m : FreeM A w) (p q : □⁺(A -> Assignment -> PROP) w)
     (pq : forall w1 r1 a1 ι1, p w1 r1 a1 ι1 -> q w1 r1 a1 ι1) :
     forall (ι : Assignment w), WP m p ι -> WP m q ι.
-  Proof. induction m; cbn; firstorder. Qed.
+  Proof. induction m; cbn; firstorder. exists x. firstorder. Qed.
 
   Lemma wp_bind {A B w} (m : FreeM A w) (f : □⁺(A -> FreeM B) w) :
     forall (Q : □⁺(B -> Assignment -> PROP) w) (ι : Assignment w),
       WP (bind m f) Q ι <->
       WP m (fun _ r a => WP (f _ r a) (_4 _ Q _ r)) ι.
-  Proof. split; intros; induction m; cbn; firstorder. Qed.
+  Proof. split; intros; induction m; cbn; firstorder; exists x; firstorder. Qed.
 
   Lemma completeness_aux {G e t ee} (T : G |-- e; t ~> ee) :
     forall (w0 : World) (ι0 : Assignment w0) (G0 : Env w0) (t0 : Ty w0),
