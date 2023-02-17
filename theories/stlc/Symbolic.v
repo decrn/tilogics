@@ -1454,3 +1454,75 @@ Module ConstraintsOnly.
 
 End ConstraintsOnly.
 
+Module CandidateType.
+
+  #[local] Set Implicit Arguments.
+  #[local] Arguments Sub.step : simpl never.
+
+  Local Notation "[ ω ] x <- ma ;; mb" :=
+    (bind ma (fun _ ω x => mb))
+      (at level 80, x at next level,
+        ma at next level, mb at level 200,
+        right associativity).
+
+  Local Notation "∃ n , m" :=
+    (Bind_Exists_Free _ _ n m)
+      (at level 80, right associativity, format "∃ n ,  m").
+
+  Notation "t1 == t2 //\ m" := (Bind_AssertEq_Free _ _ t1 t2 m) (at level 70).
+
+  Fixpoint check (e : expr) : ⊢ Env -> Ty -> FreeM Unit :=
+    fun w G tr =>
+      match e with
+      | v_true => Bind_AssertEq_Free Unit w tr (Ty_bool w) (Ret_Free Unit w tt)
+      | v_false => Bind_AssertEq_Free Unit w tr (Ty_bool w) (Ret_Free Unit w tt)
+      | e_if e0 e1 e2 =>
+        [r1] _ <- check e0 G (Ty_bool w)   ;;
+        [r2] _ <- check e1 <{ G ~ r1 }> <{ tr ~ r1 }> ;;
+        check e2 <{ G ~ r1 .> r2 }> <{ tr ~ r1 .> r2 }>
+      | e_var s =>
+        match value s G with
+        | Some a => Bind_AssertEq_Free Unit w tr a (Ret_Free Unit w tt)
+        | None => Fail_Free Unit w
+        end
+      | e_absu s e0 =>
+        ∃1, ∃2,
+          let tr' := <{ tr ~ step .> step }> in
+          let α1  := Ty_hole _ 1 (ctx.in_succ ctx.in_zero) in
+          let α2  := Ty_hole _ 2 ctx.in_zero in
+          tr' == Ty_func _ α1 α2 //\
+          check e0 ((s, α1) :: <{ G ~ step .> step }>) α2
+
+      | e_abst s t e0 =>
+        ∃2,
+          let tr' := <{ tr ~ step }> in
+          let α1  := lift t (w ▻ 2) in
+          let α2  := Ty_hole (w ▻ 2) 2 ctx.in_zero in
+          tr' == Ty_func (w ▻ 2) α1 α2 //\
+          check e0 ((s, α1) :: <{ G ~ step }>) α2
+      | e_app e0 e1 =>
+        ∃0,
+          let α := Ty_hole (w ▻ 0) 0 ctx.in_zero in
+          [r1] _ <- check e0 <{ G ~ step }> (Ty_func _ α <{ tr ~ step }>) ;;
+                    check e1 <{ G ~ step .> r1 }> <{ α ~ r1 }>
+  end.
+
+  Definition WP {A} : ⊢ FreeM A -> □⁺(A -> Assignment -> PROP) -> Assignment -> PROP.
+  Admitted.
+
+  Lemma wp_monotonic {A w} (m : FreeM A w) (p q : □⁺(A -> Lifted Prop) w)
+    (pq : forall w1 r1 a1 ι1, p w1 r1 a1 ι1 -> q w1 r1 a1 ι1) :
+    forall (ι : Assignment w), WP m p ι -> WP m q ι.
+  Admitted.
+  Lemma wp_bind {A B w} (m : FreeM A w) (f : □⁺(A -> FreeM B) w) :
+    forall (Q : □⁺(B -> Lifted Prop) w) (ι : Assignment w),
+      WP (bind m f) Q ι <->
+      WP m (fun _ r a => WP (f _ r a) (_4 _ Q _ r)) ι.
+  Admitted.
+
+  Lemma completeness_aux {G e t ee} (T : G |-- e; t ~> ee) :
+    forall (w0 : World) (ι0 : Assignment w0) (G0 : Env w0) (t0 : Ty w0),
+      G = inst G0 ι0 -> t = inst t0 ι0 ->
+      WP (check e G0 t0) (fun w1 r1 _ ι1 => ι0 = compose r1 ι1)%type ι0.
+  Admitted.
+
