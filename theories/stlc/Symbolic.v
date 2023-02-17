@@ -1507,22 +1507,33 @@ Module CandidateType.
                     check e1 <{ G ~ step .> r1 }> <{ α ~ r1 }>
   end.
 
-  Definition WP {A} : ⊢ FreeM A -> □⁺(A -> Assignment -> PROP) -> Assignment -> PROP.
-  Admitted.
+  Definition WP {A} : ⊢ FreeM A -> □⁺(A -> Assignment -> PROP) -> Assignment -> PROP. refine (
+      fix WP w m POST ı {struct m} :=
+        match m with
+        | Ret_Free _ _ v => POST w refl v ı
+        | Fail_Free _ _ => False
+        | Bind_AssertEq_Free _ _ t1 t2 k =>
+            t1 = t2 /\ WP _ k POST ı
+        | Bind_Exists_Free _ _ i k =>
+            WP _ k (_4 w POST (w ▻ i) (acc.fresh _ i _ refl)) (env.snoc ı _ _)
+        end).
+                                                                                 Proof. constructor 1. Defined. (* TODO *)
 
-  Lemma wp_monotonic {A w} (m : FreeM A w) (p q : □⁺(A -> Lifted Prop) w)
+  Lemma wp_monotonic {A w} (m : FreeM A w) (p q : □⁺(A -> Assignment -> PROP) w)
     (pq : forall w1 r1 a1 ι1, p w1 r1 a1 ι1 -> q w1 r1 a1 ι1) :
     forall (ι : Assignment w), WP m p ι -> WP m q ι.
-  Admitted.
+  Proof. induction m; cbn; firstorder. Qed.
+
   Lemma wp_bind {A B w} (m : FreeM A w) (f : □⁺(A -> FreeM B) w) :
-    forall (Q : □⁺(B -> Lifted Prop) w) (ι : Assignment w),
+    forall (Q : □⁺(B -> Assignment -> PROP) w) (ι : Assignment w),
       WP (bind m f) Q ι <->
       WP m (fun _ r a => WP (f _ r a) (_4 _ Q _ r)) ι.
-  Admitted.
+  Proof. split; intros; induction m; cbn; firstorder. Qed.
 
   Lemma completeness_aux {G e t ee} (T : G |-- e; t ~> ee) :
     forall (w0 : World) (ι0 : Assignment w0) (G0 : Env w0) (t0 : Ty w0),
       G = inst G0 ι0 -> t = inst t0 ι0 ->
-      WP (check e G0 t0) (fun w1 r1 _ ι1 => ι0 = compose r1 ι1)%type ι0.
+      WP (check e G0 t0) (fun w1 r01 _ ι1 => ι0 = compose r01 ι1)%type ι0.
   Admitted.
 
+End CandidateType.
