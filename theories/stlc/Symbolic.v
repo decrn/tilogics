@@ -178,7 +178,7 @@ Fixpoint down_add {α w1 w2} (t : Tri w1 w2) {struct t} : Tri (w1 ▻ α) (w2 �
   match t with
   | Tri.refl => Tri.refl
   | @Tri.cons _ _ x _ t r =>
-    @Tri.cons _ _ x (ctx.in_succ _) (persist _ t _ acc.step) (down_add r)
+    @Tri.cons _ _ x (ctx.in_succ _) (persist _ t _ step) (down_add r)
   end.
 
 Definition up_down_down_eq_up_down {w1 w2 w3} (r12 : w1 ⇅ w2) (down : w2 ↓ w3) : w1 ⇅ w3 :=
@@ -311,6 +311,9 @@ Proof. Admitted.
 #[export] Instance InstSub {w} : Inst (Sub w) (Assignment w).
 Admitted.
 
+#[export] Instance InstAccessibility {w} : Inst (Accessibility w) (Assignment w).
+Admitted.
+
 Lemma inst_persist_ty {w0 w1} (t : Ty w0) (r : Sub w0 w1) (ι : Assignment w1) :
   inst (persist _ t _ r) ι = inst t (inst r ι).
 Admitted.
@@ -323,8 +326,22 @@ Lemma inst_comp {w0 w1 w2} (r1 : Sub w0 w1) (r2 : Sub w1 w2) (ι : Assignment w2
   inst (r1 ⊙ˢ r2) ι = inst r1 (inst r2 ι).
 Admitted.
 
-Lemma inst_step {w n} (ι : Assignment w) (t : ty) :
+Lemma inst_sub_step {w n} (ι : Assignment w) (t : ty) :
   inst Sub.step (env.snoc ι n t) = ι.
+Admitted.
+
+Lemma inst_acc_step {w n} (ι : Assignment w) (t : ty) :
+  inst step (env.snoc ι n t) = ι.
+Admitted.
+
+Lemma inst_persist_accessibility_env {w0 w1} (r1 : w0 ↑ w1)
+  (G0 : Env w0) (ι1 : Assignment w1) :
+  inst G0 (compose r1 ι1) = inst <{ G0 ~ r1 }> ι1.
+Admitted.
+
+Lemma inst_persist_accessibility_ty {w0 w1} (r1 : w0 ↑ w1)
+  (t0 : Ty w0) (ι1 : Assignment w1) :
+  inst t0 (compose r1 ι1) = inst <{ t0 ~ r1 }> ι1.
 Admitted.
 
 Module UpDown.
@@ -1308,7 +1325,7 @@ Module ConstraintsOnly.
     #[global] Arguments False {w}.
     #[global] Arguments Ex [w] x C.
 
-    Definition denote : ⊢ CStr -> Lifted Prop :=
+    Definition denote : ⊢ CStr -> Assignment -> PROP :=
       fix den {w} C ι {struct C} : Prop :=
         match C with
         | False     => Logic.False
@@ -1327,6 +1344,8 @@ Module ConstraintsOnly.
   Fixpoint check (e : expr) : ⊢ Env -> Ty -> CStr :=
     fun (w : World) (G : Env w) (tr : Ty w) =>
       match e with
+      | v_true => tr == Ty_bool w
+      | v_false => tr == Ty_bool w
       | e_if e1 e2 e3 =>
           check e1 G (Ty_bool w) /\
           check e2 G tr /\
@@ -1359,7 +1378,6 @@ Module ConstraintsOnly.
             let α   := Ty_hole (w ▻ 0) 0 ctx.in_zero in
             check e1 G' (Ty_func _ α tr') /\
             check e2 G' α
-      | _ => tr == Ty_bool w
       end.
 
   Lemma soundness e :
@@ -1380,13 +1398,13 @@ Module ConstraintsOnly.
     - intros (t1 & t2 & H1 & H2).
       specialize (IHe _ _ _ _ H2). clear H2.
       destruct IHe as (e1' & HT). cbn in HT.
-      rewrite ?inst_lift, ?inst_persist_env, ?inst_persist_ty, ?inst_comp, ?inst_step in *.
+      rewrite ?inst_lift, ?inst_persist_env, ?inst_persist_ty, ?inst_comp, ?inst_sub_step in *.
       rewrite H1. clear H1.
       eexists. constructor. eauto.
     - intros (t1 & H1 & H2).
       specialize (IHe _ _ _ _ H2). clear H2.
       destruct IHe as (e' & HT). cbn in HT.
-      rewrite ?inst_lift, ?inst_persist_env, ?inst_persist_ty, ?inst_comp, ?inst_step in *.
+      rewrite ?inst_lift, ?inst_persist_env, ?inst_persist_ty, ?inst_comp, ?inst_sub_step in *.
       rewrite H1. clear H1.
       eexists. constructor. eauto.
     - intros (t1 & H1 & H2).
@@ -1394,7 +1412,7 @@ Module ConstraintsOnly.
       specialize (IHe2 _ _ _ _ H2). clear H2. destruct IHe2 as (e2' & HT2).
       exists (e_app e1' e2').
       cbn in HT1, HT2.
-      rewrite ?inst_lift, ?inst_persist_env, ?inst_persist_ty, ?inst_comp, ?inst_step in *.
+      rewrite ?inst_lift, ?inst_persist_env, ?inst_persist_ty, ?inst_comp, ?inst_sub_step in *.
       econstructor; eauto.
   Qed.
 
@@ -1410,19 +1428,19 @@ Module ConstraintsOnly.
       destruct value; [|discriminate].
       now injection H.
     - exists vt, t. rewrite H0. split.
-      + now rewrite inst_persist_ty, inst_comp, !inst_step.
+      + now rewrite inst_persist_ty, inst_comp, !inst_sub_step.
       + apply IHT; cbn; [|easy].
-        now rewrite inst_persist_env, inst_comp, !inst_step.
+        now rewrite inst_persist_env, inst_comp, !inst_sub_step.
     - exists t. split.
-      + now rewrite inst_lift, inst_persist_ty, inst_step.
+      + now rewrite inst_lift, inst_persist_ty, inst_sub_step.
       + apply IHT; cbn; [|easy].
-        now rewrite inst_lift, inst_persist_env, inst_step.
+        now rewrite inst_lift, inst_persist_env, inst_sub_step.
     - exists t2. split.
       + apply IHT1; cbn.
-        * now rewrite inst_persist_env, inst_step.
-        * now rewrite inst_persist_ty, inst_step.
+        * now rewrite inst_persist_env, inst_sub_step.
+        * now rewrite inst_persist_ty, inst_sub_step.
       + apply IHT2; cbn; [|easy].
-        now rewrite inst_persist_env, inst_step.
+        now rewrite inst_persist_env, inst_sub_step.
   Qed.
 
   Corollary completeness G e t ee (T : G |-- e ; t ~> ee) :
@@ -1435,4 +1453,3 @@ Module ConstraintsOnly.
 
 End ConstraintsOnly.
 
-Module

@@ -10,6 +10,7 @@ Import ctx.notations.
 
 Notation World := (Ctx nat).
 Definition TYPE : Type := World -> Type.
+Definition REL : Type := World -> TYPE.
 Definition Valid (A : TYPE) : Type :=
   forall w, A w.
 Definition Impl (A B : TYPE) : TYPE :=
@@ -34,12 +35,12 @@ Definition List (A : TYPE) : TYPE := fun w => list (A w).
 Definition Prod (A B : TYPE) : TYPE := fun w => prod (A w) (B w).
 Definition Sum (A B : TYPE) : TYPE := fun w => sum (A w) (B w).
 
-Definition BoxR (R : Relation.relation World) (A : TYPE) : TYPE :=
+Definition BoxR (R : REL) (A : TYPE) : TYPE :=
   fun w0 => forall w1, R w0 w1 -> A w1.
 
 (* Notation "◻A" := BoxR A *)
 
-Definition DiamondR (R : Relation.relation World) (A : TYPE) : TYPE :=
+Definition DiamondR (R : REL) (A : TYPE) : TYPE :=
   fun w0 => {w1 & R w0 w1 * A w1}%type.
 
 Notation "[< R >] A" := (BoxR R A) (at level 9, format "[< R >] A", right associativity).
@@ -48,6 +49,15 @@ Notation "<[ R ]> A" := (DiamondR R A) (at level 9, format "<[ R ]> A", right as
 Definition Schematic (A : TYPE) : Type :=
   { w : World & A w }.
 
+Class Refl (R : REL) : Type :=
+  refl : forall w, R w w.
+Class Trans (R : REL : Type) :=
+  trans : forall w1 w2 w3, R w1 w2 -> R w2 w3 -> R w1 w3.
+Class Step (R : REL : Type) :=
+  step : forall w α, R w (w ▻ α).
+#[global] Arguments step {R _ w α}.
+#[global] Arguments trans {R _ w1 w2 w3} _ _.
+
 Module acc.
 
   Inductive Accessibility (Σ₁ : World) : TYPE :=
@@ -55,18 +65,20 @@ Module acc.
     | fresh α : forall Σ₂, Accessibility (Σ₁ ▻ α) Σ₂ ->
                               Accessibility Σ₁ Σ₂.
 
-  Definition step {w α} : Accessibility w (w ▻ α) :=
-    fresh w α (w ▻ α) (refl (w ▻ α)).
-
-  Fixpoint trans {w1 w2 w3} (w12 : Accessibility w1 w2) : Accessibility w2 w3 -> Accessibility w1 w3 :=
-    match w12 with
-    | refl _ => fun w13 : Accessibility w1 w3 => w13
-    | fresh _ α w ω =>
-        fun ω' : Accessibility w w3  => fresh w1 α w3 (trans ω ω')
+  #[export] Instance refl_accessibility : Refl Accessibility :=
+    fun w => refl _.
+  #[export] Instance trans_accessibility : Trans Accessibility :=
+    fix trans {w1 w2 w3} (r12 : Accessibility w1 w2) : Accessibility w2 w3 -> Accessibility w1 w3 :=
+    match r12 with
+    | refl _         => fun r23 => r23
+    | fresh _ α w2 r => fun r23 => fresh _ α w3 (trans r r23)
     end.
 
-  Lemma trans_refl : forall (w1 w2 : World) w12,
-      (@trans w1 w2 w2 w12 (acc.refl w2)) = w12.
+  #[export] Instance step_accessibility : Step Accessibility :=
+    fun w α => fresh w α (w ▻ α) (refl (w ▻ α)).
+
+  Lemma trans_refl (w1 w2 : World) (w12 : Accessibility w1 w2) :
+    trans w12 (refl w2) = w12.
   Proof. intros. induction w12. auto. cbn. now rewrite IHw12. Qed.
 
   Lemma snoc_r {w1 w2} (r : Accessibility w1 w2) :
@@ -82,10 +94,12 @@ Module acc.
 
 End acc.
 
-Notation "w1 .> w2" := (acc.trans w1 w2) (at level 80).
-
 (* Everything is now qualified, except the stuff in paren on the line below *)
 Export acc (Accessibility).
+Export (hints) acc.
+
+Notation "w1 .> w2" := (trans (R := Accessibility) w1 w2) (at level 80).
+
 
 (* TODO: switch to superscript *)
 (* \^s \^+ *)
@@ -103,7 +117,7 @@ Class PersistLaws A `{Persistent Accessibility A} : Type :=
         persist w V w (acc.refl w) = V
   ; assoc_persist w1 w2 w3 r12 r23 (V : A w1) :
         persist w2 (persist w1 V w2 r12) w3 r23
-      = persist w1 V w3 (acc.trans r12 r23) }.
+      = persist w1 V w3 (trans r12 r23) }.
 
 (* Instance Persistent_Prod : forall A B R, *)
 (*     Persistent R A -> Persistent R B -> Persistent R (Prod A B). *)
@@ -112,7 +126,7 @@ Class PersistLaws A `{Persistent Accessibility A} : Type :=
 Definition T {A} : ⊢ □⁺A -> A := fun w a => a w (acc.refl w).
 
 Definition _4 {A} : ⊢ □⁺A -> □⁺□⁺A.
-Proof. cbv in *. intros.  apply X. eapply acc.trans; eauto. Defined.
+Proof. cbv in *. intros.  apply X. eapply trans; eauto. Defined.
 
 #[export] Instance Persistent_In {x} :
   Persistent Accessibility (ctx.In x) :=

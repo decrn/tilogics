@@ -171,12 +171,13 @@ Lemma compose_refl : forall w ass,
     compose (acc.refl w) ass = ass.
 Proof. easy. Qed.
 
-Lemma compose_trans {w1 w2 w3 : World} : forall ass r12 r23,
-  compose r12 (compose r23 ass) = compose (@acc.trans w1 w2 w3 r12 r23) ass.
-Proof. intros. induction r12. auto. cbn. rewrite IHr12. reflexivity. Qed.
+Lemma compose_trans {w1 w2 w3} (r12 : Accessibility w1 w2)
+  (r23 : Accessibility w2 w3) (ass : Assignment w3) :
+  compose r12 (compose r23 ass) = compose (trans r12 r23) ass.
+Proof. induction r12. auto. cbn. rewrite IHr12. reflexivity. Qed.
 
 Definition Lifted (A : Type) : TYPE :=
-  fun Σ => Assignment Σ -> A.
+  fun w => Assignment w -> A.
 
 (* pure  :: a -> f a *)
 Definition pure {A} (a : A) : Valid (Lifted A) := fun _ _ => a.
