@@ -46,7 +46,7 @@ Delimit Scope ctx_scope with ctx.
 
 Module Binding.
 
-  (* Local Set Primitive Projections. *)
+  Local Set Primitive Projections.
   Local Set Transparent Obligations.
 
   Section WithNT.
@@ -67,11 +67,12 @@ Module Binding.
 End Binding.
 Export Binding.
 
-Module ctx.
+Module Import ctx.
 
   (* Type of contexts. This is a list of bindings of type B. This type and
      subsequent types use the common notation of snoc lists. *)
-  Inductive Ctx (B : Set) : Set :=
+  #[universes(template)]
+  Inductive Ctx (B : Type) : Type :=
   | nil
   | snoc (Γ : Ctx B) (b : B).
 
@@ -86,7 +87,7 @@ Module ctx.
   Section WithBinding.
     Context {B : Set}.
 
-    Global Instance eq_dec_ctx (eqB : EqDec B) : EqDec (Ctx B) :=
+    #[export] Instance eq_dec_ctx (eqB : EqDec B) : EqDec (Ctx B) :=
       fix eq_dec_ctx (Γ Δ : Ctx B) {struct Γ} : dec_eq Γ Δ :=
         match Γ , Δ with
         | nil      , nil      => left eq_refl
@@ -118,18 +119,24 @@ Module ctx.
       | _        , _   => False
       end.
 
-    Lemma nth_is_right_exact {Γ : Ctx B} (n : nat) (b1 b2 : B) :
-      nth_is Γ n b1 -> nth_is Γ n b2 -> b1 = b2.
-    Proof.
-      revert n.
-      induction Γ.
-      - intros ? [].
-      - cbn in *.
-        destruct n. intros e1 e2.
-        refine (eq_trans _ e2).
-        apply eq_sym. auto.
-        apply IHΓ.
-    Qed.
+    Definition proof_irrelevance_het_nth_is {b1 b2 : B} :
+      forall {Γ n} (p1 : nth_is Γ n b1) (p2 : nth_is Γ n b2),
+        existT _ _ p1 = existT _ _ p2 :=
+       fix pi Γ n {struct Γ} :=
+         match Γ with
+         | nil => fun p q => match q with end
+         | snoc Γ b =>
+           match n with
+           | O   => fun p q => match p , q with
+                                 eq_refl , eq_refl => eq_refl
+                               end
+           | S n => pi Γ n
+           end
+         end.
+
+    Definition nth_is_right_exact {Γ : Ctx B} (n : nat) (b1 b2 : B)
+      (p1 : nth_is Γ n b1) (p2 : nth_is Γ n b2) : b1 = b2 :=
+      f_equal (@projT1 _ _) (proof_irrelevance_het_nth_is p1 p2).
 
     Section WithUIP.
 
@@ -145,12 +152,11 @@ Module ctx.
                        end
         end.
 
-      Global Instance eqdec_ctx_nth {Γ n b} : EqDec (nth_is Γ n b).
-      Proof. intros p q. left. apply proof_irrelevance_nth_is. Defined.
+      #[export] Instance eqdec_ctx_nth {Γ n b} : EqDec (nth_is Γ n b) :=
+        fun p q => left (proof_irrelevance_nth_is n b p q).
 
-      Lemma proof_irrelevance_nth_is_refl {Γ} (n : nat) (b : B) (p : nth_is Γ n b) :
-        proof_irrelevance_nth_is n b p p = eq_refl.
-      Proof. apply uip. Qed.
+      Definition proof_irrelevance_nth_is_refl {Γ} (n : nat) (b : B) (p : nth_is Γ n b) :
+        proof_irrelevance_nth_is n b p p = eq_refl := uip _ _.
 
     End WithUIP.
 
@@ -183,33 +189,61 @@ Module ctx.
     (*   - intros e. depelim e. destruct n, m; cbn in H0; congruence. *)
     (* Qed. *)
 
-    Inductive NilView {b : B} (i : In b nil) : Set :=.
+    (* We define several views on [In] which allows us to define mechanisms for
+       reusable dependent pattern matching. For more information on views as a
+       programming technique see:
+       - Ulf Norell (2009), "Dependently Typed Programming in Agda." AFP'08.
+         https://doi.org/10.1007/978-3-642-04652-0_5
+       - Philip Wadler (1987). "Views: a way for pattern matching to cohabit
+         with data abstraction." POPL'87.
+         https://doi.org/10.1145/41625.41653
+       - Conor McBride & James McKinna (2004). "The view from the left." JFP'04.
+         https://doi.org/10.1017/S0956796803004829 *)
 
-    Equations nilView {b : B} (i : In b nil) : NilView i :=.
+    (* A view expressing that membership in the empty context is uninhabited. *)
+    Variant NilView [b : B] (i : In b nil) : Type :=.
 
-    Inductive SnocView (Γ : Ctx B) {b' : B} : forall b, In b (snoc Γ b') -> Set :=
-    | snocViewZero                  : SnocView in_zero
-    | snocViewSucc {b} (i : In b Γ) : SnocView (in_succ i).
-    Global Arguments snocViewZero {_ _}.
+    (* A view for membership in a non-empty context. *)
+    Variant SnocView {b' : B} (Γ : Ctx B) :
+      forall b, In b (snoc Γ b') -> Type :=
+    | isZero                  : SnocView in_zero
+    | isSucc {b} (i : In b Γ) : SnocView (in_succ i).
+    #[global] Arguments SnocView {_ _} [b] _.
+    #[global] Arguments isZero {_ _}.
 
-    Equations snocView {Γ} {b b' : B} (i : In b (snoc Γ b')) :
-      @SnocView Γ b' b i :=
-    | in_zero   => snocViewZero
-    | in_succ i => snocViewSucc i.
+    (* Instead of defining separate view functions, that construct a value
+       of the *View datatypes, we use a single definition. This way, we
+       avoid definition dummy definitions the other cases like it is usually
+       done in small inversions. We simply define inversions for all cases at
+       once. *)
+    Definition view {b Γ} (bIn : In b Γ) :
+      match Γ return forall b, In b Γ -> Type with
+      | nil      => NilView
+      | snoc _ _ => SnocView
+      end b bIn :=
+      match bIn with
+      | in_zero   => isZero
+      | in_succ i => isSucc i
+      end.
 
-    Fixpoint in_cat_left {b : B} {Γ : Ctx B} (Δ : Ctx B) (bIn : In b Γ) : In b (cat Γ Δ) :=
+    (* Left and right membership proofs for context concatenation. *)
+    Fixpoint in_cat_left {b Γ} Δ (bIn : In b Γ) : In b (cat Γ Δ) :=
       match Δ with
       | nil      => bIn
       | snoc Δ _ => in_succ (in_cat_left Δ bIn)
       end.
 
-    Fixpoint in_cat_right {b : B} {Γ : Ctx B} (Δ : Ctx B) (bIn : In b Δ) : In b (cat Γ Δ) :=
+    Fixpoint in_cat_right {b Γ} Δ (bIn : In b Δ) : In b (cat Γ Δ) :=
       match bIn with
       | in_zero   => in_zero
       | in_succ i => in_succ (in_cat_right i)
       end.
 
-    Inductive CatView {Γ Δ} {b : B} : In b (cat Γ Δ) -> Set :=
+    (* A view for case splitting on a proof of membership in a concatenation.
+       By pattern matching on this view we get the membership in the left
+       respectively right side of the concatenation and refine the original
+       membership proof. *)
+    Inductive CatView {Γ Δ} [b : B] : In b (cat Γ Δ) -> Type :=
     | isCatLeft  (bIn : In b Γ) : CatView (in_cat_left Δ bIn)
     | isCatRight (bIn : In b Δ) : CatView (in_cat_right bIn).
 
@@ -312,7 +346,6 @@ Module ctx.
 
     Open Scope ctx_scope.
 
-    (* Notation "x :: τ" := (MkB x τ) (only parsing) : ctx_scope. *)
     Notation "N ∷ T" := (Binding N T) : type_scope.
     Notation "x ∷ t" := (MkB x t) : ctx_scope.
 
@@ -323,6 +356,7 @@ Module ctx.
 
     (* Use the same notations as in ListNotations. *)
     Notation "[ ]" := (nil) : ctx_scope.
+    Notation "[ctx]" := (nil) : ctx_scope.
     Notation "[ x ]" := (snoc nil x) : ctx_scope.
     Notation "[ x ; y ; .. ; z ]" :=
       (snoc .. (snoc (snoc nil x) y) .. z) : ctx_scope.
@@ -421,6 +455,7 @@ Module ctx.
 
 End ctx.
 Export ctx (Ctx).
+Export (hints) ctx.
 Notation NCtx N T := (Ctx (Binding N T)).
 Bind Scope ctx_scope with Ctx.
 Bind Scope ctx_scope with NCtx.

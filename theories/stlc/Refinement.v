@@ -146,7 +146,7 @@ Class RefinePersist {A a} `{Persistent Accessibility A} (RA : Relation A a) : Ty
 Proof. constructor.
   intros. revert v H. unfold RTy. induction V; cbn; intros. apply H. subst.
   f_equal; auto. subst.
-  induction r12. auto. cbn. rewrite IHr12. now destruct env.snocView.
+  induction r12. auto. cbn. rewrite IHr12. now destruct env.view.
 Qed.
 
 #[export] Instance RefinePersist_Env : RefinePersist REnv.

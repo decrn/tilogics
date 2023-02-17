@@ -44,7 +44,7 @@ Section DecEquality.
   #[export] Instance In_eqdec {w} : EqDec (sigT (fun x : nat => ctx.In x w)).
   Proof.
     intros [x xIn] [y yIn].
-    induction xIn; cbn; destruct (ctx.snocView yIn) as [|y yIn].
+    induction xIn; cbn; destruct (ctx.view yIn) as [|y yIn].
     - left. reflexivity.
     - right. abstract discriminate.
     - right. abstract discriminate.
@@ -162,7 +162,7 @@ Fixpoint compose {w1 w2 : World} (r12 : Accessibility w1 w2)
   | acc.refl _ => fun X0 : Assignment w1 => X0
   | acc.fresh _ α Σ₂ a0 =>
       fun X0 : Assignment Σ₂ =>
-        match env.snocView (compose a0 X0) with
+        match env.view (compose a0 X0) with
         | env.isSnoc E _ => E
         end
   end.

@@ -5,6 +5,7 @@ From Em Require Import
 Import ctx.notations.
 From Em Require
   Unification.
+From Equations Require Import Equations.
 
 Local Notation "<{ A ~ w }>" := (persist _ A _ w).
 

@@ -55,6 +55,7 @@ Class Trans (R : REL : Type) :=
   trans : forall w1 w2 w3, R w1 w2 -> R w2 w3 -> R w1 w3.
 Class Step (R : REL : Type) :=
   step : forall w α, R w (w ▻ α).
+#[global] Arguments refl {R _ w}.
 #[global] Arguments step {R _ w α}.
 #[global] Arguments trans {R _ w1 w2 w3} _ _.
 
@@ -109,7 +110,7 @@ Notation "□⁺ A" := (BoxR Accessibility A) (at level 9, format "□⁺ A", ri
 Notation "◇⁺ A" := (DiamondR Accessibility A) (at level 9, format "◇⁺ A", right associativity)
     : indexed_scope.
 
-Class Persistent (R : Relation.relation World) (A : TYPE) : Type :=
+Class Persistent (R : REL) (A : TYPE) : Type :=
   persist : ⊢ A -> BoxR R A.
 
 Class PersistLaws A `{Persistent Accessibility A} : Type :=
