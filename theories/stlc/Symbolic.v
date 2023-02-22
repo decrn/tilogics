@@ -1533,6 +1533,22 @@ Module CandidateType.
     forall (w0 : World) (ι0 : Assignment w0) (G0 : Env w0) (t0 : Ty w0),
       G = inst G0 ι0 -> t = inst t0 ι0 ->
       WP (check e G0 t0) (fun w1 r01 _ ι1 => ι0 = compose r01 ι1)%type ι0.
+  Proof.
+    Set Printing Depth 17.
+    induction T; cbn [check WP]; intros w0 ι0 G0 t0 ? ?; subst.
+    + destruct t0; try firstorder; try inversion H0. admit. (* ??? *)
+    + destruct t0; try firstorder; try inversion H0. admit. (* ??? *)
+    + rewrite wp_bind. cbn [WP]. specialize (IHT1 w0 ι0 G0 (Ty_bool w0)). admit.
+      (* apply IHT1. *)
+      (* rewrite wp_bind. destruct T2. cbn. *)
+      (* inversion T1; subst. cbn. constructor 1. easy. *)
+      (* rewrite wp_bind. inversion T2; subst. cbn. constructor 1. *)
+      (* rewrite (inst_bool _ _ ι0). reflexivity. *)
+      (* Locate "<{ t0 ~ refl }>". Search persist. *)
+      (* now rewrite Definitions.refl_persist. *)
+      (* inversion T3; subst. cbn. constructor 1. *)
+      (* rewrite (inst_bool _ _ ι0). reflexivity. *)
+      (* now rewrite Definitions.refl_persist. *)
   Admitted.
 
 End CandidateType.
