@@ -1513,9 +1513,9 @@ Module CandidateType.
       | Ret_Free _ _ v => POST w refl v ı
       | Fail_Free _ _ => False
       | Bind_AssertEq_Free _ _ t1 t2 k =>
-          t1 = t2 /\ WP _ k POST ı
+          (inst t1 ı) = (inst t2 ı) /\ WP _ k POST ı
       | Bind_Exists_Free _ _ i k =>
-          exists t, WP _ k (_4 w POST (w ▻ i) (acc.fresh _ i _ refl)) (env.snoc ı i t)
+          exists t, WP _ k (_4 w POST (w ▻ i) step) (env.snoc ı i t)
       end.
 
   Lemma wp_monotonic {A w} (m : FreeM A w) (p q : □⁺(A -> Assignment -> PROP) w)
@@ -1536,19 +1536,73 @@ Module CandidateType.
   Proof.
     Set Printing Depth 17.
     induction T; cbn [check WP]; intros w0 ι0 G0 t0 ? ?; subst.
-    + destruct t0; try firstorder; try inversion H0. admit. (* ??? *)
-    + destruct t0; try firstorder; try inversion H0. admit. (* ??? *)
-    + rewrite wp_bind. cbn [WP]. specialize (IHT1 w0 ι0 G0 (Ty_bool w0)). admit.
-      (* apply IHT1. *)
-      (* rewrite wp_bind. destruct T2. cbn. *)
-      (* inversion T1; subst. cbn. constructor 1. easy. *)
-      (* rewrite wp_bind. inversion T2; subst. cbn. constructor 1. *)
-      (* rewrite (inst_bool _ _ ι0). reflexivity. *)
-      (* Locate "<{ t0 ~ refl }>". Search persist. *)
-      (* now rewrite Definitions.refl_persist. *)
-      (* inversion T3; subst. cbn. constructor 1. *)
-      (* rewrite (inst_bool _ _ ι0). reflexivity. *)
-      (* now rewrite Definitions.refl_persist. *)
-  Admitted.
-
+    + destruct t0; try firstorder; try inversion H0.
+    + destruct t0; try firstorder; try inversion H0.
+    + rewrite wp_bind. specialize (IHT1 w0 ι0 G0 (Ty_bool w0) eq_refl eq_refl).
+      revert IHT1.
+      apply wp_monotonic. intros.
+      rewrite wp_bind.
+      specialize (IHT2 w1 ι1 <{ G0 ~ r1 }> <{ t0 ~ r1}>).
+      rewrite <- inst_persist_accessibility_env in IHT2.
+      rewrite <- inst_persist_accessibility_ty in IHT2.
+      rewrite H in IHT2.
+      specialize (IHT2 eq_refl eq_refl).
+      revert IHT2. apply wp_monotonic. intros.
+      specialize (IHT3 w2 ι2 <{ G0 ~ r1 .> r0 }> <{ t0 ~ r1 .> r0 }>).
+      rewrite <- inst_persist_accessibility_env in IHT3.
+      rewrite <- inst_persist_accessibility_ty in IHT3.
+      rewrite H, H0, compose_trans in IHT3.
+      specialize (IHT3 eq_refl eq_refl).
+      revert IHT3. apply wp_monotonic. intros. hnf. rewrite H, H0, H1.
+      now do 2 rewrite <- compose_trans.
+    + rewrite value_inst in H. destruct value; cbn in *; now inversion H.
+    + exists vt. exists t.
+      rewrite <- inst_persist_accessibility_ty.
+      cbn -[step]. split. easy.
+      specialize (IHT (w0 ▻ 1 ▻ 2)
+                      (env.snoc (env.snoc ι0 1 vt) 2 t)
+                      ((v, Ty_hole (w0 ▻ 1 ▻ 2) 1 (ctx.in_succ ctx.in_zero)) :: <{ G0 ~ step .> step }>)
+                      (Ty_hole (w0 ▻ 1 ▻ 2) 2 ctx.in_zero)).
+      cbn -[step] in IHT. rewrite <- inst_persist_accessibility_env in IHT. specialize (IHT eq_refl eq_refl).
+      revert IHT. apply wp_monotonic. intros. hnf.
+      rewrite <- compose_trans, compose_trans. cbn. now rewrite <- H.
+    + exists t.
+      cbn -[step].
+      rewrite <- inst_persist_accessibility_ty, inst_lift.
+      split.
+      now rewrite H0.
+      specialize (IHT (w0 ▻ 2)
+                      (env.snoc ι0 2 t)
+                      ((v, lift vt (w0 ▻ 2)) :: <{ G0 ~ step }>)
+                      (Ty_hole (w0 ▻ 2) 2 ctx.in_zero)).
+      cbn -[step] in IHT.
+      rewrite inst_lift in IHT.
+      rewrite <- inst_persist_accessibility_env in IHT.
+      specialize (IHT eq_refl eq_refl).
+      revert IHT. apply wp_monotonic. intros. hnf.
+      rewrite <- compose_trans. cbn. now rewrite <- H.
+    + exists t2.
+      rewrite wp_bind.
+      specialize (IHT1 (w0 ▻ 0)
+                       (env.snoc ι0 0 t2)
+                       <{ G0 ~ step }>
+                       (Ty_func (w0 ▻ 0) (Ty_hole (w0 ▻ 0) 0 ctx.in_zero) <{ t0 ~ step }>)).
+      cbn -[step] in IHT1.
+      Search inst.
+      rewrite <- inst_persist_accessibility_env in IHT1.
+      rewrite <- inst_persist_accessibility_ty in IHT1.
+      cbn in IHT1.
+      specialize (IHT1 eq_refl eq_refl).
+      revert IHT1. apply wp_monotonic. intros.
+      specialize (IHT2 _ ι1 <{ G0 ~ step .> r1 }> <{ Ty_hole (w0 ▻ 0) 0 ctx.in_zero ~ r1 }>).
+      rewrite <- inst_persist_accessibility_env in IHT2.
+      rewrite <- compose_trans in IHT2.
+      rewrite <- inst_persist_accessibility_ty in IHT2.
+      cbn -[step] in IHT2.
+      rewrite <- H in IHT2.
+      cbn in IHT2.
+      specialize (IHT2 eq_refl eq_refl).
+      revert IHT2. apply wp_monotonic. intros. hnf.
+      now rewrite <- compose_trans, <- compose_trans, <- H0, <- H.
+  Qed.
 End CandidateType.
