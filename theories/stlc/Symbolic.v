@@ -1605,4 +1605,51 @@ Module CandidateType.
       revert IHT2. apply wp_monotonic. intros. hnf.
       now rewrite <- compose_trans, <- compose_trans, <- H0, <- H.
   Qed.
+
+  Definition WLP {A} : ⊢ FreeM A -> □⁺(A -> Assignment -> PROP) -> Assignment -> PROP :=
+    fix WLP w m POST ı {struct m} :=
+      match m with
+      | Ret_Free _ _ v => POST w refl v ı
+      | Fail_Free _ _ => True
+      | Bind_AssertEq_Free _ _ t1 t2 k =>
+          (inst t1 ı) = (inst t2 ı) /\ WLP _ k POST ı
+      | Bind_Exists_Free _ _ i k =>
+          forall t, WLP _ k (_4 w POST (w ▻ i) step) (env.snoc ı i t)
+      end.
+
+  Lemma wlp_monotonic {A w} (m : FreeM A w) (p q : □⁺(A -> Assignment -> PROP) w)
+    (pq : forall w1 r1 a1 ι1, p w1 r1 a1 ι1 -> q w1 r1 a1 ι1) :
+    forall (ι : Assignment w), WLP m p ι -> WLP m q ι.
+  Proof. induction m; cbn; firstorder. Qed.
+
+  Lemma wlp_bind {A B w} (m : FreeM A w) (f : □⁺(A -> FreeM B) w) :
+    forall (Q : □⁺(B -> Assignment -> PROP) w) (ι : Assignment w),
+      WLP (bind m f) Q ι <->
+      WLP m (fun _ r a => WLP (f _ r a) (_4 _ Q _ r)) ι.
+  Proof. split; intros; induction m; cbn; firstorder. Qed.
+
+  Lemma soundness e {G t} :
+    forall (w0 : World) (ι0 : Assignment w0) (G0 : Env w0) (t0 : Ty w0),
+      G = inst G0 ι0 ->
+      t = inst t0 ι0 ->
+      WLP (check e G0 t0)
+          (fun w1 r01 _ ι1 => ι0 = compose r01 ι1 /\
+                                  exists ee, G |-- e ; t ~> ee)
+          ι0.
+  Proof.
+    induction e; cbn; intros.
+    - admit.
+    - admit.
+    - rewrite wlp_bind. specialize (IHe1 _ ι0 G0 (Ty_bool w0) H).
+      destruct t. cbn -[step] in IHe1.
+      specialize (IHe1 eq_refl).
+      revert IHe1.
+      apply wlp_monotonic. intros.
+      rewrite wlp_bind. specialize (IHe2 _ ι1 <{ G0 ~ r1 }> <{ t0 ~ r1}>).
+      rewrite <- inst_persist_accessibility_env in IHe2.
+      rewrite <- inst_persist_accessibility_ty in IHe2.
+      cbn in IHe2.
+      admit.
+  Admitted.
+
 End CandidateType.
