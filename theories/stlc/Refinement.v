@@ -175,13 +175,13 @@ Proof.
     apply IHe1. apply RΓ. clear IHe1.
     intros w1 ? ? ? ? ? ?. constructor. apply H0. constructor.
     unfold T. eapply Bind_relates_bind. cbn. apply IHe2.
-    rewrite acc.trans_refl. eapply refine_persist; eauto.
+    rewrite trans_refl_r. eapply refine_persist; eauto.
     subst. apply RΓ.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. cbn. apply IHe3.
-    rewrite acc.trans_refl. eapply refine_persist.
+    rewrite trans_refl_r. eapply refine_persist.
     subst. rewrite <- compose_trans. apply RΓ.
-    intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. cbn. apply Assert_relates_assert; cbn.
-    eapply refine_persist. subst. apply H2. now rewrite refl_persist.
+    intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. apply Assert_relates_assert; cbn.
+    eapply refine_persist. subst. assumption. assumption.
     intros ? ? ? ? ? ? ?. eapply Ret_relates_ret.
     eapply refine_persist. rewrite <- compose_trans. rewrite <- H5. subst. apply H2.
   - intros ? ? ?. induction H. cbn.

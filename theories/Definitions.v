@@ -59,6 +59,15 @@ Class Step (R : REL : Type) :=
 #[global] Arguments step {R _ w α}.
 #[global] Arguments trans {R _ w1 w2 w3} _ _.
 
+Class PreOrder R {reflR : Refl R} {transR : Trans R} : Prop :=
+  { trans_refl_l {w1 w2} {r : R w1 w2} :
+      trans refl r = r;
+    trans_refl_r {w1 w2} {r : R w1 w2} :
+      trans r refl = r;
+    trans_assoc {w0 w1 w2 w3} (r1 : R w0 w1) (r2 : R w1 w2) (r3 : R w2 w3) :
+      trans (trans r1 r2) r3 = trans r1 (trans r2 r3);
+  }.
+
 Module acc.
 
   Inductive Accessibility (Σ₁ : World) : TYPE :=
@@ -78,9 +87,13 @@ Module acc.
   #[export] Instance step_accessibility : Step Accessibility :=
     fun w α => fresh w α (w ▻ α) (refl (w ▻ α)).
 
-  Lemma trans_refl (w1 w2 : World) (w12 : Accessibility w1 w2) :
-    trans w12 (refl w2) = w12.
-  Proof. intros. induction w12. auto. cbn. now rewrite IHw12. Qed.
+  #[export] Instance preorder_accessibility : PreOrder Accessibility.
+  Proof.
+    constructor.
+    - easy.
+    - intros ? ? r; induction r; cbn; [|rewrite IHr]; easy.
+    - induction r1; cbn; congruence.
+  Qed.
 
   Lemma snoc_r {w1 w2} (r : Accessibility w1 w2) :
     forall α, Accessibility w1 (w2 ▻ α).
@@ -124,10 +137,11 @@ Class PersistLaws A `{Persistent Accessibility A} : Type :=
 (*     Persistent R A -> Persistent R B -> Persistent R (Prod A B). *)
 (* Proof. firstorder. Qed. *)
 
-Definition T {A} : ⊢ □⁺A -> A := fun w a => a w (acc.refl w).
+Definition T {R} {reflR : Refl R} {A} : ⊢ BoxR R A -> A :=
+  fun w a => a w refl.
 
-Definition _4 {A} : ⊢ □⁺A -> □⁺□⁺A.
-Proof. cbv in *. intros.  apply X. eapply trans; eauto. Defined.
+Definition _4 {R} {transR : Trans R} {A} : ⊢ BoxR R A -> BoxR R (BoxR R A) :=
+  fun w0 a w1 r1 w2 r2 => a w2 (trans r1 r2).
 
 #[export] Instance Persistent_In {x} :
   Persistent Accessibility (ctx.In x) :=

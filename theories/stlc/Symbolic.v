@@ -64,7 +64,7 @@ Fixpoint generate (e : expr) {Σ : World} (Γ : Env Σ) : FreeM Ty Σ :=
       [ ω₂ ] _     <- assert t_cnd (Ty_bool _) ;;
       [ ω₃ ] t_coq <- generate coq <{ Γ ~ ω₁ .> ω₂ }> ;;
       [ ω₄ ] t_alt <- generate alt <{ Γ ~ ω₁ .> ω₂ .> ω₃ }> ;;
-      [ ω₅ ] _     <- assert <{ t_coq ~ ω₄ }>  <{ t_alt ~ (acc.refl _) }> ;;
+      [ ω₅ ] _     <- assert <{ t_coq ~ ω₄ }>  t_alt ;;
          Ret_Free Ty _ <{ t_coq ~ ω₄ .> ω₅ }>
   | e_var var =>
       match (value var Γ) with
@@ -130,7 +130,7 @@ Fixpoint generate' (e : expr) {Σ : World} (Γ : Env Σ) : FreeM (Prod Ty Expr) 
       [ ω2 ] _     <- assert (fst r_cnd) (Ty_bool _) ;;
       [ ω3 ] r_coq <- generate' coq <{ Γ ~ ω1 .> ω2 }> ;;
       [ ω4 ] r_alt <- generate' alt <{ Γ ~ ω1 .> ω2 .> ω3 }> ;;
-      [ ω5 ] _     <- assert <{ (fst r_coq) ~ ω4 }>  <{ (fst r_alt) ~ (acc.refl _) }> ;;
+      [ ω5 ] _     <- assert <{ (fst r_coq) ~ ω4 }> (fst r_alt) ;;
          let e_cnd := <{ (snd r_cnd) ~ ω2 .> ω3 .> ω4 .> ω5 }> in
          let e_coq := <{ (snd r_coq) ~ ω4 .> ω5 }> in
          let t_coq := <{ (fst r_coq) ~ ω4 .> ω5 }> in
@@ -1612,10 +1612,10 @@ Module CandidateType.
       | Ret_Free _ _ v => POST w refl v ı
       | Fail_Free _ _ => True
       | Bind_AssertEq_Free _ _ t1 t2 k =>
-          (inst t1 ı) = (inst t2 ı) /\ WLP _ k POST ı
+          (inst t1 ı = inst t2 ı) -> WLP _ k POST ı
       | Bind_Exists_Free _ _ i k =>
           forall t, WLP _ k (_4 w POST (w ▻ i) step) (env.snoc ı i t)
-      end.
+      end%type.
 
   Lemma wlp_monotonic {A w} (m : FreeM A w) (p q : □⁺(A -> Assignment -> PROP) w)
     (pq : forall w1 r1 a1 ι1, p w1 r1 a1 ι1 -> q w1 r1 a1 ι1) :
