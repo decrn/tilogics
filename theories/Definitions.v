@@ -158,3 +158,15 @@ Definition K {R A B} :
 
 #[export] Instance PersistLaws_In {x} : PersistLaws (ctx.In x).
 Proof. constructor; [easy|induction r12; cbn; auto]. Qed.
+
+Class Bind (R : REL) (M : TYPE -> TYPE) : Type :=
+  bind : forall A B, ⊢ M A -> BoxR R (A -> M B) -> M B.
+#[global] Arguments bind {R M _ A B} [w].
+
+Module MonadNotations.
+  Notation "[ r ] x <- ma ;; mb" :=
+    (bind ma (fun _ r x => mb))
+      (at level 80, x at next level,
+        ma at next level, mb at level 200,
+        right associativity).
+End MonadNotations.

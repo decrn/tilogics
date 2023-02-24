@@ -143,6 +143,22 @@ Inductive FreeM (A : TYPE) (Σ : World) : Type :=
   | Bind_AssertEq_Free : Ty Σ -> Ty Σ -> FreeM A Σ -> FreeM A Σ
   | Bind_Exists_Free   : forall (i : nat), FreeM A (Σ ▻ i) -> FreeM A Σ.
 
+Section Bind.
+  Context {R} {reflR : Refl R} {transR : Trans R} {stepR : Step R}.
+
+  #[export] Instance bind_freem  : Bind R FreeM :=
+    fun A B =>
+      fix bind {w} m f {struct m} :=
+      match m with
+      | Ret_Free _ _ v => T f v
+      | Fail_Free _ _ => Fail_Free B w
+      | Bind_AssertEq_Free _ _ t1 t2 C1 =>
+          Bind_AssertEq_Free B w t1 t2 (bind C1 f)
+      | Bind_Exists_Free _ _ i C =>
+          Bind_Exists_Free B w i (bind C (_4 f step))
+      end.
+End Bind.
+
 Inductive SolvedM (A : TYPE) (Σ : World) : Type :=
   | Ret_Solved           : A Σ -> SolvedM A Σ
   | Fail_Solved          : SolvedM A Σ
@@ -153,8 +169,7 @@ Inductive solvedM (A : Type) : Type :=
   | fail_solved          : solvedM A
   | bind_exists_solved   : (ty -> solvedM A) -> solvedM A.
 
-Definition Assignment : TYPE :=
-  env.Env (fun _ => ty).
+Notation Assignment := (env.Env (fun _ => ty)).
 
 Fixpoint compose {w1 w2 : World} (r12 : Accessibility w1 w2)
   : Assignment w2 -> Assignment w1 :=

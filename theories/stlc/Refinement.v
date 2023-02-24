@@ -117,7 +117,7 @@ Proof. now subst. Qed.
 
 Lemma Bind_relates_bind {A B a b} (RA : Relation A a) (RB : Relation B b) :
   forall (w : Ctx nat) (ass : Assignment w),
-    ((RFree RA) -> (RBox (RA -> RFree RB)) -> (RFree RB))%R w ass (@Symbolic.bind A B w) Shallow.bind.
+    ((RFree RA) -> (RBox (RA -> RFree RB)) -> (RFree RB))%R w ass (bind (M := FreeM) (w := w)) Shallow.bind.
 Proof.
   intros w ass ? ? ?.
   induction H;  cbn; intros F f HF; try constructor; try assumption.

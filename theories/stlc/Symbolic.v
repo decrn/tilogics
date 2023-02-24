@@ -15,24 +15,6 @@ Local Notation "<{ A ~ w }>" := (persist _ A _ w).
   fun w1 t w2 ζ => Sub.subst t ζ.
 Open Scope indexed_scope.
 
-Definition bind {A B} : ⊢ FreeM A -> □⁺(A -> FreeM B) -> FreeM B :=
-  fix bind {w} m f {struct m} :=
-    match m with
-    | Ret_Free _ _ v => T f v
-    | Fail_Free _ _ => Fail_Free B w
-    | Bind_AssertEq_Free _ _ t1 t2 C1 =>
-        Bind_AssertEq_Free B w t1 t2 (bind C1 f)
-    | Bind_Exists_Free _ _ i C =>
-        Bind_Exists_Free B w i (bind C (_4 f step))
-    end.
-#[global] Arguments bind {A B} [w] m f.
-
-Local Notation "[ r ] x <- ma ;; mb" :=
-  (bind ma (fun _ r x => mb))
-    (at level 80, x at next level,
-      ma at next level, mb at level 200,
-      right associativity).
-
 Definition assert {w} t1 t2 :=
   Bind_AssertEq_Free Unit w t1 t2 (Ret_Free Unit w tt).
 
@@ -55,37 +37,42 @@ Fixpoint liftEnv (E : env) : ⊢ Env :=
     | List.cons (pair s t) E => cons (pair s (lift t w)) (liftEnv E w)
     end.
 
-Fixpoint generate (e : expr) {Σ : World} (Γ : Env Σ) : FreeM Ty Σ :=
-  match e with
-  | v_true => Ret_Free Ty Σ (Ty_bool Σ)
-  | v_false => Ret_Free Ty Σ (Ty_bool Σ)
-  | e_if cnd coq alt =>
-      [ ω₁ ] t_cnd <- generate cnd Γ ;;
-      [ ω₂ ] _     <- assert t_cnd (Ty_bool _) ;;
-      [ ω₃ ] t_coq <- generate coq <{ Γ ~ ω₁ .> ω₂ }> ;;
-      [ ω₄ ] t_alt <- generate alt <{ Γ ~ ω₁ .> ω₂ .> ω₃ }> ;;
-      [ ω₅ ] _     <- assert <{ t_coq ~ ω₄ }>  t_alt ;;
-         Ret_Free Ty _ <{ t_coq ~ ω₄ .> ω₅ }>
-  | e_var var =>
-      match (value var Γ) with
-      | Some t_var => Ret_Free Ty _ t_var
-      | None => Fail_Free Ty Σ
-      end
-  | e_app f a =>
-      [ ω1 ] t_co <- exists_Ty Σ ;;
-      [ ω2 ] t_do <- generate a <{ Γ ~ ω1 }> ;;
-      [ ω3 ] t_fn <- generate f <{ Γ ~ ω1 .> ω2 }> ;;
-      [ ω4 ] _    <- assert t_fn <{ (Ty_func _ t_do <{ t_co ~ ω2 }> ) ~ ω3 }> ;;
-         Ret_Free Ty _ <{ t_co ~ ω2 .> ω3 .> ω4 }>
-  | e_abst var t_var e =>
-      let t_var' := (lift t_var Σ) in (* t_var lives in ty, not in (Ty w) *)
-      [ ω1 ] t_e <- generate e ((var, t_var') :: Γ) ;;
-        Ret_Free Ty _ (Ty_func _ <{ t_var' ~ ω1 }> t_e)
-  | e_absu var e =>
-      [ ω1 ] t_var <- exists_Ty Σ ;;
-      [ ω2 ] t_e <- generate e ((var, t_var) :: <{ Γ ~ ω1 }>) ;;
-        Ret_Free Ty _ (Ty_func _ <{ t_var ~ ω2 }> t_e)
-  end.
+Section Generate.
+  Import MonadNotations.
+
+  Fixpoint generate (e : expr) {Σ : World} (Γ : Env Σ) : FreeM Ty Σ :=
+    match e with
+    | v_true => Ret_Free Ty Σ (Ty_bool Σ)
+    | v_false => Ret_Free Ty Σ (Ty_bool Σ)
+    | e_if cnd coq alt =>
+        [ ω₁ ] t_cnd <- generate cnd Γ ;;
+        [ ω₂ ] _     <- assert t_cnd (Ty_bool _) ;;
+        [ ω₃ ] t_coq <- generate coq <{ Γ ~ ω₁ .> ω₂ }> ;;
+        [ ω₄ ] t_alt <- generate alt <{ Γ ~ ω₁ .> ω₂ .> ω₃ }> ;;
+        [ ω₅ ] _     <- assert <{ t_coq ~ ω₄ }>  t_alt ;;
+           Ret_Free Ty _ <{ t_coq ~ ω₄ .> ω₅ }>
+    | e_var var =>
+        match (value var Γ) with
+        | Some t_var => Ret_Free Ty _ t_var
+        | None => Fail_Free Ty Σ
+        end
+    | e_app f a =>
+        [ ω1 ] t_co <- exists_Ty Σ ;;
+        [ ω2 ] t_do <- generate a <{ Γ ~ ω1 }> ;;
+        [ ω3 ] t_fn <- generate f <{ Γ ~ ω1 .> ω2 }> ;;
+        [ ω4 ] _    <- assert t_fn <{ (Ty_func _ t_do <{ t_co ~ ω2 }> ) ~ ω3 }> ;;
+           Ret_Free Ty _ <{ t_co ~ ω2 .> ω3 .> ω4 }>
+    | e_abst var t_var e =>
+        let t_var' := (lift t_var Σ) in (* t_var lives in ty, not in (Ty w) *)
+        [ ω1 ] t_e <- generate e ((var, t_var') :: Γ) ;;
+          Ret_Free Ty _ (Ty_func _ <{ t_var' ~ ω1 }> t_e)
+    | e_absu var e =>
+        [ ω1 ] t_var <- exists_Ty Σ ;;
+        [ ω2 ] t_e <- generate e ((var, t_var) :: <{ Γ ~ ω1 }>) ;;
+          Ret_Free Ty _ (Ty_func _ <{ t_var ~ ω2 }> t_e)
+    end.
+
+End Generate.
 
 Section RunTI.
 
@@ -121,45 +108,47 @@ Section TypeReconstruction.
   Definition ret  {w} := Ret_Free (Prod Ty Expr) w.
   Definition fail {w} := Fail_Free (Prod Ty Expr) w.
 
-Fixpoint generate' (e : expr) {Σ : World} (Γ : Env Σ) : FreeM (Prod Ty Expr) Σ :=
-  match e with
-  | v_true  => ret (Ty_bool Σ, (fun _ => v_true))
-  | v_false => ret (Ty_bool Σ, (fun _ => v_false))
-  | e_if cnd coq alt =>
-      [ ω1 ] r_cnd <- generate' cnd Γ ;;
-      [ ω2 ] _     <- assert (fst r_cnd) (Ty_bool _) ;;
-      [ ω3 ] r_coq <- generate' coq <{ Γ ~ ω1 .> ω2 }> ;;
-      [ ω4 ] r_alt <- generate' alt <{ Γ ~ ω1 .> ω2 .> ω3 }> ;;
-      [ ω5 ] _     <- assert <{ (fst r_coq) ~ ω4 }> (fst r_alt) ;;
-         let e_cnd := <{ (snd r_cnd) ~ ω2 .> ω3 .> ω4 .> ω5 }> in
-         let e_coq := <{ (snd r_coq) ~ ω4 .> ω5 }> in
-         let t_coq := <{ (fst r_coq) ~ ω4 .> ω5 }> in
-         let e_alt := <{ (snd r_alt) ~ ω5 }> in
-         ret (t_coq, fun a => (e_if (e_cnd a) (e_coq a) (e_alt a)))
-  | e_var var =>
-      match (value var Γ) with
-      | Some t_var => ret (t_var, fun a => e_var var)
-      | None => fail
-      end
-  | e_app f a =>
-      [ ω1 ] T_cod <- exists_Ty Σ ;;
-      [ ω2 ] r_dom <- generate' a <{ Γ ~ ω1 }> ;;
-      [ ω3 ] r_fun <- generate' f <{ Γ ~ ω1 .> ω2 }> ;;
-      [ ω4 ] _     <- assert (fst r_fun) <{ (Ty_func _ (fst r_dom) <{ T_cod ~ ω2 }> ) ~ ω3 }> ;;
-         let e_fun := <{ (snd r_fun) ~ ω4 }> in
-         let t_cod := <{ T_cod ~ ω2 .> ω3 .> ω4 }> in
-         let e_dom := <{ (snd r_dom) ~ ω3 .> ω4 }> in
-          ret ( t_cod , fun a => e_app (e_fun a) (e_dom a))
-  | e_abst var t_var e =>
-      let t_var' := (lift t_var Σ) in (* t_var lives in ty, not in (Ty w) *)
-      [ ω1 ] t_e <- generate' e ((var, t_var') :: Γ) ;;
-        ret (Ty_func _ <{ t_var' ~ ω1 }> (fst t_e), fun a => e_abst var t_var (snd t_e a))
-  | e_absu var e =>
-      [ ω1 ] t_var <- exists_Ty Σ ;;
-      [ ω2 ] t_e <- generate' e ((var, t_var) :: <{ Γ ~ ω1 }>) ;;
-        ret (Ty_func _ <{ t_var ~ ω2 }> (fst t_e),
-            fun a => e_abst var (inst <{ t_var ~ ω2 }> a) (snd t_e a))
-  end.
+  Import MonadNotations.
+
+  Fixpoint reconstruct (e : expr) {Σ : World} (Γ : Env Σ) : FreeM (Prod Ty Expr) Σ :=
+    match e with
+    | v_true  => ret (Ty_bool Σ, (fun _ => v_true))
+    | v_false => ret (Ty_bool Σ, (fun _ => v_false))
+    | e_if cnd coq alt =>
+        [ ω1 ] r_cnd <- reconstruct cnd Γ ;;
+        [ ω2 ] _     <- assert (fst r_cnd) (Ty_bool _) ;;
+        [ ω3 ] r_coq <- reconstruct coq <{ Γ ~ ω1 .> ω2 }> ;;
+        [ ω4 ] r_alt <- reconstruct alt <{ Γ ~ ω1 .> ω2 .> ω3 }> ;;
+        [ ω5 ] _     <- assert <{ (fst r_coq) ~ ω4 }> (fst r_alt) ;;
+           let e_cnd := <{ (snd r_cnd) ~ ω2 .> ω3 .> ω4 .> ω5 }> in
+           let e_coq := <{ (snd r_coq) ~ ω4 .> ω5 }> in
+           let t_coq := <{ (fst r_coq) ~ ω4 .> ω5 }> in
+           let e_alt := <{ (snd r_alt) ~ ω5 }> in
+           ret (t_coq, fun a => (e_if (e_cnd a) (e_coq a) (e_alt a)))
+    | e_var var =>
+        match (value var Γ) with
+        | Some t_var => ret (t_var, fun a => e_var var)
+        | None => fail
+        end
+    | e_app f a =>
+        [ ω1 ] T_cod <- exists_Ty Σ ;;
+        [ ω2 ] r_dom <- reconstruct a <{ Γ ~ ω1 }> ;;
+        [ ω3 ] r_fun <- reconstruct f <{ Γ ~ ω1 .> ω2 }> ;;
+        [ ω4 ] _     <- assert (fst r_fun) <{ (Ty_func _ (fst r_dom) <{ T_cod ~ ω2 }> ) ~ ω3 }> ;;
+           let e_fun := <{ (snd r_fun) ~ ω4 }> in
+           let t_cod := <{ T_cod ~ ω2 .> ω3 .> ω4 }> in
+           let e_dom := <{ (snd r_dom) ~ ω3 .> ω4 }> in
+            ret ( t_cod , fun a => e_app (e_fun a) (e_dom a))
+    | e_abst var t_var e =>
+        let t_var' := (lift t_var Σ) in (* t_var lives in ty, not in (Ty w) *)
+        [ ω1 ] t_e <- reconstruct e ((var, t_var') :: Γ) ;;
+          ret (Ty_func _ <{ t_var' ~ ω1 }> (fst t_e), fun a => e_abst var t_var (snd t_e a))
+    | e_absu var e =>
+        [ ω1 ] t_var <- exists_Ty Σ ;;
+        [ ω2 ] t_e <- reconstruct e ((var, t_var) :: <{ Γ ~ ω1 }>) ;;
+          ret (Ty_func _ <{ t_var ~ ω2 }> (fst t_e),
+              fun a => e_abst var (inst <{ t_var ~ ω2 }> a) (snd t_e a))
+    end.
 
 End TypeReconstruction.
 
@@ -337,255 +326,11 @@ Lemma inst_persist_accessibility_ty {w0 w1} (r1 : w0 ↑ w1)
   inst t0 (compose r1 ι1) = inst <{ t0 ~ r1 }> ι1.
 Admitted.
 
-Module UpDown.
-  #[local] Notation "□⇅ A" := (BoxR Acc A) (at level 9, format "□⇅ A", right associativity)
-      : indexed_scope.
+Lemma compose_step {w x t} (ι : Assignment w) :
+  compose step (env.snoc ι x t) = ι.
+Proof. reflexivity. Qed.
 
-  Definition step {w α} : w ⇅ w ▻ α :=
-    {| iw := w ▻ α;
-       pos := acc.fresh w α (w ▻ α) (acc.refl (w ▻ α));
-       neg := Tri.refl;
-    |}.
-
-  Fixpoint up_aux {w1 wi β} (p : w1 ↑ wi) {struct p} :
-    forall w2, wi ↓ w2 -> Acc (w1 ▻ β) (w2 ▻ β) :=
-    match p with
-    | acc.refl _ =>
-        fun w2 n =>
-          {| pos := acc.refl _;
-            neg := down_add n
-          |}
-    | acc.fresh _ α wi p =>
-        fun w2 n =>
-          trans
-            {| iw := w1 ▻ β ▻ α ▻ β;
-              pos := acc.fresh _ _ _ (acc.fresh _ _ _ (acc.refl _));
-              neg :=
-                let βIn := ctx.in_succ (ctx.in_succ ctx.in_zero) in
-                Tri.cons β
-                  (xIn := βIn)
-                  (Ty_hole ((w1 ▻ β ▻ α ▻ β) - β) β ctx.in_zero)
-                  Tri.refl
-            |}
-            (up_aux p w2 n)
-    end.
-
-  Definition up {w1 w2 β} (r : w1 ⇅ w2) :
-    w1 ▻ β ⇅ w2 ▻ β :=
-    match r with
-      mkAcc _ _ iw pos neg => up_aux pos w2 neg
-    end.
-
-  Definition bind {A B} : ⊢ FreeM A -> □⇅(A -> (FreeM B)) -> FreeM B :=
-    fix bind {w} m f :=
-    match m with
-    | Ret_Free _ _ a                  => T f a
-    | Fail_Free _ _                   =>
-      Fail_Free _ _
-    | Bind_AssertEq_Free _ _ t1 t2 C1 =>
-      Bind_AssertEq_Free _ _ t1 t2 (bind C1 f)
-    | Bind_Exists_Free _ _ i C =>
-      Bind_Exists_Free _ _ i (bind C (_4 f step))
-    end.
-
-  #[global] Arguments bind {A B} [w] m f.
-  #[local] Notation "[ ω ] x <- ma ;; mb" :=
-    (bind ma (fun _ (ω : Acc _ _) x => mb))
-      (at level 80, x at next level,
-        ma at next level, mb at level 200,
-        right associativity).
-
-  Fixpoint generate (e : expr) {Σ : World} (Γ : Env Σ) : FreeM Ty Σ :=
-    match e with
-    | v_true => Ret_Free Ty Σ (Ty_bool Σ)
-    | v_false => Ret_Free Ty Σ (Ty_bool Σ)
-    | e_if cnd coq alt =>
-        [ ω₁ ] t_cnd <- generate cnd Γ ;;
-        [ ω₂ ] _     <- assert t_cnd (Ty_bool _) ;;
-        [ ω₃ ] t_coq <- generate coq <{ Γ ~ ω₁ ⊙ ω₂ }> ;;
-        [ ω₄ ] t_alt <- generate alt <{ Γ ~ ω₁ ⊙ ω₂ ⊙ ω₃ }> ;;
-        [ ω₅ ] _     <- assert <{ t_coq ~ ω₄ }> t_alt ;;
-           Ret_Free Ty _ <{ t_coq ~ ω₄ ⊙ ω₅ }>
-    | e_var var =>
-        match (value var Γ) with
-        | Some t_var => Ret_Free Ty _ t_var
-        | None => Fail_Free Ty Σ
-        end
-    | e_app f a =>
-        [ ω1 ] t_co <- exists_Ty Σ ;;
-        [ ω2 ] t_do <- generate a <{ Γ ~ ω1 }> ;;
-        [ ω3 ] t_fn <- generate f <{ Γ ~ ω1 ⊙ ω2 }> ;;
-        [ ω4 ] _    <- assert t_fn <{ (Ty_func _ t_do <{ t_co ~ ω2 }> ) ~ ω3 }> ;;
-           Ret_Free Ty _ <{ t_co ~ ω2 ⊙ ω3 ⊙ ω4 }>
-    | e_abst var t_var e =>
-        let t_var' := (lift t_var Σ) in (* t_var lives in ty, not in (Ty w) *)
-        [ ω1 ] t_e <- generate e ((var, t_var') :: Γ) ;;
-          Ret_Free Ty _ (Ty_func _ <{ t_var' ~ ω1 }> t_e)
-    | e_absu var e =>
-        [ ω1 ] t_var <- exists_Ty Σ ;;
-        [ ω2 ] t_e <- generate e ((var, t_var) :: <{ Γ ~ ω1 }>) ;;
-          Ret_Free Ty _ (Ty_func _ <{ t_var ~ ω2 }> t_e)
-    end.
-
-  Module Attempt2.
-
-    Definition wp {A} :
-      ⊢ FreeM A -> □⇅(A -> PROP) -> PROP :=
-      fix wp {w} m Q {struct m} :=
-        match m with
-        | Ret_Free _ _ a  => T Q a
-        | Fail_Free _ _   => False
-        | Bind_AssertEq_Free _ _ t1 t2 m =>
-            t1 = t2 /\ wp m Q
-        | Bind_Exists_Free _ _ i m =>
-            wp m (_4 Q step)
-        end.
-    #[global] Arguments wp {A} [w].
-
-    Lemma wp_mono {A}
-      {w} (m : FreeM A w) (P Q : □⇅(A -> PROP) w)
-      (PQ : forall w' r a, P w' r a -> Q w' r a) :
-      wp m P -> wp m Q.
-    Proof.
-      induction m; cbn [wp].
-      - unfold T. apply PQ.
-      - auto.
-      - intros [H1 H2]; split.
-        exact H1. revert H2. apply IHm; auto.
-      - unfold _4; apply IHm; auto.
-    Qed.
-
-    Lemma wp_equiv {A}
-      {w} (m : FreeM A w) (P Q : □⇅(A -> PROP) w)
-      (PQ : forall w' r a, P w' r a <-> Q w' r a) :
-      wp m P <-> wp m Q.
-    Proof. split; apply wp_mono; intuition. Qed.
-
-    Lemma wp_bind {A B} (* `{Persistent Acc A,  Persistent Acc B} *)
-      {w} (m : FreeM A w) (f : □⇅(A -> FreeM B) w) (Q : □⇅(B -> PROP) w) :
-      wp (bind m f) Q <->
-      wp m (fun _ r a => wp (f _ r a) (_4 Q r)).
-    Proof.
-      induction m; cbn; unfold T, _4.
-      - apply wp_equiv. intros w1 r1 a1.
-        (* refl is left identity of trans *)
-        admit.
-      - reflexivity.
-      - apply and_iff_compat_l'. intros ?.
-        apply IHm.
-      - rewrite IHm.
-        apply wp_equiv. intros w1 r1 a1.
-        apply wp_equiv. intros w2 r2 b2.
-        unfold _4.
-        (* Need assoc lemma *)
-        admit.
-    Admitted.
-
-    Lemma completeness {G e t ee} (R : G |-- e ; t ~> ee) :
-      forall w,
-        wp (generate e (liftEnv G w))
-          (fun w _ T => exists A : Assignment w, inst T A = t).
-    Proof.
-      induction R; cbn [generate wp]; unfold assert, T; intros w0.
-      - admit.
-      - admit.
-      - rewrite wp_bind; cbn [wp].
-        specialize (IHR1 w0). revert IHR1. apply wp_mono.
-        intros w1 r1 tcnd Hcnd.
-        rewrite wp_bind; cbn [wp].
-        split.
-        { admit. }
-        unfold T.
-        rewrite wp_bind; cbn [wp].
-        specialize (IHR2 w1). revert IHR2.
-        (* need more lemmas first *)
-    Admitted.
-
-  End Attempt2.
-
-  Module Attempt3.
-
-    Definition Property : TYPE :=
-      fun w => forall w', w ⇅ w' -> Prop.
-
-    Definition False : ⊢ Property :=
-      fun _ _ _ => Logic.False.
-    #[global] Arguments False {w}.
-    Definition Eq : ⊢ Ty -> Ty -> Property :=
-      fun w t1 t2 w' r => persist _ t1 _ r = persist _ t2 _ r.
-    #[global] Arguments Eq [w].
-    Definition And : ⊢ Property -> Property -> Property :=
-      fun w P Q w' r => P _ r /\ Q _ r.
-    #[global] Arguments And [w].
-
-    Definition wp {A} :
-      ⊢ FreeM A -> □⇅(A -> Property) -> Property :=
-      fix wp {w} m Q {struct m} :=
-        match m with
-        | Ret_Free _ _ a => T Q a
-        | Fail_Free _ _ => False
-        | Bind_AssertEq_Free _ _ t1 t2 f => And (Eq t1 t2) (wp f Q)
-        | Bind_Exists_Free _ _ i f =>
-            fun w1 r1 => wp f (_4 Q step) _ (up r1)
-        end.
-    #[global] Arguments wp {A} [w].
-
-    Lemma wp_mono {A}
-      {w} (m : FreeM A w) (P Q : □⇅(A -> Property) w)
-      (PQ : forall w1 r1 a w2 r2, P w1 r1 a w2 r2 -> Q w1 r1 a w2 r2) :
-      forall w' r,
-        wp m P w' r -> wp m Q w' r.
-    Proof.
-      induction m; cbn [wp]; intros w1 r1.
-      - unfold T. apply PQ.
-      - auto.
-      - unfold And, Eq. intros [H1 H2]; split.
-        exact H1. revert H2. apply IHm; auto.
-      - unfold _4. apply IHm; auto.
-    Qed.
-
-    Lemma wp_equiv {A}
-      {w} (m : FreeM A w) (P Q : □⇅(A -> Property) w)
-      (PQ : forall w1 r1 a w2 r2, P w1 r1 a w2 r2 <-> Q w1 r1 a w2 r2) :
-      forall w' r,
-        wp m P w' r <-> wp m Q w' r.
-    Proof. split; apply wp_mono; intuition. Qed.
-
-    Lemma wp_bind {A B} `{Persistent Acc A, Persistent Acc B}
-      {w} (m : FreeM A w) (f : □⇅(A -> FreeM B) w) (Q : □⇅(B -> Property) w) :
-      forall w' r,
-        wp (bind m f) Q w' r <->
-          wp m (fun _ r a => wp (f _ r a) (_4 Q r)) w' r.
-    Proof.
-    Admitted.
-
-    Lemma completeness {G e t ee} (R : G |-- e ; t ~> ee) :
-      forall w1 w2 (r : w1 ⇅ w2),
-        wp (generate e (liftEnv G w1))
-          (fun w1 r1 T => Eq T (lift t _)
-          ) w2 r.
-    Proof.
-      induction R; cbn; unfold T, _4, K; intros w1 w2 r; cbn.
-      - reflexivity.
-      - reflexivity.
-      - rewrite wp_bind; cbn [wp].
-        specialize (IHR1 w1 w2 r). revert IHR1.
-        apply wp_mono.
-        intros w3 r3 tcnd w4 r4 Hcnd. cbn in Hcnd.
-        unfold T, _4, And; cbn [wp].
-        split. auto.
-        rewrite wp_bind; cbn [wp].
-        specialize (IHR2 w3 w3 refl). revert IHR2.
-        (* rewrite persist_liftEnv. *)
-    Admitted.
-
-  End Attempt3.
-
-End UpDown.
-
-(* Remove phase separation and all abstractions to get
-   a base line. *)
-Module EagerSolving.
+Module StrongMonotonicity.
 
   Import option.notations.
   Import Unification.
@@ -617,65 +362,6 @@ Module EagerSolving.
     fun w t1 t2 =>
       '(w;(r,u)) <- Variant1.mgu t1 t2 ;;
       Some (w; (Sub.triangular r, u)).
-
-  Fixpoint infer (e : expr) : ⊢ Env -> M Ty.
-  Proof.
-    intros w G. destruct e.
-    - exact (pure w (Ty_bool w)).
-    - exact (pure w (Ty_bool w)).
-    - eapply bind.
-      apply (infer e1 w G).
-      intros w1 r1 t1.
-      eapply bind.
-      apply (mgu w1 t1 (Ty_bool w1)).
-      intros w2 r2 _.
-      eapply bind.
-      apply (infer e2 w2 <{ G ~ r1 ⊙ r2 }>).
-      intros w3 r3 t2.
-      eapply bind.
-      apply (infer e3 w3 <{ G ~ r1 ⊙ r2 ⊙ r3 }>).
-      intros w4 r4 t3.
-      eapply bind.
-      apply (mgu w4 <{ t2 ~ r4 }> t3).
-      intros w5 r5 _.
-      apply pure.
-      exact <{ t3 ~ r5 }>.
-    - destruct (value s G) as [t|].
-      + apply pure. apply t.
-      + apply None.
-    - pose (w ▻ 0) as w1.
-      pose (Ty_hole w1 0 ctx.in_zero) as t1.
-      pose (@Sub.step w 0) as r1.
-      pose ((s, t1) :: <{ G ~ r1 }>) as G1.
-      eapply mexists.
-      eapply bind.
-      apply (infer e w1 G1).
-      intros w2 r2 t2.
-      apply pure.
-      apply (Ty_func _ <{ t1 ~ r2 }> t2).
-    - eapply bind.
-      apply (infer e w ((s,lift t w) :: G)).
-      intros w1 r1 t2.
-      apply pure.
-      apply (Ty_func _ (lift t _) t2).
-    - eapply bind.
-      apply (infer e1 w G).
-      intros w1 r1 t1.
-      pose <{ G ~ r1 }> as G1.
-      eapply bind.
-      apply (infer e2 w1 G1).
-      intros w2 r2 t2.
-      eapply (mexists (n := 0)).
-      pose (w2 ▻ 0) as w3.
-      pose (@Sub.step w2 0) as r3.
-      pose (Ty_hole w3 0 ctx.in_zero) as ti.
-      eapply bind.
-      apply (mgu _ <{ t1 ~ r2 ⊙ r3 }>
-               (Ty_func _ <{ t2 ~ r3 }> ti)).
-      intros w4 r4 _.
-      apply pure.
-      apply <{ ti ~ r4 }>.
-  Defined.
 
   Definition WLP {A} : ⊢ M A -> □ˢ(A -> PROP) -> PROP :=
     fun w m P => option.wlp (fun '(w;(r,a)) => P w r a) m.
@@ -782,93 +468,6 @@ Module EagerSolving.
   (*     + intros (w3 & r3 & H1 & H2). *)
   (*       admit. *)
   (* Abort. *)
-
-  Lemma soundness e :
-    forall (w : World) G,
-      WLP w (infer e w G)
-        (fun w1 r1 b =>
-           forall ι : Assignment w1,
-           exists ee, inst <{ G ~ r1 }> ι |-- e ; inst b ι ~> ee).
-  Proof.
-    induction e; cbn - [mexists]; intros w G.
-    - rewrite wlp_pure. intros ι. exists v_true; cbn. constructor.
-    - rewrite wlp_pure. intros ι. exists v_false; cbn. constructor.
-    - rewrite wlp_bind.
-      specialize (IHe1 w G). revert IHe1.
-      apply wlp_monotonic.
-      intros w1 r1 t1 H1.
-      rewrite wlp_bind.
-      unfold WLP at 1, mgu at 2.
-      destruct (mgu_spec t1 (Ty_bool w1)) as [(w2 & r2 & [])|]; [|constructor].
-      constructor.
-      rewrite wlp_bind.
-      specialize (IHe2 w2 (persist w G w2 (r1 ⊙ Sub.triangular r2))).
-      revert IHe2.
-      apply wlp_monotonic.
-      intros w3 r3 t2 H2.
-      rewrite wlp_bind.
-      specialize (IHe3 w3 (persist w G w3 (r1 ⊙ Sub.triangular r2 ⊙ r3))).
-      revert IHe3.
-      apply wlp_monotonic.
-      intros w4 r4 t3 H3.
-      rewrite wlp_bind.
-      unfold WLP at 1, mgu.
-      destruct (mgu_spec (persist w3 t2 w4 r4) t3) as [(w5 & r5 & [])|]; [|constructor].
-      constructor.
-      rewrite wlp_pure.
-      intros ι.
-      (* Need composition of assignments with Subs. *)
-      admit.
-    - destruct value eqn:?.
-      + rewrite wlp_pure. intros ι. exists (e_var s).
-        constructor.
-        (* need value inst lemma, and persist_subid *)
-        admit.
-      + constructor.
-    - rewrite wlp_mexists.
-      rewrite wlp_bind.
-      specialize (IHe (w ▻ 0) (cons (pair s (Ty_hole (ctx.snoc w 0) 0 ctx.in_zero)) (persist w G (ctx.snoc w 0) Sub.step))).
-      revert IHe.
-      apply wlp_monotonic.
-      intros w1 r1 t1 H1.
-      rewrite wlp_pure.
-      intros ι. specialize (H1 ι). destruct H1 as [e' HT1].
-      cbn. eexists. constructor. cbn in *.
-      (* need persist acc_trans lemma *)
-      admit.
-    - rewrite wlp_bind.
-      specialize (IHe w (cons (pair s (lift t w)) G)).
-      revert IHe.
-      apply wlp_monotonic.
-      intros w1 r1 t1 H1.
-      rewrite wlp_pure.
-      intros ι. specialize (H1 ι). destruct H1 as [e' HT1].
-      cbn. eexists.
-      (* need inst lift lemma *)
-      admit.
-    - rewrite wlp_bind.
-      specialize (IHe1 w G).
-      revert IHe1.
-      apply wlp_monotonic.
-      intros w1 r1 t1 H1.
-      rewrite wlp_bind.
-      specialize (IHe2 w1 (persist _ G _ r1)).
-      revert IHe2.
-      apply wlp_monotonic.
-      intros w2 r2 t2 H2.
-      rewrite wlp_mexists.
-      rewrite wlp_bind.
-      unfold WLP at 1, mgu.
-      destruct (mgu_spec
-                  <{ t1 ~ r2 ⊙ Sub.step }>
-                  (Ty_func (w2 ▻ 0) <{ t2 ~ Sub.step }> (Ty_hole (w2 ▻ 0) 0 ctx.in_zero)))
-        as [(w3 & r3 & [])|]; [|constructor].
-      constructor.
-      rewrite wlp_pure.
-      intros ι.
-      (* Need composition of assignments with Subs *)
-      admit.
-  Admitted.
 
   Definition REL (A : World -> Type) : Type :=
     forall w0 w1 (r1 : w0 ⊒ˢ w1),
@@ -1028,82 +627,6 @@ Module EagerSolving.
 
   Arguments mexists : simpl never.
 
-  Lemma infer_mon (e : expr) :
-    RValid (RImpl REnv (RM RTy)) (infer e).
-  Proof.
-    induction e; cbn [infer]; intros w0 w1 r01 G0 G1 HG.
-    - apply rpure. apply rty_bool.
-    - apply rpure. apply rty_bool.
-
-    - eapply rbind. now apply IHe1.
-      intros w2 w3 r02 r13 r23 Heqr23 t1_2 t1_3 rt1.
-      eapply rbind. apply rmgu; auto. apply rty_bool.
-      intros w4 w5 r24 r35 r45 Heqr45 _ _ _.
-      eapply rbind. apply IHe2. admit.
-      intros w6 w7 r46 r57 r67 Heqr67 t2_6 t2_7 rt2.
-      eapply rbind. apply IHe3. admit.
-      intros w8 w9 r68 r89 r79 Heqr79 t3_8 t3_9 rt3.
-      eapply rbind. apply rmgu; auto.
-      { unfold RTy in *. subst.
-        unfold persist, PersistentSub_Ty.
-        now rewrite <- ?Sub.subst_comp, Heqr79.
-      }
-      intros ? ? ? ? ? ? _ _ _.
-      apply rpure.
-      { unfold RTy in *. subst.
-        unfold persist, PersistentSub_Ty.
-        now rewrite <- ?Sub.subst_comp, H.
-      }
-
-    - admit.
-
-    - apply rexists.
-      eapply rbind. apply IHe. admit.
-      intros w2 w3 r02 r13 r23 Heqr23 t1_2 t1_3 rt1.
-      apply rpure.
-      apply rty_func; auto.
-      { unfold RTy in *. subst.
-        unfold persist, PersistentSub_Ty.
-        now rewrite <- Sub.subst_comp, <- Heqr23.
-      }
-
-    - eapply rbind. apply IHe. admit.
-      intros w2 w3 r02 r13 r23 Heqr23 t1_2 t1_3 rt1.
-      apply rpure.
-      apply rty_func; auto.
-      { unfold RTy. now rewrite subst_lift. }
-
-    - eapply rbind. apply IHe1; auto.
-      intros w2 w3 r02 r13 r23 Heqr23 t1_2 t1_3 rt1.
-      eapply rbind. apply IHe2; auto. admit.
-      intros w4 w5 r24 r35 r45 Heqr45 t2_4 t2_5 rt2.
-      apply rexists.
-      eapply rbind. apply rmgu.
-      { unfold RTy in *. subst.
-        unfold persist, PersistentSub_Ty.
-        rewrite <- ?Sub.subst_comp. f_equal.
-        rewrite <- trans_assoc.
-        rewrite Heqr45.
-        rewrite ?trans_assoc. f_equal.
-        admit.
-      }
-      { unfold RTy in *. subst.
-        unfold persist, PersistentSub_Ty.
-        cbn - [Sub.step].
-        rewrite <- ?Sub.subst_comp.
-        f_equal.
-        f_equal.
-        admit.
-      }
-      intros w6 w7 r46 r57 r67 Heqr6 _ _ _.
-      apply rpure.
-      { unfold RTy in *. subst.
-        unfold persist, PersistentSub_Ty.
-        rewrite <- ?Sub.subst_comp.
-        now rewrite <- Heqr6.
-      }
-  Admitted.
-
   Definition RPropImpl : REL PROP :=
     fun w0 w1 r01 p q => (q -> p)%type.
 
@@ -1124,163 +647,7 @@ Module EagerSolving.
     - inversion 1.
   Qed.
 
-  Lemma completeness {G e t ee} (R : G |-- e ; t ~> ee) :
-    forall w : World,
-      WP w (infer e w (liftEnv G w))
-        (fun w1 r1 T =>
-           forall w2 (r2 : w1 ⊒ˢ w2),
-           exists w3 (r3 : w2 ⊒ˢ w3), <{ T ~ r2 ⊙ r3 }> = lift t w3).
-  Proof.
-    Set Printing Depth 18.
-    induction R; cbn - [Sub.step Sub.subst persist]; intros w.
-    - rewrite wp_pure. intros w2 r2. exists w2. exists refl. reflexivity.
-    - rewrite wp_pure. intros w2 r2. exists w2. exists refl. reflexivity.
-
-    - rewrite wp_bind.
-      specialize (IHR1 w). revert IHR1.
-      apply wp_monotonic. intros w1 r1 t1 H1.
-      rewrite wp_bind.
-      unfold mgu at 1, WP at 1.
-      rewrite option.wp_bind.
-      destruct (mgu_spec t1 (Ty_bool w1)) as [(w2 & r2 & [])|].
-      2: {
-        exfalso.
-        destruct (H1 w1 refl) as (w2 & r2 & Heq).
-        rewrite trans_refl_l in Heq.
-        eapply (H w2 r2); clear H.
-        apply Heq.
-      }
-      constructor.
-      constructor.
-      rewrite wp_bind.
-      specialize (IHR2 w2). revert IHR2.
-      rewrite persist_liftEnv.
-      apply wp_monotonic.
-      intros w3 r3 t2 H2.
-      rewrite wp_bind.
-      specialize (IHR3 w3). revert IHR3.
-      rewrite persist_liftEnv.
-      apply wp_monotonic.
-      intros w4 r4 t3 H3.
-      rewrite wp_bind.
-      unfold mgu at 1, WP at 1.
-      rewrite option.wp_bind.
-      destruct (mgu_spec <{ t2 ~ r4 }> t3) as [(w5 & r5 & [])|].
-      2: {
-        exfalso.
-        specialize (H3 w4 refl). destruct H3 as (w5 & r5 & H3).
-        rewrite trans_refl_l in H3.
-        specialize (H2 w5 (r4 ⊙ r5)). destruct H2 as (w6 & r6 & H2).
-        apply (H0 w6 (r5 ⊙ r6)). clear - H2 H3.
-        cbv [P.max P.unifies persist PersistentSub_Ty] in *.
-        repeat rewrite Sub.subst_comp in *.
-        rewrite H2, H3. rewrite subst_lift. easy.
-      }
-
-      constructor.
-      constructor.
-      rewrite wp_pure.
-      unfold T, _4.
-      intros w6 r6. specialize (H3 w6 (Sub.triangular r5 ⊙ r6)).
-      destruct H3 as (w7 & r7 & H3).
-      exists w7. exists r7. clear - H3.
-      cbv [P.max P.unifies persist PersistentSub_Ty] in *.
-      now repeat rewrite Sub.subst_comp in *.
-
-    - rewrite value_lift. rewrite H. cbn.
-      rewrite wp_pure. intros w1 r1.
-      exists w1. exists refl.
-      now rewrite persist_liftTy.
-
-    - rewrite wp_mexists.
-      rewrite wp_bind.
-      specialize (IHR w). revert IHR.
-      rewrite persist_liftEnv.
-      cbn - [Sub.subst].
-      apply (wp_monotonic_strong RTy (w ▻ 0) w (Sub.thick ctx.in_zero (lift vt _))).
-      cbn - [Sub.thick].
-      apply infer_mon. admit.
-      intros w2 w3 r02 r13 r23 Heq t_2 t_3 rt IH.
-      cbn - [Sub.thick] in Heq.
-      rewrite wp_pure.
-      unfold RTy in *. subst.
-      unfold T, _4, persist,  PersistentSub_Ty in *.
-      remember (Ty_hole (w ▻ 0) 0 ctx.in_zero) as tfresh.
-      admit.
-
-    - rewrite wp_bind.
-      specialize (IHR w). revert IHR.
-      apply wp_monotonic.
-      intros w1 r1 t1 H1.
-      rewrite wp_pure.
-      intros w2 r2.
-      specialize (H1 w2 r2). destruct H1 as (w3 & r3 & H1).
-      exists w3, r3. cbn. f_equal.
-      + now rewrite subst_lift.
-      + apply H1.
-
-    - rewrite wp_bind.
-      specialize (IHR1 w). revert IHR1.
-      apply wp_monotonic.
-      intros w1 r1 tf H1.
-      rewrite wp_bind.
-      specialize (IHR2 w1). revert IHR2.
-      rewrite persist_liftEnv.
-      apply wp_monotonic.
-      intros w2 r2 ta H2.
-      rewrite wp_mexists.
-      rewrite wp_bind.
-      unfold mgu, WP at 1.
-      rewrite option.wp_bind.
-      destruct
-        (mgu_spec
-         <{ tf ~ r2 ⊙ Sub.step }>
-           (Ty_func (w2 ▻ 0) <{ ta ~ Sub.step }> (Ty_hole (w2 ▻ 0) 0 ctx.in_zero)))
-        as [(w3 & r3' & [])|].
-      2: {
-        exfalso.
-        specialize (H1 w2 r2).
-        destruct H1 as (w3 & r3 & H1).
-        specialize (H2 w3 r3). destruct H2 as (w4 & r4 & H2).
-        apply (H w4 (Sub.thick ctx.in_zero (lift t1 _) ⊙ r3 ⊙ r4)).
-        cbv [P.max P.unifies persist PersistentSub_Ty Sub.step] in *.
-        cbn - [Sub.thin Sub.thick].
-        repeat rewrite Sub.subst_comp in *.
-        rewrite
-          (Sub.thin_thick_pointful
-             ctx.in_zero
-             (lift t1 w2)
-             (Sub.subst tf r2)).
-        rewrite
-          (Sub.thin_thick_pointful
-             ctx.in_zero
-             (lift t1 w2)
-             ta).
-        cbn. now rewrite H1, H2, ?subst_lift.
-      }
-      constructor.
-      constructor.
-      rewrite wp_pure.
-      destruct H as [Hu _].
-      cbv [P.max P.unifies persist PersistentSub_Ty Sub.step] in *.
-      remember (Sub.triangular r3') as r3.
-      clear r3' Heqr3.
-      intros w4 r4.
-      specialize (H1 w4 (r2 ⊙ Sub.thin ctx.in_zero ⊙ r3 ⊙ r4)).
-      destruct H1 as (w5 & r5 & H1).
-      specialize (H2 w5 (Sub.thin ctx.in_zero ⊙ r3 ⊙ r4 ⊙ r5)).
-      destruct H2 as (w6 & r6 & H2).
-      cbn - [Sub.thin Sub.thick] in *.
-      exists w6, (r5 ⊙ r6).
-      rewrite ?Sub.subst_comp in *.
-      rewrite Hu in H1. clear Hu.
-      cbn - [Sub.thin] in H1.
-      injection H1. intros H11 H12. clear H1.
-      now rewrite H11, subst_lift.
-
-  Admitted.
-
-End EagerSolving.
+End StrongMonotonicity.
 
 (* Focus on the constraint generation only, forget about solving constraints
    and any semantic values. Also try to pass the type as an input instead of
@@ -1616,10 +983,6 @@ Module CandidateType.
       WLP (bind m f) Q ι <->
       WLP m (fun _ r a => WLP (f _ r a) (_4 Q r)) ι.
   Proof. split; intros; induction m; cbn; firstorder. Qed.
-
-  Lemma compose_step {w x t} (ι : Assignment w) :
-    compose step (env.snoc ι x t) = ι.
-  Proof. reflexivity. Qed.
 
   Lemma soundness e :
     forall (w0 : World) (ι0 : Assignment w0) (G0 : Env w0) (t0 : Ty w0),
