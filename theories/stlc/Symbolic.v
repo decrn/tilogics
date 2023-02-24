@@ -1628,28 +1628,54 @@ Module CandidateType.
       WLP m (fun _ r a => WLP (f _ r a) (_4 _ Q _ r)) ι.
   Proof. split; intros; induction m; cbn; firstorder. Qed.
 
-  Lemma soundness e {G t} :
+  Lemma soundness e :
     forall (w0 : World) (ι0 : Assignment w0) (G0 : Env w0) (t0 : Ty w0),
-      G = inst G0 ι0 ->
-      t = inst t0 ι0 ->
       WLP (check e G0 t0)
           (fun w1 r01 _ ι1 => ι0 = compose r01 ι1 /\
-                                  exists ee, G |-- e ; t ~> ee)
+                       exists ee, inst G0 ι0 |-- e ; inst t0 ι0 ~> ee)
           ι0.
   Proof.
     induction e; cbn; intros.
-    - admit.
-    - admit.
-    - rewrite wlp_bind. specialize (IHe1 _ ι0 G0 (Ty_bool w0) H).
-      destruct t. cbn -[step] in IHe1.
-      specialize (IHe1 eq_refl).
-      revert IHe1.
-      apply wlp_monotonic. intros.
+    - split. auto. rewrite H. eexists. constructor.
+    - split. auto. rewrite H. eexists. constructor.
+    - rewrite wlp_bind. specialize (IHe1 _ ι0 G0 (Ty_bool w0)).
+      revert IHe1. apply wlp_monotonic. intros.
       rewrite wlp_bind. specialize (IHe2 _ ι1 <{ G0 ~ r1 }> <{ t0 ~ r1}>).
-      rewrite <- inst_persist_accessibility_env in IHe2.
-      rewrite <- inst_persist_accessibility_ty in IHe2.
-      cbn in IHe2.
-      admit.
+      revert IHe2. apply wlp_monotonic. intros.
+      specialize (IHe3 _ ι2 <{ G0 ~ r1 .> r0 }> <{ t0 ~ r1 .> r0 }>).
+      revert IHe3. apply wlp_monotonic. intros.
+      hnf. destruct H1, H0, H. firstorder.
+      now rewrite <- compose_trans,
+                  <- compose_trans,
+                  <- H1,
+                  <- H0,
+                  <- H.
+      exists (e_if x0 x1 x). constructor.
+      now cbn in H4.
+      now rewrite <- inst_persist_accessibility_env,
+                  <- inst_persist_accessibility_ty,
+                  <- H in H3.
+      now rewrite <- inst_persist_accessibility_env,
+                  <- inst_persist_accessibility_ty,
+                  <- compose_trans,
+                  <- H0,
+                  <- H in H2.
+    - admit. (* destruct (value s G0); cbn; firstorder. exists (e_var s). constructor. admit. *)
+    - specialize (IHe _ (env.snoc (env.snoc ι0 1 t) 2 t1)
+                        ((s, Ty_hole (w0 ▻ 1 ▻ 2) 1 (ctx.in_succ ctx.in_zero))
+                             :: <{ G0 ~ acc.fresh w0 1 (w0 ▻ 1 ▻ 2) step }>)
+                        (Ty_hole (w0 ▻ 1 ▻ 2) 2 ctx.in_zero)).
+        revert IHe. apply wlp_monotonic. intros. hnf.
+        split. do 2 rewrite <- compose_trans. destruct H, H0. now rewrite <- H.
+        destruct H. destruct H0. destruct H0. exists (e_abst s t x).
+        admit.
+    - specialize (IHe _ (env.snoc ι0 2 t1)
+                        ((s, lift t (w0 ▻ 2)) :: <{ G0 ~ step }>)
+                        (Ty_hole (w0 ▻ 2) 2 ctx.in_zero)).
+      revert IHe. apply wlp_monotonic. intros. hnf.
+      destruct H, H0, H0. split. now rewrite <- compose_trans, <- H.
+      exists (e_abst s t x). admit.
+    - admit.
   Admitted.
 
 End CandidateType.
