@@ -15,45 +15,45 @@ Local Notation "<{ A ~ w }>" := (persist _ A _ w).
   fun w1 t w2 ζ => Sub.subst t ζ.
 Open Scope indexed_scope.
 
-Fixpoint bind [A B] {Σ} (m : FreeM A Σ) (f : □⁺ (A -> (FreeM B)) Σ)
-  : FreeM B Σ :=
-  match m with
-  | Ret_Free _ _ v => (T Σ f) v (* removing the box *)
-  | Fail_Free _ _ => Fail_Free B Σ
-  | Bind_AssertEq_Free _ _ t1 t2 C1 =>
-      Bind_AssertEq_Free B Σ t1 t2 (bind C1 f)
-  | Bind_Exists_Free _ _ i C =>
-      Bind_Exists_Free B Σ i
-        (bind (* (Σ ▻ i) *) C
-            (fun Σ' (ω : Accessibility (Σ ▻ i) Σ') (V : A Σ') =>
-               (_4 Σ f) (Σ ▻ i) (acc.fresh Σ i (Σ ▻ i) (acc.refl (Σ ▻ i))) Σ' ω V))
-  end.
+Definition bind {A B} : ⊢ FreeM A -> □⁺(A -> FreeM B) -> FreeM B :=
+  fix bind {w} m f {struct m} :=
+    match m with
+    | Ret_Free _ _ v => T f v
+    | Fail_Free _ _ => Fail_Free B w
+    | Bind_AssertEq_Free _ _ t1 t2 C1 =>
+        Bind_AssertEq_Free B w t1 t2 (bind C1 f)
+    | Bind_Exists_Free _ _ i C =>
+        Bind_Exists_Free B w i (bind C (_4 f step))
+    end.
+#[global] Arguments bind {A B} [w] m f.
 
-Local Notation "[ ω ] x <- ma ;; mb" :=
-  (bind ma (fun _ ω x => mb))
+Local Notation "[ r ] x <- ma ;; mb" :=
+  (bind ma (fun _ r x => mb))
     (at level 80, x at next level,
       ma at next level, mb at level 200,
       right associativity).
 
-Definition assert {Σ} t1 t2 :=
-  Bind_AssertEq_Free Unit Σ t1 t2 (Ret_Free Unit Σ tt).
+Definition assert {w} t1 t2 :=
+  Bind_AssertEq_Free Unit w t1 t2 (Ret_Free Unit w tt).
 
 Definition exists_Ty : forall Σ, FreeM Ty Σ :=
   fun Σ => let i := ctx.length Σ in
            Bind_Exists_Free Ty Σ i (Ret_Free _ _ (Ty_hole _ i ctx.in_zero)).
 
 (* Indexes a given ty by a world Σ *)
-Fixpoint lift (t : ty) (Σ : World) : Ty Σ :=
-  match t with
-  | ty_bool => Ty_bool Σ
-  | ty_func do co => Ty_func Σ (lift do Σ) (lift co Σ)
-  end.
+Fixpoint lift (t : ty) : ⊢ Ty :=
+  fun w =>
+    match t with
+    | ty_bool       => Ty_bool w
+    | ty_func t1 t2 => Ty_func w (lift t1 w) (lift t2 w)
+    end.
 
-Fixpoint liftEnv (E : env) (Σ : World) : Env Σ :=
-  match E with
-  | List.nil               => List.nil
-  | List.cons (pair s t) E => cons (pair s (lift t Σ)) (liftEnv E Σ)
-  end.
+Fixpoint liftEnv (E : env) : ⊢ Env :=
+  fun w =>
+    match E with
+    | List.nil               => List.nil
+    | List.cons (pair s t) E => cons (pair s (lift t w)) (liftEnv E w)
+    end.
 
 Fixpoint generate (e : expr) {Σ : World} (Γ : Env Σ) : FreeM Ty Σ :=
   match e with
@@ -172,12 +172,12 @@ Notation "w1 ⇅ w2" := (Acc w1 w2) (at level 80).
 Notation "w1 ↑ w2" := (Accessibility w1 w2) (at level 80).
 Notation "w1 ↓ w2" := (Tri w1 w2) (at level 80).
 
-Definition acc_refl w : Acc w w :=
-  {| iw := w; pos := acc.refl w; neg := Tri.refl |}.
+#[export] Instance refl_acc : Refl Acc :=
+  fun w => {| iw := w; pos := refl; neg := refl |}.
 
 Fixpoint down_add {α w1 w2} (t : Tri w1 w2) {struct t} : Tri (w1 ▻ α) (w2 ▻ α) :=
   match t with
-  | Tri.refl => Tri.refl
+  | Tri.refl => refl
   | @Tri.cons _ _ x _ t r =>
     @Tri.cons _ _ x (ctx.in_succ _) (persist _ t _ step) (down_add r)
   end.
@@ -195,37 +195,29 @@ Definition up_down_up_eq_up_up_down {w1 w2 w3} (r12: w1 ⇅ w2) (up : w2 ↑ w3)
         (fun (w w' : World) (up : w ↑ w') => forall iw : World, w1 ↑ iw -> iw ↓ w -> w1 ⇅ w')
         (mkAcc _)
         (fun w α w' up IH iw pos neg =>
-           IH (iw ▻ α) (pos .> acc.fresh iw α (iw ▻ α) (acc.refl (iw ▻ α))) (down_add neg))
+           IH (iw ▻ α) (pos .> acc.fresh iw α (iw ▻ α) refl) (down_add neg))
         w2 w3 up iw pos neg
  end.
 
-Definition acc_trans {w1 w2 w3 : World} (r12 : w1 ⇅ w2) (r23 : w2 ⇅ w3) : w1 ⇅ w3 :=
- match r23 with
- | {| iw := iw; pos := pos; neg := neg |} =>
-     up_down_down_eq_up_down (up_down_up_eq_up_up_down r12 pos) neg
- end.
+#[export] Instance trans_acc : Trans Acc :=
+  fun w1 w2 w3 r12 r23 =>
+    match r23 with
+    | {| iw := iw; pos := pos; neg := neg |} =>
+        up_down_down_eq_up_down (up_down_up_eq_up_up_down r12 pos) neg
+    end.
 
-Notation "A ⇅↓ B" := (up_down_down_eq_up_down A B) (at level 80).
-Notation "A ⇅↑ B" := (up_down_up_eq_up_up_down A B) (at level 80).
-
-Local Notation "r12 ↻ r23" := (acc_trans r12 r23) (at level 80).
-
-Lemma acc_refl_trans {w1 w2 : World} (r : w1 ⇅ w2) :
-  (acc_refl w1 ↻  r) = r.
-Proof. Admitted.
-
-Lemma acc_trans_refl {w1 w2 : World} (r : w1 ⇅ w2) :
-  (r ↻ acc_refl w2) = r.
-Proof. destruct r. cbn. now rewrite Tri.trans_refl. Defined.
-
-Lemma acc_trans_assoc {w1 w2 w3 w4} (r12 : w1 ⇅ w2) (r23 : w2 ⇅ w3) (r34 : w3 ⇅ w4) :
-   ((r12 ↻ r23) ↻ r34) = (r12 ↻ (r23 ↻ r34)).
-Proof. Admitted.
+#[export] Instance preorder_acc : PreOrder Acc.
+Proof.
+  constructor.
+  - admit.
+  - destruct r. cbn. now rewrite trans_refl_r.
+  - admit.
+Admitted.
 
 Definition sub_acc {w1 w2 : World} (r : w1 ⇅ w2) : Sub.Sub w1 w2 :=
   match r with
   | {| pos := p; neg := n |} =>
-      Sub.comp
+      trans (R := Sub)
         (env.tabulate (fun x xIn => <{ Ty_hole w1 x xIn ~ p }>))
         (Sub.triangular n)
   end.
@@ -249,7 +241,7 @@ Proof. destruct r; reflexivity. Qed.
 (* unify with PersistLaws about ↑ *)
 Class PersistLaws A `{Persistent Acc A} : Type :=
   { refl_persist w (V : A w) :
-        persist w V w (acc_refl w) = V }.
+        persist w V w refl = V }.
 
 (* Class PersistLift A `{Persistent Acc A} : Type := *)
 (*   { lift_persist (w w': World) t r : *)
@@ -324,7 +316,7 @@ Lemma inst_persist_env {w0 w1} (G : Env w0) (r : Sub w0 w1) (ι : Assignment w1)
 Admitted.
 
 Lemma inst_comp {w0 w1 w2} (r1 : Sub w0 w1) (r2 : Sub w1 w2) (ι : Assignment w2) :
-  inst (r1 ⊙ˢ r2) ι = inst r1 (inst r2 ι).
+  inst (r1 ⊙ r2) ι = inst r1 (inst r2 ι).
 Admitted.
 
 Lemma inst_sub_step {w n} (ι : Assignment w) (t : ty) :
@@ -348,14 +340,6 @@ Admitted.
 Module UpDown.
   #[local] Notation "□⇅ A" := (BoxR Acc A) (at level 9, format "□⇅ A", right associativity)
       : indexed_scope.
-  #[local] Notation "w1 .> w2" := (acc_trans w1 w2) (at level 80).
-
-  Definition T {A} : ⊢ □⇅A -> A :=
-    fun w a => a w (acc_refl w).
-  Definition K {A B} : ⊢ □⇅(A -> B) -> □⇅A -> □⇅B :=
-    fun w f a w' r => f _ r (a _ r).
-  Definition _4 {A} : ⊢ □⇅A -> □⇅□⇅A :=
-    fun w a w1 r1 w2 r2 => a w2 (r1 ↻ r2).
 
   Definition step {w α} : w ⇅ w ▻ α :=
     {| iw := w ▻ α;
@@ -373,7 +357,7 @@ Module UpDown.
           |}
     | acc.fresh _ α wi p =>
         fun w2 n =>
-          acc_trans
+          trans
             {| iw := w1 ▻ β ▻ α ▻ β;
               pos := acc.fresh _ _ _ (acc.fresh _ _ _ (acc.refl _));
               neg :=
@@ -395,13 +379,13 @@ Module UpDown.
   Definition bind {A B} : ⊢ FreeM A -> □⇅(A -> (FreeM B)) -> FreeM B :=
     fix bind {w} m f :=
     match m with
-    | Ret_Free _ _ a                  => (T _ f) a
+    | Ret_Free _ _ a                  => T f a
     | Fail_Free _ _                   =>
       Fail_Free _ _
     | Bind_AssertEq_Free _ _ t1 t2 C1 =>
       Bind_AssertEq_Free _ _ t1 t2 (bind C1 f)
     | Bind_Exists_Free _ _ i C =>
-      Bind_Exists_Free _ _ i (bind C ((_4 _ f) _ step))
+      Bind_Exists_Free _ _ i (bind C (_4 f step))
     end.
 
   #[global] Arguments bind {A B} [w] m f.
@@ -418,10 +402,10 @@ Module UpDown.
     | e_if cnd coq alt =>
         [ ω₁ ] t_cnd <- generate cnd Γ ;;
         [ ω₂ ] _     <- assert t_cnd (Ty_bool _) ;;
-        [ ω₃ ] t_coq <- generate coq <{ Γ ~ ω₁ .> ω₂ }> ;;
-        [ ω₄ ] t_alt <- generate alt <{ Γ ~ ω₁ .> ω₂ .> ω₃ }> ;;
+        [ ω₃ ] t_coq <- generate coq <{ Γ ~ ω₁ ⊙ ω₂ }> ;;
+        [ ω₄ ] t_alt <- generate alt <{ Γ ~ ω₁ ⊙ ω₂ ⊙ ω₃ }> ;;
         [ ω₅ ] _     <- assert <{ t_coq ~ ω₄ }> t_alt ;;
-           Ret_Free Ty _ <{ t_coq ~ ω₄ .> ω₅ }>
+           Ret_Free Ty _ <{ t_coq ~ ω₄ ⊙ ω₅ }>
     | e_var var =>
         match (value var Γ) with
         | Some t_var => Ret_Free Ty _ t_var
@@ -430,9 +414,9 @@ Module UpDown.
     | e_app f a =>
         [ ω1 ] t_co <- exists_Ty Σ ;;
         [ ω2 ] t_do <- generate a <{ Γ ~ ω1 }> ;;
-        [ ω3 ] t_fn <- generate f <{ Γ ~ ω1 .> ω2 }> ;;
+        [ ω3 ] t_fn <- generate f <{ Γ ~ ω1 ⊙ ω2 }> ;;
         [ ω4 ] _    <- assert t_fn <{ (Ty_func _ t_do <{ t_co ~ ω2 }> ) ~ ω3 }> ;;
-           Ret_Free Ty _ <{ t_co ~ ω2 .> ω3 .> ω4 }>
+           Ret_Free Ty _ <{ t_co ~ ω2 ⊙ ω3 ⊙ ω4 }>
     | e_abst var t_var e =>
         let t_var' := (lift t_var Σ) in (* t_var lives in ty, not in (Ty w) *)
         [ ω1 ] t_e <- generate e ((var, t_var') :: Γ) ;;
@@ -449,12 +433,12 @@ Module UpDown.
       ⊢ FreeM A -> □⇅(A -> PROP) -> PROP :=
       fix wp {w} m Q {struct m} :=
         match m with
-        | Ret_Free _ _ a  => T _ Q a
+        | Ret_Free _ _ a  => T Q a
         | Fail_Free _ _   => False
         | Bind_AssertEq_Free _ _ t1 t2 m =>
             t1 = t2 /\ wp m Q
         | Bind_Exists_Free _ _ i m =>
-            wp m (_4 w Q (w ▻ i) step)
+            wp m (_4 Q step)
         end.
     #[global] Arguments wp {A} [w].
 
@@ -480,7 +464,7 @@ Module UpDown.
     Lemma wp_bind {A B} (* `{Persistent Acc A,  Persistent Acc B} *)
       {w} (m : FreeM A w) (f : □⇅(A -> FreeM B) w) (Q : □⇅(B -> PROP) w) :
       wp (bind m f) Q <->
-      wp m (fun _ r a => wp (f _ r a) (_4 _ Q _ r)).
+      wp m (fun _ r a => wp (f _ r a) (_4 Q r)).
     Proof.
       induction m; cbn; unfold T, _4.
       - apply wp_equiv. intros w1 r1 a1.
@@ -538,11 +522,11 @@ Module UpDown.
       ⊢ FreeM A -> □⇅(A -> Property) -> Property :=
       fix wp {w} m Q {struct m} :=
         match m with
-        | Ret_Free _ _ a => T w Q a
+        | Ret_Free _ _ a => T Q a
         | Fail_Free _ _ => False
         | Bind_AssertEq_Free _ _ t1 t2 f => And (Eq t1 t2) (wp f Q)
         | Bind_Exists_Free _ _ i f =>
-            fun w1 r1 => wp f (_4 _ Q _ step) _ (up r1)
+            fun w1 r1 => wp f (_4 Q step) _ (up r1)
         end.
     #[global] Arguments wp {A} [w].
 
@@ -571,7 +555,7 @@ Module UpDown.
       {w} (m : FreeM A w) (f : □⇅(A -> FreeM B) w) (Q : □⇅(B -> Property) w) :
       forall w' r,
         wp (bind m f) Q w' r <->
-          wp m (fun _ r a => wp (f _ r a) (_4 _ Q _ r)) w' r.
+          wp m (fun _ r a => wp (f _ r a) (_4 Q r)) w' r.
     Proof.
     Admitted.
 
@@ -591,7 +575,7 @@ Module UpDown.
         unfold T, _4, And; cbn [wp].
         split. auto.
         rewrite wp_bind; cbn [wp].
-        specialize (IHR2 w3 w3 (acc_refl _)). revert IHR2.
+        specialize (IHR2 w3 w3 refl). revert IHR2.
         (* rewrite persist_liftEnv. *)
     Admitted.
 
@@ -613,28 +597,21 @@ Module EagerSolving.
       (at level 9, format "□ˢ A", right associativity)
       : indexed_scope.
 
-  Definition T {A} : ⊢ □ˢA -> A :=
-    fun w a => a w Sub.id.
-  Definition K {A B} : ⊢ □ˢ(A -> B) -> □ˢA -> □ˢB :=
-    fun w f a w' r => f _ r (a _ r).
-  Definition _4 {A} : ⊢ □ˢA -> □ˢ□ˢA :=
-    fun w a w1 r1 w2 r2 => a w2 (r1 ⊙ˢ r2).
-
   Definition M (A : TYPE) : TYPE :=
     Option (DiamondR Sub A).
 
   Definition pure {A} : ⊢ A -> M A :=
-    fun w a => Some (existT _ w (Sub.id, a)).
+    fun w a => Some (existT _ w (refl, a)).
 
   Definition bind {A B} : ⊢ M A -> □ˢ(A -> (M B)) -> M B :=
     fun w m f =>
       '(existT _ w1 (r1,a1)) <- m;;
       '(existT _ w2 (r2,b2)) <- f w1 r1 a1;;
-      Some (existT _ w2 (r1 ⊙ˢ r2, b2)).
+      Some (existT _ w2 (r1 ⊙ r2, b2)).
 
   Definition mexists {A w n} (m : M A (w ▻ n)) : M A w :=
     '(w';(r,a)) <- m ;;
-    Some (existT _ w' (Sub.step ⊙ˢ r, a)).
+    Some (existT _ w' (Sub.step ⊙ r, a)).
 
   Definition mgu : ⊢ Ty -> Ty -> M Unit :=
     fun w t1 t2 =>
@@ -653,10 +630,10 @@ Module EagerSolving.
       apply (mgu w1 t1 (Ty_bool w1)).
       intros w2 r2 _.
       eapply bind.
-      apply (infer e2 w2 <{ G ~ r1 ⊙ˢ r2 }>).
+      apply (infer e2 w2 <{ G ~ r1 ⊙ r2 }>).
       intros w3 r3 t2.
       eapply bind.
-      apply (infer e3 w3 <{ G ~ r1 ⊙ˢ r2 ⊙ˢ r3 }>).
+      apply (infer e3 w3 <{ G ~ r1 ⊙ r2 ⊙ r3 }>).
       intros w4 r4 t3.
       eapply bind.
       apply (mgu w4 <{ t2 ~ r4 }> t3).
@@ -693,7 +670,7 @@ Module EagerSolving.
       pose (@Sub.step w2 0) as r3.
       pose (Ty_hole w3 0 ctx.in_zero) as ti.
       eapply bind.
-      apply (mgu _ <{ t1 ~ r2 ⊙ˢ r3 }>
+      apply (mgu _ <{ t1 ~ r2 ⊙ r3 }>
                (Ty_func _ <{ t2 ~ r3 }> ti)).
       intros w4 r4 _.
       apply pure.
@@ -704,12 +681,12 @@ Module EagerSolving.
     fun w m P => option.wlp (fun '(w;(r,a)) => P w r a) m.
 
   Lemma wlp_pure {A w} (a : A w) (p : □ˢ(A -> PROP) w) :
-    WLP w (pure w a) p <-> T w p a.
+    WLP w (pure w a) p <-> T p a.
   Proof. unfold WLP, pure. now rewrite option.wlp_match. Qed.
 
   Lemma wlp_bind {A B w} (m : M A w) (k : □ˢ(A -> M B) w) (p : □ˢ(B -> PROP) w) :
     WLP w (bind _ m k) p <->
-      WLP w m (fun w1 r1 a1 => WLP w1 (k w1 r1 a1) (_4 w p w1 r1)).
+      WLP w m (fun w1 r1 a1 => WLP w1 (k w1 r1 a1) (_4 p r1)).
   Proof.
     unfold WLP, bind.
     rewrite option.wlp_bind.
@@ -723,7 +700,7 @@ Module EagerSolving.
 
   Lemma wlp_mexists {A w n} (m : M A (w ▻ n)) (p : □ˢ(A -> PROP) w) :
     WLP w (mexists m) p <->
-    WLP (w ▻ n) m (_4 w p (w ▻ n) Sub.step).
+    WLP (w ▻ n) m (_4 p Sub.step).
   Proof.
     unfold mexists, WLP, _4.
     rewrite option.wlp_bind.
@@ -748,14 +725,14 @@ Module EagerSolving.
     fun w m P => option.wp (fun '(w;(r,a)) => P w r a) m.
 
   Lemma wp_pure {A w} (a : A w) (p : □ˢ(A -> PROP) w) :
-    WP w (pure w a) p <-> T w p a.
+    WP w (pure w a) p <-> T p a.
   Proof.
     unfold WP, pure. now rewrite option.wp_match.
   Qed.
 
   Lemma wp_bind {A B w} (m : M A w) (k : □ˢ(A -> M B) w) (p : □ˢ(B -> PROP) w) :
     WP w (bind _ m k) p <->
-      WP w m (fun w1 r1 a1 => WP w1 (k w1 r1 a1) (_4 w p w1 r1)).
+      WP w m (fun w1 r1 a1 => WP w1 (k w1 r1 a1) (_4 p r1)).
   Proof.
     unfold WP, bind.
     rewrite option.wp_bind.
@@ -769,7 +746,7 @@ Module EagerSolving.
 
   Lemma wp_mexists {A w n} (m : M A (w ▻ n)) (p : □ˢ(A -> PROP) w) :
     WP w (mexists m) p <->
-    WP (w ▻ n) m (_4 w p (w ▻ n) Sub.step).
+    WP (w ▻ n) m (_4 p Sub.step).
   Proof.
     unfold mexists, WP, _4.
     rewrite option.wp_bind.
@@ -825,12 +802,12 @@ Module EagerSolving.
       destruct (mgu_spec t1 (Ty_bool w1)) as [(w2 & r2 & [])|]; [|constructor].
       constructor.
       rewrite wlp_bind.
-      specialize (IHe2 w2 (persist w G w2 (r1 ⊙ˢ Sub.triangular r2))).
+      specialize (IHe2 w2 (persist w G w2 (r1 ⊙ Sub.triangular r2))).
       revert IHe2.
       apply wlp_monotonic.
       intros w3 r3 t2 H2.
       rewrite wlp_bind.
-      specialize (IHe3 w3 (persist w G w3 (r1 ⊙ˢ Sub.triangular r2 ⊙ˢ r3))).
+      specialize (IHe3 w3 (persist w G w3 (r1 ⊙ Sub.triangular r2 ⊙ r3))).
       revert IHe3.
       apply wlp_monotonic.
       intros w4 r4 t3 H3.
@@ -883,7 +860,7 @@ Module EagerSolving.
       rewrite wlp_bind.
       unfold WLP at 1, mgu.
       destruct (mgu_spec
-                  <{ t1 ~ r2 ⊙ˢ Sub.step }>
+                  <{ t1 ~ r2 ⊙ Sub.step }>
                   (Ty_func (w2 ▻ 0) <{ t2 ~ Sub.step }> (Ty_hole (w2 ▻ 0) 0 ctx.in_zero)))
         as [(w3 & r3 & [])|]; [|constructor].
       constructor.
@@ -900,7 +877,7 @@ Module EagerSolving.
   Definition RBox {A} (R : REL A) : REL □ˢA :=
     fun w0 w1 r01 ba0 ba1 =>
       forall (w2 w3 : World) (r02 : w0 ⊒ˢ w2) (r13 : w1 ⊒ˢ w3) (r23 : w2 ⊒ˢ w3),
-        r01 ⊙ˢ r13 = r02 ⊙ˢ r23 ->
+        r01 ⊙ r13 = r02 ⊙ r23 ->
         R w2 w3 r23 (ba0 w2 r02) (ba1 w3 r13).
 
    (*         r01 *)
@@ -918,7 +895,7 @@ Module EagerSolving.
     intros (w2 & r02 & a2).
     intros (w3 & r13 & a3).
     refine (exists r23,
-               r01 ⊙ˢ r13 = r02 ⊙ˢ r23 /\ R _ _ r23 a2 a3).
+               r01 ⊙ r13 = r02 ⊙ r23 /\ R _ _ r23 a2 a3).
   Defined.
 
   Definition RImpl {A B} (RA : REL A) (RB : REL B) : REL (Impl A B) :=
@@ -975,7 +952,7 @@ Module EagerSolving.
     intros w0 w1 r01 a0 a1 ra.
     refine (@rsome _ (RDSub R) w0 w1 r01 _ _ _).
     unfold RDSub. exists r01. split; auto.
-    now rewrite Sub.comp_id_left, Sub.comp_id_right.
+    now rewrite trans_refl_l, trans_refl_r.
   Qed.
 
   Lemma rbind {A B} (RA : REL A) (RB : REL B) :
@@ -990,9 +967,9 @@ Module EagerSolving.
       destruct f0 as [(w4 & r4 & b4)|], f1 as [(w5 & r5 & b5)|]; cbn.
       + intros (r45 & Heqr2 & rb).
         exists r45.
-        rewrite <- ?Sub.comp_assoc.
+        rewrite <- ?trans_assoc.
         rewrite Heqr.
-        rewrite ?Sub.comp_assoc.
+        rewrite ?trans_assoc.
         now rewrite Heqr2.
       + auto.
       + auto.
@@ -1021,13 +998,13 @@ Module EagerSolving.
       destruct H0 as [H0 _].
       destruct H as [_ H].
       unfold P.unifies in *.
-      specialize (H _ (r01 ⊙ˢ Sub.triangular r13)).
+      specialize (H _ (r01 ⊙ Sub.triangular r13)).
       rewrite ?Sub.subst_comp in H.
       specialize (H H0).
       destruct H as (r23 & ?).
       exists r23. split; auto.
     - auto.
-    - apply (H w3 (r01 ⊙ˢ Sub.triangular r13)).
+    - apply (H w3 (r01 ⊙ Sub.triangular r13)).
       destruct H0 as [H0 _].
       unfold RTy in *.
       subst. unfold P.unifies in *.
@@ -1043,9 +1020,9 @@ Module EagerSolving.
     destruct m0 as [(w2 & r02 & a2)|], m1 as [(w3 & r13 & a3)|]; cbn - [Sub.step Sub.up1]; auto.
     intros (r23 & Heqr & ra).
     exists r23. split; auto.
-    rewrite Sub.comp_assoc, <- Heqr.
+    rewrite trans_assoc, <- Heqr.
     clear.
-    rewrite <- ?Sub.comp_assoc. f_equal.
+    rewrite <- ?trans_assoc. f_equal.
     admit.
   Admitted.
 
@@ -1105,9 +1082,9 @@ Module EagerSolving.
       { unfold RTy in *. subst.
         unfold persist, PersistentSub_Ty.
         rewrite <- ?Sub.subst_comp. f_equal.
-        rewrite <- Sub.comp_assoc.
+        rewrite <- trans_assoc.
         rewrite Heqr45.
-        rewrite ?Sub.comp_assoc. f_equal.
+        rewrite ?trans_assoc. f_equal.
         admit.
       }
       { unfold RTy in *. subst.
@@ -1152,12 +1129,12 @@ Module EagerSolving.
       WP w (infer e w (liftEnv G w))
         (fun w1 r1 T =>
            forall w2 (r2 : w1 ⊒ˢ w2),
-           exists w3 (r3 : w2 ⊒ˢ w3), <{ T ~ r2 ⊙ˢ r3 }> = lift t w3).
+           exists w3 (r3 : w2 ⊒ˢ w3), <{ T ~ r2 ⊙ r3 }> = lift t w3).
   Proof.
     Set Printing Depth 18.
     induction R; cbn - [Sub.step Sub.subst persist]; intros w.
-    - rewrite wp_pure. intros w2 r2. exists w2. exists Sub.id. reflexivity.
-    - rewrite wp_pure. intros w2 r2. exists w2. exists Sub.id. reflexivity.
+    - rewrite wp_pure. intros w2 r2. exists w2. exists refl. reflexivity.
+    - rewrite wp_pure. intros w2 r2. exists w2. exists refl. reflexivity.
 
     - rewrite wp_bind.
       specialize (IHR1 w). revert IHR1.
@@ -1168,8 +1145,8 @@ Module EagerSolving.
       destruct (mgu_spec t1 (Ty_bool w1)) as [(w2 & r2 & [])|].
       2: {
         exfalso.
-        destruct (H1 w1 Sub.id) as (w2 & r2 & Heq).
-        rewrite Sub.comp_id_left in Heq.
+        destruct (H1 w1 refl) as (w2 & r2 & Heq).
+        rewrite trans_refl_l in Heq.
         eapply (H w2 r2); clear H.
         apply Heq.
       }
@@ -1191,10 +1168,10 @@ Module EagerSolving.
       destruct (mgu_spec <{ t2 ~ r4 }> t3) as [(w5 & r5 & [])|].
       2: {
         exfalso.
-        specialize (H3 w4 Sub.id). destruct H3 as (w5 & r5 & H3).
-        rewrite Sub.comp_id_left in H3.
-        specialize (H2 w5 (r4 ⊙ˢ r5)). destruct H2 as (w6 & r6 & H2).
-        apply (H0 w6 (r5 ⊙ˢ r6)). clear - H2 H3.
+        specialize (H3 w4 refl). destruct H3 as (w5 & r5 & H3).
+        rewrite trans_refl_l in H3.
+        specialize (H2 w5 (r4 ⊙ r5)). destruct H2 as (w6 & r6 & H2).
+        apply (H0 w6 (r5 ⊙ r6)). clear - H2 H3.
         cbv [P.max P.unifies persist PersistentSub_Ty] in *.
         repeat rewrite Sub.subst_comp in *.
         rewrite H2, H3. rewrite subst_lift. easy.
@@ -1204,7 +1181,7 @@ Module EagerSolving.
       constructor.
       rewrite wp_pure.
       unfold T, _4.
-      intros w6 r6. specialize (H3 w6 (Sub.triangular r5 ⊙ˢ r6)).
+      intros w6 r6. specialize (H3 w6 (Sub.triangular r5 ⊙ r6)).
       destruct H3 as (w7 & r7 & H3).
       exists w7. exists r7. clear - H3.
       cbv [P.max P.unifies persist PersistentSub_Ty] in *.
@@ -1212,7 +1189,7 @@ Module EagerSolving.
 
     - rewrite value_lift. rewrite H. cbn.
       rewrite wp_pure. intros w1 r1.
-      exists w1. exists Sub.id.
+      exists w1. exists refl.
       now rewrite persist_liftTy.
 
     - rewrite wp_mexists.
@@ -1257,7 +1234,7 @@ Module EagerSolving.
       rewrite option.wp_bind.
       destruct
         (mgu_spec
-         <{ tf ~ r2 ⊙ˢ Sub.step }>
+         <{ tf ~ r2 ⊙ Sub.step }>
            (Ty_func (w2 ▻ 0) <{ ta ~ Sub.step }> (Ty_hole (w2 ▻ 0) 0 ctx.in_zero)))
         as [(w3 & r3' & [])|].
       2: {
@@ -1265,7 +1242,7 @@ Module EagerSolving.
         specialize (H1 w2 r2).
         destruct H1 as (w3 & r3 & H1).
         specialize (H2 w3 r3). destruct H2 as (w4 & r4 & H2).
-        apply (H w4 (Sub.thick ctx.in_zero (lift t1 _) ⊙ˢ r3 ⊙ˢ r4)).
+        apply (H w4 (Sub.thick ctx.in_zero (lift t1 _) ⊙ r3 ⊙ r4)).
         cbv [P.max P.unifies persist PersistentSub_Ty Sub.step] in *.
         cbn - [Sub.thin Sub.thick].
         repeat rewrite Sub.subst_comp in *.
@@ -1289,12 +1266,12 @@ Module EagerSolving.
       remember (Sub.triangular r3') as r3.
       clear r3' Heqr3.
       intros w4 r4.
-      specialize (H1 w4 (r2 ⊙ˢ Sub.thin ctx.in_zero ⊙ˢ r3 ⊙ˢ r4)).
+      specialize (H1 w4 (r2 ⊙ Sub.thin ctx.in_zero ⊙ r3 ⊙ r4)).
       destruct H1 as (w5 & r5 & H1).
-      specialize (H2 w5 (Sub.thin ctx.in_zero ⊙ˢ r3 ⊙ˢ r4 ⊙ˢ r5)).
+      specialize (H2 w5 (Sub.thin ctx.in_zero ⊙ r3 ⊙ r4 ⊙ r5)).
       destruct H2 as (w6 & r6 & H2).
       cbn - [Sub.thin Sub.thick] in *.
-      exists w6, (r5 ⊙ˢ r6).
+      exists w6, (r5 ⊙ r6).
       rewrite ?Sub.subst_comp in *.
       rewrite Hu in H1. clear Hu.
       cbn - [Sub.thin] in H1.
@@ -1358,8 +1335,8 @@ Module ConstraintsOnly.
           end
       | e_absu x e =>
           ∃1, ∃2,
-            let G'  := <{ G ~ Sub.step ⊙ˢ Sub.step }> in
-            let tr' := <{ tr ~ Sub.step ⊙ˢ Sub.step }> in
+            let G'  := <{ G ~ Sub.step ⊙ Sub.step }> in
+            let tr' := <{ tr ~ Sub.step ⊙ Sub.step }> in
             let α1  := Ty_hole (w ▻ 1 ▻ 2) 1 (ctx.in_succ ctx.in_zero) in
             let α2  := Ty_hole (w ▻ 1 ▻ 2) 2 ctx.in_zero in
             (tr' == Ty_func _ α1 α2) /\
@@ -1511,23 +1488,29 @@ Module CandidateType.
   Definition WP {A} : ⊢ FreeM A -> □⁺(A -> Assignment -> PROP) -> Assignment -> PROP :=
     fix WP w m POST ı {struct m} :=
       match m with
-      | Ret_Free _ _ v => POST w refl v ı
+      | Ret_Free _ _ v => T POST v ı
       | Fail_Free _ _ => False
       | Bind_AssertEq_Free _ _ t1 t2 k =>
           (inst t1 ı) = (inst t2 ı) /\ WP _ k POST ı
       | Bind_Exists_Free _ _ i k =>
-          exists t, WP _ k (_4 w POST (w ▻ i) step) (env.snoc ı i t)
+          exists t, WP _ k (_4 POST step) (env.snoc ı i t)
       end.
 
   Lemma wp_monotonic {A w} (m : FreeM A w) (p q : □⁺(A -> Assignment -> PROP) w)
     (pq : forall w1 r1 a1 ι1, p w1 r1 a1 ι1 -> q w1 r1 a1 ι1) :
     forall (ι : Assignment w), WP m p ι -> WP m q ι.
-  Proof. induction m; cbn; firstorder. exists x. firstorder. Qed.
+  Proof.
+    induction m; cbn.
+    - apply pq.
+    - auto.
+    - firstorder.
+    - intros ι [x H]. exists x. firstorder.
+  Qed.
 
   Lemma wp_bind {A B w} (m : FreeM A w) (f : □⁺(A -> FreeM B) w) :
     forall (Q : □⁺(B -> Assignment -> PROP) w) (ι : Assignment w),
       WP (bind m f) Q ι <->
-      WP m (fun _ r a => WP (f _ r a) (_4 _ Q _ r)) ι.
+      WP m (fun _ r a => WP (f _ r a) (_4 Q r)) ι.
   Proof. split; intros; induction m; cbn; firstorder; exists x; firstorder. Qed.
 
   Lemma lookup_compose {w1 w2 : World} (r : Accessibility w1 w2) (ι : Assignment w2) {x} (i : x ∈ w1) :
@@ -1609,23 +1592,29 @@ Module CandidateType.
   Definition WLP {A} : ⊢ FreeM A -> □⁺(A -> Assignment -> PROP) -> Assignment -> PROP :=
     fix WLP w m POST ı {struct m} :=
       match m with
-      | Ret_Free _ _ v => POST w refl v ı
+      | Ret_Free _ _ v => T POST v ı
       | Fail_Free _ _ => True
       | Bind_AssertEq_Free _ _ t1 t2 k =>
           (inst t1 ı = inst t2 ı) -> WLP _ k POST ı
       | Bind_Exists_Free _ _ i k =>
-          forall t, WLP _ k (_4 w POST (w ▻ i) step) (env.snoc ı i t)
+          forall t, WLP _ k (_4 POST step) (env.snoc ı i t)
       end%type.
 
   Lemma wlp_monotonic {A w} (m : FreeM A w) (p q : □⁺(A -> Assignment -> PROP) w)
     (pq : forall w1 r1 a1 ι1, p w1 r1 a1 ι1 -> q w1 r1 a1 ι1) :
     forall (ι : Assignment w), WLP m p ι -> WLP m q ι.
-  Proof. induction m; cbn; firstorder. Qed.
+  Proof.
+    induction m; cbn.
+    - apply pq.
+    - auto.
+    - firstorder.
+    - firstorder.
+  Qed.
 
   Lemma wlp_bind {A B w} (m : FreeM A w) (f : □⁺(A -> FreeM B) w) :
     forall (Q : □⁺(B -> Assignment -> PROP) w) (ι : Assignment w),
       WLP (bind m f) Q ι <->
-      WLP m (fun _ r a => WLP (f _ r a) (_4 _ Q _ r)) ι.
+      WLP m (fun _ r a => WLP (f _ r a) (_4 Q r)) ι.
   Proof. split; intros; induction m; cbn; firstorder. Qed.
 
   Lemma soundness e :

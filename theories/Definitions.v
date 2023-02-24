@@ -1,5 +1,3 @@
-From Coq Require Import
-     Classes.CRelationClasses.
 From Equations.Type Require
      Classes.
 Require Import Relation_Definitions String.
@@ -112,8 +110,8 @@ End acc.
 Export acc (Accessibility).
 Export (hints) acc.
 
-Notation "w1 .> w2" := (trans (R := Accessibility) w1 w2) (at level 80).
-
+Notation "w1 .> w2" := (trans (R := Accessibility) w1 w2) (at level 80, only parsing).
+Infix "⊙" := trans (at level 60, right associativity).
 
 (* TODO: switch to superscript *)
 (* \^s \^+ *)
@@ -139,9 +137,16 @@ Class PersistLaws A `{Persistent Accessibility A} : Type :=
 
 Definition T {R} {reflR : Refl R} {A} : ⊢ BoxR R A -> A :=
   fun w a => a w refl.
+#[global] Arguments T {R _ A} [_] _ : simpl never.
 
 Definition _4 {R} {transR : Trans R} {A} : ⊢ BoxR R A -> BoxR R (BoxR R A) :=
   fun w0 a w1 r1 w2 r2 => a w2 (trans r1 r2).
+#[global] Arguments _4 {R _ A} [_] _ [_] _ [_] _ : simpl never.
+
+Definition K {R A B} :
+  ⊢ BoxR R (A -> B) -> (BoxR R A -> BoxR R B) :=
+  fun w0 f a w1 ω01 =>
+    f w1 ω01 (a w1 ω01).
 
 #[export] Instance Persistent_In {x} :
   Persistent Accessibility (ctx.In x) :=

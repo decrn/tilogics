@@ -92,21 +92,6 @@ Section Löb.
 
 End Löb.
 
-Definition K {A B} :
-  ⊢ □(A -> B) -> (□A -> □B) :=
-  fun w0 f a w1 ω01 =>
-    f w1 ω01 (a w1 ω01).
-Definition T {A} :
-  ⊢ □A -> A :=
-  fun w0 a => a w0 Tri.refl.
-Definition four {A} :
-  ⊢ □A -> □□A :=
-  fun w0 a w1 ω01 w2 ω12 =>
-    a w2 (Tri.trans ω01 ω12).
-Global Arguments four : simpl never.
-Definition D {A} : ⊢ □A -> ◇A :=
-  fun w a => existT _ w (Tri.refl, T a).
-
 Definition box2later {A} : ⊢ □A -> ▶A.
   intros w a x xIn t. apply a. econstructor.
   apply t. constructor.
@@ -273,7 +258,7 @@ Local Notation "s [ ζ ]" :=
   (Sub.subst s ζ)
     (at level 8, left associativity,
       format "s [ ζ ]").
-Local Coercion Sub.triangular : Tri.Tri >-> Sub.Sub.
+(* Local Coercion Sub.triangular : Tri.Tri >-> Sub.Sub. *)
 
 Section Mult.
   Import option.notations.
@@ -300,7 +285,7 @@ Notation "⟨ ζ ⟩ x <- ma ;; mb" :=
 
 (* see Kobayashi, S. (1997). Monad as modality. *)
 Definition strength {A B} : Hom (□A * ◆B) (◆(□A * B)) :=
-  fun w0 '(a0,b0) => bind b0 (fun w1 ζ1 b1 => η (four a0 ζ1, b1)).
+  fun w0 '(a0,b0) => bind b0 (fun w1 ζ1 b1 => η (_4 a0 ζ1, b1)).
 
 (* Notation "ζ1 ≽ ζ2" := (Subgeq ζ1 ζ2) (at level 80). *)
 (* Notation "ζ1 ≲ ζ2" := (Subleq ζ1 ζ2) (at level 80). *)
@@ -423,20 +408,20 @@ Module P.
   Qed.
 
   Definition extend {w1 w2} (P : Property w1) (ζ1 : w1 ⊒ˢ w2) : Property w2 :=
-    fun Δ ζ2 => P Δ (ζ1 ⊙ˢ ζ2).
+    fun Δ ζ2 => P Δ (ζ1 ⊙ ζ2).
 
   Lemma extend_id {w0} (P : Property w0) :
-    iff (extend P Sub.id) P.
+    iff (extend P refl) P.
   Proof.
     unfold iff, extend. intros.
-    now rewrite Sub.comp_id_left.
+    now rewrite trans_refl_l.
   Qed.
 
-  Lemma extend_and {w0 w1} (P Q : Property w0) (ζ1 : w0 ⊒⁻ w1) :
+  Lemma extend_and {w0 w1} (P Q : Property w0) (ζ1 : w0 ⊒ˢ w1) :
     iff (extend (and P Q) ζ1) (and (extend P ζ1) (extend Q ζ1)).
   Proof. reflexivity. Qed.
 
-  Lemma extend_unifies {w0 w1} (s t : Ty w0) (ζ : w0 ⊒⁻ w1) :
+  Lemma extend_unifies {w0 w1} (s t : Ty w0) (ζ : w0 ⊒ˢ w1) :
     iff (unifies s[ζ] t[ζ]) (extend (unifies s t) ζ).
   Proof.
     unfold iff, extend, unifies. intros.
@@ -446,8 +431,8 @@ Module P.
   Lemma optimists {w0 w1 w2 w3} (P Q : Property w0) (ζ1 : w0 ⊒ˢ w1) (ζ2 : w1 ⊒ˢ w2) (ζ3 : w2 ⊒ˢ w3) :
     DClosed P ->
     max (extend P ζ1) ζ2 ->
-    max (extend Q (ζ1 ⊙ˢ ζ2)) ζ3 ->
-    max (extend (and P Q) ζ1) (ζ2 ⊙ˢ ζ3).
+    max (extend Q (ζ1 ⊙ ζ2)) ζ3 ->
+    max (extend (and P Q) ζ1) (ζ2 ⊙ ζ3).
   Proof.
     unfold DClosed, extend.
     intros dcp [p12 pmax] [q123 qmax].
@@ -456,21 +441,21 @@ Module P.
     - revert p12. apply dcp.
       apply Sub.geq_precom.
       apply Sub.geq_extend.
-    - revert q123. now rewrite Sub.comp_assoc.
+    - revert q123. now rewrite trans_assoc.
     - intros ? f [H1 H2].
       apply pmax in H1.
       destruct H1 as [g ?].
       subst f.
       apply Sub.geq_precom.
       apply qmax.
-      now rewrite Sub.comp_assoc.
+      now rewrite trans_assoc.
   Qed.
 
   Lemma optimists_unifies {w w1 w2 w3} {s1 s2 t1 t2 : Ty w}
     (ζ1 : w ⊒ˢ w1) (ζ2 : w1 ⊒ˢ w2) (ζ3 : w2 ⊒ˢ w3) :
     max (unifies s1[ζ1] t1[ζ1]) ζ2 ->
-    max (unifies s2[ζ1 ⊙ˢ ζ2] t2[ζ1 ⊙ˢ ζ2]) ζ3 ->
-    max (and (unifies s1[ζ1] t1[ζ1]) (unifies s2[ζ1] t2[ζ1])) (ζ2 ⊙ˢ ζ3).
+    max (unifies s2[ζ1 ⊙ ζ2] t2[ζ1 ⊙ ζ2]) ζ3 ->
+    max (and (unifies s1[ζ1] t1[ζ1]) (unifies s2[ζ1] t2[ζ1])) (ζ2 ⊙ ζ3).
   Proof.
     unfold max, and, unifies. rewrite ?Sub.subst_comp.
     intros [p12 pmax] [q123 qmax]. split. split; congruence.
@@ -515,7 +500,7 @@ Lemma wp_η {A w} (a : A w) (POST : □(A -> PROP) w) :
 Proof. unfold wp, η. now option.tactics.mixin. Qed.
 
 Lemma wp_μ {A B w} (a : ◆A w) (f : □(A -> ◆B) w) (POST : □(B -> PROP) w) :
-  wp (bind a f) POST <-> wp a (fun _ ζ1 a1 => wp (f _ ζ1 a1) (four POST ζ1)).
+  wp (bind a f) POST <-> wp a (fun _ ζ1 a1 => wp (f _ ζ1 a1) (_4 POST ζ1)).
 Proof.
   unfold wp, bind, acc.
   now repeat
@@ -529,7 +514,7 @@ Lemma wlp_η {A w} (a : A w) (POST : □(A -> PROP) w) :
 Proof. unfold wlp, η. now option.tactics.mixin. Qed.
 
 Lemma wlp_μ {A B w} (a : ◆A w) (f : □(A -> ◆B) w) (POST : □(B -> PROP) w) :
-  wlp (bind a f) POST <-> wlp a (fun _ ζ1 a1 => wlp (f _ ζ1 a1) (four POST ζ1)).
+  wlp (bind a f) POST <-> wlp a (fun _ ζ1 a1 => wlp (f _ ζ1 a1) (_4 POST ζ1)).
 Proof.
   unfold wlp, bind, acc.
   now repeat
@@ -546,7 +531,7 @@ Qed.
 
 Lemma spec_μ {A B w} (a : ◆A w) (f : □(A -> ◆B) w) (SPOST : □(B -> PROP) w) (NPOST : PROP w) :
   spec (bind a f) SPOST NPOST <->
-  spec a (fun _ ζ1 a1 => spec (f _ ζ1 a1) (four SPOST ζ1) NPOST) NPOST.
+  spec a (fun _ ζ1 a1 => spec (f _ ζ1 a1) (_4 SPOST ζ1) NPOST) NPOST.
 Proof.
   unfold spec, bind, acc.
   repeat
@@ -597,12 +582,12 @@ Section VarView.
 End VarView.
 
 Lemma trivialproblem {w} (t : Ty w) :
-  P.max (P.unifies t t) Sub.id.
+  P.max (P.unifies t t) refl.
 Proof.
   unfold P.max. split.
   - reflexivity.
   - intros ? ζ ?. exists ζ.
-    now rewrite Sub.comp_id_left.
+    now rewrite trans_refl_l.
 Qed.
 
 Lemma varelim {w x} (xIn : x ∈ w) (t : Ty (w - x)) :
@@ -616,12 +601,12 @@ Proof.
     rewrite occurs_check_view_refl.
     rewrite <- Sub.subst_comp.
     rewrite Sub.comp_thin_thick.
-    rewrite Sub.subst_id.
+    rewrite Sub.subst_refl.
     reflexivity.
   - unfold P.unifies, Sub.geq. cbn. intros * Heq.
-    exists (Sub.comp (Sub.thin xIn) ζ2).
+    exists (Sub.thin xIn ⊙ ζ2).
     apply env.lookup_extensional. intros y yIn.
-    rewrite ?Sub.lookup_comp.
+    rewrite ?Sub.lookup_trans.
     rewrite Sub.lookup_thick.
     rewrite Sub.subst_comp.
     unfold thickIn.
@@ -669,46 +654,46 @@ Module Variant1.
 
 
   Lemma flex_sound {w y} (t : Ty w) (yIn : y ∈ w) :
-    wlp (flex t yIn) (fun _ ζ1 _ => P.unifies t (Ty_hole yIn) ζ1).
+    wlp (flex t yIn) (fun _ ζ1 _ => P.unifies t (Ty_hole yIn) (Sub.triangular ζ1)).
   Proof.
     unfold P.unifies, flex, wlp.
     destruct (varview t).
     - destruct (occurs_check_view yIn xIn).
       + constructor. reflexivity.
       + constructor. cbn - [Sub.subst].
-        rewrite Sub.comp_id_right. cbn.
+        rewrite trans_refl_r. cbn.
         rewrite ?Sub.lookup_thick. unfold thickIn.
         now rewrite ?occurs_check_view_refl, ?occurs_check_view_thin.
     - repeat rewrite ?option.wlp_aplazy, ?option.wlp_map.
       generalize (occurs_check_sound t yIn).
       apply option.wlp_monotonic.
       intros t' ->. cbn.
-      rewrite Sub.comp_id_right.
+      rewrite trans_refl_r.
       rewrite Sub.subst_thin.
       rewrite <- Sub.subst_comp.
       rewrite Sub.comp_thin_thick.
-      rewrite Sub.subst_id.
+      rewrite Sub.subst_refl.
       rewrite Sub.lookup_thick.
       unfold thickIn.
       now rewrite occurs_check_view_refl.
   Qed.
 
-  Lemma flex_complete {w0 w1 y} (ζ1 : w0 ⊒⁻ w1) (t : Ty w0) (yIn : y ∈ w0) :
+  Lemma flex_complete {w0 w1 y} (ζ1 : w0 ⊒ˢ w1) (t : Ty w0) (yIn : y ∈ w0) :
     P.unifies t (Ty_hole yIn) ζ1 ->
-    wp (flex t yIn) (fun mgw mgζ _ => mgζ ≽ˢ ζ1).
+    wp (flex t yIn) (fun mgw mgζ _ => Sub.triangular mgζ ≽ˢ ζ1).
   Proof.
     intros. unfold flex.
     destruct (varview t).
     - destruct (occurs_check_view yIn xIn).
       + constructor. apply Sub.geq_max.
       + constructor; cbn.
-        rewrite Sub.comp_id_right.
+        rewrite trans_refl_r.
         apply (@varelim _ _ yIn).
         now symmetry.
     - unfold wp. apply option.wp_map.
       destruct (occurs_check_spec yIn t).
       + constructor. cbn. subst.
-        rewrite Sub.comp_id_right.
+        rewrite trans_refl_r.
         apply varelim. now symmetry.
       + exfalso. destruct H1.
         * specialize (H0 _ yIn). contradiction.
@@ -720,7 +705,7 @@ Module Variant1.
     let P := P.unifies (Ty_hole xIn) t in
     spec
       (flex t xIn)
-      (fun w' ζ' _ => P.max P ζ')
+      (fun w' ζ' _ => P.max P (Sub.triangular ζ'))
       (P.nothing P).
   Proof.
     unfold flex.
@@ -728,14 +713,14 @@ Module Variant1.
     - destruct (occurs_check_view xIn xIn0); subst.
       + constructor. apply trivialproblem.
       + constructor. cbn.
-        rewrite Sub.comp_id_right.
+        rewrite trans_refl_r.
         change (Ty_hole (in_thin xIn yIn)) with (thin xIn (Ty_hole yIn)).
         apply varelim.
     - unfold spec. rewrite option.spec_map.
       generalize (occurs_check_spec xIn t).
       apply option.spec_monotonic.
       + intros t' ->. cbn.
-        rewrite Sub.comp_id_right.
+        rewrite trans_refl_r.
         apply varelim.
       + specialize (H _ xIn).
         intros []. contradiction.
@@ -763,8 +748,8 @@ Module Variant1.
     cbv [Impl Valid Box Forall PROP W OptionT DiamondT Wpure Option].
     intros w0 t x xIn POST.
     refine (exists w1 : World, exists ζ1 : w0 ⊒⁻ w1, POST w1 ζ1 _).
-    destruct (eq_dec (Ty_hole xIn)[ζ1] t[ζ1]).
-    apply Some. exists w1. split. apply Tri.refl. apply tt.
+    destruct (eq_dec (Ty_hole xIn)[Sub.triangular ζ1] t[Sub.triangular ζ1]).
+    apply Some. exists w1. split. apply refl. apply tt.
     apply None.
   Defined.
 
@@ -773,7 +758,7 @@ Module Variant1.
     cbv [Impl Valid Box Forall PROP].
     intros w0 t x xIn POST.
     refine (exists w1 : World, exists ζ1 : w0 ⊒⁻ w1, POST w1 ζ1 _).
-    destruct (eq_dec (Ty_hole xIn)[ζ1] t[ζ1]).
+    destruct (eq_dec (Ty_hole xIn)[Sub.triangular ζ1] t[Sub.triangular ζ1]).
     apply (Some tt).
     apply None.
   Defined.
@@ -801,7 +786,7 @@ Module Variant1.
   Definition mg : ⊢ ◆Unit -> □(Option Unit -> PROP) :=
     fun w0 d w1 ζ1 o =>
       match o , d with
-      | Some _ , Some (existT _ mgw (mgζ , _)) => mgζ ≽ˢ ζ1
+      | Some _ , Some (existT _ mgw (mgζ , _)) => Sub.triangular mgζ ≽ˢ Sub.triangular ζ1
       | None   , _                             => True
       | Some _ , None                          => False
       end.
@@ -811,10 +796,10 @@ Module Variant1.
       { m : ◆Unit w0 | mg m ζ1 spec }.
 
     Definition dret {w0 w1} (ζ1 : w0 ⊒⁻ w1) (a : Unit w0) : DUM ζ1 (Some a) :=
-      exist _ (Some (w0; (Tri.refl, a))) (Sub.geq_max ζ1).
+      exist _ (Some (w0; (Tri.refl, a))) (Sub.geq_max (Sub.triangular ζ1)).
 
     Definition flexspec {w0} (t : Ty w0) {x} (xIn : x ∈ w0) {w1} (ζ1 : w0 ⊒⁻ w1) : Option Unit w1 :=
-      if eq_dec (Ty_hole xIn)[ζ1] t[ζ1] then Some tt else None.
+      if eq_dec (Ty_hole xIn)[Sub.triangular ζ1] t[Sub.triangular ζ1] then Some tt else None.
 
     Program Definition dflex {w0} (t : Ty w0) {x} (xIn : x ∈ w0) {w1} (ζ1 : w0 ⊒⁻ w1) : DUM ζ1 (flexspec t xIn ζ1) :=
         match varview t with
@@ -868,15 +853,15 @@ Module Variant1.
   (* Qed. *)
 
   Lemma flexcorrect {w} (t : Ty w) {x} (xIn : x ∈ w) {w2} (ζ2 : w ⊒⁻ w2) :
-    mg (flex t xIn) ζ2 (cflex (Ty_hole xIn)[ζ2] t[ζ2]).
+    mg (flex t xIn) ζ2 (cflex (Ty_hole xIn)[Sub.triangular ζ2] t[Sub.triangular ζ2]).
   Proof.
-    unfold cflex, mg. destruct (eq_dec (Ty_hole xIn)[ζ2] t[ζ2]).
+    unfold cflex, mg. destruct (eq_dec (Ty_hole xIn)[Sub.triangular ζ2] t[Sub.triangular ζ2]).
     - unfold flex. destruct (varview t) as [y yIn|].
       + destruct (occurs_check_view xIn yIn); cbn.
         * apply Sub.geq_max.
-        * rewrite Sub.comp_id_right. now apply varelim.
+        * rewrite trans_refl_r. now apply varelim.
       + destruct (occurs_check_spec xIn t) as [|[]]; cbn.
-        * rewrite Sub.comp_id_right. subst. now apply varelim.
+        * rewrite trans_refl_r. subst. now apply varelim.
         * now apply H in H0.
         * apply nothing_unifies_occurs_strictly in H0.
           apply (H0 _ _ e).
@@ -892,8 +877,8 @@ Module Variant1.
     Definition cmgu : ⊢ CMGU :=
       fun w => fix cmgu s t :=
         match s , t with
-        | Ty_hole xIn as s , t               => fun _ ζ => cflex s[ζ] t[ζ]
-        | s               , Ty_hole yIn as t => fun _ ζ => cflex s[ζ] t[ζ]
+        | Ty_hole xIn as s , t               => fun _ ζ => cflex s[Sub.triangular ζ] t[Sub.triangular ζ]
+        | s               , Ty_hole yIn as t => fun _ ζ => cflex s[Sub.triangular ζ] t[Sub.triangular ζ]
         | Ty_bool          , Ty_bool          => fun _ _ => Some tt
         | Ty_func s1 s2    , Ty_func t1 t2    => fun _ ζ => 'tt <- cmgu s1 t1 _ ζ ;; 'tt <- cmgu s2 t2 _ ζ ;; Some tt
         | _               , _               => fun _ _ => None
@@ -915,16 +900,16 @@ Module Variant1.
         let P := P.unifies t1 t2 in
         spec
           (u t1 t2)
-          (fun w2 ζ2 _ => P.max P ζ2)
+          (fun w2 ζ2 _ => P.max P (Sub.triangular ζ2))
           (P.nothing P).
 
   Definition BoxUnifierSpec : ⊢ BoxUnifier -> PROP :=
     fun w bu =>
       forall t1 t2 w1 (ζ1 : w ⊒⁻ w1),
-        let P := P.unifies t1[ζ1] t2[ζ1] in
+        let P := P.unifies t1[Sub.triangular ζ1] t2[Sub.triangular ζ1] in
         spec
           (bu t1 t2 w1 ζ1)
-          (fun w2 ζ2 _ => P.max P ζ2)
+          (fun w2 ζ2 _ => P.max P (Sub.triangular ζ2))
           (P.nothing P).
 
   Section MguO.
@@ -943,11 +928,11 @@ Module Variant1.
     Import P.
 
     Lemma boxflex_spec {x} (xIn : x ∈ w) (t : Ty w) (w1 : World) (ζ1 : w ⊒⁻ w1) :
-      let P := P.unifies (Ty_hole xIn)[ζ1] t[ζ1] in
-      spec (boxflex xIn t ζ1) (fun w2 ζ2 _ => P.max P ζ2) (P.nothing P).
+      let P := P.unifies (Ty_hole xIn)[Sub.triangular ζ1] t[Sub.triangular ζ1] in
+      spec (boxflex xIn t ζ1) (fun w2 ζ2 _ => P.max P (Sub.triangular ζ2)) (P.nothing P).
     Proof.
       destruct ζ1; cbn - [Sub.subst].
-      - rewrite ?Sub.subst_id. apply flex_spec.
+      - rewrite ?Sub.subst_refl. apply flex_spec.
       - rewrite ?Sub.subst_comp. apply lmgu_spec.
     Qed.
 
@@ -960,7 +945,7 @@ Module Variant1.
         | Ty_func s1 s2 , Ty_func t1 t2 =>
             fun _ ζ1 =>
               ⟨ ζ2 ⟩ _ <- bmgu s1 t1 _ ζ1 ;;
-              ⟨ ζ3 ⟩ _ <- bmgu s2 t2 _ (Tri.trans ζ1 ζ2) ;;
+              ⟨ ζ3 ⟩ _ <- bmgu s2 t2 _ (ζ1 ⊙⁻ ζ2) ;;
               η tt
         | _            , _            => fun _ _ => None
         end.
@@ -980,7 +965,7 @@ Module Variant1.
           (fun (w1 : World) (ζ1 : w ⊒⁻ w1) =>
            bind (boxmgu s1 t1 ζ1)
              (fun (w2 : World) (ζ2 : w1 ⊒⁻ w2) (_ : Unit w2) =>
-              bind (boxmgu s2 t2 (Tri.trans ζ1 ζ2)) (fun (w3 : World) (_ : w2 ⊒⁻ w3) (_ : Unit w3) => η tt)))).
+              bind (boxmgu s2 t2 (ζ1 ⊙⁻ ζ2)) (fun (w3 : World) (_ : w2 ⊒⁻ w3) (_ : Unit w3) => η tt)))).
 
       Lemma boxmgu_elim : forall (t1 t2 : Ty w), P t1 t2 (boxmgu t1 t2).
       Proof. induction t1; intros t2; cbn; auto; destruct t2; auto. Qed.
@@ -1038,7 +1023,7 @@ Module Variant1.
       forall {w1} (ζ1 : w ⊒⁻ w1),
         wlp
           (boxmgu t1 t2 ζ1)
-          (fun w2 ζ2 _ => P.unifies t1[ζ1] t2[ζ1] ζ2).
+          (fun w2 ζ2 _ => P.unifies t1[Sub.triangular ζ1] t2[Sub.triangular ζ1] (Sub.triangular ζ2)).
     Proof.
       pattern (boxmgu t1 t2).
       apply boxmgu_elim; clear t1 t2; cbn; intros; try (now constructor).
@@ -1050,9 +1035,9 @@ Module Variant1.
         apply option.wlp_monotonic. intros [w2 [ζ2 _]] ?.
         rewrite wlp_μ. generalize (H0 _ (ζ1 ⊙⁻ ζ2)).
         apply option.wlp_monotonic. intros [w3 [ζ3 _]] ?.
-        constructor. unfold four. cbn.
+        constructor. unfold _4. cbn.
         rewrite ?Sub.triangular_trans. cbn.
-        rewrite Sub.comp_id_right.
+        rewrite trans_refl_r.
         apply unifiesX_equiv. cbn.
         split.
         + revert H. apply dclosed_unifies. apply Sub.geq_extend.
@@ -1062,8 +1047,8 @@ Module Variant1.
 
     Lemma boxmgu_complete (t1 t2 : Ty w) :
       forall {w0} (ζ0 : w ⊒⁻ w0) [w1] (ζ1 : w0 ⊒ˢ w1),
-        P.unifies t1[ζ0] t2[ζ0] ζ1 ->
-        wp (boxmgu t1 t2 ζ0) (fun mgw mgζ _ => mgζ ≽ˢ ζ1).
+        P.unifies t1[Sub.triangular ζ0] t2[Sub.triangular ζ0] ζ1 ->
+        wp (boxmgu t1 t2 ζ0) (fun mgw mgζ _ => Sub.triangular mgζ ≽ˢ ζ1).
     Proof.
       pattern (boxmgu t1 t2).
       apply boxmgu_elim; clear t1 t2;
@@ -1079,13 +1064,13 @@ Module Variant1.
       - apply P.unifiesX_equiv in H1. destruct H1 as [HU1 HU2].
         rewrite wp_μ. generalize (H _ ζ0 _ ζ1 HU1). clear H.
         apply option.wp_monotonic. intros [mgw1 [mgζ1 _]] [ζ1' ->].
-        assert (P.unifies s2[ζ0 ⊙⁻ mgζ1] t2[ζ0 ⊙⁻ mgζ1] ζ1') as HU2'.
+        assert (P.unifies s2[Sub.triangular (ζ0 ⊙⁻ mgζ1)] t2[Sub.triangular (ζ0 ⊙⁻ mgζ1)] ζ1') as HU2'.
         { revert HU2. unfold unifies.
           now rewrite ?Sub.triangular_trans, ?Sub.subst_comp.
         }
         rewrite wp_μ. generalize (H0 _ (ζ0 ⊙⁻ mgζ1) _ ζ1' HU2').
         apply option.wp_monotonic. intros [mgw2 [mgζ2 _]] [ζ2' ->].
-        constructor. unfold four.
+        constructor. unfold _4.
         rewrite ?Sub.triangular_trans.
         apply Sub.geq_precom.
         apply Sub.geq_precom.
@@ -1123,8 +1108,8 @@ Module Variant1.
     unfold UnifierSpec, mgu. intros t1 t2.
     specialize (bmgu_spec t1 t2 Tri.refl).
     apply option.spec_monotonic; cbn.
-    - intros [w1 [ζ1 []]]. now rewrite ?Sub.subst_id.
-    - now rewrite ?Sub.subst_id.
+    - intros [w1 [ζ1 []]]. now rewrite ?Sub.subst_refl.
+    - now rewrite ?Sub.subst_refl.
   Qed.
 
   Definition boxsolve : ⊢ List (Prod Ty Ty) -> □◆Unit :=
@@ -1206,7 +1191,7 @@ Module Variant2.
     | Ty_bool       | Ty_bool       := fun _ _ => η Ty_bool;
     | Ty_func s1 s2 | Ty_func t1 t2 := fun _ ζ1 =>
                                        ⟨ ζ2 ⟩ r1 <- boxmgu s1 t1 ζ1 ;;
-                                       ⟨ ζ3 ⟩ r2 <- boxmgu s2 t2 (Tri.trans ζ1 ζ2) ;;
+                                       ⟨ ζ3 ⟩ r2 <- boxmgu s2 t2 (ζ1 ⊙⁻ ζ2) ;;
                                        η (Ty_func (realsubst_slow r1 ζ3) r2);
     | _            | _            := fun _ _ => None.
 

@@ -90,36 +90,64 @@ End Thin.
 
 Module Tri.
 
-  Import Coq.Classes.CRelationClasses.
+  #[local] Unset Elimination Schemes.
 
   Inductive Tri (w : World) : World -> Set :=
   | refl      : w ⊒⁻ w
   | cons {w' x} (xIn : x ∈ w) (t : Ty (w - x)) (ζ : w - x ⊒⁻ w') : w ⊒⁻ w'
   where "w1 ⊒⁻ w2" := (Tri w1 w2).
-  Global Arguments refl {_}.
-  Global Arguments cons {_ _} x {_} t ζ.
+  #[global] Arguments refl {_}.
+  #[global] Arguments cons {_ _} x {_} t ζ.
 
-  Fixpoint trans [w0 w1 w2] (ζ1 : w0 ⊒⁻ w1) {struct ζ1} : w1 ⊒⁻ w2 -> w0 ⊒⁻ w2 :=
-    match ζ1 with
-    | refl        => fun ζ2 => ζ2
-    | cons x t ζ1 => fun ζ2 => cons x t (trans ζ1 ζ2)
-    end.
-  Local Infix "⊙" := trans (at level 60, right associativity).
-  #[export] Instance preorder_tri : PreOrder Tri :=
-    {| PreOrder_Reflexive w := refl;
-       PreOrder_Transitive  := trans
-    |}.
+  #[export] Instance refl_tri : Refl Tri :=
+    fun w => refl.
+  #[export] Instance trans_tri : Trans Tri :=
+    fix trans [w0 w1 w2] (ζ1 : w0 ⊒⁻ w1) {struct ζ1} : w1 ⊒⁻ w2 -> w0 ⊒⁻ w2 :=
+      match ζ1 with
+      | refl        => fun ζ2 => ζ2
+      | cons x t ζ1 => fun ζ2 => cons x t (trans ζ1 ζ2)
+      end.
+
+  Definition Tri_rect :=
+fun (P : forall w c : World, w ⊒⁻ c -> Type) (f : forall w : World, P w w Definitions.refl)
+  (f0 : forall (w w' : World) (x : nat) (xIn : x ∈ w) (t : Ty (w - x)) (ζ : w - x ⊒⁻ w'), P (w - x) w' ζ -> P w w' (cons x t ζ)) =>
+fix F (w c : World) (t : w ⊒⁻ c) {struct t} : P w c t :=
+  match t as t0 in (_ ⊒⁻ c0) return (P w c0 t0) with
+  | refl => f w
+  | @cons _ w' x xIn t0 ζ => f0 w w' x xIn t0 ζ (F (w - x) w' ζ)
+  end.
+
+  Definition Tri_ind :=
+fun (P : forall w c : World, w ⊒⁻ c -> Prop) (f : forall w : World, P w w Definitions.refl)
+  (f0 : forall (w w' : World) (x : nat) (xIn : x ∈ w) (t : Ty (w - x)) (ζ : w - x ⊒⁻ w'), P (w - x) w' ζ -> P w w' (cons x t ζ)) =>
+fix F (w c : World) (t : w ⊒⁻ c) {struct t} : P w c t :=
+  match t as t0 in (_ ⊒⁻ c0) return (P w c0 t0) with
+  | refl => f w
+  | @cons _ w' x xIn t0 ζ => f0 w w' x xIn t0 ζ (F (w - x) w' ζ)
+  end.
+
+  Definition Tri_rec := fun P : forall w c : World, w ⊒⁻ c -> Set => Tri_rect P.
+
+  Definition Tri_sind :=
+fun (P : forall w c : World, w ⊒⁻ c -> SProp) (f : forall w : World, P w w Definitions.refl)
+  (f0 : forall (w w' : World) (x : nat) (xIn : x ∈ w) (t : Ty (w - x)) (ζ : w - x ⊒⁻ w'), P (w - x) w' ζ -> P w w' (cons x t ζ)) =>
+fix F (w c : World) (t : w ⊒⁻ c) {struct t} : P w c t :=
+  match t as t0 in (_ ⊒⁻ c0) return (P w c0 t0) with
+  | refl => f w
+  | @cons _ w' x xIn t0 ζ => f0 w w' x xIn t0 ζ (F (w - x) w' ζ)
+  end.
+
+  #[export] Instance preorder_tri : PreOrder Tri.
+  Proof.
+    constructor.
+    - easy.
+    - intros ? ? r; induction r; cbn; [|rewrite IHr]; easy.
+    - induction r1; cbn; congruence.
+  Qed.
 
   Definition single {w} x {xIn : x ∈ w} (t : Ty (w - x)) : w ⊒⁻ w - x :=
     cons x t refl.
   Global Arguments single {w} x {xIn} t.
-
-  Lemma trans_refl {w1 w2} (ζ : w1 ⊒⁻ w2) : ζ ⊙ refl = ζ.
-  Proof. induction ζ; cbn; congruence. Qed.
-
-  Lemma trans_assoc {w0 w1 w2 w3} (ζ1 : w0 ⊒⁻ w1) (ζ2 : w1 ⊒⁻ w2) (ζ3 : w2 ⊒⁻ w3) :
-    (ζ1 ⊙ ζ2) ⊙ ζ3 = ζ1 ⊙ (ζ2 ⊙ ζ3).
-  Proof. induction ζ1; cbn; congruence. Qed.
 
   (* Definition geq {w0 w1} (ζ1 : w0 ⊒⁻ w1) [w2] (ζ2 : w0 ⊒⁻ w2) : Prop := *)
   (*   exists ζ12 : w1 ⊒⁻ w2, ζ2 = ζ1 ⊙ ζ12. *)
@@ -199,6 +227,7 @@ Module Tri.
   (* Qed. *)
 
 End Tri.
+Export (hints) Tri.
 Export Tri (Tri).
 Notation "w1 ⊒⁻ w2" := (Tri w1 w2) (at level 80).
-Infix "⊙⁻" := Tri.trans (at level 60, right associativity).
+Infix "⊙⁻" := (trans (R := Tri)) (at level 60, right associativity).
