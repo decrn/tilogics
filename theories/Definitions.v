@@ -40,6 +40,8 @@ Definition BoxR (R : REL) (A : TYPE) : TYPE :=
 
 Definition DiamondR (R : REL) (A : TYPE) : TYPE :=
   fun w0 => {w1 & R w0 w1 * A w1}%type.
+Definition DiamondT (R : REL) (M : TYPE -> TYPE) : TYPE -> TYPE :=
+  fun A => M (DiamondR R A).
 
 Notation "[< R >] A" := (BoxR R A) (at level 9, format "[< R >] A", right associativity).
 Notation "<[ R ]> A" := (DiamondR R A) (at level 9, format "<[ R ]> A", right associativity).
