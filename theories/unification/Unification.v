@@ -57,7 +57,7 @@ Set Implicit Arguments.
 
 Reserved Notation "w1 ⊒ w2" (at level 80).
 
-Notation "□ A" := (BoxR Tri A) (at level 9, format "□ A", right associativity).
+Notation "□ A" := (Box Tri A) (at level 9, format "□ A", right associativity).
 Notation "◇ A" := (DiamondT Tri id A) (at level 9, format "◇ A", right associativity).
 Notation "? A" := (Option A) (at level 9, format "? A", right associativity).
 Notation "◆ A" := (DiamondT Tri Option A) (at level 9, format "◆ A", right associativity).
@@ -495,7 +495,7 @@ Proof. unfold wp, η. now option.tactics.mixin. Qed.
 Lemma wp_μ {A B w} (a : ◆A w) (f : □(A -> ◆B) w) (POST : □(B -> PROP) w) :
   wp (bind a f) POST <-> wp a (fun _ ζ1 a1 => wp (f _ ζ1 a1) (_4 POST ζ1)).
 Proof.
-  unfold wp, bind, acc, DiamondR.
+  unfold wp, bind, acc, Diamond.
   now repeat
     (rewrite ?option.wp_bind, ?option.wp_map;
      repeat option.tactics.mixin;
@@ -509,7 +509,7 @@ Proof. unfold wlp, η. now option.tactics.mixin. Qed.
 Lemma wlp_μ {A B w} (a : ◆A w) (f : □(A -> ◆B) w) (POST : □(B -> PROP) w) :
   wlp (bind a f) POST <-> wlp a (fun _ ζ1 a1 => wlp (f _ ζ1 a1) (_4 POST ζ1)).
 Proof.
-  unfold wlp, bind, acc, DiamondR.
+  unfold wlp, bind, acc, Diamond.
   now repeat
     (rewrite ?option.wlp_bind, ?option.wlp_map;
      repeat option.tactics.mixin;
@@ -526,7 +526,7 @@ Lemma spec_μ {A B w} (a : ◆A w) (f : □(A -> ◆B) w) (SPOST : □(B -> PROP
   spec (bind a f) SPOST NPOST <->
   spec a (fun _ ζ1 a1 => spec (f _ ζ1 a1) (_4 SPOST ζ1) NPOST) NPOST.
 Proof.
-  unfold spec, bind, acc, DiamondR.
+  unfold spec, bind, acc, Diamond.
   repeat
     (rewrite ?option.spec_bind, ?option.spec_map;
      repeat option.tactics.mixin;
@@ -738,7 +738,7 @@ Module Variant1.
 
   Definition flexspecw : ⊢ Ty -> ∀ x, In x -> W Unit.
   Proof.
-    cbv [Impl Valid BoxR Forall PROP W OptionT DiamondT Wpure Option].
+    cbv [Impl Valid Box Forall PROP W OptionT DiamondT Wpure Option].
     intros w0 t x xIn POST.
     refine (exists w1 : World, exists ζ1 : w0 ⊒⁻ w1, POST w1 ζ1 _).
     destruct (eq_dec (Ty_hole xIn)[Sub.triangular ζ1] t[Sub.triangular ζ1]).
@@ -748,7 +748,7 @@ Module Variant1.
 
   Definition flexspec : ⊢ Ty -> ∀ x, In x -> □(Option Unit -> PROP) -> PROP.
   Proof.
-    cbv [Impl Valid BoxR Forall PROP].
+    cbv [Impl Valid Box Forall PROP].
     intros w0 t x xIn POST.
     refine (exists w1 : World, exists ζ1 : w0 ⊒⁻ w1, POST w1 ζ1 _).
     destruct (eq_dec (Ty_hole xIn)[Sub.triangular ζ1] t[Sub.triangular ζ1]).
@@ -1216,7 +1216,7 @@ Defined.
 Definition SubstLifted (A : Type) :
   ⊢ Lifted A -> □(Lifted A).
 Proof.
-  unfold Valid, BoxR, Impl, Lifted.
+  unfold Valid, Box, Impl, Lifted.
   intros w fa w1 ζ1 ass. apply fa.
   apply (compose ζ1 ass).
 Defined.

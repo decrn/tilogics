@@ -8,7 +8,10 @@ Import ctx.notations.
 
 Notation World := (Ctx nat).
 Definition TYPE : Type := World -> Type.
-Definition REL : Type := World -> TYPE.
+(* The type of accessibility relations between worlds. Because we work with
+   multiple different definitions of accessibility, we generalize many
+   definitions over the accessibility relation. *)
+Definition ACC : Type := World -> TYPE.
 Definition Valid (A : TYPE) : Type :=
   forall w, A w.
 Definition Impl (A B : TYPE) : TYPE :=
@@ -33,27 +36,24 @@ Definition List (A : TYPE) : TYPE := fun w => list (A w).
 Definition Prod (A B : TYPE) : TYPE := fun w => prod (A w) (B w).
 Definition Sum (A B : TYPE) : TYPE := fun w => sum (A w) (B w).
 
-Definition BoxR (R : REL) (A : TYPE) : TYPE :=
+Definition Box (R : ACC) (A : TYPE) : TYPE :=
   fun w0 => forall w1, R w0 w1 -> A w1.
 
 (* Notation "◻A" := BoxR A *)
 
-Definition DiamondR (R : REL) (A : TYPE) : TYPE :=
+Definition Diamond (R : ACC) (A : TYPE) : TYPE :=
   fun w0 => {w1 & R w0 w1 * A w1}%type.
-Definition DiamondT (R : REL) (M : TYPE -> TYPE) : TYPE -> TYPE :=
-  fun A => M (DiamondR R A).
-
-Notation "[< R >] A" := (BoxR R A) (at level 9, format "[< R >] A", right associativity).
-Notation "<[ R ]> A" := (DiamondR R A) (at level 9, format "<[ R ]> A", right associativity).
+Definition DiamondT (R : ACC) (M : TYPE -> TYPE) : TYPE -> TYPE :=
+  fun A => M (Diamond R A).
 
 Definition Schematic (A : TYPE) : Type :=
   { w : World & A w }.
 
-Class Refl (R : REL) : Type :=
+Class Refl (R : ACC) : Type :=
   refl : forall w, R w w.
-Class Trans (R : REL : Type) :=
+Class Trans (R : ACC) : Type :=
   trans : forall w1 w2 w3, R w1 w2 -> R w2 w3 -> R w1 w3.
-Class Step (R : REL : Type) :=
+Class Step (R : ACC) : Type :=
   step : forall w α, R w (w ▻ α).
 #[global] Arguments refl {R _ w}.
 #[global] Arguments step {R _ w α}.
@@ -118,13 +118,13 @@ Infix "⊙" := trans (at level 60, right associativity).
 (* TODO: switch to superscript *)
 (* \^s \^+ *)
 
-Notation "□⁺ A" := (BoxR Accessibility A) (at level 9, format "□⁺ A", right associativity)
+Notation "□⁺ A" := (Box Accessibility A) (at level 9, format "□⁺ A", right associativity)
     : indexed_scope.
-Notation "◇⁺ A" := (DiamondR Accessibility A) (at level 9, format "◇⁺ A", right associativity)
+Notation "◇⁺ A" := (Diamond Accessibility A) (at level 9, format "◇⁺ A", right associativity)
     : indexed_scope.
 
-Class Persistent (R : REL) (A : TYPE) : Type :=
-  persist : ⊢ A -> BoxR R A.
+Class Persistent (R : ACC) (A : TYPE) : Type :=
+  persist : ⊢ A -> Box R A.
 
 Class PersistLaws A `{Persistent Accessibility A} : Type :=
   { refl_persist w (V : A w) :
@@ -137,16 +137,16 @@ Class PersistLaws A `{Persistent Accessibility A} : Type :=
 (*     Persistent R A -> Persistent R B -> Persistent R (Prod A B). *)
 (* Proof. firstorder. Qed. *)
 
-Definition T {R} {reflR : Refl R} {A} : ⊢ BoxR R A -> A :=
+Definition T {R} {reflR : Refl R} {A} : ⊢ Box R A -> A :=
   fun w a => a w refl.
 #[global] Arguments T {R _ A} [_] _ : simpl never.
 
-Definition _4 {R} {transR : Trans R} {A} : ⊢ BoxR R A -> BoxR R (BoxR R A) :=
+Definition _4 {R} {transR : Trans R} {A} : ⊢ Box R A -> Box R (Box R A) :=
   fun w0 a w1 r1 w2 r2 => a w2 (trans r1 r2).
 #[global] Arguments _4 {R _ A} [_] _ [_] _ [_] _ : simpl never.
 
 Definition K {R A B} :
-  ⊢ BoxR R (A -> B) -> (BoxR R A -> BoxR R B) :=
+  ⊢ Box R (A -> B) -> (Box R A -> Box R B) :=
   fun w0 f a w1 ω01 =>
     f w1 ω01 (a w1 ω01).
 
@@ -161,8 +161,8 @@ Definition K {R A B} :
 #[export] Instance PersistLaws_In {x} : PersistLaws (ctx.In x).
 Proof. constructor; [easy|induction r12; cbn; auto]. Qed.
 
-Class Bind (R : REL) (M : TYPE -> TYPE) : Type :=
-  bind : forall A B, ⊢ M A -> BoxR R (A -> M B) -> M B.
+Class Bind (R : ACC) (M : TYPE -> TYPE) : Type :=
+  bind : forall A B, ⊢ M A -> Box R (A -> M B) -> M B.
 #[global] Arguments bind {R M _ A B} [w].
 
 Module MonadNotations.

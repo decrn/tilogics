@@ -174,11 +174,11 @@ Proof.
   - intros Γ γ RΓ. eapply Bind_relates_bind.
     apply IHe1. apply RΓ. clear IHe1.
     intros w1 ? ? ? ? ? ?. constructor. apply H0. constructor.
-    unfold T. eapply Bind_relates_bind. cbn. apply IHe2.
+    unfold T. eapply Bind_relates_bind. apply IHe2.
     rewrite trans_refl_r. eapply refine_persist; eauto.
     subst. apply RΓ.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. cbn. apply IHe3.
-    rewrite trans_refl_r. eapply refine_persist.
+    eapply refine_persist.
     subst. rewrite <- compose_trans. apply RΓ.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. apply Assert_relates_assert; cbn.
     eapply refine_persist. subst. assumption. assumption.

@@ -47,10 +47,10 @@ Section Generate.
     | e_if cnd coq alt =>
         [ ω₁ ] t_cnd <- generate cnd Γ ;;
         [ ω₂ ] _     <- assert t_cnd (Ty_bool _) ;;
-        [ ω₃ ] t_coq <- generate coq <{ Γ ~ ω₁ .> ω₂ }> ;;
-        [ ω₄ ] t_alt <- generate alt <{ Γ ~ ω₁ .> ω₂ .> ω₃ }> ;;
+        [ ω₃ ] t_coq <- generate coq <{ Γ ~ ω₁ ⊙ ω₂ }> ;;
+        [ ω₄ ] t_alt <- generate alt <{ Γ ~ ω₁ ⊙ ω₂ ⊙ ω₃ }> ;;
         [ ω₅ ] _     <- assert <{ t_coq ~ ω₄ }>  t_alt ;;
-           Ret_Free Ty _ <{ t_coq ~ ω₄ .> ω₅ }>
+           Ret_Free Ty _ <{ t_coq ~ ω₄ ⊙ ω₅ }>
     | e_var var =>
         match (value var Γ) with
         | Some t_var => Ret_Free Ty _ t_var
@@ -59,9 +59,9 @@ Section Generate.
     | e_app f a =>
         [ ω1 ] t_co <- exists_Ty Σ ;;
         [ ω2 ] t_do <- generate a <{ Γ ~ ω1 }> ;;
-        [ ω3 ] t_fn <- generate f <{ Γ ~ ω1 .> ω2 }> ;;
+        [ ω3 ] t_fn <- generate f <{ Γ ~ ω1 ⊙ ω2 }> ;;
         [ ω4 ] _    <- assert t_fn <{ (Ty_func _ t_do <{ t_co ~ ω2 }> ) ~ ω3 }> ;;
-           Ret_Free Ty _ <{ t_co ~ ω2 .> ω3 .> ω4 }>
+           Ret_Free Ty _ <{ t_co ~ ω2 ⊙ ω3 ⊙ ω4 }>
     | e_abst var t_var e =>
         let t_var' := (lift t_var Σ) in (* t_var lives in ty, not in (Ty w) *)
         [ ω1 ] t_e <- generate e ((var, t_var') :: Γ) ;;
@@ -103,7 +103,7 @@ Section TypeReconstruction.
   (* TODO: define reader applicative to use ctor of expr to create Expr *)
 
 #[export] Instance Persistent_Lifted {A} : Persistent Accessibility (Lifted A).
-  Proof. unfold Persistent, Valid, Impl, Lifted, BoxR. eauto using compose. Qed.
+  Proof. unfold Persistent, Valid, Impl, Lifted, Box. eauto using compose. Qed.
 
   Definition ret  {w} := Ret_Free (Prod Ty Expr) w.
   Definition fail {w} := Fail_Free (Prod Ty Expr) w.
@@ -117,12 +117,12 @@ Section TypeReconstruction.
     | e_if cnd coq alt =>
         [ ω1 ] r_cnd <- reconstruct cnd Γ ;;
         [ ω2 ] _     <- assert (fst r_cnd) (Ty_bool _) ;;
-        [ ω3 ] r_coq <- reconstruct coq <{ Γ ~ ω1 .> ω2 }> ;;
-        [ ω4 ] r_alt <- reconstruct alt <{ Γ ~ ω1 .> ω2 .> ω3 }> ;;
+        [ ω3 ] r_coq <- reconstruct coq <{ Γ ~ ω1 ⊙ ω2 }> ;;
+        [ ω4 ] r_alt <- reconstruct alt <{ Γ ~ ω1 ⊙ ω2 ⊙ ω3 }> ;;
         [ ω5 ] _     <- assert <{ (fst r_coq) ~ ω4 }> (fst r_alt) ;;
-           let e_cnd := <{ (snd r_cnd) ~ ω2 .> ω3 .> ω4 .> ω5 }> in
-           let e_coq := <{ (snd r_coq) ~ ω4 .> ω5 }> in
-           let t_coq := <{ (fst r_coq) ~ ω4 .> ω5 }> in
+           let e_cnd := <{ (snd r_cnd) ~ ω2 ⊙ ω3 ⊙ ω4 ⊙ ω5 }> in
+           let e_coq := <{ (snd r_coq) ~ ω4 ⊙ ω5 }> in
+           let t_coq := <{ (fst r_coq) ~ ω4 ⊙ ω5 }> in
            let e_alt := <{ (snd r_alt) ~ ω5 }> in
            ret (t_coq, fun a => (e_if (e_cnd a) (e_coq a) (e_alt a)))
     | e_var var =>
@@ -133,11 +133,11 @@ Section TypeReconstruction.
     | e_app f a =>
         [ ω1 ] T_cod <- exists_Ty Σ ;;
         [ ω2 ] r_dom <- reconstruct a <{ Γ ~ ω1 }> ;;
-        [ ω3 ] r_fun <- reconstruct f <{ Γ ~ ω1 .> ω2 }> ;;
+        [ ω3 ] r_fun <- reconstruct f <{ Γ ~ ω1 ⊙ ω2 }> ;;
         [ ω4 ] _     <- assert (fst r_fun) <{ (Ty_func _ (fst r_dom) <{ T_cod ~ ω2 }> ) ~ ω3 }> ;;
            let e_fun := <{ (snd r_fun) ~ ω4 }> in
-           let t_cod := <{ T_cod ~ ω2 .> ω3 .> ω4 }> in
-           let e_dom := <{ (snd r_dom) ~ ω3 .> ω4 }> in
+           let t_cod := <{ T_cod ~ ω2 ⊙ ω3 ⊙ ω4 }> in
+           let e_dom := <{ (snd r_dom) ~ ω3 ⊙ ω4 }> in
             ret ( t_cod , fun a => e_app (e_fun a) (e_dom a))
     | e_abst var t_var e =>
         let t_var' := (lift t_var Σ) in (* t_var lives in ty, not in (Ty w) *)
@@ -184,7 +184,7 @@ Definition up_down_up_eq_up_up_down {w1 w2 w3} (r12: w1 ⇅ w2) (up : w2 ↑ w3)
         (fun (w w' : World) (up : w ↑ w') => forall iw : World, w1 ↑ iw -> iw ↓ w -> w1 ⇅ w')
         (mkAcc _)
         (fun w α w' up IH iw pos neg =>
-           IH (iw ▻ α) (pos .> acc.fresh iw α (iw ▻ α) refl) (down_add neg))
+           IH (iw ▻ α) (pos ⊙ step) (down_add neg))
         w2 w3 up iw pos neg
  end.
 
@@ -338,12 +338,12 @@ Module StrongMonotonicity.
 
   #[local] Arguments Sub.thin : simpl never.
   #[local] Notation "□ˢ A" :=
-    (BoxR Sub A)
+    (Box Sub A)
       (at level 9, format "□ˢ A", right associativity)
       : indexed_scope.
 
   Definition M (A : TYPE) : TYPE :=
-    Option (DiamondR Sub A).
+    Option (Diamond Sub A).
 
   Definition pure {A} : ⊢ A -> M A :=
     fun w a => Some (existT _ w (refl, a)).
@@ -469,11 +469,11 @@ Module StrongMonotonicity.
   (*       admit. *)
   (* Abort. *)
 
-  Definition REL (A : World -> Type) : Type :=
+  Definition RELATION (A : World -> Type) : Type :=
     forall w0 w1 (r1 : w0 ⊒ˢ w1),
       A w0 -> A w1 -> Prop.
 
-  Definition RBox {A} (R : REL A) : REL □ˢA :=
+  Definition RBox {A} (R : RELATION A) : RELATION □ˢA :=
     fun w0 w1 r01 ba0 ba1 =>
       forall (w2 w3 : World) (r02 : w0 ⊒ˢ w2) (r13 : w1 ⊒ˢ w3) (r23 : w2 ⊒ˢ w3),
         r01 ⊙ r13 = r02 ⊙ r23 ->
@@ -488,7 +488,7 @@ Module StrongMonotonicity.
    (*    w2 -------> w3 *)
    (*         r23 *)
 
-  Definition RDSub {A} (R : REL A) : REL <[Sub]>A.
+  Definition RDSub {A} (R : RELATION A) : RELATION (Diamond Sub A).
   Proof.
     intros w0 w1 r01.
     intros (w2 & r02 & a2).
@@ -497,13 +497,13 @@ Module StrongMonotonicity.
                r01 ⊙ r13 = r02 ⊙ r23 /\ R _ _ r23 a2 a3).
   Defined.
 
-  Definition RImpl {A B} (RA : REL A) (RB : REL B) : REL (Impl A B) :=
+  Definition RImpl {A B} (RA : RELATION A) (RB : RELATION B) : RELATION (Impl A B) :=
     fun w0 w1 r01 f0 f1 =>
       forall a0 a1,
         RA w0 w1 r01 a0 a1 ->
         RB w0 w1 r01 (f0 a0) (f1 a1).
 
-  Definition ROption {A} (R : REL A) : REL (Option A) :=
+  Definition ROption {A} (R : RELATION A) : RELATION (Option A) :=
     fun w0 w1 r01 m0 m1 =>
       match m0 , m1 with
       | Some a0 , Some a1 => R w0 w1 r01 a0 a1
@@ -512,7 +512,7 @@ Module StrongMonotonicity.
       | None    , None    => True
       end.
 
-  Definition RTy : REL Ty :=
+  Definition RTy : RELATION Ty :=
     fun w0 w1 r01 t0 t1 =>
       t1 = Sub.subst t0 r01.
 
@@ -528,24 +528,24 @@ Module StrongMonotonicity.
     RTy w0 w1 r01 (Ty_func _ t1_0 t2_0) (Ty_func _ t1_1 t2_1).
   Proof. unfold RTy; cbn; intros; now f_equal. Qed.
 
-  Definition REnv : REL Env.
+  Definition REnv : RELATION Env.
   Admitted.
 
-  Definition RM {A} (R : REL A) : REL (M A) :=
+  Definition RM {A} (R : RELATION A) : RELATION (M A) :=
     ROption (RDSub R).
 
-  Definition RValid {A} (R : REL A) (a : ⊢ A) : Prop :=
+  Definition RValid {A} (R : RELATION A) (a : ⊢ A) : Prop :=
     forall w0 w1 r01,
       R w0 w1 r01 (a w0) (a w1).
 
-  Definition RUnit : REL Unit :=
+  Definition RUnit : RELATION Unit :=
     fun _ _ _ _ _ => True.
 
-  Lemma rsome {A} (R : REL A) w0 w1 (r01 : Sub w0 w1) (a0 : A w0) (a1 : A w1) (ra : R w0 w1 r01 a0 a1) :
+  Lemma rsome {A} (R : RELATION A) w0 w1 (r01 : Sub w0 w1) (a0 : A w0) (a1 : A w1) (ra : R w0 w1 r01 a0 a1) :
     ROption R w0 w1 r01 (Some a0) (Some a1).
   Proof. apply ra. Qed.
 
-  Lemma rpure {A} (R : REL A) :
+  Lemma rpure {A} (R : RELATION A) :
     RValid (RImpl R (RM R)) pure.
   Proof.
     intros w0 w1 r01 a0 a1 ra.
@@ -554,7 +554,7 @@ Module StrongMonotonicity.
     now rewrite trans_refl_l, trans_refl_r.
   Qed.
 
-  Lemma rbind {A B} (RA : REL A) (RB : REL B) :
+  Lemma rbind {A B} (RA : RELATION A) (RB : RELATION B) :
     RValid (RImpl (RM RA) (RImpl (RBox (RImpl RA (RM RB))) (RM RB))) bind.
   Proof.
     unfold RValid, RImpl, RBox, RM.
@@ -611,7 +611,7 @@ Module StrongMonotonicity.
     - auto.
   Qed.
 
-  Definition rexists {A} (R : REL A) w0 w1 (r01 : Sub w0 w1) {n} (m0 : M A (w0 ▻ n)) (m1 : M A (w1 ▻ n)) :
+  Definition rexists {A} (R : RELATION A) w0 w1 (r01 : Sub w0 w1) {n} (m0 : M A (w0 ▻ n)) (m1 : M A (w1 ▻ n)) :
     RM R (w0 ▻ n) (w1 ▻ n) (Sub.up1 r01) m0 m1 ->
     RM R w0 w1 r01 (mexists m0) (mexists m1).
   Proof.
@@ -627,10 +627,10 @@ Module StrongMonotonicity.
 
   Arguments mexists : simpl never.
 
-  Definition RPropImpl : REL PROP :=
+  Definition RPropImpl : RELATION PROP :=
     fun w0 w1 r01 p q => (q -> p)%type.
 
-  Lemma wp_monotonic_strong {A} (R : REL A) :
+  Lemma wp_monotonic_strong {A} (R : RELATION A) :
     RValid (RImpl (RM R) (RImpl (RBox (RImpl R RPropImpl)) RPropImpl)) WP.
   Proof.
     intros w0 w1 r01 m0 m1 rm p0 p1 rp.
@@ -824,7 +824,7 @@ Module CandidateType.
       | e_if e0 e1 e2 =>
         [r1] _ <- check e0 G (Ty_bool w)   ;;
         [r2] _ <- check e1 <{ G ~ r1 }> <{ tr ~ r1 }> ;;
-        check e2 <{ G ~ r1 .> r2 }> <{ tr ~ r1 .> r2 }>
+        check e2 <{ G ~ r1 ⊙ r2 }> <{ tr ~ r1 ⊙ r2 }>
       | e_var s =>
         match value s G with
         | Some a => Bind_AssertEq_Free Unit w tr a (Ret_Free Unit w tt)
@@ -832,11 +832,11 @@ Module CandidateType.
         end
       | e_absu s e0 =>
         ∃1, ∃2,
-          let tr' := <{ tr ~ step .> step }> in
+          let tr' := <{ tr ~ step ⊙ step }> in
           let α1  := Ty_hole _ 1 (ctx.in_succ ctx.in_zero) in
           let α2  := Ty_hole _ 2 ctx.in_zero in
           tr' == Ty_func _ α1 α2 //\
-          check e0 ((s, α1) :: <{ G ~ step .> step }>) α2
+          check e0 ((s, α1) :: <{ G ~ step ⊙ step }>) α2
 
       | e_abst s t e0 =>
         ∃2,
@@ -849,7 +849,7 @@ Module CandidateType.
         ∃0,
           let α := Ty_hole (w ▻ 0) 0 ctx.in_zero in
           [r1] _ <- check e0 <{ G ~ step }> (Ty_func _ α <{ tr ~ step }>) ;;
-                    check e1 <{ G ~ step .> r1 }> <{ α ~ r1 }>
+                    check e1 <{ G ~ step ⊙ r1 }> <{ α ~ r1 }>
   end.
 
   Definition WP {A} : ⊢ FreeM A -> □⁺(A -> Assignment -> PROP) -> Assignment -> PROP :=
@@ -903,7 +903,7 @@ Module CandidateType.
       rewrite Hι0 in IHT2.
       specialize (IHT2 eq_refl eq_refl).
       revert IHT2. apply wp_monotonic. intros w2 r2 _ ι2 Hι1.
-      specialize (IHT3 w2 ι2 <{ G0 ~ r1 .> r2 }> <{ t0 ~ r1 .> r2 }>).
+      specialize (IHT3 w2 ι2 <{ G0 ~ r1 ⊙ r2 }> <{ t0 ~ r1 ⊙ r2 }>).
       rewrite <- inst_persist_accessibility_env in IHT3.
       rewrite <- inst_persist_accessibility_ty in IHT3.
       rewrite Hι0, Hι1, compose_trans in IHT3.
@@ -917,7 +917,7 @@ Module CandidateType.
       split; [easy|].
       specialize (IHT (w0 ▻ 1 ▻ 2)
                       (env.snoc (env.snoc ι0 1 vt) 2 t)
-                      ((v, Ty_hole (w0 ▻ 1 ▻ 2) 1 (ctx.in_succ ctx.in_zero)) :: <{ G0 ~ step .> step }>)
+                      ((v, Ty_hole (w0 ▻ 1 ▻ 2) 1 (ctx.in_succ ctx.in_zero)) :: <{ G0 ~ step ⊙ step }>)
                       (Ty_hole (w0 ▻ 1 ▻ 2) 2 ctx.in_zero)).
       cbn in IHT. rewrite <- inst_persist_accessibility_env in IHT. specialize (IHT eq_refl eq_refl).
       revert IHT. apply wp_monotonic. intros. hnf.
@@ -946,7 +946,7 @@ Module CandidateType.
       rewrite <- inst_persist_accessibility_ty in IHT1.
       specialize (IHT1 eq_refl eq_refl).
       revert IHT1. apply wp_monotonic. intros.
-      specialize (IHT2 _ ι1 <{ G0 ~ step .> r1 }> (Ty_hole w1 0 <{ ctx.in_zero ~ r1 }>)).
+      specialize (IHT2 _ ι1 <{ G0 ~ step ⊙ r1 }> (Ty_hole w1 0 <{ ctx.in_zero ~ r1 }>)).
       cbn in IHT2.
       rewrite <- inst_persist_accessibility_env in IHT2.
       rewrite <- compose_trans in IHT2.
@@ -998,7 +998,7 @@ Module CandidateType.
       revert IHe1. apply wlp_monotonic. intros.
       rewrite wlp_bind. specialize (IHe2 _ ι1 <{ G0 ~ r1 }> <{ t0 ~ r1}>).
       revert IHe2. apply wlp_monotonic. intros.
-      specialize (IHe3 _ ι2 <{ G0 ~ r1 .> r0 }> <{ t0 ~ r1 .> r0 }>).
+      specialize (IHe3 _ ι2 <{ G0 ~ r1 ⊙ r0 }> <{ t0 ~ r1 ⊙ r0 }>).
       revert IHe3. apply wlp_monotonic. intros.
       hnf. destruct H1, H0, H. subst.
       rewrite <- ?inst_persist_accessibility_env,
