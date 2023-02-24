@@ -68,26 +68,26 @@ Class PreOrder R {reflR : Refl R} {transR : Trans R} : Prop :=
       trans (trans r1 r2) r3 = trans r1 (trans r2 r3);
   }.
 
-Module acc.
+Module alloc.
 
-  Inductive Accessibility (Σ₁ : World) : TYPE :=
-    | refl    : Accessibility Σ₁ Σ₁
-    | fresh α : forall Σ₂, Accessibility (Σ₁ ▻ α) Σ₂ ->
-                              Accessibility Σ₁ Σ₂.
+  Inductive Alloc (Σ₁ : World) : TYPE :=
+    | refl    : Alloc Σ₁ Σ₁
+    | fresh α : forall Σ₂, Alloc (Σ₁ ▻ α) Σ₂ ->
+                              Alloc Σ₁ Σ₂.
 
-  #[export] Instance refl_accessibility : Refl Accessibility :=
+  #[export] Instance refl_accessibility : Refl Alloc :=
     fun w => refl _.
-  #[export] Instance trans_accessibility : Trans Accessibility :=
-    fix trans {w1 w2 w3} (r12 : Accessibility w1 w2) : Accessibility w2 w3 -> Accessibility w1 w3 :=
+  #[export] Instance trans_accessibility : Trans Alloc :=
+    fix trans {w1 w2 w3} (r12 : Alloc w1 w2) : Alloc w2 w3 -> Alloc w1 w3 :=
     match r12 with
     | refl _         => fun r23 => r23
     | fresh _ α w2 r => fun r23 => fresh _ α w3 (trans r r23)
     end.
 
-  #[export] Instance step_accessibility : Step Accessibility :=
+  #[export] Instance step_accessibility : Step Alloc :=
     fun w α => fresh w α (w ▻ α) (refl (w ▻ α)).
 
-  #[export] Instance preorder_accessibility : PreOrder Accessibility.
+  #[export] Instance preorder_accessibility : PreOrder Alloc.
   Proof.
     constructor.
     - easy.
@@ -95,40 +95,40 @@ Module acc.
     - induction r1; cbn; congruence.
   Qed.
 
-  Lemma snoc_r {w1 w2} (r : Accessibility w1 w2) :
-    forall α, Accessibility w1 (w2 ▻ α).
+  Lemma snoc_r {w1 w2} (r : Alloc w1 w2) :
+    forall α, Alloc w1 (w2 ▻ α).
   Proof.
     induction r; cbn; intros β.
     - econstructor 2; constructor 1.
     - econstructor 2. apply IHr.
   Qed.
 
-  Lemma nil_l {w} : Accessibility ctx.nil w.
+  Lemma nil_l {w} : Alloc ctx.nil w.
   Proof. induction w; [constructor|now apply snoc_r]. Qed.
 
-End acc.
+End alloc.
 
 (* Everything is now qualified, except the stuff in paren on the line below *)
-Export acc (Accessibility).
-Export (hints) acc.
+Export alloc (Alloc).
+Export (hints) alloc.
 
-Notation "w1 .> w2" := (trans (R := Accessibility) w1 w2) (at level 80, only parsing).
+Notation "w1 .> w2" := (trans (R := Alloc) w1 w2) (at level 80, only parsing).
 Infix "⊙" := trans (at level 60, right associativity).
 
 (* TODO: switch to superscript *)
 (* \^s \^+ *)
 
-Notation "□⁺ A" := (Box Accessibility A) (at level 9, format "□⁺ A", right associativity)
+Notation "□⁺ A" := (Box Alloc A) (at level 9, format "□⁺ A", right associativity)
     : indexed_scope.
-Notation "◇⁺ A" := (Diamond Accessibility A) (at level 9, format "◇⁺ A", right associativity)
+Notation "◇⁺ A" := (Diamond Alloc A) (at level 9, format "◇⁺ A", right associativity)
     : indexed_scope.
 
 Class Persistent (R : ACC) (A : TYPE) : Type :=
   persist : ⊢ A -> Box R A.
 
-Class PersistLaws A `{Persistent Accessibility A} : Type :=
+Class PersistLaws A `{Persistent Alloc A} : Type :=
   { refl_persist w (V : A w) :
-        persist w V w (acc.refl w) = V
+        persist w V w refl = V
   ; assoc_persist w1 w2 w3 r12 r23 (V : A w1) :
         persist w2 (persist w1 V w2 r12) w3 r23
       = persist w1 V w3 (trans r12 r23) }.
@@ -151,11 +151,11 @@ Definition K {R A B} :
     f w1 ω01 (a w1 ω01).
 
 #[export] Instance Persistent_In {x} :
-  Persistent Accessibility (ctx.In x) :=
-  fix transient {w} (xIn : x ∈ w) {w'} (r : Accessibility w w') {struct r} :=
+  Persistent Alloc (ctx.In x) :=
+  fix transient {w} (xIn : x ∈ w) {w'} (r : Alloc w w') {struct r} :=
     match r with
-    | acc.refl _        => xIn
-    | acc.fresh _ α _ r => transient (in_succ xIn) r
+    | alloc.refl _        => xIn
+    | alloc.fresh _ α _ r => transient (in_succ xIn) r
     end.
 
 #[export] Instance PersistLaws_In {x} : PersistLaws (ctx.In x).

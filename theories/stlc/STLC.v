@@ -171,23 +171,23 @@ Inductive solvedM (A : Type) : Type :=
 
 Notation Assignment := (env.Env (fun _ => ty)).
 
-Fixpoint compose {w1 w2 : World} (r12 : Accessibility w1 w2)
+Fixpoint compose {w1 w2 : World} (r12 : Alloc w1 w2)
   : Assignment w2 -> Assignment w1 :=
-  match r12 in (Accessibility _ c0) return (Assignment c0 -> Assignment w1) with
-  | acc.refl _ => fun X0 : Assignment w1 => X0
-  | acc.fresh _ α Σ₂ a0 =>
+  match r12 in (Alloc _ c0) return (Assignment c0 -> Assignment w1) with
+  | alloc.refl _ => fun X0 : Assignment w1 => X0
+  | alloc.fresh _ α Σ₂ a0 =>
       fun X0 : Assignment Σ₂ =>
         match env.view (compose a0 X0) with
         | env.isSnoc E _ => E
         end
   end.
 
-Lemma compose_refl : forall w ass,
-    compose (acc.refl w) ass = ass.
+Lemma compose_refl {w} (ass : Assignment w) :
+    compose refl ass = ass.
 Proof. easy. Qed.
 
-Lemma compose_trans {w1 w2 w3} (r12 : Accessibility w1 w2)
-  (r23 : Accessibility w2 w3) (ass : Assignment w3) :
+Lemma compose_trans {w1 w2 w3} (r12 : Alloc w1 w2)
+  (r23 : Alloc w2 w3) (ass : Assignment w3) :
   compose r12 (compose r23 ass) = compose (trans r12 r23) ass.
 Proof. induction r12. auto. cbn. rewrite IHr12. reflexivity. Qed.
 
@@ -248,8 +248,8 @@ Class Inst (A : TYPE) (a : Type) : Type :=
   | (s,T) :: sTs => (s, inst T ass) :: inst_env sTs ass
   end.
 
-#[export] Instance Persistent_Ty : Persistent Accessibility Ty :=
-  fix per {w} (t : Ty w) {w'} (r : Accessibility w w') : Ty w' :=
+#[export] Instance Persistent_Ty : Persistent Alloc Ty :=
+  fix per {w} (t : Ty w) {w'} (r : Alloc w w') : Ty w' :=
     match t with
     | Ty_bool _ => Ty_bool w'
     | Ty_func _ t1 t2 => Ty_func w' (per t1 r) (per t2 r)

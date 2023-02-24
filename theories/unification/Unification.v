@@ -1124,7 +1124,7 @@ Module Variant1.
     ⊢ FreeM A -> ?◇⁺(List (Ty * Ty) * A) :=
     fix pr {w} m {struct m} :=
     match m with
-    | Ret_Free _ _ a => Some (w; (acc.refl w, (List.nil, a)))
+    | Ret_Free _ _ a => Some (w; (refl, (List.nil, a)))
     | Fail_Free _ _ => None
     | Bind_AssertEq_Free _ _ t1 t2 m =>
         '(w1; (r1, (cs, a))) <- pr m;;
@@ -1134,7 +1134,7 @@ Module Variant1.
         Some (w1; (r1, (cons c cs, a)))
     | Bind_Exists_Free _ _ i m =>
         '(w1; (r1, csa)) <- pr m ;;
-        Some (w1; (acc.fresh w i w1 r1, csa))
+        Some (w1; (step ⊙ r1, csa))
     end.
 
   Definition solve_ng {A} {pA : Persistent Tri.Tri A} :
@@ -1142,7 +1142,7 @@ Module Variant1.
     fun m =>
       '(w1; (r, (cs, a))) <- prenex m ;;
       '(w2; (ζ, tt))      <- solve cs;;
-      Some (w2; (acc.nil_l,persist _ a _ ζ)).
+      Some (w2; (alloc.nil_l,persist _ a _ ζ)).
 
 End Variant1.
 Export Variant1.
@@ -1211,12 +1211,4 @@ Proof.
   apply env.tabulate.
   intros x xIn.
   apply (inst (env.lookup (Sub.triangular ζ) xIn) ass).
-Defined.
-
-Definition SubstLifted (A : Type) :
-  ⊢ Lifted A -> □(Lifted A).
-Proof.
-  unfold Valid, Box, Impl, Lifted.
-  intros w fa w1 ζ1 ass. apply fa.
-  apply (compose ζ1 ass).
 Defined.

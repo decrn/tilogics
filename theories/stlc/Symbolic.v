@@ -102,7 +102,7 @@ Section TypeReconstruction.
   Notation Expr := (Lifted expr).
   (* TODO: define reader applicative to use ctor of expr to create Expr *)
 
-#[export] Instance Persistent_Lifted {A} : Persistent Accessibility (Lifted A).
+#[export] Instance Persistent_Lifted {A} : Persistent Alloc (Lifted A).
   Proof. unfold Persistent, Valid, Impl, Lifted, Box. eauto using compose. Qed.
 
   Definition ret  {w} := Ret_Free (Prod Ty Expr) w.
@@ -154,11 +154,11 @@ End TypeReconstruction.
 
 Record Acc (w w' : World) : Type := mkAcc
   { iw : World
-  ; pos : Accessibility w iw
+  ; pos : Alloc w iw
   ; neg : Tri iw w' }.
 
 Notation "w1 ⇅ w2" := (Acc w1 w2) (at level 80).
-Notation "w1 ↑ w2" := (Accessibility w1 w2) (at level 80).
+Notation "w1 ↑ w2" := (Alloc w1 w2) (at level 80).
 Notation "w1 ↓ w2" := (Tri w1 w2) (at level 80).
 
 #[export] Instance refl_acc : Refl Acc :=
@@ -180,7 +180,7 @@ Definition up_down_down_eq_up_down {w1 w2 w3} (r12 : w1 ⇅ w2) (down : w2 ↓ w
 Definition up_down_up_eq_up_up_down {w1 w2 w3} (r12: w1 ⇅ w2) (up : w2 ↑ w3) : w1 ⇅ w3 :=
  match r12 with
  | {| iw := iw; pos := pos; neg := neg |} =>
-      acc.Accessibility_rect
+      alloc.Alloc_rect
         (fun (w w' : World) (up : w ↑ w') => forall iw : World, w1 ↑ iw -> iw ↓ w -> w1 ⇅ w')
         (mkAcc _)
         (fun w α w' up IH iw pos neg =>
@@ -293,7 +293,7 @@ Proof. Admitted.
 #[export] Instance InstSub {w} : Inst (Sub w) (Assignment w).
 Admitted.
 
-#[export] Instance InstAccessibility {w} : Inst (Accessibility w) (Assignment w).
+#[export] Instance InstAlloc {w} : Inst (Alloc w) (Assignment w).
 Admitted.
 
 Lemma inst_persist_ty {w0 w1} (t : Ty w0) (r : Sub w0 w1) (ι : Assignment w1) :
@@ -880,7 +880,7 @@ Module CandidateType.
       WP m (fun _ r a => WP (f _ r a) (_4 Q r)) ι.
   Proof. split; intros; induction m; cbn; firstorder; exists x; firstorder. Qed.
 
-  Lemma lookup_compose {w1 w2 : World} (r : Accessibility w1 w2) (ι : Assignment w2) {x} (i : x ∈ w1) :
+  Lemma lookup_compose {w1 w2 : World} (r : Alloc w1 w2) (ι : Assignment w2) {x} (i : x ∈ w1) :
     env.lookup (compose r ι) i = env.lookup ι <{ i ~ r }>.
   Proof. induction r. reflexivity. cbn. rewrite <- IHr. now destruct env.view. Qed.
 

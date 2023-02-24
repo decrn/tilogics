@@ -72,7 +72,7 @@ Open Scope indexed_scope.
 
 Definition RBox {A a} (RA : Relation A a) : Relation □⁺A a :=
   fun (w : Ctx nat) (ass : Assignment w) (x : □⁺A w) (y : a) =>
-    forall (w' : Ctx nat) (ω : Accessibility w w') (ass' : Assignment w'),
+    forall (w' : Ctx nat) (ω : Alloc w w') (ass' : Assignment w'),
       ass = compose ω ass' ->
       RA _ ass' (x w' ω) y.
 
@@ -137,7 +137,7 @@ Lemma Func_relates_func :
     RTy w ass (Ty_func w D C) (ty_func d c).
 Proof. intros. inversion H. inversion H0. constructor. Qed.
 
-Class RefinePersist {A a} `{Persistent Accessibility A} (RA : Relation A a) : Type :=
+Class RefinePersist {A a} `{Persistent Alloc A} (RA : Relation A a) : Type :=
   { refine_persist w1 w2 r12 ass V v :
       RA w1 (compose r12 ass) V v ->
       RA w2 ass (persist w1 V w2 r12) v }.
