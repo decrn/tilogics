@@ -1617,6 +1617,10 @@ Module CandidateType.
       WLP m (fun _ r a => WLP (f _ r a) (_4 Q r)) ι.
   Proof. split; intros; induction m; cbn; firstorder. Qed.
 
+  Lemma compose_step {w x t} (ι : Assignment w) :
+    compose step (env.snoc ι x t) = ι.
+  Proof. reflexivity. Qed.
+
   Lemma soundness e :
     forall (w0 : World) (ι0 : Assignment w0) (G0 : Env w0) (t0 : Ty w0),
       WLP (check e G0 t0)
@@ -1633,31 +1637,32 @@ Module CandidateType.
       revert IHe2. apply wlp_monotonic. intros.
       specialize (IHe3 _ ι2 <{ G0 ~ r1 .> r0 }> <{ t0 ~ r1 .> r0 }>).
       revert IHe3. apply wlp_monotonic. intros.
-      hnf. destruct H1, H0, H. firstorder.
-      now rewrite <- compose_trans,
-                  <- compose_trans,
-                  <- H1,
-                  <- H0,
-                  <- H.
-      exists (e_if x0 x1 x). constructor.
-      now cbn in H4.
-      now rewrite <- inst_persist_accessibility_env,
-                  <- inst_persist_accessibility_ty,
-                  <- H in H3.
-      now rewrite <- inst_persist_accessibility_env,
-                  <- inst_persist_accessibility_ty,
-                  <- compose_trans,
-                  <- H0,
-                  <- H in H2.
-    - admit. (* destruct (value s G0); cbn; firstorder. exists (e_var s). constructor. admit. *)
+      hnf. destruct H1, H0, H. subst.
+      rewrite <- ?inst_persist_accessibility_env,
+              <- ?inst_persist_accessibility_ty,
+              <- ?compose_trans in *.
+      split; [easy|].
+      firstorder.
+      exists (e_if x0 x1 x).
+      now constructor.
+    - destruct (value s G0) eqn:?; [|easy].
+      intros Heqt. split; [easy|].
+      exists (e_var s). constructor.
+      rewrite value_inst, Heqo. cbn. congruence.
     - specialize (IHe _ (env.snoc (env.snoc ι0 1 t) 2 t1)
                         ((s, Ty_hole (w0 ▻ 1 ▻ 2) 1 (ctx.in_succ ctx.in_zero))
-                             :: <{ G0 ~ acc.fresh w0 1 (w0 ▻ 1 ▻ 2) step }>)
+                             :: <{ G0 ~ step ⊙ step }>)
                         (Ty_hole (w0 ▻ 1 ▻ 2) 2 ctx.in_zero)).
-        revert IHe. apply wlp_monotonic. intros. hnf.
-        split. do 2 rewrite <- compose_trans. destruct H, H0. now rewrite <- H.
-        destruct H. destruct H0. destruct H0. exists (e_abst s t x).
-        admit.
+      revert IHe. apply wlp_monotonic. unfold _4. cbn.
+      intros ? ? _ ? (Hι1 & e' & IHe).
+      rewrite
+        <- ?inst_persist_accessibility_env,
+        <- ?inst_persist_accessibility_ty,
+        <- ?compose_trans, <- ?Hι1, ?compose_step in *.
+      split; [easy|].
+      exists (e_abst s t e').
+      rewrite H.
+      now constructor.
     - specialize (IHe _ (env.snoc ι0 2 t1)
                         ((s, lift t (w0 ▻ 2)) :: <{ G0 ~ step }>)
                         (Ty_hole (w0 ▻ 2) 2 ctx.in_zero)).
