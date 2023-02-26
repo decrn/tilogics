@@ -17,40 +17,6 @@ Local Notation "<{ A ~ w }>" := (persist _ A _ w).
   fun w1 u w2 ζ => u.
 Open Scope indexed_scope.
 
-#[export] Instance InstSub : forall w, Inst (Sub w) (Assignment w) :=
-  fix instsub {w0 w1} (r : Sub w0 w1) (ι : Assignment w1) {struct r} :=
-    match r with
-    | env.nil        => env.nil
-    | env.snoc r _ t => env.snoc (inst (Inst := @instsub _) r ι) _ (inst t ι)
-    end.
-
-#[export] Instance InstAlloc : forall w, Inst (Alloc w) (Assignment w) :=
-  fix installoc {w0 w1} (r : Alloc w0 w1) :=
-    match r with
-    | alloc.refl _        => fun ι => ι
-    | alloc.fresh _ α w r => fun ι => let (r',_) := env.view (inst (Inst := @installoc _) r ι) in r'
-    end.
-
-#[export] Instance InstTri : forall w, Inst (Tri w) (Assignment w) :=
-  fix insttri {w0 w1} (r : Tri w0 w1) :=
-    match r with
-    | Tri.refl => fun ι => ι
-    | @Tri.cons _ w' x xIn t r =>
-        fun ι =>
-          let ι' := inst (Inst := @insttri _) r ι in
-          env.insert xIn ι' (inst t ι')
-    end.
-
-Lemma inst_refl {R} {reflR : Refl R} {instR : forall w, Inst (R w) (Assignment w)}
-  {w} (ι : Assignment w) :
-  inst (refl (R := R)) ι = ι.
-Proof. Admitted.
-
-Lemma inst_trans {R} {transR : Trans R} {instR : forall w, Inst (R w) (Assignment w)}
-  {w1 w2 w3} (r12 : R w1 w2) (r23 : R w2 w3) (ass : Assignment w3) :
-  inst (trans r12 r23) ass = inst r12 (inst r23 ass).
-Proof. Admitted.
-
 Definition assert {w} t1 t2 :=
   Bind_AssertEq_Free Unit w t1 t2 (Ret_Free Unit w tt).
 

@@ -73,7 +73,7 @@ Open Scope indexed_scope.
 Definition RBox {A a} (RA : Relation A a) : Relation □⁺A a :=
   fun (w : Ctx nat) (ass : Assignment w) (x : □⁺A w) (y : a) =>
     forall (w' : Ctx nat) (ω : Alloc w w') (ass' : Assignment w'),
-      ass = compose ω ass' ->
+      ass = inst ω ass' ->
       RA _ ass' (x w' ω) y.
 
 (* For functions/impl: related inputs go to related outputs *)
@@ -122,11 +122,11 @@ Proof.
   intros w ass ? ? ?.
   induction H;  cbn; intros F f HF; try constructor; try assumption.
   - unfold RBox in HF. unfold RArr in HF. apply HF.
-    symmetry. apply compose_refl. apply H.
+    symmetry. apply inst_refl. apply H.
   - unfold RBox in IHRFree. unfold RArr in IHRFree. apply IHRFree.
     unfold RBox in HF. unfold RArr in HF. apply HF.
   - intro. apply H0. unfold RBox.
-    intros. apply HF. clear HF H0 H. rewrite <- compose_trans. cbn. now rewrite <- H1.
+    intros. apply HF. clear HF H0 H. rewrite inst_trans. cbn. now rewrite <- H1.
 Qed.
 
 (* Should probably generalize this to any constructor *)
@@ -139,7 +139,7 @@ Proof. intros. inversion H. inversion H0. constructor. Qed.
 
 Class RefinePersist {A a} `{Persistent Alloc A} (RA : Relation A a) : Type :=
   { refine_persist w1 w2 r12 ass V v :
-      RA w1 (compose r12 ass) V v ->
+      RA w1 (inst r12 ass) V v ->
       RA w2 ass (persist w1 V w2 r12) v }.
 
 #[export] Instance RefinePersist_Ty : RefinePersist RTy.
@@ -179,11 +179,11 @@ Proof.
     subst. apply RΓ.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. cbn. apply IHe3.
     eapply refine_persist.
-    subst. rewrite <- compose_trans. apply RΓ.
+    subst. rewrite inst_trans. apply RΓ.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind. apply Assert_relates_assert; cbn.
     eapply refine_persist. subst. assumption. assumption.
     intros ? ? ? ? ? ? ?. eapply Ret_relates_ret.
-    eapply refine_persist. rewrite <- compose_trans. rewrite <- H5. subst. apply H2.
+    eapply refine_persist. rewrite inst_trans. rewrite <- H5. subst. apply H2.
   - intros ? ? ?. induction H. cbn.
     destruct (string_dec s k). now constructor. apply IHREnv.
     cbn. constructor.
@@ -202,13 +202,13 @@ Proof.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind.
     eapply IHe2. eapply refine_persist. subst. apply RΓ.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind.
-    eapply IHe1. eapply refine_persist. rewrite <- compose_trans. subst. apply RΓ.
+    eapply IHe1. eapply refine_persist. rewrite inst_trans. subst. apply RΓ.
     intros ? ? ? ? ? ? ?. eapply Bind_relates_bind.
     eapply Assert_relates_assert. apply H4.
     eapply refine_persist. apply Func_relates_func. subst. apply H2.
     eapply refine_persist. subst. apply H0.
     intros ? ? ? ? ? ? ?. apply Ret_relates_ret. eapply refine_persist.
-    repeat rewrite <- compose_trans. rewrite <- H5. rewrite <- H3. subst. apply H0.
+    repeat rewrite inst_trans. rewrite <- H5. rewrite <- H3. subst. apply H0.
 Qed.
 
 Inductive RSolved {A a} (RA : Relation A a) (w : Ctx nat) (ass : Assignment w)

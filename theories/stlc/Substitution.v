@@ -121,6 +121,13 @@ Module Sub.
       now rewrite ?lookup_trans, subst_comp.
   Qed.
 
+  #[export] Instance InstSub : forall w, Inst (Sub w) (Assignment w) :=
+    fix instsub {w0 w1} (r : Sub w0 w1) (ι : Assignment w1) {struct r} :=
+      match r with
+      | env.nil        => env.nil
+      | env.snoc r _ t => env.snoc (inst (Inst := @instsub _) r ι) _ (inst t ι)
+      end.
+
   Lemma triangular_trans {w0 w1 w2} (ζ01 : w0 ⊒⁻ w1) (ζ12 : w1 ⊒⁻ w2) :
     triangular (trans ζ01 ζ12) =
       trans (triangular ζ01) (triangular ζ12).

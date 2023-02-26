@@ -27,7 +27,7 @@
 (******************************************************************************)
 
 From Em Require Import
-     Definitions Context STLC.
+     Definitions Context Environment STLC.
 Import ctx.notations.
 Import SigTNotations.
 
@@ -144,6 +144,16 @@ fix F (w c : World) (t : w ⊒⁻ c) {struct t} : P w c t :=
     - intros ? ? r; induction r; cbn; [|rewrite IHr]; easy.
     - induction r1; cbn; congruence.
   Qed.
+
+  #[export] Instance InstTri : forall w, Inst (Tri w) (Assignment w) :=
+    fix insttri {w0 w1} (r : Tri w0 w1) :=
+      match r with
+      | Tri.refl => fun ι => ι
+      | @Tri.cons _ w' x xIn t r =>
+          fun ι =>
+            let ι' := inst (Inst := @insttri _) r ι in
+            env.insert xIn ι' (inst t ι')
+      end.
 
   Definition single {w} x {xIn : x ∈ w} (t : Ty (w - x)) : w ⊒⁻ w - x :=
     cons x t refl.

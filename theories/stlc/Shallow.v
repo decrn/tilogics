@@ -64,7 +64,7 @@ Fixpoint generate {m} `{TypeCheckM m} (expression : expr) (ctx : env) : m (prod 
       assert Tcoq Talt               ;;
       ret (Tcoq, e_if Ecnd Ecoq Ealt)
   | e_var var =>
-      match (value var ctx) with
+      match (resolve var ctx) with
       | Some Tvar => ret (Tvar, expression)
       | None => fail
       end
@@ -253,7 +253,7 @@ Fixpoint gensem (ctx : list (string * ty)) (expression : expr) (type : ty) : Pro
       gensem ctx coq type    /\
       gensem ctx alt type
   | e_var var =>
-      match (value var ctx) with
+      match (resolve var ctx) with
       | None => False
       | Some t => t = type
       end
@@ -296,7 +296,7 @@ Fixpoint generate_no_elab {m} `{TypeCheckM m} (expression : expr) (ctx : env) : 
       assert Tcoq Talt               ;;
       ret Tcoq
   | e_var var =>
-      match (value var ctx) with
+      match (resolve var ctx) with
       | Some Tvar => ret Tvar
       | None      => fail
       end
