@@ -171,26 +171,6 @@ Inductive solvedM (A : Type) : Type :=
 
 Notation Assignment := (env.Env (fun _ => ty)).
 
-Fixpoint compose {w1 w2 : World} (r12 : Alloc w1 w2)
-  : Assignment w2 -> Assignment w1 :=
-  match r12 in (Alloc _ c0) return (Assignment c0 -> Assignment w1) with
-  | alloc.refl _ => fun X0 : Assignment w1 => X0
-  | alloc.fresh _ α Σ₂ a0 =>
-      fun X0 : Assignment Σ₂ =>
-        match env.view (compose a0 X0) with
-        | env.isSnoc E _ => E
-        end
-  end.
-
-Lemma compose_refl {w} (ass : Assignment w) :
-    compose refl ass = ass.
-Proof. easy. Qed.
-
-Lemma compose_trans {w1 w2 w3} (r12 : Alloc w1 w2)
-  (r23 : Alloc w2 w3) (ass : Assignment w3) :
-  compose r12 (compose r23 ass) = compose (trans r12 r23) ass.
-Proof. induction r12. auto. cbn. rewrite IHr12. reflexivity. Qed.
-
 Definition Lifted (A : Type) : TYPE :=
   fun w => Assignment w -> A.
 
@@ -228,32 +208,35 @@ Class Inst (A : TYPE) (a : Type) : Type :=
   Inst (Option AT) (option A) :=
   fun w ma ass => option_map (fun a => inst a ass) ma.
 
-#[export] Instance inst_ty :
-  Inst Ty ty :=
+#[export] Instance inst_ty : Inst Ty ty :=
   fix inst_ty {w} T ass :=
-  match T with
-  | Ty_bool _ =>
-      ty_bool
-  | Ty_func _ σ τ =>
-      ty_func (inst_ty σ ass) (inst_ty τ ass)
-  | Ty_hole _ _ i =>
-      env.lookup ass i
-  end.
+    match T with
+    | Ty_bool _     => ty_bool
+    | Ty_func _ σ τ => ty_func (inst_ty σ ass) (inst_ty τ ass)
+    | Ty_hole _ _ i => env.lookup ass i
+    end.
 
 #[export] Instance inst_env :
   Inst Env env :=
   fix inst_env {w} E ass :=
   match E with
-  | []%list      => []%list
+  | []           => []
   | (s,T) :: sTs => (s, inst T ass) :: inst_env sTs ass
-  end.
+  end%list.
 
-#[export] Instance Persistent_Ty : Persistent Alloc Ty :=
-  fix per {w} (t : Ty w) {w'} (r : Alloc w w') : Ty w' :=
+Class Lk (R : ACC) : Type :=
+  lk w1 w2 (r : R w1 w2) x (xIn : ctx.In x w1) : Ty w2.
+#[global] Arguments lk {R _ w1 w2} r {x} xIn.
+
+#[export] Instance lk_alloc : Lk Alloc :=
+  fun w1 w2 r x xIn => Ty_hole _ x (persist _ xIn _ r).
+
+#[export] Instance Persistent_Ty {R} {lkR : Lk R} : Persistent R Ty :=
+  fix per {w} (t : Ty w) {w'} (r : R w w') : Ty w' :=
     match t with
     | Ty_bool _ => Ty_bool w'
     | Ty_func _ t1 t2 => Ty_func w' (per t1 r) (per t2 r)
-    | Ty_hole _ i i0 => Ty_hole w' i (persist w i0 w' r)
+    | Ty_hole _ x xIn => lk r xIn
     end.
 
 #[export] Instance PersistLaws_Ty : PersistLaws Ty.
@@ -261,6 +244,7 @@ Proof.
   constructor.
   - induction V; cbn; f_equal; auto.
   - induction V; cbn; f_equal; auto.
+    unfold lk, lk_alloc. f_equal.
     apply assoc_persist.
 Qed.
 

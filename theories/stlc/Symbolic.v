@@ -13,7 +13,43 @@ Local Notation "<{ A ~ w }>" := (persist _ A _ w).
   fun w1 t w2 ζ => Sub.subst t (Sub.triangular ζ).
 #[export] Instance PersistentSub_Ty : Persistent Sub Ty :=
   fun w1 t w2 ζ => Sub.subst t ζ.
+#[export] Instance persistent_unit {R} : Persistent R Unit :=
+  fun w1 u w2 ζ => u.
 Open Scope indexed_scope.
+
+#[export] Instance InstSub : forall w, Inst (Sub w) (Assignment w) :=
+  fix instsub {w0 w1} (r : Sub w0 w1) (ι : Assignment w1) {struct r} :=
+    match r with
+    | env.nil        => env.nil
+    | env.snoc r _ t => env.snoc (inst (Inst := @instsub _) r ι) _ (inst t ι)
+    end.
+
+#[export] Instance InstAlloc : forall w, Inst (Alloc w) (Assignment w) :=
+  fix installoc {w0 w1} (r : Alloc w0 w1) :=
+    match r with
+    | alloc.refl _        => fun ι => ι
+    | alloc.fresh _ α w r => fun ι => let (r',_) := env.view (inst (Inst := @installoc _) r ι) in r'
+    end.
+
+#[export] Instance InstTri : forall w, Inst (Tri w) (Assignment w) :=
+  fix insttri {w0 w1} (r : Tri w0 w1) :=
+    match r with
+    | Tri.refl => fun ι => ι
+    | @Tri.cons _ w' x xIn t r =>
+        fun ι =>
+          let ι' := inst (Inst := @insttri _) r ι in
+          env.insert xIn ι' (inst t ι')
+    end.
+
+Lemma inst_refl {R} {reflR : Refl R} {instR : forall w, Inst (R w) (Assignment w)}
+  {w} (ι : Assignment w) :
+  inst (refl (R := R)) ι = ι.
+Proof. Admitted.
+
+Lemma inst_trans {R} {transR : Trans R} {instR : forall w, Inst (R w) (Assignment w)}
+  {w1 w2 w3} (r12 : R w1 w2) (r23 : R w2 w3) (ass : Assignment w3) :
+  inst (trans r12 r23) ass = inst r12 (inst r23 ass).
+Proof. Admitted.
 
 Definition assert {w} t1 t2 :=
   Bind_AssertEq_Free Unit w t1 t2 (Ret_Free Unit w tt).
@@ -102,8 +138,9 @@ Section TypeReconstruction.
   Notation Expr := (Lifted expr).
   (* TODO: define reader applicative to use ctor of expr to create Expr *)
 
-#[export] Instance Persistent_Lifted {A} : Persistent Alloc (Lifted A).
-  Proof. unfold Persistent, Valid, Impl, Lifted, Box. eauto using compose. Qed.
+  #[export] Instance Persistent_Lifted {R : ACC} {A}
+    {instR : forall w, Inst (R w) (Assignment w)} : Persistent R (Lifted A) :=
+    fun w0 a w1 r1 ι1 => a (inst r1 ι1).
 
   Definition ret  {w} := Ret_Free (Prod Ty Expr) w.
   Definition fail {w} := Fail_Free (Prod Ty Expr) w.
@@ -152,90 +189,96 @@ Section TypeReconstruction.
 
 End TypeReconstruction.
 
-Record Acc (w w' : World) : Type := mkAcc
-  { iw : World
-  ; pos : Alloc w iw
-  ; neg : Tri iw w' }.
+Module acc.
 
-Notation "w1 ⇅ w2" := (Acc w1 w2) (at level 80).
-Notation "w1 ↑ w2" := (Alloc w1 w2) (at level 80).
-Notation "w1 ↓ w2" := (Tri w1 w2) (at level 80).
+  Record Acc (w w' : World) : Type := mkAcc
+    { iw : World
+    ; pos : Alloc w iw
+    ; neg : Tri iw w' }.
 
-#[export] Instance refl_acc : Refl Acc :=
-  fun w => {| iw := w; pos := refl; neg := refl |}.
+  Notation "w1 ⇅ w2" := (Acc w1 w2) (at level 80).
+  Notation "w1 ↑ w2" := (Alloc w1 w2) (at level 80).
+  Notation "w1 ↓ w2" := (Tri w1 w2) (at level 80).
 
-Fixpoint down_add {α w1 w2} (t : Tri w1 w2) {struct t} : Tri (w1 ▻ α) (w2 ▻ α) :=
-  match t with
-  | Tri.refl => refl
-  | @Tri.cons _ _ x _ t r =>
-    @Tri.cons _ _ x (ctx.in_succ _) (persist _ t _ step) (down_add r)
-  end.
+  #[export] Instance refl_acc : Refl Acc :=
+    fun w => {| iw := w; pos := refl; neg := refl |}.
 
-Definition up_down_down_eq_up_down {w1 w2 w3} (r12 : w1 ⇅ w2) (down : w2 ↓ w3) : w1 ⇅ w3 :=
-  match r12 with
-  | {| iw := iw; pos := pos; neg := neg |} =>
-        mkAcc _ _ _ pos (neg ⊙⁻ down)
-  end.
+  Fixpoint down_add {α w1 w2} (t : Tri w1 w2) {struct t} : Tri (w1 ▻ α) (w2 ▻ α) :=
+    match t with
+    | Tri.refl => refl
+    | @Tri.cons _ _ x _ t r =>
+      @Tri.cons _ _ x (ctx.in_succ _) (persist _ t _ step) (down_add r)
+    end.
 
-Definition up_down_up_eq_up_up_down {w1 w2 w3} (r12: w1 ⇅ w2) (up : w2 ↑ w3) : w1 ⇅ w3 :=
- match r12 with
- | {| iw := iw; pos := pos; neg := neg |} =>
-      alloc.Alloc_rect
-        (fun (w w' : World) (up : w ↑ w') => forall iw : World, w1 ↑ iw -> iw ↓ w -> w1 ⇅ w')
-        (mkAcc _)
-        (fun w α w' up IH iw pos neg =>
-           IH (iw ▻ α) (pos ⊙ step) (down_add neg))
-        w2 w3 up iw pos neg
- end.
-
-#[export] Instance trans_acc : Trans Acc :=
-  fun w1 w2 w3 r12 r23 =>
-    match r23 with
+  Definition up_down_down_eq_up_down {w1 w2 w3} (r12 : w1 ⇅ w2) (down : w2 ↓ w3) : w1 ⇅ w3 :=
+    match r12 with
     | {| iw := iw; pos := pos; neg := neg |} =>
-        up_down_down_eq_up_down (up_down_up_eq_up_up_down r12 pos) neg
+          mkAcc _ _ _ pos (neg ⊙⁻ down)
     end.
 
-#[export] Instance preorder_acc : PreOrder Acc.
-Proof.
-  constructor.
-  - admit.
-  - destruct r. cbn. now rewrite trans_refl_r.
-  - admit.
-Admitted.
+  Definition up_down_up_eq_up_up_down {w1 w2 w3} (r12: w1 ⇅ w2) (up : w2 ↑ w3) : w1 ⇅ w3 :=
+   match r12 with
+   | {| iw := iw; pos := pos; neg := neg |} =>
+        alloc.Alloc_rect
+          (fun (w w' : World) (up : w ↑ w') => forall iw : World, w1 ↑ iw -> iw ↓ w -> w1 ⇅ w')
+          (mkAcc _)
+          (fun w α w' up IH iw pos neg =>
+             IH (iw ▻ α) (pos ⊙ step) (down_add neg))
+          w2 w3 up iw pos neg
+   end.
 
-Definition sub_acc {w1 w2 : World} (r : w1 ⇅ w2) : Sub.Sub w1 w2 :=
-  match r with
-  | {| pos := p; neg := n |} =>
-      trans (R := Sub)
-        (env.tabulate (fun x xIn => <{ Ty_hole w1 x xIn ~ p }>))
-        (Sub.triangular n)
-  end.
+  #[export] Instance trans_acc : Trans Acc :=
+    fun w1 w2 w3 r12 r23 =>
+      match r23 with
+      | {| iw := iw; pos := pos; neg := neg |} =>
+          up_down_down_eq_up_down (up_down_up_eq_up_up_down r12 pos) neg
+      end.
 
-#[export] Instance PersistentAcc_Ty : Persistent Acc Ty :=
-  fun w1 t w2 r =>
+  #[export] Instance preorder_acc : PreOrder Acc.
+  Proof.
+    constructor.
+    - admit.
+    - destruct r. cbn. now rewrite trans_refl_r.
+    - admit.
+  Admitted.
+
+  Import (hints) Sub.
+
+  Definition sub_acc {w1 w2 : World} (r : w1 ⇅ w2) : Sub w1 w2 :=
     match r with
-      {| iw := wi; pos := r1; neg := r2 |} =>
-        <{ <{ t ~ r1 }> ~ r2 }>
+    | {| pos := p; neg := n |} =>
+        trans (R := Sub)
+          (env.tabulate (fun x xIn => <{ Ty_hole w1 x xIn ~ p }>))
+          (Sub.triangular n)
     end.
 
-Lemma persist_bool {w1 w2} (r : Acc w1 w2) :
-  persist _ (Ty_bool _) _ r = Ty_bool _.
-Proof. destruct r; reflexivity. Qed.
+  #[export] Instance PersistentAcc_Ty : Persistent Acc Ty :=
+    fun w1 t w2 r =>
+      match r with
+        {| iw := wi; pos := r1; neg := r2 |} =>
+          <{ <{ t ~ r1 }> ~ r2 }>
+      end.
 
-Lemma persist_func {w1 w2} (r : Acc w1 w2) (t1 t2 : Ty _) :
-  persist _ (Ty_func _ t1 t2) _ r =
-  Ty_func _ (persist _ t1 _ r) (persist _ t2 _ r).
-Proof. destruct r; reflexivity. Qed.
+  Lemma persist_bool {w1 w2} (r : Acc w1 w2) :
+    persist _ (Ty_bool _) _ r = Ty_bool _.
+  Proof. destruct r; reflexivity. Qed.
 
-(* unify with PersistLaws about ↑ *)
-Class PersistLaws A `{Persistent Acc A} : Type :=
-  { refl_persist w (V : A w) :
-        persist w V w refl = V }.
+  Lemma persist_func {w1 w2} (r : Acc w1 w2) (t1 t2 : Ty _) :
+    persist _ (Ty_func _ t1 t2) _ r =
+    Ty_func _ (persist _ t1 _ r) (persist _ t2 _ r).
+  Proof. destruct r; reflexivity. Qed.
 
-(* Class PersistLift A `{Persistent Acc A} : Type := *)
-(*   { lift_persist (w w': World) t r : *)
-(*     persist w (lift t _) w' r = lift t _ }. *)
-(* (* TODO: make lift generic (liftEnv is needed for Env) *) *)
+  (* unify with PersistLaws about ↑ *)
+  Class PersistLaws A `{Persistent Acc A} : Type :=
+    { refl_persist w (V : A w) :
+          persist w V w refl = V }.
+
+  (* Class PersistLift A `{Persistent Acc A} : Type := *)
+  (*   { lift_persist (w w': World) t r : *)
+  (*     persist w (lift t _) w' r = lift t _ }. *)
+  (* (* TODO: make lift generic (liftEnv is needed for Env) *) *)
+
+End acc.
 
 Lemma persist_liftTy : forall (w w' : World) t (r : Sub w w'),
     persist w (lift t _) w' r = lift t _.
@@ -290,51 +333,29 @@ Lemma inst_lift_env (w : World) (G : env) (ι : Assignment w) :
   inst (liftEnv G w) ι = G.
 Proof. Admitted.
 
-#[export] Instance InstSub {w} : Inst (Sub w) (Assignment w).
-Admitted.
+Lemma inst_persist_env {R} {persR : Persistent R Env}
+  {instR : forall w, Inst (R w) (Assignment w)}
+  {w0 w1} (r1 : R w0 w1) (G0 : Env w0) (ι1 : Assignment w1) :
+  inst <{ G0 ~ r1 }> ι1 = inst G0 (inst r1 ι1).
+Proof. Admitted.
 
-#[export] Instance InstAlloc {w} : Inst (Alloc w) (Assignment w).
-Admitted.
+Lemma inst_persist_ty {R} {persR : Persistent R Ty}
+  {instR : forall w, Inst (R w) (Assignment w)}
+  {w0 w1} (r1 : R w0 w1) (t0 : Ty w0) (ι1 : Assignment w1) :
+  inst <{ t0 ~ r1 }> ι1 = inst t0 (inst r1 ι1).
+Proof. Admitted.
 
-Lemma inst_persist_ty {w0 w1} (t : Ty w0) (r : Sub w0 w1) (ι : Assignment w1) :
-  inst (persist _ t _ r) ι = inst t (inst r ι).
-Admitted.
-
-Lemma inst_persist_env {w0 w1} (G : Env w0) (r : Sub w0 w1) (ι : Assignment w1) :
-  inst (persist _ G _ r) ι = inst G (inst r ι).
-Admitted.
-
-Lemma inst_comp {w0 w1 w2} (r1 : Sub w0 w1) (r2 : Sub w1 w2) (ι : Assignment w2) :
-  inst (r1 ⊙ r2) ι = inst r1 (inst r2 ι).
-Admitted.
-
-Lemma inst_sub_step {w n} (ι : Assignment w) (t : ty) :
-  inst Sub.step (env.snoc ι n t) = ι.
-Admitted.
-
-Lemma inst_acc_step {w n} (ι : Assignment w) (t : ty) :
-  inst step (env.snoc ι n t) = ι.
-Admitted.
-
-Lemma inst_persist_accessibility_env {w0 w1} (r1 : w0 ↑ w1)
-  (G0 : Env w0) (ι1 : Assignment w1) :
-  inst G0 (compose r1 ι1) = inst <{ G0 ~ r1 }> ι1.
-Admitted.
-
-Lemma inst_persist_accessibility_ty {w0 w1} (r1 : w0 ↑ w1)
-  (t0 : Ty w0) (ι1 : Assignment w1) :
-  inst t0 (compose r1 ι1) = inst <{ t0 ~ r1 }> ι1.
-Admitted.
-
-Lemma compose_step {w x t} (ι : Assignment w) :
-  compose step (env.snoc ι x t) = ι.
-Proof. reflexivity. Qed.
+Lemma inst_step {R} {stepR : Step R} {instR : forall w, Inst (R w) (Assignment w)}
+  {w x} (ι : Assignment (w ▻ x)) :
+  inst (step (R := R)) ι = let (ι',_) := env.view ι in ι'.
+Proof. Admitted.
 
 Module StrongMonotonicity.
 
   Import option.notations.
   Import Unification.
   Import SigTNotations.
+  Import (hints) Sub.
 
   #[local] Arguments Sub.thin : simpl never.
   #[local] Notation "□ˢ A" :=
@@ -356,7 +377,7 @@ Module StrongMonotonicity.
 
   Definition mexists {A w n} (m : M A (w ▻ n)) : M A w :=
     '(w';(r,a)) <- m ;;
-    Some (existT _ w' (Sub.step ⊙ r, a)).
+    Some (existT _ w' (step ⊙ r, a)).
 
   Definition mgu : ⊢ Ty -> Ty -> M Unit :=
     fun w t1 t2 =>
@@ -386,7 +407,7 @@ Module StrongMonotonicity.
 
   Lemma wlp_mexists {A w n} (m : M A (w ▻ n)) (p : □ˢ(A -> PROP) w) :
     WLP w (mexists m) p <->
-    WLP (w ▻ n) m (_4 p Sub.step).
+    WLP (w ▻ n) m (_4 p step).
   Proof.
     unfold mexists, WLP, _4.
     rewrite option.wlp_bind.
@@ -432,7 +453,7 @@ Module StrongMonotonicity.
 
   Lemma wp_mexists {A w n} (m : M A (w ▻ n)) (p : □ˢ(A -> PROP) w) :
     WP w (mexists m) p <->
-    WP (w ▻ n) m (_4 p Sub.step).
+    WP (w ▻ n) m (_4 p step).
   Proof.
     unfold mexists, WP, _4.
     rewrite option.wp_bind.
@@ -616,7 +637,7 @@ Module StrongMonotonicity.
     RM R w0 w1 r01 (mexists m0) (mexists m1).
   Proof.
     unfold RM, ROption, mexists.
-    destruct m0 as [(w2 & r02 & a2)|], m1 as [(w3 & r13 & a3)|]; cbn - [Sub.step Sub.up1]; auto.
+    destruct m0 as [(w2 & r02 & a2)|], m1 as [(w3 & r13 & a3)|]; cbn - [step Sub.up1]; auto.
     intros (r23 & Heqr & ra).
     exists r23. split; auto.
     rewrite trans_assoc, <- Heqr.
@@ -658,7 +679,7 @@ Module ConstraintsOnly.
   Import Unification.
 
   #[local] Set Implicit Arguments.
-  #[local] Arguments Sub.step : simpl never.
+  #[local] Arguments step : simpl never.
 
   Module C.
 
@@ -702,24 +723,24 @@ Module ConstraintsOnly.
           end
       | e_absu x e =>
           ∃1, ∃2,
-            let G'  := <{ G ~ Sub.step ⊙ Sub.step }> in
-            let tr' := <{ tr ~ Sub.step ⊙ Sub.step }> in
+            let G'  := <{ G ~ step ⊙ step }> in
+            let tr' := <{ tr ~ step ⊙ step }> in
             let α1  := Ty_hole (w ▻ 1 ▻ 2) 1 (ctx.in_succ ctx.in_zero) in
             let α2  := Ty_hole (w ▻ 1 ▻ 2) 2 ctx.in_zero in
             (tr' == Ty_func _ α1 α2) /\
             check e ((x, α1) :: G') α2
       | e_abst x xt e =>
           ∃2,
-            let G'  := <{ G ~ Sub.step }> in
-            let tr' := <{ tr ~ Sub.step }> in
+            let G'  := <{ G ~ step }> in
+            let tr' := <{ tr ~ step }> in
             let α1  := lift xt _ in
             let α2  := Ty_hole (w ▻ 2) 2 ctx.in_zero in
             (tr' == Ty_func _ α1 α2) /\
             check e ((x, α1) :: G') α2
       | e_app e1 e2 =>
           ∃0,
-            let G'  := <{ G ~ Sub.step }> in
-            let tr' := <{ tr ~ Sub.step }> in
+            let G'  := <{ G ~ step }> in
+            let tr' := <{ tr ~ step }> in
             let α   := Ty_hole (w ▻ 0) 0 ctx.in_zero in
             check e1 G' (Ty_func _ α tr') /\
             check e2 G' α
@@ -743,13 +764,14 @@ Module ConstraintsOnly.
     - intros (t1 & t2 & H1 & H2).
       specialize (IHe _ _ _ _ H2). clear H2.
       destruct IHe as (e1' & HT). cbn in HT.
-      rewrite ?inst_lift, ?inst_persist_env, ?inst_persist_ty, ?inst_comp, ?inst_sub_step in *.
-      rewrite H1. clear H1.
+      rewrite ?inst_lift, ?inst_persist_env, ?inst_persist_ty, ?inst_trans, ?inst_step in *.
+      cbn in *. rewrite H1. clear H1.
       eexists. constructor. eauto.
     - intros (t1 & H1 & H2).
       specialize (IHe _ _ _ _ H2). clear H2.
       destruct IHe as (e' & HT). cbn in HT.
-      rewrite ?inst_lift, ?inst_persist_env, ?inst_persist_ty, ?inst_comp, ?inst_sub_step in *.
+      rewrite ?inst_lift, ?inst_persist_env, ?inst_persist_ty, ?inst_trans, ?inst_step in *.
+      cbn in *.
       rewrite H1. clear H1.
       eexists. constructor. eauto.
     - intros (t1 & H1 & H2).
@@ -757,7 +779,7 @@ Module ConstraintsOnly.
       specialize (IHe2 _ _ _ _ H2). clear H2. destruct IHe2 as (e2' & HT2).
       exists (e_app e1' e2').
       cbn in HT1, HT2.
-      rewrite ?inst_lift, ?inst_persist_env, ?inst_persist_ty, ?inst_comp, ?inst_sub_step in *.
+      rewrite ?inst_lift, ?inst_persist_env, ?inst_persist_ty, ?inst_trans, ?inst_step in *.
       econstructor; eauto.
   Qed.
 
@@ -773,19 +795,19 @@ Module ConstraintsOnly.
       destruct value; [|discriminate].
       now injection H.
     - exists vt, t. rewrite H0. split.
-      + now rewrite inst_persist_ty, inst_comp, !inst_sub_step.
+      + now rewrite inst_persist_ty, inst_trans, !inst_step.
       + apply IHT; cbn; [|easy].
-        now rewrite inst_persist_env, inst_comp, !inst_sub_step.
+        now rewrite inst_persist_env, inst_trans, !inst_step.
     - exists t. split.
-      + now rewrite inst_lift, inst_persist_ty, inst_sub_step.
+      + now rewrite inst_lift, inst_persist_ty, inst_step.
       + apply IHT; cbn; [|easy].
-        now rewrite inst_lift, inst_persist_env, inst_sub_step.
+        now rewrite inst_lift, inst_persist_env, inst_step.
     - exists t2. split.
       + apply IHT1; cbn.
-        * now rewrite inst_persist_env, inst_sub_step.
-        * now rewrite inst_persist_ty, inst_sub_step.
+        * now rewrite inst_persist_env, inst_step.
+        * now rewrite inst_persist_ty, inst_step.
       + apply IHT2; cbn; [|easy].
-        now rewrite inst_persist_env, inst_sub_step.
+        now rewrite inst_persist_env, inst_step.
   Qed.
 
   Corollary completeness G e t ee (T : G |-- e ; t ~> ee) :
@@ -801,11 +823,11 @@ End ConstraintsOnly.
 Module CandidateType.
 
   #[local] Set Implicit Arguments.
-  #[local] Arguments Sub.step : simpl never.
+  #[local] Arguments step : simpl never.
   #[local] Arguments step : simpl never.
 
   Local Notation "[ ω ] x <- ma ;; mb" :=
-    (bind ma (fun _ ω x => mb))
+    (bind (R := Alloc) ma (fun _ ω x => mb))
       (at level 80, x at next level,
         ma at next level, mb at level 200,
         right associativity).
@@ -880,14 +902,14 @@ Module CandidateType.
       WP m (fun _ r a => WP (f _ r a) (_4 Q r)) ι.
   Proof. split; intros; induction m; cbn; firstorder; exists x; firstorder. Qed.
 
-  Lemma lookup_compose {w1 w2 : World} (r : Alloc w1 w2) (ι : Assignment w2) {x} (i : x ∈ w1) :
-    env.lookup (compose r ι) i = env.lookup ι <{ i ~ r }>.
+  Lemma lookup_inst {w1 w2 : World} (r : Alloc w1 w2) (ι : Assignment w2) {x} (i : x ∈ w1) :
+    env.lookup (inst r ι) i = env.lookup ι <{ i ~ r }>.
   Proof. induction r. reflexivity. cbn. rewrite <- IHr. now destruct env.view. Qed.
 
   Lemma completeness_aux {G e t ee} (T : G |-- e; t ~> ee) :
     forall (w0 : World) (ι0 : Assignment w0) (G0 : Env w0) (t0 : Ty w0),
       G = inst G0 ι0 -> t = inst t0 ι0 ->
-      WP (check e G0 t0) (fun w1 r01 _ ι1 => ι0 = compose r01 ι1)%type ι0.
+      WP (check e G0 t0) (fun w1 r01 _ ι1 => ι0 = inst r01 ι1)%type ι0.
   Proof.
     Set Printing Depth 17.
     induction T; cbn; intros w0 ι0 G0 t0 ? ?; subst.
@@ -898,32 +920,32 @@ Module CandidateType.
       apply wp_monotonic. intros w1 r1 _ ι1 Hι0.
       rewrite wp_bind.
       specialize (IHT2 w1 ι1 <{ G0 ~ r1 }> <{ t0 ~ r1}>).
-      rewrite <- inst_persist_accessibility_env in IHT2.
-      rewrite <- inst_persist_accessibility_ty in IHT2.
+      rewrite inst_persist_env in IHT2.
+      rewrite inst_persist_ty in IHT2.
       rewrite Hι0 in IHT2.
       specialize (IHT2 eq_refl eq_refl).
       revert IHT2. apply wp_monotonic. intros w2 r2 _ ι2 Hι1.
       specialize (IHT3 w2 ι2 <{ G0 ~ r1 ⊙ r2 }> <{ t0 ~ r1 ⊙ r2 }>).
-      rewrite <- inst_persist_accessibility_env in IHT3.
-      rewrite <- inst_persist_accessibility_ty in IHT3.
-      rewrite Hι0, Hι1, compose_trans in IHT3.
+      rewrite inst_persist_env in IHT3.
+      rewrite inst_persist_ty in IHT3.
+      rewrite Hι0, Hι1, inst_trans in IHT3.
       specialize (IHT3 eq_refl eq_refl).
       revert IHT3. apply wp_monotonic. unfold _4.
       intros w3 r3 _ ι3 Hι2.
-      now rewrite Hι0, Hι1, Hι2, <- !compose_trans.
+      now rewrite Hι0, Hι1, Hι2, !inst_trans.
     + rewrite value_inst in H. destruct value; cbn in *; now inversion H.
     + exists vt. exists t.
-      rewrite <- inst_persist_accessibility_ty.
+      rewrite inst_persist_ty.
       split; [easy|].
       specialize (IHT (w0 ▻ 1 ▻ 2)
                       (env.snoc (env.snoc ι0 1 vt) 2 t)
                       ((v, Ty_hole (w0 ▻ 1 ▻ 2) 1 (ctx.in_succ ctx.in_zero)) :: <{ G0 ~ step ⊙ step }>)
                       (Ty_hole (w0 ▻ 1 ▻ 2) 2 ctx.in_zero)).
-      cbn in IHT. rewrite <- inst_persist_accessibility_env in IHT. specialize (IHT eq_refl eq_refl).
+      cbn in IHT. rewrite inst_persist_env in IHT. specialize (IHT eq_refl eq_refl).
       revert IHT. apply wp_monotonic. intros. hnf.
-      now rewrite <- !compose_trans, <- H.
+      now rewrite !inst_trans, <- H.
     + exists t.
-      rewrite <- inst_persist_accessibility_ty, inst_lift, H0.
+      rewrite inst_persist_ty, inst_lift, H0.
       split; [easy|].
       specialize (IHT (w0 ▻ 2)
                       (env.snoc ι0 2 t)
@@ -931,10 +953,10 @@ Module CandidateType.
                       (Ty_hole (w0 ▻ 2) 2 ctx.in_zero)).
       cbn in IHT.
       rewrite inst_lift in IHT.
-      rewrite <- inst_persist_accessibility_env in IHT.
+      rewrite inst_persist_env in IHT.
       specialize (IHT eq_refl eq_refl).
       revert IHT. apply wp_monotonic. intros. hnf.
-      now rewrite <- compose_trans, <- H.
+      now rewrite inst_trans, <- H.
     + exists t2.
       rewrite wp_bind.
       specialize (IHT1 (w0 ▻ 0)
@@ -942,18 +964,18 @@ Module CandidateType.
                        <{ G0 ~ step }>
                        (Ty_func (w0 ▻ 0) (Ty_hole (w0 ▻ 0) 0 ctx.in_zero) <{ t0 ~ step }>)).
       cbn in IHT1.
-      rewrite <- inst_persist_accessibility_env in IHT1.
-      rewrite <- inst_persist_accessibility_ty in IHT1.
+      rewrite inst_persist_env in IHT1.
+      rewrite inst_persist_ty in IHT1.
       specialize (IHT1 eq_refl eq_refl).
       revert IHT1. apply wp_monotonic. intros.
       specialize (IHT2 _ ι1 <{ G0 ~ step ⊙ r1 }> (Ty_hole w1 0 <{ ctx.in_zero ~ r1 }>)).
       cbn in IHT2.
-      rewrite <- inst_persist_accessibility_env in IHT2.
-      rewrite <- compose_trans in IHT2.
-      rewrite <- lookup_compose, <- H in IHT2.
+      rewrite inst_persist_env in IHT2.
+      rewrite inst_trans in IHT2.
+      rewrite <- lookup_inst, <- H in IHT2.
       specialize (IHT2 eq_refl eq_refl).
       revert IHT2. apply wp_monotonic. intros. hnf.
-      now rewrite <- compose_trans, <- compose_trans, <- H0, <- H.
+      now rewrite !inst_trans, <- H0, <- H.
   Qed.
 
   Definition WLP {A} : ⊢ FreeM A -> □⁺(A -> Assignment -> PROP) -> Assignment -> PROP :=
@@ -987,7 +1009,7 @@ Module CandidateType.
   Lemma soundness e :
     forall (w0 : World) (ι0 : Assignment w0) (G0 : Env w0) (t0 : Ty w0),
       WLP (check e G0 t0)
-          (fun w1 r01 _ ι1 => ι0 = compose r01 ι1 /\
+          (fun w1 r01 _ ι1 => ι0 = inst r01 ι1 /\
                        exists ee, inst G0 ι0 |-- e ; inst t0 ι0 ~> ee)
           ι0.
   Proof.
@@ -1001,9 +1023,9 @@ Module CandidateType.
       specialize (IHe3 _ ι2 <{ G0 ~ r1 ⊙ r0 }> <{ t0 ~ r1 ⊙ r0 }>).
       revert IHe3. apply wlp_monotonic. intros.
       hnf. destruct H1, H0, H. subst.
-      rewrite <- ?inst_persist_accessibility_env,
-              <- ?inst_persist_accessibility_ty,
-              <- ?compose_trans in *.
+      rewrite ?inst_persist_env,
+              ?inst_persist_ty,
+              ?inst_trans in *.
       split; [easy|].
       firstorder.
       exists (e_if x0 x1 x).
@@ -1019,9 +1041,10 @@ Module CandidateType.
       revert IHe. apply wlp_monotonic. unfold _4. cbn.
       intros ? ? _ ? (Hι1 & e' & IHe).
       rewrite
-        <- ?inst_persist_accessibility_env,
-        <- ?inst_persist_accessibility_ty,
-        <- ?compose_trans, <- ?Hι1, ?compose_step in *.
+        ?inst_persist_env,
+        ?inst_persist_ty,
+        ?inst_trans, <- ?Hι1, ?inst_step in *.
+      cbn in *.
       split; [easy|].
       exists (e_abst s t e').
       rewrite H.
@@ -1030,7 +1053,7 @@ Module CandidateType.
                         ((s, lift t (w0 ▻ 2)) :: <{ G0 ~ step }>)
                         (Ty_hole (w0 ▻ 2) 2 ctx.in_zero)).
       revert IHe. apply wlp_monotonic. intros. hnf.
-      destruct H, H0, H0. split. now rewrite <- compose_trans, <- H.
+      destruct H, H0, H0. split. now rewrite inst_trans, <- H.
       exists (e_abst s t x). admit.
     - admit.
   Admitted.

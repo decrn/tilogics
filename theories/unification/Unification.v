@@ -284,6 +284,8 @@ Definition strength {A B} : Hom (□A * ◆B) (◆(□A * B)) :=
 (* Notation "ζ1 ≲ ζ2" := (Subleq ζ1 ζ2) (at level 80). *)
 (* Notation "ζ1 ≼ ζ2" := (Trileq ζ1 ζ2) (at level 80). *)
 
+Import (hints) Sub.
+
 Definition Property : TYPE :=
   fun w => forall w', w ⊒ˢ w' -> Prop.
   (* □PROP. *)
@@ -1193,22 +1195,4 @@ Module Variant2.
   Definition mgu : ⊢ Unifier :=
     fun w s t => T (@Löb _ boxmgu w s t).
 
-
 End Variant2.
-
-Fixpoint compose {w0 w1} (ζ : w0 ⊒⁻ w1) : Assignment w1 -> Assignment w0 :=
-  match ζ in (_ ⊒⁻ c) return (Assignment c -> Assignment w0) with
-  | Tri.refl => fun ass : Assignment w0 => ass
-  | @Tri.cons _ w' x xIn t ζ =>
-      fun ass  =>
-        let ass' := compose ζ ass in
-        env.insert xIn ass' (inst t ass')
-  end.
-
-Definition compose' {w0 w1} (ζ : w0 ⊒⁻ w1) : Assignment w1 -> Assignment w0.
-Proof.
-  intros ass.
-  apply env.tabulate.
-  intros x xIn.
-  apply (inst (env.lookup (Sub.triangular ζ) xIn) ass).
-Defined.

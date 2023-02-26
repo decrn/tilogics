@@ -65,8 +65,6 @@ Module Sub.
     env.tabulate (thickIn xIn s).
   Definition thin {w x} (xIn : x ∈ w) : w - x ⊒ˢ w :=
     env.tabulate (fun y yIn => Ty_hole (ctx.in_thin xIn yIn)).
-  Definition step {w x} : w ⊒ˢ w ▻ x :=
-    thin ctx.in_zero.
 
   #[export] Instance refl_sub : Refl Sub :=
     fun w => env.tabulate (fun _ => Ty_hole).
@@ -76,6 +74,9 @@ Module Sub.
       | env.nil         => env.nil
       | env.snoc ζ1 x t => env.snoc (trans ζ1 ζ2) x (subst t ζ2)
       end.
+  #[export] Instance step_sub : Step Sub :=
+    fun w x => thin ctx.in_zero.
+
   Definition up1 {w0 w1} (r01 : Sub w0 w1) {n} : Sub (w0 ▻ n) (w1 ▻ n) :=
     env.snoc (env.map (fun _ t => subst t step) r01) n (Ty_hole ctx.in_zero).
 
@@ -213,7 +214,6 @@ Module Sub.
   Qed.
 
 End Sub.
-Export (hints) Sub.
 Export Sub (Sub).
 Infix "⊒ˢ" := Sub.Sub.
 Infix "≽ˢ" := Sub.geq (at level 80).
