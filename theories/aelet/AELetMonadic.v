@@ -53,11 +53,11 @@ Fixpoint is_annotated (e : expr) : Prop :=
 Definition ty_eqb (a b : ty) : {a = b} + {a <> b}.
 Proof. decide equality. Defined.
 
-Fixpoint value {X: Type} (var : string) (ctx : list (string * X)) : option X :=
+Fixpoint resolve {X: Type} (var : string) (ctx : list (string * X)) : option X :=
   match ctx with
   | nil => None
   | (var', val) :: ctx' =>
-      if (string_dec var var') then Some val else (value var ctx')
+      if (string_dec var var') then Some val else (resolve var ctx')
   end.
 
 Definition env := list (string * ty).
@@ -452,7 +452,7 @@ Fixpoint infer {m} `{TypeCheckM m} (ctx : env) (expression : expr) : m (prod ty 
       '(t_bod, e_bod) <- infer ((var, at_val) :: ctx) bod ;;
       ret (t_bod, e_tlet var at_val e_val e_bod)
   | e_var var =>
-      match (value var ctx) with
+      match (resolve var ctx) with
       | Some t_var => ret (t_var, expression)
       | None => fail
       end
@@ -506,7 +506,7 @@ Inductive tpb : env -> expr -> ty -> expr -> Prop :=
       : tpb g (e_tlet v t1 e1 e2) t2
               (e_tlet v t1 e1' e2')
   | tpb_var (g : env) (v : string) (vt : ty)
-            (H : (value v g) = Some vt)
+            (H : (resolve v g) = Some vt)
       : tpb g (e_var v) vt
               (e_var v).
 
@@ -560,7 +560,7 @@ Proof.
     apply wlp_bind. apply wlp_ty_eqb. intro. subst.
     apply wlp_bind. specialize (IHe2 ((s, t) :: G)). revert IHe2. apply wlp_monotone. intros t2 H2. destruct t2.
     apply wlp_ret. constructor; assumption.
-  - intro. destruct (value s G) eqn:?.
+  - intro. destruct (resolve s G) eqn:?.
     + apply wlp_ret. constructor. apply Heqo.
     + apply wlp_fail. auto.
 Restart.

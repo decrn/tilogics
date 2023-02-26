@@ -88,11 +88,11 @@ Definition env := list (string * ty).
 Definition Env Σ := list (string * Ty Σ).
 
 (* Context lookup *)
-Fixpoint value {X} (var : string) (ctx : list (string * X)) : option X :=
+Fixpoint resolve {X} (var : string) (ctx : list (string * X)) : option X :=
   match ctx with
   | nil => None
   | (var', val) :: ctx' =>
-      if (string_dec var var') then Some val else (value var ctx')
+      if (string_dec var var') then Some val else (resolve var ctx')
   end.
 
 (* ===== Typing relation ===== *)
@@ -111,7 +111,7 @@ Inductive tpb : env -> expr -> ty -> expr -> Prop :=
       g |-- alt ; t       ~> alt' ->
       g |-- (e_if cnd coq alt) ; t ~> (e_if cnd' coq' alt')
   | tpb_var : forall g v vt,
-      value v g = Some vt ->
+      resolve v g = Some vt ->
       g |-- (e_var v) ; vt ~> (e_var v)
   | tpb_absu : forall v vt g e e' t,
       ((v, vt) :: g) |-- e ; t ~> e' ->

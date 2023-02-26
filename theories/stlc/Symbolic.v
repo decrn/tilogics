@@ -88,7 +88,7 @@ Section Generate.
         [ ω₅ ] _     <- assert <{ t_coq ~ ω₄ }>  t_alt ;;
            Ret_Free Ty _ <{ t_coq ~ ω₄ ⊙ ω₅ }>
     | e_var var =>
-        match (value var Γ) with
+        match (resolve var Γ) with
         | Some t_var => Ret_Free Ty _ t_var
         | None => Fail_Free Ty Σ
         end
@@ -163,7 +163,7 @@ Section TypeReconstruction.
            let e_alt := <{ (snd r_alt) ~ ω5 }> in
            ret (t_coq, fun a => (e_if (e_cnd a) (e_coq a) (e_alt a)))
     | e_var var =>
-        match (value var Γ) with
+        match (resolve var Γ) with
         | Some t_var => ret (t_var, fun a => e_var var)
         | None => fail
         end
@@ -307,18 +307,18 @@ Proof.
   induction t; intros w1 w2 r; cbn; now f_equal.
 Qed.
 
-Lemma value_lift (g : env) (x : String.string) (w : World) :
-  value x (liftEnv g w) =
-    option.map (fun t => lift t w) (value x g).
+Lemma resolve_lift (g : env) (x : String.string) (w : World) :
+  resolve x (liftEnv g w) =
+    option.map (fun t => lift t w) (resolve x g).
 Proof.
   induction g as [|[y t]]; cbn.
   - reflexivity.
   - now destruct String.string_dec.
 Qed.
 
-Lemma value_inst (w : World) (g : Env w) (x : String.string) (ι : Assignment w) :
-  value x (inst g ι) =
-    option.map (fun t => inst t ι) (value x g).
+Lemma resolve_inst (w : World) (g : Env w) (x : String.string) (ι : Assignment w) :
+  resolve x (inst g ι) =
+    option.map (fun t => inst t ι) (resolve x g).
 Proof.
   induction g as [|[y t]]; cbn.
   - reflexivity.
@@ -717,7 +717,7 @@ Module ConstraintsOnly.
           check e2 G tr /\
           check e3 G tr
       | e_var s =>
-          match value s G with
+          match resolve s G with
           | Some a => tr == a
           | None => C.False
           end
@@ -759,8 +759,8 @@ Module ConstraintsOnly.
       specialize (IHe2 _ _ _ _ H2). clear H2. destruct IHe2 as (e2' & HT2).
       specialize (IHe3 _ _ _ _ H3). clear H3. destruct IHe3 as (e3' & HT3).
       eexists. constructor; eauto.
-    - destruct value eqn:?; cbn; intros Heq; [|contradiction].
-      eexists. constructor. now rewrite value_inst, Heqo, Heq.
+    - destruct resolve eqn:?; cbn; intros Heq; [|contradiction].
+      eexists. constructor. now rewrite resolve_inst, Heqo, Heq.
     - intros (t1 & t2 & H1 & H2).
       specialize (IHe _ _ _ _ H2). clear H2.
       destruct IHe as (e1' & HT). cbn in HT.
@@ -791,8 +791,8 @@ Module ConstraintsOnly.
     - auto.
     - auto.
     - intuition.
-    - rewrite value_inst in H.
-      destruct value; [|discriminate].
+    - rewrite resolve_inst in H.
+      destruct resolve; [|discriminate].
       now injection H.
     - exists vt, t. rewrite H0. split.
       + now rewrite inst_persist_ty, inst_trans, !inst_step.
@@ -848,7 +848,7 @@ Module CandidateType.
         [r2] _ <- check e1 <{ G ~ r1 }> <{ tr ~ r1 }> ;;
         check e2 <{ G ~ r1 ⊙ r2 }> <{ tr ~ r1 ⊙ r2 }>
       | e_var s =>
-        match value s G with
+        match resolve s G with
         | Some a => Bind_AssertEq_Free Unit w tr a (Ret_Free Unit w tt)
         | None => Fail_Free Unit w
         end
@@ -933,7 +933,7 @@ Module CandidateType.
       revert IHT3. apply wp_monotonic. unfold _4.
       intros w3 r3 _ ι3 Hι2.
       now rewrite Hι0, Hι1, Hι2, !inst_trans.
-    + rewrite value_inst in H. destruct value; cbn in *; now inversion H.
+    + rewrite resolve_inst in H. destruct resolve; cbn in *; now inversion H.
     + exists vt. exists t.
       rewrite inst_persist_ty.
       split; [easy|].
@@ -1030,10 +1030,10 @@ Module CandidateType.
       firstorder.
       exists (e_if x0 x1 x).
       now constructor.
-    - destruct (value s G0) eqn:?; [|easy].
+    - destruct (resolve s G0) eqn:?; [|easy].
       intros Heqt. split; [easy|].
       exists (e_var s). constructor.
-      rewrite value_inst, Heqo. cbn. congruence.
+      rewrite resolve_inst, Heqo. cbn. congruence.
     - specialize (IHe _ (env.snoc (env.snoc ι0 1 t) 2 t1)
                         ((s, Ty_hole (w0 ▻ 1 ▻ 2) 1 (ctx.in_succ ctx.in_zero))
                              :: <{ G0 ~ step ⊙ step }>)
