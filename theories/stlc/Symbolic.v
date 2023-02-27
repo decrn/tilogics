@@ -316,6 +316,11 @@ Lemma inst_step {R} {stepR : Step R} {instR : forall w, Inst (R w) (Assignment w
   inst (step (R := R)) ι = let (ι',_) := env.view ι in ι'.
 Proof. Admitted.
 
+Lemma inst_step_snoc {R} {stepR : Step R} {instR : forall w, Inst (R w) (Assignment w)}
+  {w x} (ι : Assignment w) (t : ty) :
+  inst (step (R := R)) (env.snoc ι x t) = ι.
+Proof. rewrite inst_step. reflexivity. Qed.
+
 Module StrongMonotonicity.
 
   Import option.notations.
@@ -730,14 +735,13 @@ Module ConstraintsOnly.
     - intros (t1 & t2 & H1 & H2).
       specialize (IHe _ _ _ _ H2). clear H2.
       destruct IHe as (e1' & HT). cbn in HT.
-      rewrite ?inst_lift, ?inst_persist_env, ?inst_persist_ty, ?inst_trans, ?inst_step in *.
-      cbn in *. rewrite H1. clear H1.
+      rewrite ?inst_lift, ?inst_persist_env, ?inst_persist_ty, ?inst_trans, ?inst_step_snoc in *.
+      rewrite H1. clear H1.
       eexists. constructor. eauto.
     - intros (t1 & H1 & H2).
       specialize (IHe _ _ _ _ H2). clear H2.
       destruct IHe as (e' & HT). cbn in HT.
-      rewrite ?inst_lift, ?inst_persist_env, ?inst_persist_ty, ?inst_trans, ?inst_step in *.
-      cbn in *.
+      rewrite ?inst_lift, ?inst_persist_env, ?inst_persist_ty, ?inst_trans, ?inst_step_snoc in *.
       rewrite H1. clear H1.
       eexists. constructor. eauto.
     - intros (t1 & H1 & H2).
@@ -745,7 +749,7 @@ Module ConstraintsOnly.
       specialize (IHe2 _ _ _ _ H2). clear H2. destruct IHe2 as (e2' & HT2).
       exists (e_app e1' e2').
       cbn in HT1, HT2.
-      rewrite ?inst_lift, ?inst_persist_env, ?inst_persist_ty, ?inst_trans, ?inst_step in *.
+      rewrite ?inst_lift, ?inst_persist_env, ?inst_persist_ty, ?inst_trans, ?inst_step_snoc in *.
       econstructor; eauto.
   Qed.
 
@@ -761,19 +765,19 @@ Module ConstraintsOnly.
       destruct resolve; [|discriminate].
       now injection H.
     - exists vt, t. rewrite H0. split.
-      + now rewrite inst_persist_ty, inst_trans, !inst_step.
+      + now rewrite inst_persist_ty, inst_trans, !inst_step_snoc.
       + apply IHT; cbn; [|easy].
-        now rewrite inst_persist_env, inst_trans, !inst_step.
+        now rewrite inst_persist_env, inst_trans, !inst_step_snoc.
     - exists t. split.
-      + now rewrite inst_lift, inst_persist_ty, inst_step.
+      + now rewrite inst_lift, inst_persist_ty, inst_step_snoc.
       + apply IHT; cbn; [|easy].
-        now rewrite inst_lift, inst_persist_env, inst_step.
+        now rewrite inst_lift, inst_persist_env, inst_step_snoc.
     - exists t2. split.
       + apply IHT1; cbn.
-        * now rewrite inst_persist_env, inst_step.
-        * now rewrite inst_persist_ty, inst_step.
+        * now rewrite inst_persist_env, inst_step_snoc.
+        * now rewrite inst_persist_ty, inst_step_snoc.
       + apply IHT2; cbn; [|easy].
-        now rewrite inst_persist_env, inst_step.
+        now rewrite inst_persist_env, inst_step_snoc.
   Qed.
 
   Corollary completeness G e t ee (T : G |-- e ; t ~> ee) :
@@ -1009,8 +1013,7 @@ Module CandidateType.
       rewrite
         ?inst_persist_env,
         ?inst_persist_ty,
-        ?inst_trans, <- ?Hι1, ?inst_step in *.
-      cbn in *.
+        ?inst_trans, <- ?Hι1, ?inst_step_snoc in *.
       split; [easy|].
       exists (e_abst s t e').
       rewrite H.
@@ -1019,9 +1022,35 @@ Module CandidateType.
                         ((s, lift t (w0 ▻ 2)) :: <{ G0 ~ step }>)
                         (Ty_hole (w0 ▻ 2) 2 ctx.in_zero)).
       revert IHe. apply wlp_monotonic. intros. hnf.
-      destruct H, H0, H0. split. now rewrite inst_trans, <- H.
-      exists (e_abst s t x). admit.
-    - admit.
-  Admitted.
+      destruct H0 as (Heq & e' & Ht). split. now rewrite inst_trans, <- Heq.
+      exists (e_abst s t e'). cbn in *.
+      Set Printing Depth 50.
+      rewrite
+        ?inst_persist_env,
+        ?inst_persist_ty,
+        ?inst_trans, ?inst_step_snoc in *.
+      rewrite H, inst_lift in *.
+      now constructor.
+    - rewrite wlp_bind.
+      specialize (IHe1 _ (env.snoc ι0 0 t)
+                        <{ G0 ~ step }>
+                        (Ty_func (w0 ▻ 0)
+                           (Ty_hole (w0 ▻ 0) 0 ctx.in_zero)
+                           <{ t0 ~ step }>)).
+      revert IHe1. apply wlp_monotonic. intros.
+      specialize (IHe2 _ ι1 <{ G0 ~ step ⊙ r1 }> (lk r1 ctx.in_zero)).
+      revert IHe2. apply wlp_monotonic. intros. hnf.
+      destruct H0 as (Hι1 & e2' & Hte2), H as (Hsnoc & e1' & Hte1).
+      split. now rewrite ?inst_trans, <- Hι1, <- Hsnoc, inst_step.
+      exists (e_app e1' e2').
+      constructor 7 with t;
+      rewrite
+        ?inst_persist_env,
+        ?inst_persist_ty,
+        ?inst_trans, ?inst_step_snoc, ?inst_step, <- ?Hsnoc in *; cbn in *;
+      rewrite ?lookup_inst, <- ?Hsnoc in *.
+      + now rewrite inst_persist_ty in Hte1.
+      + now rewrite <- lookup_inst, <- Hsnoc in Hte2.
+  Qed.
 
 End CandidateType.
