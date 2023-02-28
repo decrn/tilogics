@@ -1005,7 +1005,95 @@ End CandidateType.
           (fun w1 r01 '(t,ee) ι1 => ι0 = inst r01 ι1 /\
                                    inst G0 ι0 |-- e ; inst t ι1 ~> inst ee ι1)
           ι0.
-  Admitted.
+  Proof. Set Printing Depth 17.
+    induction e; cbn; intros.
+    - repeat constructor.
+    - repeat constructor.
+    - rewrite wlp_bind. specialize (IHe1 _ ι0 G0).
+      revert IHe1. apply wlp_monotonic. intros w1 r1 v1 ι1 Hv1.
+      destruct v1 eqn:? in Hv1. destruct Hv1. intro.
+      unfold T.
+      rewrite wlp_bind. specialize (IHe2 _ ι1 <{ G0 ~ r1 ⊙ refl }>).
+      revert IHe2. apply wlp_monotonic. intros w2 r2 v2 ι2 Hv2.
+      destruct v2 eqn:? in Hv2. destruct Hv2.
+      rewrite wlp_bind.
+      specialize (IHe3 _ ι2 <{ G0 ~ r1 ⊙ refl ⊙ r2 }>).
+      revert IHe3. apply wlp_monotonic. intros w3 r3 v3 ι3 Hv3.
+      destruct v3 eqn:? in Hv3. destruct Hv3. intro.
+      hnf.
+      rewrite ?inst_persist_env,
+              ?inst_persist_ty,
+              ?inst_trans in *. cbn.
+      split. now rewrite <- H4, <- H2, <- H.
+      constructor 3.
+      + rewrite Heqp. cbn.
+        rewrite ?inst_trans. cbn.
+        rewrite <- H4, <- H2.
+        rewrite Heqp in H1. cbn in H1.
+        rewrite H1 in H0. unfold inst, inst_lifted in H0.
+        apply H0.
+      + rewrite Heqp0. cbn. rewrite <- H4. rewrite inst_trans. cbn. rewrite <- H4. cbn in H3. rewrite <- H in H3. unfold inst, inst_lifted in H3. apply H3.
+      + rewrite Heqp0, Heqp1. cbn. rewrite <- H4. cbn in H5. rewrite <- H2, <- H in H5. rewrite Heqp0, Heqp1 in H6. cbn in H6. rewrite <- H4 in H6. rewrite H6. apply H5.
+    - destruct (resolve s G0) eqn:?; [|easy].
+      cbn. unfold T. split. auto. constructor.
+      rewrite resolve_inst, Heqo. cbn. congruence.
+    - unfold T, _4.
+      rewrite wlp_bind.
+      specialize (IHe _ (env.snoc ι0 (ctx.length w0) t) ((s,
+         Ty_hole (w0 ▻ ctx.length w0) (ctx.length w0)
+           ctx.in_zero) :: <{ G0 ~ step ⊙ refl }>)).
+      revert IHe. apply wlp_monotonic. intros w1 r1 v1 ι1 Hv1.
+      destruct v1 eqn:? in Hv1. destruct Hv1. cbn.
+      unfold T, _4.
+      rewrite ?inst_persist_env,
+              ?inst_persist_ty,
+              ?inst_trans in *. cbn.
+      rewrite <- H. split. auto.
+      constructor.
+      cbn in H0. rewrite <- CandidateType.lookup_inst. rewrite <- H. cbn.
+      rewrite Heqp. cbn.
+      rewrite ?inst_persist_env,
+              ?inst_persist_ty,
+              ?inst_trans in *. cbn in *.
+      apply H0.
+    - rewrite wlp_bind.
+      specialize (IHe _ ι0 ((s, lift t w0) :: G0)).
+      revert IHe. apply wlp_monotonic. intros w1 r1 v1 ι1 Hv1.
+      destruct v1 eqn:? in Hv1. destruct Hv1. cbn.
+      unfold T, _4.
+      split. rewrite inst_trans. cbn. now rewrite <- H.
+      rewrite Heqp. cbn.
+      rewrite ?inst_persist_ty, ?inst_lift.
+      constructor 6. cbn in H0.
+      now rewrite ?inst_lift in H0.
+    - unfold T, _4. rewrite wlp_bind.
+      specialize (IHe2 _ (env.snoc ι0 (ctx.length w0) t) <{ G0 ~ step ⊙ refl }>).
+      revert IHe2. apply wlp_monotonic. intros w1 r1 v1 ι1 Hv1.
+      destruct v1 eqn:? in Hv1. destruct Hv1. cbn.
+      rewrite wlp_bind.
+      specialize (IHe1 _ ι1 <{ G0 ~ alloc.fresh w0 (ctx.length w0) w1 r1 }>).
+      revert IHe1. apply wlp_monotonic. intros w2 r2 v2 ι2 Hv2.
+      destruct v2 eqn:? in Hv2. destruct Hv2. cbn.
+      intro.
+      unfold T, _4.
+      rewrite ?inst_persist_env,
+              ?inst_persist_ty,
+              ?inst_trans in *. cbn in *.
+      rewrite Heqp, Heqp0, <- H1 in H3. cbn in H3.
+      rewrite <- H1, <- H. cbn. split. auto.
+      constructor 7 with (inst t0 ι1). rewrite <- H in H2. cbn in H2.
+      rewrite <- CandidateType.lookup_inst in H3.
+      rewrite <- H1 in H3.
+      rewrite Heqp0. cbn.
+      rewrite <- CandidateType.lookup_inst.
+      rewrite ?inst_trans. cbn.
+      rewrite <- H1, <- H. cbn.
+      rewrite H3 in H2.
+      rewrite <- CandidateType.lookup_inst in H2. rewrite <- H in H2. cbn in H2.
+      apply H2.
+      rewrite Heqp. cbn. rewrite ?inst_trans. cbn. rewrite <- H1.
+      apply H0.
+  Qed.
 
   Lemma completeness_aux {G e t ee} (T : G |-- e; t ~> ee) :
     forall (w0 : World) (ι0 : Assignment w0) (G0 : Env w0),
