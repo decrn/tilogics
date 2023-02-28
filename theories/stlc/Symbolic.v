@@ -999,6 +999,183 @@ Module CandidateType.
 
 End CandidateType.
 
+Module ProofWorlds.
+
+  #[local] Set Implicit Arguments.
+  #[local] Arguments step : simpl never.
+
+  Local Notation "[ ω ] x <- ma ;; mb" :=
+    (bind (R := Alloc) ma (fun _ ω x => mb))
+      (at level 80, x at next level,
+        ma at next level, mb at level 200,
+        right associativity).
+
+  Local Notation "∃ n , m" :=
+    (Bind_Exists_Free _ _ n m)
+      (at level 80, right associativity, format "∃ n ,  m").
+
+  Notation "t1 == t2 //\ m" := (Bind_AssertEq_Free _ _ t1 t2 m) (at level 70).
+
+  Fixpoint check (e : expr) : ⊢ Env -> Ty -> FreeM Unit :=
+    fun w G tr =>
+      match e with
+      | v_true => Bind_AssertEq_Free Unit w tr (Ty_bool w) (Ret_Free Unit w tt)
+      | v_false => Bind_AssertEq_Free Unit w tr (Ty_bool w) (Ret_Free Unit w tt)
+      | e_if e0 e1 e2 =>
+        [r1] _ <- check e0 G (Ty_bool w)   ;;
+        [r2] _ <- check e1 <{ G ~ r1 }> <{ tr ~ r1 }> ;;
+        check e2 <{ G ~ r1 ⊙ r2 }> <{ tr ~ r1 ⊙ r2 }>
+      | e_var s =>
+        match resolve s G with
+        | Some a => Bind_AssertEq_Free Unit w tr a (Ret_Free Unit w tt)
+        | None => Fail_Free Unit w
+        end
+      | e_absu s e0 =>
+        ∃1, ∃2,
+          let tr' := <{ tr ~ step ⊙ step }> in
+          let α1  := Ty_hole _ 1 (ctx.in_succ ctx.in_zero) in
+          let α2  := Ty_hole _ 2 ctx.in_zero in
+          tr' == Ty_func _ α1 α2 //\
+          check e0 ((s, α1) :: <{ G ~ step ⊙ step }>) α2
+
+      | e_abst s t e0 =>
+        ∃2,
+          let tr' := <{ tr ~ step }> in
+          let α1  := lift t (w ▻ 2) in
+          let α2  := Ty_hole (w ▻ 2) 2 ctx.in_zero in
+          tr' == Ty_func (w ▻ 2) α1 α2 //\
+          check e0 ((s, α1) :: <{ G ~ step }>) α2
+      | e_app e0 e1 =>
+        ∃0,
+          let α := Ty_hole (w ▻ 0) 0 ctx.in_zero in
+          [r1] _ <- check e0 <{ G ~ step }> (Ty_func _ α <{ tr ~ step }>) ;;
+                    check e1 <{ G ~ step ⊙ r1 }> <{ α ~ r1 }>
+  end.
+
+  #[projections(primitive)]
+  Record PWorld : Type :=
+    { world :> World;
+      assign : Assignment world
+    }.
+
+  Definition PTYPE : Type := PWorld -> Type.
+  Definition PACC : Type := PWorld -> PTYPE.
+
+  Bind    Scope indexed_scope with PTYPE.
+
+  Definition PBox (R : PACC) (A : PTYPE) : PTYPE :=
+    fun w0 => forall (w1 : PWorld), R w0 w1 -> A w1.
+
+  Definition ACC2PACC (R : ACC)
+    {instR : forall w, Inst (R w) (Assignment w)} : PACC :=
+    fun w0 w1 => { r : R w0 w1 & inst r (assign w1) = assign w0 }.
+
+  Definition PValid (A : PTYPE) : Type :=
+    forall w, A w.
+  Definition PImpl (A B : PTYPE) : PTYPE :=
+    fun w => (A w -> B w)%type.
+
+  Notation "⊩ A" := (PValid A) (at level 100).
+  Notation "A ↣ B" := (PImpl A B)
+    (at level 99, B at level 200, right associativity) :
+      indexed_scope.
+
+  #[local] Notation "□ᵖ A" :=
+    (PBox (ACC2PACC Alloc) A)
+      (at level 9, format "□ᵖ A", right associativity)
+      : indexed_scope.
+
+  Definition PT {A} : ⊩ □ᵖ A ↣ A.
+  Proof.
+    intros w a. apply a. hnf. exists refl. apply inst_refl.
+  Defined.
+  #[global] Arguments PT {A} [_] _ : simpl never.
+
+  Definition P4 {A} : ⊩ □ᵖ A ↣ □ᵖ (□ᵖ A).
+  Proof.
+    intros [w0 ι0] a [w1 ι1] r1 [w2 ι2] r2; cbn in *.
+    apply a.
+    exists (projT1 r1 ⊙ projT1 r2). cbn.
+    hnf in r1. hnf in r2. cbn in *.
+    rewrite inst_trans.
+    rewrite <- (projT2 r1).
+    apply f_equal.
+    apply (projT2 r2).
+  Defined.
+  #[global] Arguments P4 {A} [_] _ [_] _ [_] _ : simpl never.
+
+  Definition pstep (w : PWorld) (x : nat) (t : ty) :
+    ACC2PACC Alloc w {| world := w ▻ x; assign := env.snoc (assign w) x t |} :=
+    existT
+      (fun r => inst r (env.snoc (assign w) x t) = assign w)
+      step (inst_step (env.snoc (assign w) x t)).
+
+  Definition WP {A} : ⊩ FreeM A ↣ □ᵖ(A ↣ PROP) ↣ PROP :=
+    fix WP w m POST {struct m} :=
+    match m with
+    | Ret_Free _ _ v => PT POST v
+    | Fail_Free _ _ => False
+    | Bind_AssertEq_Free _ _ t1 t2 k =>
+        inst t1 (assign w) = inst t2 (assign w) /\ WP _ k POST
+    | Bind_Exists_Free _ _ i k =>
+        exists t : ty,
+          WP {| world := w ▻ i; assign := env.snoc (assign w) i t |}
+            k (P4 POST (pstep w i t))
+    end.
+
+  Lemma wp_monotonic {A : TYPE} {w : PWorld}
+    (m : FreeM A w) (p q : □ᵖ(A ↣ PROP) w)
+    (pq : forall w1 r1 a1, p w1 r1 a1 -> q w1 r1 a1) :
+    WP m p -> WP m q.
+  Proof.
+    destruct w as [w ι]. cbn in m.
+    induction m; cbn.
+    - apply pq.
+    - auto.
+    - firstorder.
+    - intros [x H]. exists x.
+      revert H. apply IHm. intros *.
+      apply pq.
+  Qed.
+
+  (* Lemma wp_bind {A B w} (m : FreeM A w) (f : □⁺(A -> FreeM B) w) : *)
+  (*   forall (Q : □⁺(B -> Assignment -> PROP) w) (ι : Assignment w), *)
+  (*     WP (bind m f) Q ι <-> *)
+  (*     WP m (fun _ r a => WP (f _ r a) (_4 Q r)) ι. *)
+  (* Proof. split; intros; induction m; cbn; firstorder; exists x; firstorder. Qed. *)
+
+  (* Lemma lookup_inst {w1 w2 : World} (r : Alloc w1 w2) (ι : Assignment w2) {x} (i : x ∈ w1) : *)
+  (*   env.lookup (inst r ι) i = env.lookup ι <{ i ~ r }>. *)
+  (* Proof. induction r. reflexivity. cbn. rewrite <- IHr. now destruct env.view. Qed. *)
+
+  Lemma completeness_aux {G e t ee} (T : G |-- e; t ~> ee) :
+    forall (w0 : PWorld) (G0 : Env w0) (t0 : Ty w0),
+      G = inst G0 (assign w0) -> t = inst t0 (assign w0) ->
+      WP (check e G0 t0) (fun w1 r01 _ => True).
+  Proof. Admitted.
+
+  Definition WLP {A} : ⊩ FreeM A ↣ □ᵖ(A ↣ PROP) ↣ PROP :=
+    fix WP w m POST {struct m} :=
+    match m with
+    | Ret_Free _ _ v => PT POST v
+    | Fail_Free _ _ => True
+    | Bind_AssertEq_Free _ _ t1 t2 k =>
+        inst t1 (assign w) = inst t2 (assign w) -> WP _ k POST
+    | Bind_Exists_Free _ _ i k =>
+        forall t : ty,
+          WP {| world := w ▻ i; assign := env.snoc (assign w) i t |}
+            k (P4 POST (pstep w i t))
+    end%type.
+
+  Lemma soundness e :
+    forall (w0 : PWorld) (G0 : Env w0) (t0 : Ty w0),
+      WLP (check e G0 t0)
+          (fun w1 r01 _ =>
+             exists ee, inst G0 (assign w0) |-- e ; inst t0 (assign w0) ~> ee).
+  Proof. Admitted.
+
+End ProofWorlds.
+
   Lemma soundness e :
     forall (w0 : World) (ι0 : Assignment w0) (G0 : Env w0),
       WLP (reconstruct e G0)
