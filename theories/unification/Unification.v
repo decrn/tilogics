@@ -63,6 +63,23 @@ Notation "? A" := (Option A) (at level 9, format "? A", right associativity).
 Notation "◆ A" := (DiamondT Tri Option A) (at level 9, format "◆ A", right associativity).
 Notation "A * B" := (Prod A B).
 
+Module BoveCapretta.
+
+  Set Case Analysis Schemes.
+  Inductive dom (w : World) : Type :=
+  | domstep : (forall x (xIn : x ∈ w), dom (w - x)) -> dom w.
+
+  Obligation Tactic := auto using Nat.eq_le_incl, length_remove.
+  Equations indom {w : World} : dom w by wf (length w) :=
+  indom := domstep (fun _ _ => indom).
+  #[global] Arguments indom w : clear implicits.
+
+  Definition dom_inv w (d : dom w) :
+    (forall x (xIn : x ∈ w), dom (w - x)) :=
+    match d with domstep x => x end.
+
+End BoveCapretta.
+
 Section Löb.
 
   Context (A : TYPE) (step : ⊢ ▷A -> A).
