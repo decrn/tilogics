@@ -286,24 +286,67 @@ Lemma inst_trans {R} {transR : Trans R} {instR : forall w, Inst (R w) (Assignmen
   inst (trans r12 r23) ass = inst r12 (inst r23 ass).
 Proof. Admitted.
 
-Definition WLP {A} : ⊢ FreeM A -> □⁺(A -> Assignment -> PROP) -> Assignment -> PROP :=
-  fix WLP w m POST ı {struct m} :=
-    match m with
-    | Ret_Free _ _ v => T POST v ı
-    | Fail_Free _ _ => True
-    | Bind_AssertEq_Free _ _ t1 t2 k =>
-        (inst t1 ı = inst t2 ı) -> WLP _ k POST ı
-    | Bind_Exists_Free _ _ i k =>
-        forall t, WLP _ k (_4 POST step) (env.snoc ı i t)
-    end%type.
+Section WeakestPre.
+  Open Scope indexed_scope.
 
-Definition WP {A} : ⊢ FreeM A -> □⁺(A -> Assignment -> PROP) -> Assignment -> PROP :=
-  fix WP w m POST ı {struct m} :=
-    match m with
-    | Ret_Free _ _ v => T POST v ı
-    | Fail_Free _ _ => False
-    | Bind_AssertEq_Free _ _ t1 t2 k =>
-        (inst t1 ı) = (inst t2 ı) /\ WP _ k POST ı
-    | Bind_Exists_Free _ _ i k =>
-        exists t, WP _ k (_4 POST step) (env.snoc ı i t)
-    end.
+  Definition WLP {A} : ⊢ FreeM A -> □⁺(A -> Assignment -> PROP) -> Assignment -> PROP :=
+    fix WLP w m POST ı {struct m} :=
+      match m with
+      | Ret_Free _ _ v => T POST v ı
+      | Fail_Free _ _ => True
+      | Bind_AssertEq_Free _ _ t1 t2 k =>
+          (inst t1 ı = inst t2 ı) -> WLP _ k POST ı
+      | Bind_Exists_Free _ _ i k =>
+          forall t, WLP _ k (_4 POST step) (env.snoc ı i t)
+      end%type.
+
+  Definition WP {A} : ⊢ FreeM A -> □⁺(A -> Assignment -> PROP) -> Assignment -> PROP :=
+    fix WP w m POST ı {struct m} :=
+      match m with
+      | Ret_Free _ _ v => T POST v ı
+      | Fail_Free _ _ => False
+      | Bind_AssertEq_Free _ _ t1 t2 k =>
+          (inst t1 ı) = (inst t2 ı) /\ WP _ k POST ı
+      | Bind_Exists_Free _ _ i k =>
+          exists t, WP _ k (_4 POST step) (env.snoc ı i t)
+      end.
+
+
+#[global] Arguments WP  {A} {w} _ _ _.
+#[global] Arguments WLP {A} {w} _ _ _.
+
+  Lemma wlp_monotonic {A w} (m : FreeM A w) (p q : □⁺(A -> Assignment -> PROP) w)
+    (pq : forall w1 r1 a1 ι1, p w1 r1 a1 ι1 -> q w1 r1 a1 ι1) :
+    forall (ι : Assignment w), WLP m p ι -> WLP m q ι.
+  Proof.
+    induction m; cbn.
+    - apply pq.
+    - auto.
+    - firstorder.
+    - firstorder.
+  Qed.
+
+  Lemma wlp_bind {A B w} (m : FreeM A w) (f : □⁺(A -> FreeM B) w) :
+    forall (Q : □⁺(B -> Assignment -> PROP) w) (ι : Assignment w),
+      WLP (bind m f) Q ι <->
+      WLP m (fun _ r a => WLP (f _ r a) (_4 Q r)) ι.
+  Proof. split; intros; induction m; cbn; firstorder. Qed.
+
+  Lemma wp_monotonic {A w} (m : FreeM A w) (p q : □⁺(A -> Assignment -> PROP) w)
+    (pq : forall w1 r1 a1 ι1, p w1 r1 a1 ι1 -> q w1 r1 a1 ι1) :
+    forall (ι : Assignment w), WP m p ι -> WP m q ι.
+  Proof.
+    induction m; cbn.
+    - apply pq.
+    - auto.
+    - firstorder.
+    - intros ι [x H]. exists x. firstorder.
+  Qed.
+
+  Lemma wp_bind {A B w} (m : FreeM A w) (f : □⁺(A -> FreeM B) w) :
+    forall (Q : □⁺(B -> Assignment -> PROP) w) (ι : Assignment w),
+      WP (bind m f) Q ι <->
+      WP m (fun _ r a => WP (f _ r a) (_4 Q r)) ι.
+  Proof. split; intros; induction m; cbn; firstorder; exists x; firstorder. Qed.
+
+End WeakestPre.

@@ -844,24 +844,6 @@ Module CandidateType.
                     check e1 <{ G ~ step ⊙ r1 }> <{ α ~ r1 }>
   end.
 
-
-  Lemma wp_monotonic {A w} (m : FreeM A w) (p q : □⁺(A -> Assignment -> PROP) w)
-    (pq : forall w1 r1 a1 ι1, p w1 r1 a1 ι1 -> q w1 r1 a1 ι1) :
-    forall (ι : Assignment w), WP m p ι -> WP m q ι.
-  Proof.
-    induction m; cbn.
-    - apply pq.
-    - auto.
-    - firstorder.
-    - intros ι [x H]. exists x. firstorder.
-  Qed.
-
-  Lemma wp_bind {A B w} (m : FreeM A w) (f : □⁺(A -> FreeM B) w) :
-    forall (Q : □⁺(B -> Assignment -> PROP) w) (ι : Assignment w),
-      WP (bind m f) Q ι <->
-      WP m (fun _ r a => WP (f _ r a) (_4 Q r)) ι.
-  Proof. split; intros; induction m; cbn; firstorder; exists x; firstorder. Qed.
-
   Lemma lookup_inst {w1 w2 : World} (r : Alloc w1 w2) (ι : Assignment w2) {x} (i : x ∈ w1) :
     env.lookup (inst r ι) i = env.lookup ι <{ i ~ r }>.
   Proof. induction r. reflexivity. cbn. rewrite <- IHr. now destruct env.view. Qed.
@@ -937,22 +919,6 @@ Module CandidateType.
       revert IHT2. apply wp_monotonic. intros. hnf.
       now rewrite !inst_trans, <- H0, <- H.
   Qed.
-  Lemma wlp_monotonic {A w} (m : FreeM A w) (p q : □⁺(A -> Assignment -> PROP) w)
-    (pq : forall w1 r1 a1 ι1, p w1 r1 a1 ι1 -> q w1 r1 a1 ι1) :
-    forall (ι : Assignment w), WLP m p ι -> WLP m q ι.
-  Proof.
-    induction m; cbn.
-    - apply pq.
-    - auto.
-    - firstorder.
-    - firstorder.
-  Qed.
-
-  Lemma wlp_bind {A B w} (m : FreeM A w) (f : □⁺(A -> FreeM B) w) :
-    forall (Q : □⁺(B -> Assignment -> PROP) w) (ι : Assignment w),
-      WLP (bind m f) Q ι <->
-      WLP m (fun _ r a => WLP (f _ r a) (_4 Q r)) ι.
-  Proof. split; intros; induction m; cbn; firstorder. Qed.
 
   Lemma soundness e :
     forall (w0 : World) (ι0 : Assignment w0) (G0 : Env w0) (t0 : Ty w0),
@@ -1035,7 +1001,7 @@ End CandidateType.
 
   Lemma soundness e :
     forall (w0 : World) (ι0 : Assignment w0) (G0 : Env w0),
-      CandidateType.WLP (reconstruct e G0)
+      WLP (reconstruct e G0)
           (fun w1 r01 '(t,ee) ι1 => ι0 = inst r01 ι1 /\
                                    inst G0 ι0 |-- e ; inst t ι1 ~> inst ee ι1)
           ι0.
@@ -1044,7 +1010,7 @@ End CandidateType.
   Lemma completeness_aux {G e t ee} (T : G |-- e; t ~> ee) :
     forall (w0 : World) (ι0 : Assignment w0) (G0 : Env w0),
       G = inst G0 ι0 ->
-      CandidateType.WP (reconstruct e G0) (fun w1 r01 '(t',ee) ι1 =>
+      WP (reconstruct e G0) (fun w1 r01 '(t',ee) ι1 =>
                                              ι0 = inst r01 ι1 /\
                                              t = inst t' ι1) ι0.
   Admitted.
