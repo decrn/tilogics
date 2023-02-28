@@ -1039,4 +1039,12 @@ End CandidateType.
           (fun w1 r01 '(t,ee) ι1 => ι0 = inst r01 ι1 /\
                                    inst G0 ι0 |-- e ; inst t ι1 ~> inst ee ι1)
           ι0.
-  Proof.
+  Admitted.
+
+  Lemma completeness_aux {G e t ee} (T : G |-- e; t ~> ee) :
+    forall (w0 : World) (ι0 : Assignment w0) (G0 : Env w0),
+      G = inst G0 ι0 ->
+      CandidateType.WP (reconstruct e G0) (fun w1 r01 '(t',ee) ι1 =>
+                                             ι0 = inst r01 ι1 /\
+                                             t = inst t' ι1) ι0.
+  Admitted.
