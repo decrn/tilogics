@@ -1013,4 +1013,101 @@ End CandidateType.
       WP (reconstruct e G0) (fun w1 r01 '(t',ee) ι1 =>
                                              ι0 = inst r01 ι1 /\
                                              t = inst t' ι1) ι0.
-  Admitted.
+  Proof.
+    Set Printing Depth 17.
+    induction T; cbn; intros w0 ι0 G0 ?; subst.
+    + easy.
+    + easy.
+    + rewrite wp_bind. specialize (IHT1 w0 ι0 G0 eq_refl).
+      revert IHT1. apply wp_monotonic. intros w1 r1 v1 ι1 Hv1.
+      cbn. destruct v1 eqn:? in Hv1. destruct Hv1. split. now rewrite H0, Heqp.
+      unfold T.
+      rewrite wp_bind.
+      specialize (IHT2 _ ι1 <{ G0 ~ r1 ⊙ refl }>).
+      rewrite inst_persist_env in IHT2.
+      rewrite inst_trans in IHT2.
+      cbn in IHT2.
+      rewrite <- H in IHT2.
+      specialize (IHT2 eq_refl).
+      revert IHT2. apply wp_monotonic. intros w2 r2 v2 ι2 Hv2.
+      destruct v2 eqn:? in Hv2. destruct Hv2.
+      rewrite wp_bind.
+      specialize (IHT3 _ ι2 <{ G0 ~ r1 ⊙ refl ⊙ r2 }>).
+      rewrite inst_persist_env in IHT3.
+      rewrite inst_trans in IHT3.
+      cbn in IHT3.
+      rewrite <- H1, <- H in IHT3.
+      specialize (IHT3 eq_refl).
+      revert IHT3. apply wp_monotonic. intros w3 r3 v3 ι3 Hv3.
+      destruct v3 eqn:? in Hv3. destruct Hv3. cbn.
+      rewrite Heqp0, Heqp1. cbn.
+      rewrite inst_persist_ty, <- H3.
+      split. now rewrite <- H2, <- H4.
+      unfold T. hnf.
+      rewrite ?inst_persist_ty,
+              ?inst_trans. cbn.
+      now rewrite <- H3, <- H2, <- H1, <- H.
+    + rewrite resolve_inst in H. destruct resolve; cbn in *; now inversion H.
+    + exists vt.
+      unfold Definitions.T, _4.
+      rewrite wp_bind.
+      specialize (IHT _ (env.snoc ι0 (ctx.length w0) vt)
+                        ((v, Ty_hole (w0 ▻ ctx.length w0) (ctx.length w0) ctx.in_zero)
+                           :: <{ G0 ~ step ⊙ refl }>)).
+      cbn in IHT.
+      rewrite inst_persist_env in IHT.
+      cbn in IHT.
+      specialize (IHT eq_refl).
+      revert IHT. apply wp_monotonic. intros w1 r1 v1 ι1 Hv1. cbn.
+      unfold Definitions.T, _4. cbn.
+      destruct v1 eqn:? in Hv1. destruct Hv1.
+      split.
+      rewrite inst_trans. cbn. now rewrite <- H.
+      rewrite Heqp. cbn.
+      now rewrite <- H0, <- CandidateType.lookup_inst, <- H.
+    + rewrite wp_bind.
+      specialize (IHT _ ι0 ((v, lift vt w0) :: G0)).
+      cbn in IHT.
+      rewrite inst_lift in IHT.
+      specialize (IHT eq_refl).
+      revert IHT. apply wp_monotonic. intros w1 r1 v1 ι1 Hv1. cbn.
+      unfold Definitions.T, _4. cbn.
+      destruct v1 eqn:? in Hv1. destruct Hv1.
+      split.
+      rewrite inst_trans. cbn. now rewrite H.
+      rewrite inst_persist_ty. rewrite inst_lift.
+      now rewrite Heqp, H0.
+    + exists t1.
+      unfold Definitions.T, _4. cbn.
+      rewrite wp_bind.
+      specialize (IHT2 _ (env.snoc ι0 (ctx.length w0) t2) <{ G0 ~ alloc.fresh w0 (ctx.length w0) (w0 ▻ ctx.length w0) refl }>).
+      cbn in IHT2.
+      rewrite inst_persist_env in IHT2.
+      cbn in IHT2.
+      specialize (IHT2 eq_refl).
+      revert IHT2. apply wp_monotonic. intros w1 r1 v1 ι1 Hv1. cbn.
+      destruct v1 eqn:? in Hv1. destruct Hv1.
+      rewrite wp_bind.
+      specialize (IHT1 _ ι1 <{ G0 ~ alloc.fresh w0 (ctx.length w0) w1 r1 }>).
+      rewrite inst_persist_env in IHT1. cbn in IHT1.
+      Set Printing Depth 50.
+      rewrite <- H in IHT1. cbn in IHT1.
+      specialize (IHT1 eq_refl).
+      revert IHT1. apply wp_monotonic. intros w2 r2 v2 ι2 Hv2. cbn.
+      destruct v2 eqn:? in Hv2. destruct Hv2.
+      split.
+      - rewrite Heqp0. cbn.
+        rewrite <- H2, inst_persist_ty, Heqp, <- H1. cbn.
+        now rewrite <- H0,
+                    -> assoc_persist,
+                    <- CandidateType.lookup_inst,
+                    -> inst_trans,
+                    <- H1,
+                    <- H.
+      - unfold Definitions.T, _4. cbn.
+        rewrite ?inst_trans. cbn.
+        rewrite <- H1, <- H. cbn.
+        rewrite <- ?CandidateType.lookup_inst,
+                -> ?inst_trans. cbn.
+        now rewrite <- H1, <- H.
+  Qed.
