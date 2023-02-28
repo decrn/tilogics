@@ -1054,3 +1054,11 @@ Module CandidateType.
   Qed.
 
 End CandidateType.
+
+  Lemma soundness e :
+    forall (w0 : World) (ι0 : Assignment w0) (G0 : Env w0),
+      CandidateType.WLP (reconstruct e G0)
+          (fun w1 r01 '(t,ee) ι1 => ι0 = inst r01 ι1 /\
+                                   inst G0 ι0 |-- e ; inst t ι1 ~> inst ee ι1)
+          ι0.
+  Proof.

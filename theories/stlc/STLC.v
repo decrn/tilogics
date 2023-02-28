@@ -224,6 +224,10 @@ Class Inst (A : TYPE) (a : Type) : Type :=
   | (s,T) :: sTs => (s, inst T ass) :: inst_env sTs ass
   end%list.
 
+#[export] Instance inst_lifted {A} :
+  Inst (Lifted A) A :=
+  fun w x ass => x ass.
+
 Class Lk (R : ACC) : Type :=
   lk w1 w2 (r : R w1 w2) x (xIn : ctx.In x w1) : Ty w2.
 #[global] Arguments lk {R _ w1 w2} r {x} xIn.
