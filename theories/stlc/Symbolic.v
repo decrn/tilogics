@@ -844,16 +844,6 @@ Module CandidateType.
                     check e1 <{ G ~ step ⊙ r1 }> <{ α ~ r1 }>
   end.
 
-  Definition WP {A} : ⊢ FreeM A -> □⁺(A -> Assignment -> PROP) -> Assignment -> PROP :=
-    fix WP w m POST ı {struct m} :=
-      match m with
-      | Ret_Free _ _ v => T POST v ı
-      | Fail_Free _ _ => False
-      | Bind_AssertEq_Free _ _ t1 t2 k =>
-          (inst t1 ı) = (inst t2 ı) /\ WP _ k POST ı
-      | Bind_Exists_Free _ _ i k =>
-          exists t, WP _ k (_4 POST step) (env.snoc ı i t)
-      end.
 
   Lemma wp_monotonic {A w} (m : FreeM A w) (p q : □⁺(A -> Assignment -> PROP) w)
     (pq : forall w1 r1 a1 ι1, p w1 r1 a1 ι1 -> q w1 r1 a1 ι1) :
@@ -947,18 +937,6 @@ Module CandidateType.
       revert IHT2. apply wp_monotonic. intros. hnf.
       now rewrite !inst_trans, <- H0, <- H.
   Qed.
-
-  Definition WLP {A} : ⊢ FreeM A -> □⁺(A -> Assignment -> PROP) -> Assignment -> PROP :=
-    fix WLP w m POST ı {struct m} :=
-      match m with
-      | Ret_Free _ _ v => T POST v ı
-      | Fail_Free _ _ => True
-      | Bind_AssertEq_Free _ _ t1 t2 k =>
-          (inst t1 ı = inst t2 ı) -> WLP _ k POST ı
-      | Bind_Exists_Free _ _ i k =>
-          forall t, WLP _ k (_4 POST step) (env.snoc ı i t)
-      end%type.
-
   Lemma wlp_monotonic {A w} (m : FreeM A w) (p q : □⁺(A -> Assignment -> PROP) w)
     (pq : forall w1 r1 a1 ι1, p w1 r1 a1 ι1 -> q w1 r1 a1 ι1) :
     forall (ι : Assignment w), WLP m p ι -> WLP m q ι.

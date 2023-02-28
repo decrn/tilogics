@@ -285,3 +285,25 @@ Lemma inst_trans {R} {transR : Trans R} {instR : forall w, Inst (R w) (Assignmen
   {w1 w2 w3} (r12 : R w1 w2) (r23 : R w2 w3) (ass : Assignment w3) :
   inst (trans r12 r23) ass = inst r12 (inst r23 ass).
 Proof. Admitted.
+
+Definition WLP {A} : ⊢ FreeM A -> □⁺(A -> Assignment -> PROP) -> Assignment -> PROP :=
+  fix WLP w m POST ı {struct m} :=
+    match m with
+    | Ret_Free _ _ v => T POST v ı
+    | Fail_Free _ _ => True
+    | Bind_AssertEq_Free _ _ t1 t2 k =>
+        (inst t1 ı = inst t2 ı) -> WLP _ k POST ı
+    | Bind_Exists_Free _ _ i k =>
+        forall t, WLP _ k (_4 POST step) (env.snoc ı i t)
+    end%type.
+
+Definition WP {A} : ⊢ FreeM A -> □⁺(A -> Assignment -> PROP) -> Assignment -> PROP :=
+  fix WP w m POST ı {struct m} :=
+    match m with
+    | Ret_Free _ _ v => T POST v ı
+    | Fail_Free _ _ => False
+    | Bind_AssertEq_Free _ _ t1 t2 k =>
+        (inst t1 ı) = (inst t2 ı) /\ WP _ k POST ı
+    | Bind_Exists_Free _ _ i k =>
+        exists t, WP _ k (_4 POST step) (env.snoc ı i t)
+    end.
