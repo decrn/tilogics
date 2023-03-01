@@ -1345,7 +1345,7 @@ End ProofWorlds.
     + exists t1.
       unfold Definitions.T, _4. cbn.
       rewrite wp_bind.
-      specialize (IHT2 _ (env.snoc ι0 (ctx.length w0) t2) <{ G0 ~ alloc.fresh w0 (ctx.length w0) (w0 ▻ ctx.length w0) refl }>).
+      specialize (IHT2 _ (env.snoc ι0 (ctx.length w0) t1) <{ G0 ~ alloc.fresh w0 (ctx.length w0) (w0 ▻ ctx.length w0) refl }>).
       cbn in IHT2.
       rewrite inst_persist_env in IHT2.
       cbn in IHT2.
