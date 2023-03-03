@@ -280,6 +280,9 @@ Class InstRefl (R : ACC) {reflR : Refl R} {instR : forall w, Inst (R w) (Assignm
   inst_refl : forall {w} (ι : Assignment w), inst (refl (R := R)) ι = ι.
 #[global] Arguments InstRefl R {_ _}.
 
+#[export] Instance instrefl_alloc : InstRefl Alloc :=
+  fun _ _ => eq_refl.
+
 Lemma inst_trans {R} {transR : Trans R} {instR : forall w, Inst (R w) (Assignment w)}
   {w1 w2 w3} (r12 : R w1 w2) (r23 : R w2 w3) (ass : Assignment w3) :
   inst (trans r12 r23) ass = inst r12 (inst r23 ass).
