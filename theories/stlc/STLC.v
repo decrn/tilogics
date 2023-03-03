@@ -276,10 +276,9 @@ Qed.
     | alloc.fresh _ α w r => fun ι => let (r',_) := env.view (inst (Inst := @installoc _) r ι) in r'
     end.
 
-Lemma inst_refl {R} {reflR : Refl R} {instR : forall w, Inst (R w) (Assignment w)}
-  {w} (ι : Assignment w) :
-  inst (refl (R := R)) ι = ι.
-Proof. Admitted.
+Class InstRefl (R : ACC) {reflR : Refl R} {instR : forall w, Inst (R w) (Assignment w)} : Prop :=
+  inst_refl : forall {w} (ι : Assignment w), inst (refl (R := R)) ι = ι.
+#[global] Arguments InstRefl R {_ _}.
 
 Lemma inst_trans {R} {transR : Trans R} {instR : forall w, Inst (R w) (Assignment w)}
   {w1 w2 w3} (r12 : R w1 w2) (r23 : R w2 w3) (ass : Assignment w3) :

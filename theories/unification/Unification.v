@@ -122,7 +122,7 @@ Definition sooner2diamondtm {A} : ⊢ ◀A -> ◆A.
 Defined.
 
 Definition η {A} : ⊢ A -> ◆A :=
-  fun w a => Some (existT _ w (Tri.refl, a)).
+  fun w a => Some (existT _ w (refl, a)).
 Arguments η {A w} a.
 
 Definition η1 {A} {w x} {xIn : x ∈ w} (t : Ty (w - x)) (a : A (w - x)) : ◆A w :=
@@ -743,7 +743,7 @@ Module Variant1.
     refine (fun w0 a0 POST => _).
     destruct a0 as [[w1 [ζ1 a]]|].
     cbv. apply (POST w1 ζ1 (Some a)).
-    apply (POST w0 Tri.refl None).
+    apply (T POST None).
   Defined.
 
   Definition Wpure : TYPE -> TYPE :=
@@ -788,7 +788,7 @@ Module Variant1.
     unfold flex. destruct (varview t) as [y yIn|].
     - destruct (occurs_check_view xIn yIn); unfold order, spec', flexspec, η;
         cbn - [eq_dec]; intros P Q PQ HP.
-      + exists w. exists Tri.refl. rewrite eq_dec_refl. auto.
+      + exists w. exists refl. rewrite eq_dec_refl. auto.
       + exists (w - x). exists (Tri.single x (Ty_hole yIn)).
   Admitted.
 
@@ -924,11 +924,127 @@ Module Variant1.
           (fun w2 ζ2 _ => P.max P (Sub.triangular ζ2))
           (P.nothing P).
 
+  Module ProofAssignmentBased.
+
+    Definition WP {A} : ⊢ ◆A -> □(A -> Assignment -> PROP) -> Assignment -> PROP :=
+      fun w0 d Q ι0 =>
+        option.wp
+          (fun '(w1; (ζ01, a)) =>
+             exists (ι1 : Assignment w1),
+               inst ζ01 ι1 = ι0 /\ Q w1 ζ01 a ι1) d.
+
+    Lemma wp_pure {A w0} (ι0 : Assignment w0) (a : A w0)
+      (Q : □(A -> Assignment -> PROP) w0) :
+      WP (η a) Q ι0 <-> T Q a ι0.
+    Proof.
+      unfold WP, η, T. rewrite option.wp_match.
+      split.
+      - intros (ι1 & e & HQ). now subst.
+      - intros HQ. exists ι0. auto.
+    Qed.
+
+    Lemma wp_bind {A B w0} (ι0 : Assignment w0) (d : ◆A w0) (f : □(A -> ◆B) w0)
+      (Q : □(B -> Assignment -> PROP) w0) :
+       WP (bind d f) Q ι0 <->
+       WP d (fun w1 ζ1 a1 ι1 => WP (f w1 ζ1 a1) (_4 Q ζ1) ι1) ι0.
+    Proof.
+      unfold WP, bind, acc.
+      rewrite option.wp_bind.
+      option.tactics.mixin.
+      intros (w1 & ζ01 & a).
+      rewrite option.wp_map.
+      setoid_rewrite option.wp_match.
+      destruct (f w1 ζ01 a) as [(w2 & ζ2 & b2)|]; [|firstorder].
+      split.
+      - intros (ι2 & e1 & HQ). subst. exists (inst ζ2 ι2).
+        split; [rewrite inst_trans|]; firstorder.
+      - intros (ι1 & e0 & ι2 & e1 & HQ). subst. exists ι2.
+        split; [rewrite inst_trans|]; firstorder.
+    Qed.
+
+    Lemma wp_monotonic {A w0} (m : ◆A w0) :
+      forall (p q : □(A -> Assignment -> PROP) w0)
+             (ι0 : Assignment w0)
+             (pq : forall w1 ζ1 a1 ι1, inst ζ1 ι1 = ι0 -> p w1 ζ1 a1 ι1 -> q w1 ζ1 a1 ι1),
+        WP m p ι0 -> WP m q ι0.
+    Proof.
+      unfold WP; intros * pq. apply option.wp_monotonic.
+      intros (w1 & ζ01 & a1) (ι1 & e1 & H).
+      exists ι1; split; [assumption|].
+      revert e1 H; apply pq.
+    Qed.
+
+    Definition WLP {A} : ⊢ ◆A -> □(A -> Assignment -> PROP) -> Assignment -> PROP :=
+      fun w d Q ι0 =>
+        option.wlp
+          (fun '(w1; (ζ01, a)) =>
+             forall ι1 : Assignment w1, inst ζ01 ι1 = ι0 -> Q w1 ζ01 a ι1)
+          d.
+
+    Lemma wlp_pure {A w} (a : A w) (Q : □(A -> Assignment -> PROP) w) (ι : Assignment w) :
+      WLP (η a) Q ι <-> T Q a ι.
+    Proof.
+      unfold WLP, η, T. rewrite option.wlp_match.
+      split; intros; subst; auto.
+    Qed.
+
+    Lemma wlp_bind {A B w0} (d : ◆A w0) (f : □(A -> ◆B) w0) (Q : □(B -> Assignment -> PROP) w0)
+      (ι0 : Assignment w0) :
+      WLP (bind d f) Q ι0 <-> WLP d (fun _ ζ1 a1 ι1 => WLP (f _ ζ1 a1) (_4 Q ζ1) ι1) ι0.
+    Proof.
+      unfold WLP, bind, acc.
+      rewrite option.wlp_bind.
+      option.tactics.mixin.
+      intros (w1 & ζ01 & a).
+      rewrite option.wlp_map.
+      setoid_rewrite option.wlp_match.
+      destruct (f w1 ζ01 a) as [(w2 & ζ2 & b2)|]; [|firstorder].
+      split.
+      - intros HQ ι1 e1 ι2 e2. subst. apply HQ, inst_trans.
+      - intros HQ ι2 e2. subst. apply (HQ (inst ζ2 ι2)).
+        now rewrite inst_trans. easy.
+    Qed.
+
+    Lemma wlp_monotonic {A w0} (m : ◆A w0) :
+      forall (p q : □(A -> Assignment -> PROP) w0)
+             (ι0 : Assignment w0)
+             (pq : forall w1 ζ1 a1 ι1, inst ζ1 ι1 = ι0 -> p w1 ζ1 a1 ι1 -> q w1 ζ1 a1 ι1),
+        WLP m p ι0 -> WLP m q ι0.
+    Proof.
+      unfold WLP; intros * pq. apply option.wlp_monotonic.
+      intros (w1 & ζ01 & a1) H ι1 e1. specialize (H ι1 e1).
+      revert e1 H; apply pq.
+    Qed.
+
+    Definition UnifierSound : ⊢ Unifier -> PROP :=
+      fun w0 u =>
+        forall (t1 t2 : Ty w0) (ι0 : Assignment w0),
+          WLP (u t1 t2) (fun _ _ _ _ => inst t1 ι0 = inst t2 ι0) ι0.
+
+    Definition UnifierComplete : ⊢ Unifier -> PROP :=
+      fun w0 u =>
+        forall (t1 t2 : Ty w0) (ι0 : Assignment w0),
+          inst t1 ι0 = inst t2 ι0 ->
+          WP (u t1 t2) (fun _ _ _ _ => True) ι0.
+
+    Definition BoxUnifierSound : ⊢ BoxUnifier -> PROP :=
+      fun w0 bu =>
+        forall (t1 t2 : Ty w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1) (ι1 : Assignment w1),
+          WLP (bu t1 t2 w1 ζ01)
+            (fun _ _ _ _ =>
+               inst t1 (inst ζ01 ι1) = inst t2 (inst ζ01 ι1)) ι1.
+
+    Definition BoxUnifierComplete : ⊢ BoxUnifier -> PROP :=
+      fun w0 bu =>
+        forall (t1 t2 : Ty w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1) (ι1 : Assignment w1),
+          inst t1 (inst ζ01 ι1) = inst t2 (inst ζ01 ι1) ->
+          WP (bu t1 t2 w1 ζ01) (fun _ _ _ _ => True) ι1.
+
+  End ProofAssignmentBased.
+
   Section MguO.
 
     Context [w] (lmgu : ▷BoxUnifier w).
-    Context (lmgu_spec : forall x (xIn : x ∈ w),
-                BoxUnifierSpec (lmgu xIn)).
 
     Definition boxflex {x} (xIn : x ∈ w) (t : Ty w) : □◆Unit w :=
       box_intro_split
@@ -937,169 +1053,217 @@ Module Variant1.
            let ζ := Sub.thick zIn u in
            lmgu _ (Ty_hole xIn)[ζ] t[ζ]).
 
-    Import P.
 
-    Lemma boxflex_spec {x} (xIn : x ∈ w) (t : Ty w) (w1 : World) (ζ1 : w ⊒⁻ w1) :
-      let P := P.unifies (Ty_hole xIn)[Sub.triangular ζ1] t[Sub.triangular ζ1] in
-      spec (boxflex xIn t ζ1) (fun w2 ζ2 _ => P.max P (Sub.triangular ζ2)) (P.nothing P).
-    Proof.
-      destruct ζ1; cbn - [Sub.subst].
-      - rewrite ?Sub.subst_refl. apply flex_spec.
-      - rewrite ?Sub.subst_comp. apply lmgu_spec.
-    Qed.
+    Section SubstitutionBased.
+      Import P.
 
-    Definition boxmgu : BoxUnifier w :=
-      fix bmgu s t {struct s} :=
-        match s , t with
-        | Ty_hole xIn   , t            => boxflex xIn t
-        | s            , Ty_hole yIn   => boxflex yIn s
-        | Ty_bool       , Ty_bool       => fun _ _ => η tt
-        | Ty_func s1 s2 , Ty_func t1 t2 =>
-            fun _ ζ1 =>
-              ⟨ ζ2 ⟩ _ <- bmgu s1 t1 _ ζ1 ;;
-              ⟨ ζ3 ⟩ _ <- bmgu s2 t2 _ (ζ1 ⊙⁻ ζ2) ;;
-              η tt
-        | _            , _            => fun _ _ => None
-        end.
+      Context (lmgu_spec : forall x (xIn : x ∈ w),
+                  BoxUnifierSpec (lmgu xIn)).
 
-    Section boxmgu_elim.
+      Lemma boxflex_spec {x} (xIn : x ∈ w) (t : Ty w) (w1 : World) (ζ1 : w ⊒⁻ w1) :
+        let P := P.unifies (Ty_hole xIn)[Sub.triangular ζ1] t[Sub.triangular ζ1] in
+        spec (boxflex xIn t ζ1) (fun w2 ζ2 _ => P.max P (Sub.triangular ζ2)) (P.nothing P).
+      Proof.
+        destruct ζ1; cbn - [Sub.subst].
+        - rewrite ?Sub.subst_refl. apply flex_spec.
+        - rewrite ?Sub.subst_comp. apply lmgu_spec.
+      Qed.
 
-      Context (P : Ty w -> Ty w -> □◆Unit w -> Type).
-      Context (fflex1 : forall (x : nat) (xIn : x ∈ w) (t : Ty w), P (Ty_hole xIn) t (boxflex xIn t)).
-      Context (fflex2 : forall (x : nat) (xIn : x ∈ w) (t : Ty w), P t (Ty_hole xIn) (boxflex xIn t)).
-      Context (fbool : P Ty_bool Ty_bool (fun (w1 : World) (_ : w ⊒⁻ w1) => η tt)).
-      Context (fbool_func : forall T1 T2 : Ty w, P Ty_bool (Ty_func T1 T2) (fun (w1 : World) (_ : w ⊒⁻ w1) => None)).
-      Context (ffunc_bool : forall T1 T2 : Ty w, P (Ty_func T1 T2) Ty_bool (fun (w1 : World) (_ : w ⊒⁻ w1) => None)).
-      Context (ffunc : forall s1 s2 t1 t2 : Ty w,
-        (P s1 t1 (boxmgu s1 t1)) ->
-        (P s2 t2 (boxmgu s2 t2)) ->
-        P (Ty_func s1 s2) (Ty_func t1 t2)
-          (fun (w1 : World) (ζ1 : w ⊒⁻ w1) =>
-           bind (boxmgu s1 t1 ζ1)
-             (fun (w2 : World) (ζ2 : w1 ⊒⁻ w2) (_ : Unit w2) =>
-              bind (boxmgu s2 t2 (ζ1 ⊙⁻ ζ2)) (fun (w3 : World) (_ : w2 ⊒⁻ w3) (_ : Unit w3) => η tt)))).
+      Definition boxmgu : BoxUnifier w :=
+        fix bmgu s t {struct s} :=
+          match s , t with
+          | Ty_hole xIn   , t            => boxflex xIn t
+          | s            , Ty_hole yIn   => boxflex yIn s
+          | Ty_bool       , Ty_bool       => fun _ _ => η tt
+          | Ty_func s1 s2 , Ty_func t1 t2 =>
+              fun _ ζ1 =>
+                ⟨ ζ2 ⟩ _ <- bmgu s1 t1 _ ζ1 ;;
+                ⟨ ζ3 ⟩ _ <- bmgu s2 t2 _ (ζ1 ⊙⁻ ζ2) ;;
+                η tt
+          | _            , _            => fun _ _ => None
+          end.
 
-      Lemma boxmgu_elim : forall (t1 t2 : Ty w), P t1 t2 (boxmgu t1 t2).
-      Proof. induction t1; intros t2; cbn; auto; destruct t2; auto. Qed.
+      Section boxmgu_elim.
 
-    End boxmgu_elim.
+        Context (P : Ty w -> Ty w -> □◆Unit w -> Type).
+        Context (fflex1 : forall (x : nat) (xIn : x ∈ w) (t : Ty w), P (Ty_hole xIn) t (boxflex xIn t)).
+        Context (fflex2 : forall (x : nat) (xIn : x ∈ w) (t : Ty w), P t (Ty_hole xIn) (boxflex xIn t)).
+        Context (fbool : P Ty_bool Ty_bool (fun (w1 : World) (_ : w ⊒⁻ w1) => η tt)).
+        Context (fbool_func : forall T1 T2 : Ty w, P Ty_bool (Ty_func T1 T2) (fun (w1 : World) (_ : w ⊒⁻ w1) => None)).
+        Context (ffunc_bool : forall T1 T2 : Ty w, P (Ty_func T1 T2) Ty_bool (fun (w1 : World) (_ : w ⊒⁻ w1) => None)).
+        Context (ffunc : forall s1 s2 t1 t2 : Ty w,
+          (P s1 t1 (boxmgu s1 t1)) ->
+          (P s2 t2 (boxmgu s2 t2)) ->
+          P (Ty_func s1 s2) (Ty_func t1 t2)
+            (fun (w1 : World) (ζ1 : w ⊒⁻ w1) =>
+             bind (boxmgu s1 t1 ζ1)
+               (fun (w2 : World) (ζ2 : w1 ⊒⁻ w2) (_ : Unit w2) =>
+                bind (boxmgu s2 t2 (ζ1 ⊙⁻ ζ2)) (fun (w3 : World) (_ : w2 ⊒⁻ w3) (_ : Unit w3) => η tt)))).
 
-    (* Lemma boxmgu_correct (t1 t2 : Ty w) : *)
-    (*   forall {w1} (ζ1 : w ⊒⁻ w1) {w2} (ζ2 : w1 ⊒⁻ w2), *)
-    (*     mg (boxmgu t1 t2 ζ1) (cmgu t1 t2 (ζ1 ⊙ ζ2)) ζ2. *)
-    (* Proof. *)
-    (*   pattern (boxmgu t1 t2). apply boxmgu_elim; clear t1 t2. *)
-    (*   - admit. *)
-    (*   - admit. *)
-    (*   - intros. exists ζ2. cbn - [Sub.comp]. now rewrite Sub.comp_id_left. *)
-    (*   - intros. constructor. *)
-    (*   - intros. constructor. *)
-    (*   - intros * IH1 IH2 *. cbn. *)
-    (*     (* apply (mg_bind (boxmgu s1 t1 ζ1) _ (cmgu s1 t1 (ζ1 ⊙ ζ2))); auto. *) *)
-    (* Admitted. *)
+        Lemma boxmgu_elim : forall (t1 t2 : Ty w), P t1 t2 (boxmgu t1 t2).
+        Proof. induction t1; intros t2; cbn; auto; destruct t2; auto. Qed.
 
-    (* Lemma boxmgu_spec : BoxUnifierSpec boxmgu. *)
-    (* Proof. *)
-    (*   intros s t. pattern (boxmgu s t). *)
-    (*   apply boxmgu_elim; clear s t. *)
-    (*   - cbn. intros. apply boxflex_spec. *)
-    (*   - cbn. intros x xIn t w1 ζ1. *)
-    (*     generalize (boxflex_spec xIn t ζ1). cbn. *)
-    (*     apply option.spec_monotonic. *)
-    (*     + intros [w2 [ζ2 []]] H. *)
-    (*       now rewrite unifies_sym. *)
-    (*     + intros H. *)
-    (*       now rewrite unifies_sym. *)
-    (*   - constructor. apply trivialproblem. *)
-    (*   - constructor. discriminate. *)
-    (*   - constructor. discriminate. *)
-    (*   - cbn. intros. *)
-    (*     rewrite spec_μ. *)
-    (*     generalize (H w1 ζ1). clear H. *)
-    (*     apply option.spec_monotonic. *)
-    (*     intros [w2 [ζ2 _]] ?. *)
-    (*     rewrite spec_μ. *)
-    (*     generalize (H0 w2 (Tri.trans ζ1 ζ2)). clear H0. *)
-    (*     apply option.spec_monotonic. *)
-    (*     intros [w3 [ζ3 _]] ?. *)
-    (*     constructor. unfold four. *)
-    (*     + rewrite Tri.trans_refl, unifiesX_equiv; cbn. *)
-    (*       rewrite Sub.triangular_trans. *)
-    (*       rewrite Sub.triangular_trans in H0. *)
-    (*       now apply optimists_unifies. *)
-    (*     + admit. *)
-    (*     + admit. *)
-    (* Admitted. *)
+      End boxmgu_elim.
 
-    Lemma boxmgu_sound (t1 t2 : Ty w) :
-      forall {w1} (ζ1 : w ⊒⁻ w1),
-        wlp
-          (boxmgu t1 t2 ζ1)
-          (fun w2 ζ2 _ => P.unifies t1[Sub.triangular ζ1] t2[Sub.triangular ζ1] (Sub.triangular ζ2)).
-    Proof.
-      pattern (boxmgu t1 t2).
-      apply boxmgu_elim; clear t1 t2; cbn; intros; try (now constructor).
-      - destruct (boxflex_spec xIn t ζ1); constructor.
-        destruct a as [w2 [ζ2 []]]. apply H.
-      - destruct (boxflex_spec xIn t ζ1); constructor.
-        destruct a as [w2 [ζ2 []]]. apply unifies_sym. apply H.
-      - rewrite wlp_μ. generalize (H _ ζ1). clear H.
-        apply option.wlp_monotonic. intros [w2 [ζ2 _]] ?.
-        rewrite wlp_μ. generalize (H0 _ (ζ1 ⊙⁻ ζ2)).
-        apply option.wlp_monotonic. intros [w3 [ζ3 _]] ?.
-        constructor. unfold _4. cbn.
-        rewrite ?Sub.triangular_trans. cbn.
-        rewrite trans_refl_r.
-        apply unifiesX_equiv. cbn.
-        split.
-        + revert H. apply dclosed_unifies. apply Sub.geq_extend.
-        + revert H1. unfold unifies.
-          now rewrite ?Sub.triangular_trans, ?Sub.subst_comp.
-    Qed.
+      (* Lemma boxmgu_correct (t1 t2 : Ty w) : *)
+      (*   forall {w1} (ζ1 : w ⊒⁻ w1) {w2} (ζ2 : w1 ⊒⁻ w2), *)
+      (*     mg (boxmgu t1 t2 ζ1) (cmgu t1 t2 (ζ1 ⊙ ζ2)) ζ2. *)
+      (* Proof. *)
+      (*   pattern (boxmgu t1 t2). apply boxmgu_elim; clear t1 t2. *)
+      (*   - admit. *)
+      (*   - admit. *)
+      (*   - intros. exists ζ2. cbn - [Sub.comp]. now rewrite Sub.comp_id_left. *)
+      (*   - intros. constructor. *)
+      (*   - intros. constructor. *)
+      (*   - intros * IH1 IH2 *. cbn. *)
+      (*     (* apply (mg_bind (boxmgu s1 t1 ζ1) _ (cmgu s1 t1 (ζ1 ⊙ ζ2))); auto. *) *)
+      (* Admitted. *)
 
-    Lemma boxmgu_complete (t1 t2 : Ty w) :
-      forall {w0} (ζ0 : w ⊒⁻ w0) [w1] (ζ1 : w0 ⊒ˢ w1),
-        P.unifies t1[Sub.triangular ζ0] t2[Sub.triangular ζ0] ζ1 ->
-        wp (boxmgu t1 t2 ζ0) (fun mgw mgζ _ => Sub.triangular mgζ ≽ˢ ζ1).
-    Proof.
-      pattern (boxmgu t1 t2).
-      apply boxmgu_elim; clear t1 t2;
-        cbn - [Sub.subst]; intros; try (now constructor);
-        try discriminate.
-      - destruct (boxflex_spec xIn t ζ0).
-        + constructor. destruct a as [w2 [ζ2 []]]. now apply H0.
-        + now apply H0 in H.
-      - destruct (boxflex_spec xIn t ζ0).
-        + constructor. destruct a as [w2 [ζ2 []]]. now apply H0.
-        + now apply unifies_sym, H0 in H.
-      - constructor. apply Sub.geq_max.
-      - apply P.unifiesX_equiv in H1. destruct H1 as [HU1 HU2].
-        rewrite wp_μ. generalize (H _ ζ0 _ ζ1 HU1). clear H.
-        apply option.wp_monotonic. intros [mgw1 [mgζ1 _]] [ζ1' ->].
-        assert (P.unifies s2[Sub.triangular (ζ0 ⊙⁻ mgζ1)] t2[Sub.triangular (ζ0 ⊙⁻ mgζ1)] ζ1') as HU2'.
-        { revert HU2. unfold unifies.
-          now rewrite ?Sub.triangular_trans, ?Sub.subst_comp.
-        }
-        rewrite wp_μ. generalize (H0 _ (ζ0 ⊙⁻ mgζ1) _ ζ1' HU2').
-        apply option.wp_monotonic. intros [mgw2 [mgζ2 _]] [ζ2' ->].
-        constructor. unfold _4.
-        rewrite ?Sub.triangular_trans.
-        apply Sub.geq_precom.
-        apply Sub.geq_precom.
-        apply Sub.geq_max.
-    Qed.
+      (* Lemma boxmgu_spec : BoxUnifierSpec boxmgu. *)
+      (* Proof. *)
+      (*   intros s t. pattern (boxmgu s t). *)
+      (*   apply boxmgu_elim; clear s t. *)
+      (*   - cbn. intros. apply boxflex_spec. *)
+      (*   - cbn. intros x xIn t w1 ζ1. *)
+      (*     generalize (boxflex_spec xIn t ζ1). cbn. *)
+      (*     apply option.spec_monotonic. *)
+      (*     + intros [w2 [ζ2 []]] H. *)
+      (*       now rewrite unifies_sym. *)
+      (*     + intros H. *)
+      (*       now rewrite unifies_sym. *)
+      (*   - constructor. apply trivialproblem. *)
+      (*   - constructor. discriminate. *)
+      (*   - constructor. discriminate. *)
+      (*   - cbn. intros. *)
+      (*     rewrite spec_μ. *)
+      (*     generalize (H w1 ζ1). clear H. *)
+      (*     apply option.spec_monotonic. *)
+      (*     intros [w2 [ζ2 _]] ?. *)
+      (*     rewrite spec_μ. *)
+      (*     generalize (H0 w2 (Tri.trans ζ1 ζ2)). clear H0. *)
+      (*     apply option.spec_monotonic. *)
+      (*     intros [w3 [ζ3 _]] ?. *)
+      (*     constructor. unfold four. *)
+      (*     + rewrite Tri.trans_refl, unifiesX_equiv; cbn. *)
+      (*       rewrite Sub.triangular_trans. *)
+      (*       rewrite Sub.triangular_trans in H0. *)
+      (*       now apply optimists_unifies. *)
+      (*     + admit. *)
+      (*     + admit. *)
+      (* Admitted. *)
 
-    Lemma boxmgu_spec' : BoxUnifierSpec boxmgu.
-    Proof.
-      unfold BoxUnifierSpec. intros *.
-      pose proof (boxmgu_complete t1 t2 ζ1) as Hcompl.
-      destruct (boxmgu_sound t1 t2 ζ1); constructor.
-      - destruct a as [w2 [ζ2 []]]. split; auto.
-        intros w3 ζ3 Hζ3. specialize (Hcompl w3 ζ3 Hζ3). revert Hcompl.
-        unfold wp. now rewrite option.wp_match.
-      - intros w3 ζ3 Hζ3. specialize (Hcompl w3 ζ3 Hζ3). revert Hcompl.
-        unfold wp. now rewrite option.wp_match.
-    Qed.
+      Lemma boxmgu_sound (t1 t2 : Ty w) :
+        forall {w1} (ζ1 : w ⊒⁻ w1),
+          wlp
+            (boxmgu t1 t2 ζ1)
+            (fun w2 ζ2 _ => P.unifies t1[Sub.triangular ζ1] t2[Sub.triangular ζ1] (Sub.triangular ζ2)).
+      Proof.
+        pattern (boxmgu t1 t2).
+        apply boxmgu_elim; clear t1 t2; cbn; intros; try (now constructor).
+        - destruct (boxflex_spec xIn t ζ1); constructor.
+          destruct a as [w2 [ζ2 []]]. apply H.
+        - destruct (boxflex_spec xIn t ζ1); constructor.
+          destruct a as [w2 [ζ2 []]]. apply unifies_sym. apply H.
+        - rewrite wlp_μ. generalize (H _ ζ1). clear H.
+          apply option.wlp_monotonic. intros [w2 [ζ2 _]] ?.
+          rewrite wlp_μ. generalize (H0 _ (ζ1 ⊙⁻ ζ2)).
+          apply option.wlp_monotonic. intros [w3 [ζ3 _]] ?.
+          constructor. unfold _4. cbn.
+          rewrite ?Sub.triangular_trans. cbn.
+          rewrite trans_refl_r.
+          apply unifiesX_equiv. cbn.
+          split.
+          + revert H. apply dclosed_unifies. apply Sub.geq_extend.
+          + revert H1. unfold unifies.
+            now rewrite ?Sub.triangular_trans, ?Sub.subst_comp.
+      Qed.
+
+      Lemma boxmgu_complete (t1 t2 : Ty w) :
+        forall {w0} (ζ0 : w ⊒⁻ w0) [w1] (ζ1 : w0 ⊒ˢ w1),
+          P.unifies t1[Sub.triangular ζ0] t2[Sub.triangular ζ0] ζ1 ->
+          wp (boxmgu t1 t2 ζ0) (fun mgw mgζ _ => Sub.triangular mgζ ≽ˢ ζ1).
+      Proof.
+        pattern (boxmgu t1 t2).
+        apply boxmgu_elim; clear t1 t2;
+          cbn - [Sub.subst]; intros; try (now constructor);
+          try discriminate.
+        - destruct (boxflex_spec xIn t ζ0).
+          + constructor. destruct a as [w2 [ζ2 []]]. now apply H0.
+          + now apply H0 in H.
+        - destruct (boxflex_spec xIn t ζ0).
+          + constructor. destruct a as [w2 [ζ2 []]]. now apply H0.
+          + now apply unifies_sym, H0 in H.
+        - constructor. apply Sub.geq_max.
+        - apply P.unifiesX_equiv in H1. destruct H1 as [HU1 HU2].
+          rewrite wp_μ. generalize (H _ ζ0 _ ζ1 HU1). clear H.
+          apply option.wp_monotonic. intros [mgw1 [mgζ1 _]] [ζ1' ->].
+          assert (P.unifies s2[Sub.triangular (ζ0 ⊙⁻ mgζ1)] t2[Sub.triangular (ζ0 ⊙⁻ mgζ1)] ζ1') as HU2'.
+          { revert HU2. unfold unifies.
+            now rewrite ?Sub.triangular_trans, ?Sub.subst_comp.
+          }
+          rewrite wp_μ. generalize (H0 _ (ζ0 ⊙⁻ mgζ1) _ ζ1' HU2').
+          apply option.wp_monotonic. intros [mgw2 [mgζ2 _]] [ζ2' ->].
+          constructor. unfold _4.
+          rewrite ?Sub.triangular_trans.
+          apply Sub.geq_precom.
+          apply Sub.geq_precom.
+          apply Sub.geq_max.
+      Qed.
+
+      Lemma boxmgu_spec' : BoxUnifierSpec boxmgu.
+      Proof.
+        unfold BoxUnifierSpec. intros *.
+        pose proof (boxmgu_complete t1 t2 ζ1) as Hcompl.
+        destruct (boxmgu_sound t1 t2 ζ1); constructor.
+        - destruct a as [w2 [ζ2 []]]. split; auto.
+          intros w3 ζ3 Hζ3. specialize (Hcompl w3 ζ3 Hζ3). revert Hcompl.
+          unfold wp. now rewrite option.wp_match.
+        - intros w3 ζ3 Hζ3. specialize (Hcompl w3 ζ3 Hζ3). revert Hcompl.
+          unfold wp. now rewrite option.wp_match.
+      Qed.
+
+    End SubstitutionBased.
+
+    Section AssignmentBased.
+
+      Import ProofAssignmentBased.
+      Context (lmgu_sound : forall x (xIn : x ∈ w),
+                  BoxUnifierSound (lmgu xIn)).
+
+      Lemma boxmgu_sound_assignment : BoxUnifierSound boxmgu.
+      Proof.
+        intros t1 t2. pattern (boxmgu t1 t2).
+        apply boxmgu_elim; clear t1 t2.
+        - admit.
+        - admit.
+        - intros *. now rewrite wlp_pure.
+        - constructor.
+        - constructor.
+        - intros * IH1 IH2 *. rewrite wlp_bind.
+          specialize (IH1 _ ζ01 ι1). revert IH1.
+          apply wlp_monotonic; intros w2 ζ12 _ ι2 ? ?.
+          rewrite wlp_bind.
+          specialize (IH2 _ (ζ01 ⊙ ζ12) ι2). revert IH2.
+          apply wlp_monotonic; intros w3 ζ23 _ ι3 ? ?.
+          rewrite wlp_pure. hnf. cbn. subst.
+          rewrite inst_trans in *. now f_equal.
+      Admitted.
+
+      Lemma boxmgu_complete_assignment : BoxUnifierComplete boxmgu.
+      Proof.
+        intros t1 t2. pattern (boxmgu t1 t2).
+        apply boxmgu_elim; clear t1 t2.
+        - admit.
+        - admit.
+        - intros * _. now rewrite wp_pure.
+        - cbn; discriminate.
+        - cbn; discriminate.
+        - intros * IH1 IH2 * Heq. cbn in Heq.
+          rewrite wp_bind.
+          generalize (IH1 _ ζ01 ι1). clear IH1.
+      Admitted.
+
+    End AssignmentBased.
 
   End MguO.
 
@@ -1162,6 +1326,7 @@ Module Variant1.
       '(w1; (r, (cs, a))) <- prenex m ;;
       '(w2; (ζ, tt))      <- solve cs;;
       Some (w2; (alloc.nil_l,persist _ a _ ζ)).
+
 
 End Variant1.
 Export Variant1.
