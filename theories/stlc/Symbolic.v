@@ -10,11 +10,27 @@ From Equations Require Import Equations.
 Local Notation "<{ A ~ w }>" := (persist _ A _ w).
 
 #[export] Instance PersistentTri_Ty : Persistent Tri Ty :=
-  fun w1 t w2 ζ => Sub.subst t (Sub.triangular ζ).
+  fun w1 t w2 r => Sub.subst t (Sub.triangular r).
 #[export] Instance PersistentSub_Ty : Persistent Sub Ty :=
-  fun w1 t w2 ζ => Sub.subst t ζ.
+  fun w1 t w2 r => Sub.subst t r.
 #[export] Instance persistent_unit {R} : Persistent R Unit :=
-  fun w1 u w2 ζ => u.
+  fun w1 u w2 r => u.
+#[export] Instance persistent_prod {R A B} {pRA : Persistent R A} {pRB : Persistent R B} : Persistent R (Prod A B) :=
+  fun w1 '(a,b) w2 r => (persist _ a _ r, persist _ b _ r).
+
+Notation Expr := (Lifted expr).
+(* TODO: define reader applicative to use ctor of expr to create Expr *)
+
+#[export] Instance Persistent_Lifted {R : ACC} {A}
+  {instR : forall w, Inst (R w) (Assignment w)} : Persistent R (Lifted A) :=
+  fun w0 a w1 r1 ι1 => a (inst r1 ι1).
+
+Fixpoint grounding (w : World) : Assignment w :=
+  match w with
+  | ctx.nil      => env.nil
+  | ctx.snoc Γ b => env.snoc (grounding Γ) b ty_bool
+  end%ctx.
+
 Open Scope indexed_scope.
 
 Definition assert {w} t1 t2 :=
@@ -88,25 +104,12 @@ Section RunTI.
     | None             => None
     end.
 
-  Fixpoint grounding (w : World) : Assignment w :=
-    match w with
-    | ctx.nil      => env.nil
-    | ctx.snoc Γ b => env.snoc (grounding Γ) b ty_bool
-    end%ctx.
-
   Definition infer_grounded (e : expr) : option ty :=
     option.map (fun '(w; t) => inst t (grounding w)) (infer_schematic e).
 
 End RunTI.
 
 Section TypeReconstruction.
-
-  Notation Expr := (Lifted expr).
-  (* TODO: define reader applicative to use ctor of expr to create Expr *)
-
-  #[export] Instance Persistent_Lifted {R : ACC} {A}
-    {instR : forall w, Inst (R w) (Assignment w)} : Persistent R (Lifted A) :=
-    fun w0 a w1 r1 ι1 => a (inst r1 ι1).
 
   Definition ret  {w} := Ret_Free (Prod Ty Expr) w.
   Definition fail {w} := Fail_Free (Prod Ty Expr) w.
@@ -152,6 +155,23 @@ Section TypeReconstruction.
           ret (Ty_func _ <{ t_var ~ ω2 }> (fst t_e),
               fun a => e_abst var (inst <{ t_var ~ ω2 }> a) (snd t_e a))
     end.
+
+  Import SigTNotations.
+
+  (* reconstruct_schematic defines type reconstruction without grounding
+     of remaining unification variables. *)
+  Definition reconstruct_schematic (e : expr) : option (Schematic (Prod Ty Expr)) :=
+    match Unification.Variant1.solve_ng (reconstruct e []%list) with
+    | Some (w; (_, te)) => Some (w; te)
+    | None              => None
+    end.
+
+  Definition reconstruct_grounded (e : expr) : option (ty * expr) :=
+    option.map
+      (fun s : Schematic _ =>
+         let (w, te) := s in
+         inst te (grounding w))
+      (reconstruct_schematic e).
 
 End TypeReconstruction.
 

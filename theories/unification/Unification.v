@@ -1230,12 +1230,53 @@ Module Variant1.
       Context (lmgu_sound : forall x (xIn : x ∈ w),
                   BoxUnifierSound (lmgu xIn)).
 
+      Lemma flex_sound_assignment {x} (xIn : x ∈ w) (t : Ty w) (ι0 : Assignment w) :
+        WLP (flex t xIn) (fun w1 ζ01 _ ι1 => inst (Ty_hole xIn) ι0 = inst t ι0) ι0.
+      Proof.
+        unfold flex, WLP.
+        destruct (varview t) as [y yIn|].
+        - destruct (occurs_check_view xIn yIn).
+          + constructor. reflexivity.
+          + constructor. cbn - [inst]. intros.
+            rewrite <- Sub.lookup_thin.
+            change (env.lookup (Sub.thin xIn) yIn) with (Sub.subst (Ty_hole yIn) (Sub.thin xIn)).
+            (* rewrite trans_refl_r. cbn. *)
+            (* rewrite ?Sub.lookup_thick. unfold thickIn. *)
+            (* now rewrite ?occurs_check_view_refl, ?occurs_check_view_thin. *)
+            admit.
+        - rewrite ?option.wlp_aplazy, ?option.wlp_map.
+          generalize (occurs_check_sound t xIn).
+          apply option.wlp_monotonic.
+          intros t' ->. cbn - [inst]. intros.
+          (* rewrite trans_refl_r. *)
+          (* rewrite Sub.subst_thin. *)
+          (*   rewrite <- Sub.subst_comp. *)
+          (*   rewrite Sub.comp_thin_thick. *)
+          (*   rewrite Sub.subst_refl. *)
+          (*   rewrite Sub.lookup_thick. *)
+          (*   unfold thickIn. *)
+          (*   now rewrite occurs_check_view_refl. *)
+          admit.
+      Admitted.
+
+      Lemma boxflex_sound_assignment {x} (xIn : x ∈ w) (t : Ty w) (w1 : World) (ζ01 : w ⊒⁻ w1) (ι1 : Assignment w1) :
+        WLP (boxflex xIn t ζ01) (fun w2 ζ2 _ _ => inst (Ty_hole xIn) (inst ζ01 ι1) = inst t (inst ζ01 ι1)) ι1.
+      Proof.
+        unfold boxflex, box_intro_split.
+        destruct ζ01 as [|w2 y yIn ty].
+        - apply flex_sound_assignment.
+        - generalize (lmgu_sound yIn (Ty_hole xIn)[Sub.thick yIn ty] t[Sub.thick yIn ty] ζ01 ι1).
+          apply wlp_monotonic. intros w3 ζ3 _ ι3 <-. cbn.
+          admit.
+      Admitted.
+
       Lemma boxmgu_sound_assignment : BoxUnifierSound boxmgu.
       Proof.
         intros t1 t2. pattern (boxmgu t1 t2).
         apply boxmgu_elim; clear t1 t2.
-        - admit.
-        - admit.
+        - intros. apply boxflex_sound_assignment.
+        - intros. generalize (boxflex_sound_assignment xIn t ζ01 ι1).
+          now apply wlp_monotonic.
         - intros *. now rewrite wlp_pure.
         - constructor.
         - constructor.
@@ -1247,13 +1288,13 @@ Module Variant1.
           apply wlp_monotonic; intros w3 ζ23 _ ι3 ? ?.
           rewrite wlp_pure. hnf. cbn. subst.
           rewrite inst_trans in *. now f_equal.
-      Admitted.
+      Qed.
 
       Lemma boxmgu_complete_assignment : BoxUnifierComplete boxmgu.
       Proof.
         intros t1 t2. pattern (boxmgu t1 t2).
         apply boxmgu_elim; clear t1 t2.
-        - admit.
+        - cbn. admit.
         - admit.
         - intros * _. now rewrite wp_pure.
         - cbn; discriminate.
