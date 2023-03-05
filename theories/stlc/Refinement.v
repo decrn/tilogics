@@ -157,7 +157,7 @@ Qed.
 
 Lemma lift_preserves_relatedness :
   forall w ass t,
-    RTy w ass (Symbolic.lift t w) t.
+    RTy w ass (lift t w) t.
 Proof. induction t. constructor. now apply Func_relates_func. Qed.
 
 Arguments Symbolic.assert    : simpl never.

@@ -352,3 +352,48 @@ Section WeakestPre.
   Proof. split; intros; induction m; cbn; firstorder; exists x; firstorder. Qed.
 
 End WeakestPre.
+
+(* Indexes a given ty by a world Σ *)
+Fixpoint lift (t : ty) : ⊢ Ty :=
+  fun w =>
+    match t with
+    | ty_bool       => Ty_bool w
+    | ty_func t1 t2 => Ty_func w (lift t1 w) (lift t2 w)
+    end.
+
+Fixpoint liftEnv (E : env) : ⊢ Env :=
+  fun w =>
+    match E with
+    | List.nil               => List.nil
+    | List.cons (pair s t) E => cons (pair s (lift t w)) (liftEnv E w)
+    end.
+
+Lemma inst_lift (w : World) (t : ty) (ι : Assignment w) :
+  inst (lift t w) ι = t.
+Proof. Admitted.
+
+Lemma inst_lift_env (w : World) (G : env) (ι : Assignment w) :
+  inst (liftEnv G w) ι = G.
+Proof. Admitted.
+
+Lemma inst_persist_env {R} {persR : Persistent R Env}
+  {instR : forall w, Inst (R w) (Assignment w)}
+  {w0 w1} (r1 : R w0 w1) (G0 : Env w0) (ι1 : Assignment w1) :
+  inst (persist _ G0 _ r1) ι1 = inst G0 (inst r1 ι1).
+Proof. Admitted.
+
+Lemma inst_persist_ty {R} {persR : Persistent R Ty}
+  {instR : forall w, Inst (R w) (Assignment w)}
+  {w0 w1} (r1 : R w0 w1) (t0 : Ty w0) (ι1 : Assignment w1) :
+  inst (persist _ t0 _ r1) ι1 = inst t0 (inst r1 ι1).
+Proof. Admitted.
+
+Lemma inst_step {R} {stepR : Step R} {instR : forall w, Inst (R w) (Assignment w)}
+  {w x} (ι : Assignment (w ▻ x)) :
+  inst (step (R := R)) ι = let (ι',_) := env.view ι in ι'.
+Proof. Admitted.
+
+Lemma inst_step_snoc {R} {stepR : Step R} {instR : forall w, Inst (R w) (Assignment w)}
+  {w x} (ι : Assignment w) (t : ty) :
+  inst (step (R := R)) (env.snoc ι x t) = ι.
+Proof. rewrite inst_step. reflexivity. Qed.

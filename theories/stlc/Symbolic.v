@@ -9,10 +9,7 @@ From Equations Require Import Equations.
 
 Local Notation "<{ A ~ w }>" := (persist _ A _ w).
 
-#[export] Instance PersistentTri_Ty : Persistent Tri Ty :=
-  fun w1 t w2 r => Sub.subst t (Sub.triangular r).
-#[export] Instance PersistentSub_Ty : Persistent Sub Ty :=
-  fun w1 t w2 r => Sub.subst t r.
+
 #[export] Instance persistent_unit {R} : Persistent R Unit :=
   fun w1 u w2 r => u.
 #[export] Instance persistent_prod {R A B} {pRA : Persistent R A} {pRB : Persistent R B} : Persistent R (Prod A B) :=
@@ -39,21 +36,6 @@ Definition assert {w} t1 t2 :=
 Definition exists_Ty : forall Σ, FreeM Ty Σ :=
   fun Σ => let i := ctx.length Σ in
            Bind_Exists_Free Ty Σ i (Ret_Free _ _ (Ty_hole _ i ctx.in_zero)).
-
-(* Indexes a given ty by a world Σ *)
-Fixpoint lift (t : ty) : ⊢ Ty :=
-  fun w =>
-    match t with
-    | ty_bool       => Ty_bool w
-    | ty_func t1 t2 => Ty_func w (lift t1 w) (lift t2 w)
-    end.
-
-Fixpoint liftEnv (E : env) : ⊢ Env :=
-  fun w =>
-    match E with
-    | List.nil               => List.nil
-    | List.cons (pair s t) E => cons (pair s (lift t w)) (liftEnv E w)
-    end.
 
 Section Generate.
   Import MonadNotations.
@@ -95,6 +77,7 @@ End Generate.
 Section RunTI.
 
   Import SigTNotations.
+  Import (hints) Sub.
 
   (* infer_schematic defines inference without grounding
      of remaining unification variables. *)
@@ -157,6 +140,7 @@ Section TypeReconstruction.
     end.
 
   Import SigTNotations.
+  Import (hints) Sub.
 
   (* reconstruct_schematic defines type reconstruction without grounding
      of remaining unification variables. *)
@@ -266,80 +250,55 @@ Module acc.
 
 End acc.
 
-Lemma persist_liftTy : forall (w w' : World) t (r : Sub w w'),
-    persist w (lift t _) w' r = lift t _.
-Proof.
-  intros w w' t. revert w'.
-  induction t; cbn; intros; now f_equal.
-Qed.
+Section MoveMe.
 
-(* Lemma persist_split : forall w w' iw (pos : w ↑ iw) (neg : iw ↓ w') x, *)
-(*   persist w  x iw pos -> *)
-(*   persist iw x w' neg -> *)
-(*   persist w  x w' {| iw := iw; pos := pos; neg := neg |}. *)
+  Import (hints) Sub.
+  Lemma persist_liftTy : forall (w w' : World) t (r : Sub w w'),
+      persist w (lift t _) w' r = lift t _.
+  Proof.
+    intros w w' t. revert w'.
+    induction t; cbn; intros; now f_equal.
+  Qed.
 
-Lemma persist_liftEnv : forall (w w' : World) e (r : Sub w w'),
-    persist w (liftEnv e _) w' r = liftEnv e _.
-Proof.
-  induction e. now cbn.
-  destruct a. cbn. intro r. rewrite IHe.
-  now rewrite persist_liftTy.
-Qed.
+  (* Lemma persist_split : forall w w' iw (pos : w ↑ iw) (neg : iw ↓ w') x, *)
+  (*   persist w  x iw pos -> *)
+  (*   persist iw x w' neg -> *)
+  (*   persist w  x w' {| iw := iw; pos := pos; neg := neg |}. *)
 
-Lemma subst_lift (t : ty) :
-  forall w1 w2 (r : w1 ⊒ˢ w2),
-    Sub.subst (lift t w1) r = lift t w2.
-Proof.
-  induction t; intros w1 w2 r; cbn; now f_equal.
-Qed.
+  Lemma persist_liftEnv : forall (w w' : World) e (r : Sub w w'),
+      persist w (liftEnv e _) w' r = liftEnv e _.
+  Proof.
+    induction e. now cbn.
+    destruct a. cbn. intro r. rewrite IHe.
+    now rewrite persist_liftTy.
+  Qed.
 
-Lemma resolve_lift (g : env) (x : String.string) (w : World) :
-  resolve x (liftEnv g w) =
-    option.map (fun t => lift t w) (resolve x g).
-Proof.
-  induction g as [|[y t]]; cbn.
-  - reflexivity.
-  - now destruct String.string_dec.
-Qed.
+  Lemma subst_lift (t : ty) :
+    forall w1 w2 (r : w1 ⊒ˢ w2),
+      persist _ (lift t w1) _ r = lift t w2.
+  Proof.
+    induction t; intros w1 w2 r; cbn; now f_equal.
+  Qed.
 
-Lemma resolve_inst (w : World) (g : Env w) (x : String.string) (ι : Assignment w) :
-  resolve x (inst g ι) =
-    option.map (fun t => inst t ι) (resolve x g).
-Proof.
-  induction g as [|[y t]]; cbn.
-  - reflexivity.
-  - now destruct String.string_dec.
-Qed.
+  Lemma resolve_lift (g : env) (x : String.string) (w : World) :
+    resolve x (liftEnv g w) =
+      option.map (fun t => lift t w) (resolve x g).
+  Proof.
+    induction g as [|[y t]]; cbn.
+    - reflexivity.
+    - now destruct String.string_dec.
+  Qed.
 
-Lemma inst_lift (w : World) (t : ty) (ι : Assignment w) :
-  inst (lift t w) ι = t.
-Proof. Admitted.
+  Lemma resolve_inst (w : World) (g : Env w) (x : String.string) (ι : Assignment w) :
+    resolve x (inst g ι) =
+      option.map (fun t => inst t ι) (resolve x g).
+  Proof.
+    induction g as [|[y t]]; cbn.
+    - reflexivity.
+    - now destruct String.string_dec.
+  Qed.
 
-Lemma inst_lift_env (w : World) (G : env) (ι : Assignment w) :
-  inst (liftEnv G w) ι = G.
-Proof. Admitted.
-
-Lemma inst_persist_env {R} {persR : Persistent R Env}
-  {instR : forall w, Inst (R w) (Assignment w)}
-  {w0 w1} (r1 : R w0 w1) (G0 : Env w0) (ι1 : Assignment w1) :
-  inst <{ G0 ~ r1 }> ι1 = inst G0 (inst r1 ι1).
-Proof. Admitted.
-
-Lemma inst_persist_ty {R} {persR : Persistent R Ty}
-  {instR : forall w, Inst (R w) (Assignment w)}
-  {w0 w1} (r1 : R w0 w1) (t0 : Ty w0) (ι1 : Assignment w1) :
-  inst <{ t0 ~ r1 }> ι1 = inst t0 (inst r1 ι1).
-Proof. Admitted.
-
-Lemma inst_step {R} {stepR : Step R} {instR : forall w, Inst (R w) (Assignment w)}
-  {w x} (ι : Assignment (w ▻ x)) :
-  inst (step (R := R)) ι = let (ι',_) := env.view ι in ι'.
-Proof. Admitted.
-
-Lemma inst_step_snoc {R} {stepR : Step R} {instR : forall w, Inst (R w) (Assignment w)}
-  {w x} (ι : Assignment w) (t : ty) :
-  inst (step (R := R)) (env.snoc ι x t) = ι.
-Proof. rewrite inst_step. reflexivity. Qed.
+End MoveMe.
 
 Module StrongMonotonicity.
 
@@ -526,7 +485,7 @@ Module StrongMonotonicity.
 
   Definition RTy : RELATION Ty :=
     fun w0 w1 r01 t0 t1 =>
-      t1 = Sub.subst t0 r01.
+      t1 = persist _ t0 _ r01.
 
   Lemma rty_bool {w0 w1 r01} :
     RTy w0 w1 r01 (Ty_bool _) (Ty_bool _).
@@ -610,7 +569,7 @@ Module StrongMonotonicity.
       destruct H as [_ H].
       unfold P.unifies in *.
       specialize (H _ (r01 ⊙ Sub.triangular r13)).
-      rewrite ?Sub.subst_comp in H.
+      rewrite ?Sub.persist_trans in H.
       specialize (H H0).
       destruct H as (r23 & ?).
       exists r23. split; auto.
@@ -619,7 +578,7 @@ Module StrongMonotonicity.
       destruct H0 as [H0 _].
       unfold RTy in *.
       subst. unfold P.unifies in *.
-      now rewrite ?Sub.subst_comp, H0.
+      now rewrite ?Sub.persist_trans, H0.
     - auto.
   Qed.
 
@@ -897,17 +856,18 @@ Module CandidateType.
       now rewrite Hι0, Hι1, Hι2, !inst_trans.
     + rewrite resolve_inst in H. destruct resolve; cbn in *; now inversion H.
     + exists vt. exists t.
-      rewrite inst_persist_ty.
+      rewrite inst_persist_ty, inst_trans, !inst_step_snoc.
       split; [easy|].
       specialize (IHT (w0 ▻ 1 ▻ 2)
                       (env.snoc (env.snoc ι0 1 vt) 2 t)
                       ((v, Ty_hole (w0 ▻ 1 ▻ 2) 1 (ctx.in_succ ctx.in_zero)) :: <{ G0 ~ step ⊙ step }>)
                       (Ty_hole (w0 ▻ 1 ▻ 2) 2 ctx.in_zero)).
-      cbn in IHT. rewrite inst_persist_env in IHT. specialize (IHT eq_refl eq_refl).
+      cbn in IHT. rewrite inst_persist_env, inst_trans, !inst_step_snoc in IHT.
+      specialize (IHT eq_refl eq_refl).
       revert IHT. apply wp_monotonic. intros. hnf.
       now rewrite !inst_trans, <- H.
     + exists t.
-      rewrite inst_persist_ty, inst_lift, H0.
+      rewrite inst_persist_ty, inst_lift, inst_step_snoc, H0.
       split; [easy|].
       specialize (IHT (w0 ▻ 2)
                       (env.snoc ι0 2 t)
@@ -916,6 +876,7 @@ Module CandidateType.
       cbn in IHT.
       rewrite inst_lift in IHT.
       rewrite inst_persist_env in IHT.
+      rewrite inst_step_snoc in IHT.
       specialize (IHT eq_refl eq_refl).
       revert IHT. apply wp_monotonic. intros. hnf.
       now rewrite inst_trans, <- H.
@@ -928,6 +889,7 @@ Module CandidateType.
       cbn in IHT1.
       rewrite inst_persist_env in IHT1.
       rewrite inst_persist_ty in IHT1.
+      rewrite inst_step_snoc in IHT1.
       specialize (IHT1 eq_refl eq_refl).
       revert IHT1. apply wp_monotonic. intros.
       specialize (IHT2 _ ι1 <{ G0 ~ step ⊙ r1 }> (Ty_hole w1 0 <{ ctx.in_zero ~ r1 }>)).
@@ -1013,7 +975,7 @@ Module CandidateType.
         ?inst_persist_ty,
         ?inst_trans, ?inst_step_snoc, ?inst_step, <- ?Hsnoc in *; cbn in *;
       rewrite ?lookup_inst, <- ?Hsnoc in *.
-      + now rewrite inst_persist_ty in Hte1.
+      + now rewrite inst_persist_ty, inst_step_snoc in Hte1.
       + now rewrite <- lookup_inst, <- Hsnoc in Hte2.
   Qed.
 
@@ -1236,9 +1198,10 @@ End ProofWorlds.
       rewrite resolve_inst, Heqo. cbn. congruence.
     - unfold T, _4.
       rewrite wlp_bind.
+      rewrite trans_refl_r.
       specialize (IHe _ (env.snoc ι0 (ctx.length w0) t) ((s,
          Ty_hole (w0 ▻ ctx.length w0) (ctx.length w0)
-           ctx.in_zero) :: <{ G0 ~ step ⊙ refl }>)).
+           ctx.in_zero) :: <{ G0 ~ step }>)).
       revert IHe. apply wlp_monotonic. intros w1 r1 v1 ι1 Hv1.
       destruct v1 eqn:? in Hv1. destruct Hv1. cbn.
       unfold T, _4.
@@ -1264,7 +1227,8 @@ End ProofWorlds.
       constructor 6. cbn in H0.
       now rewrite ?inst_lift in H0.
     - unfold T, _4. rewrite wlp_bind.
-      specialize (IHe2 _ (env.snoc ι0 (ctx.length w0) t) <{ G0 ~ step ⊙ refl }>).
+      rewrite trans_refl_r.
+      specialize (IHe2 _ (env.snoc ι0 (ctx.length w0) t) <{ G0 ~ step }>).
       revert IHe2. apply wlp_monotonic. intros w1 r1 v1 ι1 Hv1.
       destruct v1 eqn:? in Hv1. destruct Hv1. cbn.
       rewrite wlp_bind.
@@ -1365,7 +1329,7 @@ End ProofWorlds.
     + exists t1.
       unfold Definitions.T, _4. cbn.
       rewrite wp_bind.
-      specialize (IHT2 _ (env.snoc ι0 (ctx.length w0) t1) <{ G0 ~ alloc.fresh w0 (ctx.length w0) (w0 ▻ ctx.length w0) refl }>).
+      specialize (IHT2 _ (env.snoc ι0 (ctx.length w0) t1) <{ G0 ~ step }>).
       cbn in IHT2.
       rewrite inst_persist_env in IHT2.
       cbn in IHT2.

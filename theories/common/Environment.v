@@ -140,10 +140,15 @@ Section WithBinding.
 
     End Inversions.
 
-    (*!*)
-    Equations lookup {Γ} (E : Env Γ) {b} (bIn : b ∈ Γ) : D b :=
-    | snoc _ v | ctx.in_zero   => v
-    | snoc E _ | ctx.in_succ i => lookup E i.
+    Fixpoint lookup {Γ} (E : Env Γ) : forall {b}, b ∈ Γ -> D b :=
+      match E with
+      | nil      => fun _ bIn => match ctx.view bIn with end
+      | snoc E v => fun _ bIn =>
+        match ctx.view bIn with
+        | ctx.isZero   => v
+        | ctx.isSucc i => lookup E i
+        end
+      end.
 
     Inductive All (Q : forall b, D b -> Type) : forall {Γ}, Env Γ -> Type :=
     | all_nil : All Q nil
@@ -234,16 +239,16 @@ Section WithBinding.
         snoc (tabulate (fun y yIn => EΓb y (ctx.in_succ yIn))) (EΓb _ ctx.in_zero)
       end.
 
-    (* Fixpoint update {Γ} (E : Env Γ) {struct E} : *)
-    (*   forall {b} (bIn : b ∈ Γ) (new : D b), Env Γ := *)
-    (*   match E with *)
-    (*   | nil => ctx.in_case_nil *)
-    (*   | snoc E bold => *)
-    (*     ctx.in_case_snoc *)
-    (*       (fun z => D z -> Env _) *)
-    (*       (fun new => snoc E new) *)
-    (*       (fun b0' bIn0' new => snoc (update E bIn0' new) bold) *)
-    (*   end. *)
+    Fixpoint update {Γ} (E : Env Γ) {struct E} :
+      forall {b} (bIn : b ∈ Γ) (new : D b), Env Γ :=
+      match E with
+      | nil        => fun _ bIn => match ctx.view bIn with end
+      | snoc E old => fun _ bIn =>
+        match ctx.view bIn with
+        | ctx.isZero     => snoc E
+        | ctx.isSucc bIn => fun new => snoc (update E bIn new) old
+        end
+      end.
 
     Definition head {Γ b} (E : Env (Γ ▻ b)) : D b :=
       match E in Env Γb
@@ -311,18 +316,27 @@ Section WithBinding.
       lookup (insert bIn E v) bIn = v.
     Proof. induction Γ; destroy bIn; destroy E; cbn; auto. Qed.
 
-    (* (* Slower implementation of insert that is easier to reason about. *) *)
-    (* Definition insert' {Γ : Ctx B} {b} (bIn : b ∈ Γ) (E : Env (Γ - b)) (v : D b) : Env Γ := *)
-    (*   tabulate (fun x xIn => *)
-    (*               match ctx.occurs_check_var bIn xIn with *)
-    (*               | inl e    => eq_rect b D v x e *)
-    (*               | inr xIn' => lookup E xIn' *)
-    (*               end). *)
+    Lemma lookup_insert_thin {b Γ} {bIn : b ∈ Γ}
+          {E : Env (Γ - b)} {v : D b}
+          (b' : B) (i : b' ∈ Γ - b) :
+      lookup (insert bIn E v) (ctx.in_thin bIn i) = lookup E i.
+    Proof.
+      induction Γ; destroy bIn; destroy E; destroy i; auto.
+      exact (IHΓ _ _ _).
+    Qed.
 
-    (* (* Slower implementation of remove that is easier to reason about. *) *)
-    (* Definition remove' {Γ b} (E : Env Γ) (bIn : b ∈ Γ) : Env (Γ - b) := *)
-    (*   tabulate (fun x xIn => lookup E (ctx.shift_var bIn xIn)). *)
-    (* Global Arguments remove' {_} b E. *)
+    (* Slower implementation of insert that is easier to reason about. *)
+    Definition insert' {Γ : Ctx B} {b} (bIn : b ∈ Γ) (E : Env (Γ - b)) (v : D b) : Env Γ :=
+      tabulate (fun x xIn =>
+                  match ctx.occurs_check_view bIn xIn with
+                  | ctx.Same _      => v
+                  | ctx.Diff _ xIn' => lookup E xIn'
+                  end).
+
+    (* Slower implementation of remove that is easier to reason about. *)
+    Definition remove' {Γ b} (E : Env Γ) (bIn : b ∈ Γ) : Env (Γ - b) :=
+      tabulate (fun x xIn => lookup E (ctx.in_thin bIn xIn)).
+    Global Arguments remove' {_} b E.
 
     (* Lemma lookup_update {Γ} (E : Env Γ) : *)
     (*   forall {b} (bInΓ : b ∈ Γ) (db : D b), *)
@@ -374,27 +388,23 @@ Section WithBinding.
       apply (IHΓ (fun b bInΓ => g b (ctx.in_succ _))).
     Qed.
 
-    (* Lemma remove_remove' {Γ x} (E : Env Γ) (xIn : x ∈ Γ) : *)
-    (*   remove x E xIn = remove' x E xIn. *)
-    (* Proof. *)
-    (*   unfold remove'. induction E; destroy xIn; cbn. *)
-    (*   - apply lookup_extensional; intros. *)
-    (*     now rewrite lookup_tabulate. *)
-    (*   - f_equal. apply IHE. *)
-    (* Qed. *)
+    Lemma remove_remove' {Γ x} (E : Env Γ) (xIn : x ∈ Γ) :
+      remove x E xIn = remove' x E xIn.
+    Proof.
+      unfold remove'. induction E; destroy xIn; cbn.
+      - apply lookup_extensional; intros.
+        now rewrite lookup_tabulate.
+      - f_equal. apply IHE.
+    Qed.
 
-    (* Lemma insert_insert' {Γ x} (xIn : x ∈ Γ) (E : Env (Γ - x)) (v : D x) : *)
-    (*   insert xIn E v = insert' xIn E v. *)
-    (* Proof. *)
-    (*   unfold insert'. eapply lookup_extensional. intros b' bIn. *)
-    (*   rewrite lookup_tabulate. *)
-    (*   pose proof (ovs := ctx.occurs_check_var_spec xIn bIn). *)
-    (*   destruct (ctx.occurs_check_var xIn bIn). *)
-    (*   - subst. *)
-    (*     now rewrite insert_lookup. *)
-    (*   - destruct ovs as (-> & neq). *)
-    (*     now rewrite insert_lookup_shift. *)
-    (* Qed. *)
+    Lemma insert_insert' {Γ x} (xIn : x ∈ Γ) (E : Env (Γ - x)) (v : D x) :
+      insert xIn E v = insert' xIn E v.
+    Proof.
+      unfold insert'. eapply lookup_extensional. intros b' bIn.
+      rewrite lookup_tabulate. destruct ctx.occurs_check_view.
+      - now rewrite lookup_insert.
+      - now rewrite lookup_insert_thin.
+    Qed.
 
     Lemma lookup_cat_left {Γ1 Γ2 x} (xIn : x ∈ Γ1) (E1 : Env Γ1) (E2 : Env Γ2) :
       lookup (cat E1 E2) (ctx.in_cat_left Γ2 xIn) = lookup E1 xIn.

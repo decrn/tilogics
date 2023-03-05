@@ -52,14 +52,10 @@ Module Sub.
     fun w0 => forall w1, w0 ⊒ˢ w1 -> A w1.
   Local Notation "□ A" := (Box A) (at level 9, format "□ A", right associativity).
 
-  Definition subst : ⊢ Ty -> □Ty :=
-    fun w1 =>
-      fix subst (S : Ty w1) {w2} (ζ : w1 ⊒ˢ w2) {struct S} : Ty w2 :=
-      match S with
-      | Ty_hole σIn   => env.lookup ζ σIn
-      | Ty_bool       => Ty_bool
-      | Ty_func S1 S2 => Ty_func (subst S1 ζ) (subst S2 ζ)
-      end.
+  #[local] Notation subst t θ := (persist _ t _ θ) (only parsing).
+
+  #[export] Instance lk_sub : Lk Sub :=
+    fun w1 w2 r x xIn => env.lookup r xIn.
 
   Definition thick {w x} (xIn : x ∈ w) (s : Ty (w - x)) : w ⊒ˢ w - x :=
     env.tabulate (thickIn xIn s).
@@ -72,13 +68,13 @@ Module Sub.
     fix trans {w0 w1 w2} ζ1 ζ2 {struct ζ1} :=
       match ζ1 with
       | env.nil         => env.nil
-      | env.snoc ζ1 x t => env.snoc (trans ζ1 ζ2) x (subst t ζ2)
+      | env.snoc ζ1 x t => env.snoc (trans ζ1 ζ2) x (persist _ t _ ζ2)
       end.
   #[export] Instance step_sub : Step Sub :=
     fun w x => thin ctx.in_zero.
 
   Definition up1 {w0 w1} (r01 : Sub w0 w1) {n} : Sub (w0 ▻ n) (w1 ▻ n) :=
-    env.snoc (env.map (fun _ t => subst t step) r01) n (Ty_hole ctx.in_zero).
+    env.snoc (env.map (fun _ (t : Ty _) => persist _ t _ step) r01) n (Ty_hole ctx.in_zero).
 
   Fixpoint triangular {w1 w2} (ζ : w1 ⊒⁻ w2) : w1 ⊒ˢ w2 :=
     match ζ with
@@ -86,47 +82,51 @@ Module Sub.
     | Tri.cons x t ζ => trans (thick _ t) (triangular ζ)
     end.
 
-  Lemma lookup_refl {w x} (xIn : x ∈ w)  :
-    env.lookup refl xIn = Ty_hole xIn.
-  Proof. apply env.lookup_tabulate. Qed.
+  Ltac foldlk :=
+    change_no_check (env.lookup ?x ?y) with (lk x y).
 
-  Lemma lookup_trans {w1 w2 w3 x} (xIn : x ∈ w1) (ζ1 : w1 ⊒ˢ w2) (ζ2 : w2 ⊒ˢ w3) :
-    env.lookup (trans ζ1 ζ2) xIn = subst (env.lookup ζ1 xIn) ζ2.
-  Proof. induction ζ1; destruct (ctx.view xIn); cbn; auto. Qed.
+  Lemma lk_refl {w x} (xIn : x ∈ w)  :
+    lk refl xIn = Ty_hole xIn.
+  Proof. apply (env.lookup_tabulate (fun _ => Ty_hole)). Qed.
 
-  Lemma lookup_thin {w x y} (xIn : x ∈ w) (yIn : y ∈ w - x) :
-    env.lookup (thin xIn) yIn = Ty_hole (ctx.in_thin xIn yIn).
-  Proof. unfold thin. now rewrite env.lookup_tabulate. Qed.
+  Lemma lk_trans {w1 w2 w3 x} (xIn : x ∈ w1) (ζ1 : w1 ⊒ˢ w2) (ζ2 : w2 ⊒ˢ w3) :
+    lk (trans ζ1 ζ2) xIn = persist _ (lk ζ1 xIn) _ ζ2.
+  Proof. induction ζ1; destruct (ctx.view xIn); cbn; now foldlk. Qed.
 
-  Lemma lookup_thick {w x y} (xIn : x ∈ w) (t : Ty _) (yIn : y ∈ w) :
-    env.lookup (thick xIn t) yIn = thickIn xIn t yIn.
-  Proof. unfold thick. now rewrite env.lookup_tabulate. Qed.
+  Lemma lk_thin {w x y} (xIn : x ∈ w) (yIn : y ∈ w - x) :
+    lk (thin xIn) yIn = Ty_hole (ctx.in_thin xIn yIn).
+  Proof. unfold lk, lk_sub, thin. now rewrite env.lookup_tabulate. Qed.
 
-  Lemma subst_refl {w} (t : Ty w) :
-    subst t refl = t.
-  Proof. induction t; cbn; f_equal; now rewrite ?lookup_refl. Qed.
+  Lemma lk_thick {w x y} (xIn : x ∈ w) (t : Ty _) (yIn : y ∈ w) :
+    lk (thick xIn t) yIn = thickIn xIn t yIn.
+  Proof. unfold lk, lk_sub, thick. now rewrite env.lookup_tabulate. Qed.
 
-  Lemma subst_comp {w1} (t : Ty w1) {w2 w3} (ζ2 : w2 ⊒ˢ w3) (ζ1 : w1 ⊒ˢ w2) :
+  Lemma persist_refl {w} (t : Ty w) :
+    persist _ t _ refl = t.
+  Proof. (* induction t; cbn; f_equal; now rewrite ?lookup_refl. *) Admitted.
+
+  Lemma persist_trans {w1} (t : Ty w1) {w2 w3} (ζ2 : w2 ⊒ˢ w3) (ζ1 : w1 ⊒ˢ w2) :
     subst t (trans ζ1 ζ2) = subst (subst t ζ1) ζ2.
-  Proof. induction t; cbn; f_equal; now rewrite ?lookup_trans. Qed.
+  Proof. (* induction t; cbn; f_equal; now rewrite ?lookup_trans. *) Admitted.
 
   #[export] Instance preorder_sub : PreOrder Sub.
   Proof.
     constructor.
-    - intros. apply env.lookup_extensional. intros.
-      now rewrite lookup_trans, lookup_refl.
-    - intros. apply env.lookup_extensional. intros.
-      now rewrite lookup_trans, subst_refl.
-    - intros. apply env.lookup_extensional. intros.
-      now rewrite ?lookup_trans, subst_comp.
+    - intros. apply env.lookup_extensional. intros. foldlk.
+      now rewrite lk_trans, lk_refl.
+    - intros. apply env.lookup_extensional. intros. foldlk.
+      now rewrite lk_trans, persist_refl.
+    - intros. apply env.lookup_extensional. intros. foldlk.
+      now rewrite ?lk_trans, persist_trans.
   Qed.
 
   #[export] Instance InstSub : forall w, Inst (Sub w) (Assignment w) :=
-    fix instsub {w0 w1} (r : Sub w0 w1) (ι : Assignment w1) {struct r} :=
-      match r with
-      | env.nil        => env.nil
-      | env.snoc r _ t => env.snoc (inst (Inst := @instsub _) r ι) _ (inst t ι)
-      end.
+    fun w0 w1 r ι => env.map (fun _ (t : Ty w1) => inst t ι) r.
+    (* fix instsub {w0 w1} (r : Sub w0 w1) (ι : Assignment w1) {struct r} := *)
+    (*   match r with *)
+    (*   | env.nil        => env.nil *)
+    (*   | env.snoc r _ t => env.snoc (inst (Inst := @instsub _) r ι) _ (inst t ι) *)
+    (*   end. *)
 
   Lemma triangular_trans {w0 w1 w2} (ζ01 : w0 ⊒⁻ w1) (ζ12 : w1 ⊒⁻ w2) :
     triangular (trans ζ01 ζ12) =
@@ -140,19 +140,19 @@ Module Sub.
   Lemma comp_thin_thick {w x} (xIn : x ∈ w) (s : Ty (w - x)) :
     trans (thin xIn) (thick xIn s) = refl.
   Proof.
-    apply env.lookup_extensional. intros y yIn.
-    rewrite lookup_trans, lookup_refl, lookup_thin. cbn.
-    rewrite lookup_thick. unfold thickIn.
+    apply env.lookup_extensional. intros y yIn. foldlk.
+    rewrite lk_trans, lk_refl, lk_thin. cbn.
+    rewrite lk_thick. unfold thickIn.
     now rewrite ctx.occurs_check_view_thin.
   Qed.
 
   Lemma thin_thick_pointful {w x} (xIn : x ∈ w) (s : Ty (w - x)) (t : Ty (w - x)) :
     subst (subst t (thin xIn)) (thick xIn s) = t.
-  Proof. now rewrite <- subst_comp, comp_thin_thick, subst_refl. Qed.
+  Proof. now rewrite <- persist_trans, comp_thin_thick, persist_refl. Qed.
 
   Lemma subst_thin {w x} (xIn : x ∈ w) (T : Ty (w - x)) :
     Triangular.thin xIn T = subst T (thin xIn).
-  Proof. induction T; cbn; f_equal; now rewrite ?lookup_thin. Qed.
+  Proof. induction T; cbn; f_equal; now rewrite ?lk_thin. Qed.
 
   Definition geq {w0 w1} (ζ1 : w0 ⊒ˢ w1) [w2] (ζ2 : w0 ⊒ˢ w2) : Prop :=
     exists ζ12 : w1 ⊒ˢ w2, ζ2 = ζ1 ⊙ ζ12.
@@ -195,17 +195,15 @@ Module Sub.
   Proof.
     induction ζ1; cbn [geqb triangular]; intros w2 ζ2.
     - constructor. apply geq_max.
-    - destruct Ty_eqdec.
+    - unfold trans at 1. cbn - [Ty_eqdec]. destruct Ty_eqdec.
       + destruct (IHζ1 _ (thin xIn ⊙ ζ2)); constructor; clear IHζ1.
         * destruct g as [ζ2']. exists ζ2'.
           rewrite trans_assoc. rewrite <- H. clear - e.
-          apply env.lookup_extensional.
-          intros y yIn.
-          rewrite lookup_trans.
-          rewrite lookup_thick. unfold thickIn.
+          apply env.lookup_extensional. intros y yIn. foldlk.
+          rewrite lk_trans.
+          rewrite lk_thick. unfold thickIn.
           destruct (ctx.occurs_check_view xIn yIn). apply e.
-          cbn. rewrite lookup_trans. unfold thin.
-          now rewrite env.lookup_tabulate.
+          cbn. now rewrite lk_trans, lk_thin.
         * intros [ζ2' ->]. apply n. clear n. exists ζ2'.
           rewrite <- ?trans_assoc.
           rewrite comp_thin_thick.
@@ -215,10 +213,22 @@ Module Sub.
         rewrite <- ?trans_assoc.
         rewrite comp_thin_thick.
         rewrite trans_refl_l.
-        cbn. rewrite ?lookup_trans, lookup_thick.
+        cbn. rewrite ?lk_trans, lk_thick.
         unfold thickIn. rewrite ctx.occurs_check_view_refl.
-        now rewrite subst_comp.
+        now rewrite persist_trans.
   Qed.
+
+  Lemma inst_thin {w} (ι : Assignment w) {x} (xIn : x ∈ w) :
+    inst (Sub.thin xIn) ι = env.remove x ι xIn.
+  Proof.
+    rewrite env.remove_remove'.
+    apply env.lookup_extensional. intros y yIn.
+    unfold env.remove', thin, inst, InstSub.
+    now rewrite env.lookup_map, ?env.lookup_tabulate.
+  Qed.
+
+  #[export] Instance persistenttri_ty : Persistent Tri Ty :=
+    fun w1 t w2 r => persist _ t _ (Sub.triangular r).
 
 End Sub.
 Export Sub (Sub).
@@ -228,3 +238,4 @@ Infix "≽ˢ" := Sub.geq (at level 80).
 
 (* Infix "≽⁻" := Tri.geq (at level 80). *)
 (* Infix "≽?" := Sub.geqb (at level 80). *)
+

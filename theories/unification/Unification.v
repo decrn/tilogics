@@ -28,9 +28,10 @@
 
 From Coq Require Import
      Arith.PeanoNat
-     Classes.CRelationClasses
+     (* Classes.CRelationClasses *)
      Classes.Equivalence
      Classes.Morphisms
+     Classes.RelationClasses
      Program.Equality
      Program.Tactics
      Setoid
@@ -80,6 +81,29 @@ Module BoveCapretta.
 
 End BoveCapretta.
 
+Section MoveMe.
+
+  Import (hints) Sub Tri.
+  Lemma inst_sub_thick {Σ : World} {x} (xIn : x ∈ Σ)
+        (t : Ty (Σ - x)) (ι : Assignment (Σ - x)) :
+    inst (Sub.thick xIn t) ι = env.insert xIn ι (inst t ι).
+  Proof.
+  (*   rewrite env.insert_insert'. *)
+  (*   apply env.lookup_extensional. intros y yIn. *)
+  (*   unfold env.insert', sub_single; cbn. *)
+  (*   unfold inst at 1, inst_sub, inst_env. *)
+  (*   rewrite env.lookup_map, ?env.lookup_tabulate. *)
+  (*   now destruct (ctx.occurs_check_view xIn yIn). *)
+  (* Qed. *)
+      Admitted.
+
+  Lemma persist_sub_tri_thick {w x} (xIn : x ∈ w) s (t : Ty _) :
+    persist _ t (remove xIn) (Sub.thick xIn s) =
+    persist _ t (remove xIn) (Tri.thick x s).
+  Proof. Admitted.
+
+End MoveMe.
+
 Section Löb.
 
   Context (A : TYPE) (step : ⊢ ▷A -> A).
@@ -111,7 +135,7 @@ Definition sooner2diamond {A} : ⊢ ◀A -> ◇A :=
   fun w a =>
     match a with
       existT _ x (existT _ xIn (t , a)) =>
-      existT _ (w - x) (pair (Tri.single x t) a)
+      existT _ (w - x) (pair (Tri.thick x t) a)
     end.
 
 Definition sooner2diamondtm {A} : ⊢ ◀A -> ◆A.
@@ -265,7 +289,7 @@ Defined.
 (* Notation "f <$> a" := (fmap f a) (at level 20). *)
 
 Local Notation "s [ ζ ]" :=
-  (Sub.subst s ζ)
+  (persist _ s _ ζ)
     (at level 8, left associativity,
       format "s [ ζ ]").
 (* Local Coercion Sub.triangular : Tri.Tri >-> Sub.Sub. *)
@@ -415,7 +439,7 @@ Module P.
     unfold DClosed, P.unifies.
     intros ? ? ? ? [? ->] ?.
     Set Printing Coercions.
-    rewrite ?Sub.subst_comp.
+    rewrite ?Sub.persist_trans.
     now f_equal.
   Qed.
 
@@ -437,7 +461,7 @@ Module P.
     iff (unifies s[ζ] t[ζ]) (extend (unifies s t) ζ).
   Proof.
     unfold iff, extend, unifies. intros.
-    now rewrite ?Sub.subst_comp.
+    now rewrite ?Sub.persist_trans.
   Qed.
 
   Lemma optimists {w0 w1 w2 w3} (P Q : Property w0) (ζ1 : w0 ⊒ˢ w1) (ζ2 : w1 ⊒ˢ w2) (ζ3 : w2 ⊒ˢ w3) :
@@ -469,10 +493,10 @@ Module P.
     max (unifies s2[ζ1 ⊙ ζ2] t2[ζ1 ⊙ ζ2]) ζ3 ->
     max (and (unifies s1[ζ1] t1[ζ1]) (unifies s2[ζ1] t2[ζ1])) (ζ2 ⊙ ζ3).
   Proof.
-    unfold max, and, unifies. rewrite ?Sub.subst_comp.
+    unfold max, and, unifies. rewrite ?Sub.persist_trans.
     intros [p12 pmax] [q123 qmax]. split. split; congruence.
     intros w4 ζ4 [H1 H2].
-    apply pmax in H1. destruct H1 as [ζ24 ->]. rewrite ?Sub.subst_comp in H2.
+    apply pmax in H1. destruct H1 as [ζ24 ->]. rewrite ?Sub.persist_trans in H2.
     apply qmax in H2. destruct H2 as [ζ34 ->].
     apply Sub.geq_precom.
     apply Sub.geq_extend.
@@ -608,30 +632,28 @@ Proof.
   rewrite Sub.subst_thin.
   split.
   - unfold P.unifies. cbn.
-    rewrite Sub.lookup_thick.
+    rewrite Sub.lk_thick.
     unfold thickIn.
     rewrite occurs_check_view_refl.
-    rewrite <- Sub.subst_comp.
+    rewrite <- Sub.persist_trans.
     rewrite Sub.comp_thin_thick.
-    rewrite Sub.subst_refl.
+    rewrite Sub.persist_refl.
     reflexivity.
   - unfold P.unifies, Sub.geq. cbn. intros * Heq.
     exists (Sub.thin xIn ⊙ ζ2).
-    apply env.lookup_extensional. intros y yIn.
-    rewrite ?Sub.lookup_trans.
-    rewrite Sub.lookup_thick.
-    rewrite Sub.subst_comp.
+    apply env.lookup_extensional. intros y yIn. Sub.foldlk.
+    rewrite ?Sub.lk_trans, Sub.lk_thick, Sub.persist_trans.
     unfold thickIn.
     destruct (occurs_check_view xIn yIn); cbn.
     + apply Heq.
-    + now rewrite Sub.lookup_thin.
+    + now rewrite Sub.lk_thin.
 Qed.
 
 Lemma no_cycle {w} (t : Ty w) : ~ Ty_subterm t t.
 Proof. induction (wellfounded (R:=@Ty_subterm w) t). intuition. Qed.
 
 Lemma Ty_subterm_subst {w1 w2} (s t : Ty w1) (ζ : Sub.Sub w1 w2) :
-  Ty_subterm s t -> Ty_subterm (Sub.subst s ζ) (Sub.subst t ζ).
+  Ty_subterm s t -> Ty_subterm s[ζ] t[ζ].
 Proof.
   unfold Ty_subterm. induction 1; cbn.
   - constructor 1; destruct H; constructor.
@@ -643,7 +665,7 @@ Lemma nothing_unifies_occurs_strictly {w x} (xIn : x ∈ w) (t : Ty w) :
   P.nothing (P.unifies (Ty_hole xIn) t).
 Proof.
   unfold P.nothing, P.unifies; intros.
-  apply no_cycle with (Sub.subst t ζ).
+  apply no_cycle with t[ζ].
   rewrite <- H0 at 1.
   now apply Ty_subterm_subst.
 Qed.
@@ -664,7 +686,6 @@ Module Variant1.
             (occurs_check t xIn)
       end.
 
-
   Lemma flex_sound {w y} (t : Ty w) (yIn : y ∈ w) :
     wlp (flex t yIn) (fun _ ζ1 _ => P.unifies t (Ty_hole yIn) (Sub.triangular ζ1)).
   Proof.
@@ -672,20 +693,20 @@ Module Variant1.
     destruct (varview t).
     - destruct (occurs_check_view yIn xIn).
       + constructor. reflexivity.
-      + constructor. cbn - [Sub.subst].
-        rewrite trans_refl_r. cbn.
-        rewrite ?Sub.lookup_thick. unfold thickIn.
+      + constructor. cbn. Sub.foldlk.
+        rewrite trans_refl_r.
+        rewrite ?Sub.lk_thick. unfold thickIn.
         now rewrite ?occurs_check_view_refl, ?occurs_check_view_thin.
     - repeat rewrite ?option.wlp_aplazy, ?option.wlp_map.
       generalize (occurs_check_sound t yIn).
       apply option.wlp_monotonic.
-      intros t' ->. cbn.
+      intros t' ->. cbn. Sub.foldlk.
       rewrite trans_refl_r.
       rewrite Sub.subst_thin.
-      rewrite <- Sub.subst_comp.
+      rewrite <- Sub.persist_trans.
       rewrite Sub.comp_thin_thick.
-      rewrite Sub.subst_refl.
-      rewrite Sub.lookup_thick.
+      rewrite Sub.persist_refl.
+      rewrite Sub.lk_thick.
       unfold thickIn.
       now rewrite occurs_check_view_refl.
   Qed.
@@ -789,7 +810,7 @@ Module Variant1.
     - destruct (occurs_check_view xIn yIn); unfold order, spec', flexspec, η;
         cbn - [eq_dec]; intros P Q PQ HP.
       + exists w. exists refl. rewrite eq_dec_refl. auto.
-      + exists (w - x). exists (Tri.single x (Ty_hole yIn)).
+      + exists (w - x). exists (Tri.thick x (Ty_hole yIn)).
   Admitted.
 
   Definition cflex : ⊢ Ty -> Ty -> Option Unit :=
@@ -926,29 +947,132 @@ Module Variant1.
 
   Module ProofAssignmentBased.
 
-    Definition WP {A} : ⊢ ◆A -> □(A -> Assignment -> PROP) -> Assignment -> PROP :=
+    Declare Scope pred_scope.
+    Delimit Scope pred_scope with P.
+
+    Definition Pred (w : World) : Type :=
+      Assignment w -> Prop.
+    Bind Scope pred_scope with Pred.
+    Notation RPred := (respectful eq iff).
+
+    Section Connectives.
+
+      Context {w : World}.
+
+      Definition PValid {w} (P : Pred w) : Prop :=
+        forall ι, P ι.
+      Definition BiEntails : relation (Pred w) :=
+        fun P Q => forall ι, P ι <-> Q ι.
+      Definition Entails : relation (Pred w) :=
+        fun P Q => forall ι, P ι -> Q ι.
+
+      #[export] Instance equivalence_bientails : Equivalence BiEntails.
+      Proof.
+        constructor; unfold Reflexive, Symmetric, Transitive, BiEntails;
+          [ reflexivity | now symmetry | now etransitivity ].
+      Qed.
+      #[export] Instance preorder_entails : RelationClasses.PreOrder Entails.
+      Proof. constructor; unfold Reflexive, Transitive, Entails; auto. Qed.
+
+      #[export] Instance subrelation_bientails_entails :
+        subrelation BiEntails Entails.
+      Proof. intros x y xy ι. apply xy. Qed.
+
+      #[export] Instance subrelation_bientails_flip_entails :
+        subrelation BiEntails (Basics.flip Entails).
+      Proof. intros x y xy ι. apply xy. Qed.
+
+      (* #[export] Instance proper_bientails : *)
+      (*   Proper (BiEntails ==> BiEntails ==> iff) BiEntails. *)
+      (* Proof. intuition. Qed. *)
+      (* #[export] Instance proper_entails : *)
+      (*   Proper (BiEntails ==> BiEntails ==> iff) Entails. *)
+      (* Proof. intuition. Qed. *)
+
+      Definition PTrue : Pred w :=
+        fun _ => True.
+      Definition PIff (P Q : Pred w) : Pred w :=
+        fun ι => P ι <-> Q ι.
+      Definition PImpl (P Q : Pred w) : Pred w :=
+        fun ι => (P ι -> Q ι)%type.
+
+      #[export] Instance proper_pvalid_bientails : Proper (BiEntails ==> iff) PValid.
+      Proof. firstorder. Qed.
+      #[export] Instance proper_pvalid_entails : Proper (Entails ==> Basics.impl) PValid.
+      Proof. firstorder. Qed.
+      #[export] Instance proper_piff : Proper (BiEntails ==> BiEntails ==> BiEntails) PIff.
+      Proof. firstorder. Qed.
+      #[export] Instance proper_pimpl : Proper (BiEntails ==> BiEntails ==> BiEntails) PImpl.
+      Proof. firstorder. Qed.
+
+    End Connectives.
+
+    (* #[export] Instance proper_iff_impl {w} : *)
+    (*   Proper (BiEntails ==> BiEntails ==> Basics.flip Basics.impl) (@BiEntails w). *)
+    (* Proof. firstorder. Qed. *)
+
+    Definition Ext : ⊢ Pred -> □Pred :=
+      fun w0 p w1 r ι => p (inst r ι).
+    #[global] Arguments Ext [w] _%P [w1].
+
+    #[export] Instance proper_ext_bientails {w : World} :
+      Proper (BiEntails ==> forall_relation (fun _ => eq ==> BiEntails)) (@Ext w).
+    Proof. intros p q pq w1 ? ? ? ι; subst; apply pq. Qed.
+    #[export] Instance proper_ext_entails {w : World} :
+      Proper (Entails ==> forall_relation (fun _ => eq ==> Entails)) (@Ext w).
+    Proof. intros p q pq w1 ? ? ? ι; subst; apply pq. Qed.
+
+    Lemma ext_refl {w} (P : Pred w) :
+      BiEntails (Ext P refl) P.
+    Proof. unfold BiEntails, Ext. intros ι. now rewrite inst_refl. Qed.
+
+    Lemma ext_trans {w0 w1 w2} (r1 : Tri w0 w1) (r2 : Tri w1 w2)
+      (P : Pred w0) :
+      BiEntails (Ext P (trans r1 r2)) (Ext (Ext P r1) r2).
+    Proof. unfold BiEntails, Ext. intros ι. now rewrite inst_trans. Qed.
+
+    Notation "⊩ P" := (PValid P) (at level 95).
+    (* Notation "⊩ P" := (forall ι, P%P ι) (at level 95). *)
+
+    Notation "P ⊣⊢ Q" := (BiEntails P Q) (at level 95).
+    Notation "⊤" := PTrue : pred_scope.
+    Notation "P ⇔ Q" := (PIff P Q) (at level 94) : pred_scope.
+    Notation "P ⇒ Q" := (PImpl P Q) (at level 94, right associativity) : pred_scope.
+
+    Definition PEq : ⊢ Ty -> Ty -> Pred :=
+      fun w t1 t2 ι => inst t1 ι = inst t2 ι.
+    Notation "t1 ≃ t2" := (PEq t1 t2) (at level 90) : pred_scope.
+
+    Lemma peq_persist {w0 w1} (r : Tri w0 w1) (t1 t2 : Ty w0) :
+      PEq (persist _ t1 _ r) (persist _ t2 _ r) ⊣⊢ Ext (PEq t1 t2) r.
+    Proof.
+      unfold BiEntails, PEq, Ext. intros ι.
+      now rewrite !inst_persist_ty.
+    Qed.
+
+    Notation "'Fun' x => b" := (fun w ζ x => b%P w ζ) (x binder, at level 100) : pred_scope.
+
+    Definition WP {A} : ⊢ ◆A -> □(A -> Pred) -> Pred :=
       fun w0 d Q ι0 =>
         option.wp
           (fun '(w1; (ζ01, a)) =>
              exists (ι1 : Assignment w1),
                inst ζ01 ι1 = ι0 /\ Q w1 ζ01 a ι1) d.
+    #[global] Arguments WP {A}%indexed_scope [w] _ _%P _.
 
-    Lemma wp_pure {A w0} (ι0 : Assignment w0) (a : A w0)
-      (Q : □(A -> Assignment -> PROP) w0) :
-      WP (η a) Q ι0 <-> T Q a ι0.
+    Lemma wp_pure {A w0} (a : A w0) (Q : □(A -> Pred) w0) :
+      WP (η a) Q ⊣⊢ T Q a.
     Proof.
-      unfold WP, η, T. rewrite option.wp_match.
+      unfold BiEntails, WP, η. intros ι0. rewrite option.wp_match.
       split.
       - intros (ι1 & e & HQ). now subst.
       - intros HQ. exists ι0. auto.
     Qed.
 
-    Lemma wp_bind {A B w0} (ι0 : Assignment w0) (d : ◆A w0) (f : □(A -> ◆B) w0)
-      (Q : □(B -> Assignment -> PROP) w0) :
-       WP (bind d f) Q ι0 <->
-       WP d (fun w1 ζ1 a1 ι1 => WP (f w1 ζ1 a1) (_4 Q ζ1) ι1) ι0.
+    Lemma wp_bind {A B w0} (d : ◆A w0) (f : □(A -> ◆B) w0) (Q : □(B -> Pred) w0) :
+      WP (bind d f) Q ⊣⊢ WP d (fun w1 ζ1 a1 => WP (f w1 ζ1 a1) (_4 Q ζ1)).
     Proof.
-      unfold WP, bind, acc.
+      unfold BiEntails, WP, bind, acc. intros ι0.
       rewrite option.wp_bind.
       option.tactics.mixin.
       intros (w1 & ζ01 & a).
@@ -963,36 +1087,37 @@ Module Variant1.
     Qed.
 
     Lemma wp_monotonic {A w0} (m : ◆A w0) :
-      forall (p q : □(A -> Assignment -> PROP) w0)
+      forall (p q : □(A -> Pred) w0)
              (ι0 : Assignment w0)
-             (pq : forall w1 ζ1 a1 ι1, inst ζ1 ι1 = ι0 -> p w1 ζ1 a1 ι1 -> q w1 ζ1 a1 ι1),
-        WP m p ι0 -> WP m q ι0.
+             (pq : forall w1 ζ1 a1 ι1, inst ζ1 ι1 = ι0 -> PImpl (p w1 ζ1 a1) (q w1 ζ1 a1) ι1),
+        PImpl (WP m p) (WP m q) ι0.
     Proof.
-      unfold WP; intros * pq. apply option.wp_monotonic.
+      unfold PImpl, WP; intros * pq. apply option.wp_monotonic.
       intros (w1 & ζ01 & a1) (ι1 & e1 & H).
       exists ι1; split; [assumption|].
       revert e1 H; apply pq.
     Qed.
 
-    Definition WLP {A} : ⊢ ◆A -> □(A -> Assignment -> PROP) -> Assignment -> PROP :=
+    Definition WLP {A} : ⊢ ◆A -> □(A -> Pred) -> Pred :=
       fun w d Q ι0 =>
         option.wlp
           (fun '(w1; (ζ01, a)) =>
              forall ι1 : Assignment w1, inst ζ01 ι1 = ι0 -> Q w1 ζ01 a ι1)
           d.
+    #[global] Arguments WLP {A}%indexed_scope [w] _ _%P _.
 
-    Lemma wlp_pure {A w} (a : A w) (Q : □(A -> Assignment -> PROP) w) (ι : Assignment w) :
-      WLP (η a) Q ι <-> T Q a ι.
+    Lemma wlp_pure {A w} (a : A w) (Q : □(A -> Pred) w) :
+      WLP (η a) Q ⊣⊢ T Q a.
     Proof.
-      unfold WLP, η, T. rewrite option.wlp_match.
+      unfold PIff, WLP, η, T. intros ι.
+      rewrite option.wlp_match.
       split; intros; subst; auto.
     Qed.
 
-    Lemma wlp_bind {A B w0} (d : ◆A w0) (f : □(A -> ◆B) w0) (Q : □(B -> Assignment -> PROP) w0)
-      (ι0 : Assignment w0) :
-      WLP (bind d f) Q ι0 <-> WLP d (fun _ ζ1 a1 ι1 => WLP (f _ ζ1 a1) (_4 Q ζ1) ι1) ι0.
+    Lemma wlp_bind {A B w0} (d : ◆A w0) (f : □(A -> ◆B) w0) (Q : □(B -> Pred) w0) :
+      WLP (bind d f) Q ⊣⊢ WLP d (fun _ ζ1 a1 => WLP (f _ ζ1 a1) (_4 Q ζ1)).
     Proof.
-      unfold WLP, bind, acc.
+      unfold BiEntails, WLP, bind, acc. intros ι0.
       rewrite option.wlp_bind.
       option.tactics.mixin.
       intros (w1 & ζ01 & a).
@@ -1006,7 +1131,7 @@ Module Variant1.
     Qed.
 
     Lemma wlp_monotonic {A w0} (m : ◆A w0) :
-      forall (p q : □(A -> Assignment -> PROP) w0)
+      forall (p q : □(A -> Pred) w0)
              (ι0 : Assignment w0)
              (pq : forall w1 ζ1 a1 ι1, inst ζ1 ι1 = ι0 -> p w1 ζ1 a1 ι1 -> q w1 ζ1 a1 ι1),
         WLP m p ι0 -> WLP m q ι0.
@@ -1016,29 +1141,49 @@ Module Variant1.
       revert e1 H; apply pq.
     Qed.
 
+    #[export] Instance proper_wlp_bientails {A w} (d : ◆A w) :
+      Proper
+        (forall_relation
+           (fun _ => pointwise_relation _
+                       (pointwise_relation _ BiEntails)) ==> BiEntails)
+        (WLP d).
+    Proof.
+      intros p q pq ι.
+      split; apply wlp_monotonic;
+        intros * ?; now apply pq.
+    Qed.
+
+    #[export] Instance proper_wlp_entails {A w} (d : ◆A w) :
+      Proper
+        (forall_relation
+           (fun _ => pointwise_relation _
+                       (pointwise_relation _ Entails)) ==> Entails)
+        (WLP d).
+    Proof.
+      intros p q pq ι.
+      apply wlp_monotonic;
+        intros * ?; now apply pq.
+    Qed.
+
     Definition UnifierSound : ⊢ Unifier -> PROP :=
       fun w0 u =>
-        forall (t1 t2 : Ty w0) (ι0 : Assignment w0),
-          WLP (u t1 t2) (fun _ _ _ _ => inst t1 ι0 = inst t2 ι0) ι0.
+        forall (t1 t2 : Ty w0),
+          ⊩ WLP (u t1 t2) (Fun _ => Ext (t1 ≃ t2)).
 
     Definition UnifierComplete : ⊢ Unifier -> PROP :=
       fun w0 u =>
-        forall (t1 t2 : Ty w0) (ι0 : Assignment w0),
-          inst t1 ι0 = inst t2 ι0 ->
-          WP (u t1 t2) (fun _ _ _ _ => True) ι0.
+        forall (t1 t2 : Ty w0),
+          ⊩ t1 ≃ t2 ⇒ WP (u t1 t2) (fun _ _ _ => PTrue).
 
     Definition BoxUnifierSound : ⊢ BoxUnifier -> PROP :=
       fun w0 bu =>
-        forall (t1 t2 : Ty w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1) (ι1 : Assignment w1),
-          WLP (bu t1 t2 w1 ζ01)
-            (fun _ _ _ _ =>
-               inst t1 (inst ζ01 ι1) = inst t2 (inst ζ01 ι1)) ι1.
+        forall (t1 t2 : Ty w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1),
+          ⊩ WLP (bu t1 t2 w1 ζ01) (Fun _ => Ext (Ext (t1 ≃ t2) ζ01)).
 
     Definition BoxUnifierComplete : ⊢ BoxUnifier -> PROP :=
       fun w0 bu =>
-        forall (t1 t2 : Ty w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1) (ι1 : Assignment w1),
-          inst t1 (inst ζ01 ι1) = inst t2 (inst ζ01 ι1) ->
-          WP (bu t1 t2 w1 ζ01) (fun _ _ _ _ => True) ι1.
+        forall (t1 t2 : Ty w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1),
+          Entails (Ext (t1 ≃ t2) ζ01) (WP (bu t1 t2 w1 ζ01) (fun _ _ _ => PTrue)).
 
   End ProofAssignmentBased.
 
@@ -1053,7 +1198,6 @@ Module Variant1.
            let ζ := Sub.thick zIn u in
            lmgu _ (Ty_hole xIn)[ζ] t[ζ]).
 
-
     Section SubstitutionBased.
       Import P.
 
@@ -1064,9 +1208,9 @@ Module Variant1.
         let P := P.unifies (Ty_hole xIn)[Sub.triangular ζ1] t[Sub.triangular ζ1] in
         spec (boxflex xIn t ζ1) (fun w2 ζ2 _ => P.max P (Sub.triangular ζ2)) (P.nothing P).
       Proof.
-        destruct ζ1; cbn - [Sub.subst].
-        - rewrite ?Sub.subst_refl. apply flex_spec.
-        - rewrite ?Sub.subst_comp. apply lmgu_spec.
+        destruct ζ1; cbn; Sub.foldlk.
+        - rewrite !Sub.persist_refl, !Sub.lk_refl. apply flex_spec.
+        - rewrite !Sub.persist_trans, !Sub.lk_trans. apply lmgu_spec.
       Qed.
 
       Definition boxmgu : BoxUnifier w :=
@@ -1175,7 +1319,7 @@ Module Variant1.
           split.
           + revert H. apply dclosed_unifies. apply Sub.geq_extend.
           + revert H1. unfold unifies.
-            now rewrite ?Sub.triangular_trans, ?Sub.subst_comp.
+            now rewrite ?Sub.triangular_trans, ?Sub.persist_trans.
       Qed.
 
       Lemma boxmgu_complete (t1 t2 : Ty w) :
@@ -1185,7 +1329,7 @@ Module Variant1.
       Proof.
         pattern (boxmgu t1 t2).
         apply boxmgu_elim; clear t1 t2;
-          cbn - [Sub.subst]; intros; try (now constructor);
+          cbn; intros; try (now constructor);
           try discriminate.
         - destruct (boxflex_spec xIn t ζ0).
           + constructor. destruct a as [w2 [ζ2 []]]. now apply H0.
@@ -1199,7 +1343,7 @@ Module Variant1.
           apply option.wp_monotonic. intros [mgw1 [mgζ1 _]] [ζ1' ->].
           assert (P.unifies s2[Sub.triangular (ζ0 ⊙⁻ mgζ1)] t2[Sub.triangular (ζ0 ⊙⁻ mgζ1)] ζ1') as HU2'.
           { revert HU2. unfold unifies.
-            now rewrite ?Sub.triangular_trans, ?Sub.subst_comp.
+            now rewrite ?Sub.triangular_trans, ?Sub.persist_trans.
           }
           rewrite wp_μ. generalize (H0 _ (ζ0 ⊙⁻ mgζ1) _ ζ1' HU2').
           apply option.wp_monotonic. intros [mgw2 [mgζ2 _]] [ζ2' ->].
@@ -1230,78 +1374,83 @@ Module Variant1.
       Context (lmgu_sound : forall x (xIn : x ∈ w),
                   BoxUnifierSound (lmgu xIn)).
 
-      Lemma flex_sound_assignment {x} (xIn : x ∈ w) (t : Ty w) (ι0 : Assignment w) :
-        WLP (flex t xIn) (fun w1 ζ01 _ ι1 => inst (Ty_hole xIn) ι0 = inst t ι0) ι0.
+      Lemma flex_sound_assignment {x} (xIn : x ∈ w) (t : Ty w) :
+        ⊩ WLP (flex t xIn) (Fun _ => Ext (Ty_hole xIn ≃ t)).
       Proof.
-        unfold flex, WLP.
-        destruct (varview t) as [y yIn|].
+        unfold flex. destruct (varview t) as [y yIn|].
         - destruct (occurs_check_view xIn yIn).
-          + constructor. reflexivity.
-          + constructor. cbn - [inst]. intros.
-            rewrite <- Sub.lookup_thin.
-            change (env.lookup (Sub.thin xIn) yIn) with (Sub.subst (Ty_hole yIn) (Sub.thin xIn)).
-            (* rewrite trans_refl_r. cbn. *)
-            (* rewrite ?Sub.lookup_thick. unfold thickIn. *)
-            (* now rewrite ?occurs_check_view_refl, ?occurs_check_view_thin. *)
-            admit.
-        - rewrite ?option.wlp_aplazy, ?option.wlp_map.
+          + rewrite wlp_pure. unfold T. now rewrite ext_refl.
+          + constructor. unfold Ext, PEq. cbn. intros.
+            now rewrite env.lookup_insert, env.lookup_insert_thin.
+        - unfold PValid, WLP. intros ι. rewrite !option.wlp_map.
           generalize (occurs_check_sound t xIn).
           apply option.wlp_monotonic.
-          intros t' ->. cbn - [inst]. intros.
-          (* rewrite trans_refl_r. *)
-          (* rewrite Sub.subst_thin. *)
-          (*   rewrite <- Sub.subst_comp. *)
-          (*   rewrite Sub.comp_thin_thick. *)
-          (*   rewrite Sub.subst_refl. *)
-          (*   rewrite Sub.lookup_thick. *)
-          (*   unfold thickIn. *)
-          (*   now rewrite occurs_check_view_refl. *)
-          admit.
-      Admitted.
+          unfold Ext, PEq. cbn. intros t' -> * <-.
+          rewrite env.lookup_insert.
+          rewrite Sub.subst_thin.
+          rewrite inst_persist_ty.
+          rewrite Sub.inst_thin.
+          rewrite env.remove_insert.
+          reflexivity.
+      Qed.
 
-      Lemma boxflex_sound_assignment {x} (xIn : x ∈ w) (t : Ty w) (w1 : World) (ζ01 : w ⊒⁻ w1) (ι1 : Assignment w1) :
-        WLP (boxflex xIn t ζ01) (fun w2 ζ2 _ _ => inst (Ty_hole xIn) (inst ζ01 ι1) = inst t (inst ζ01 ι1)) ι1.
+      Lemma boxflex_sound_assignment {x} (xIn : x ∈ w) (t : Ty w)
+        {w1} (ζ01 : w ⊒⁻ w1) :
+        ⊩ WLP (boxflex xIn t ζ01) (Fun _ => Ext (Ext (Ty_hole xIn ≃ t) ζ01)).
       Proof.
         unfold boxflex, box_intro_split.
         destruct ζ01 as [|w2 y yIn ty].
-        - apply flex_sound_assignment.
-        - generalize (lmgu_sound yIn (Ty_hole xIn)[Sub.thick yIn ty] t[Sub.thick yIn ty] ζ01 ι1).
-          apply wlp_monotonic. intros w3 ζ3 _ ι3 <-. cbn.
-          admit.
-      Admitted.
+        - change (@Tri.refl ?w) with (@refl Tri _ w).
+          generalize (flex_sound_assignment xIn t).
+          apply proper_pvalid_entails.
+          apply proper_wlp_entails.
+          intros w2 ζ2 _.
+          now rewrite ext_refl.
+        - change (Tri.cons ?x ?t ?r) with (Tri.thick x t ⊙ r).
+          rewrite !persist_sub_tri_thick.
+          generalize (lmgu_sound yIn (Ty_hole xIn)[Tri.thick y ty] t[Tri.thick y ty] ζ01). clear.
+          apply proper_pvalid_entails.
+          apply proper_wlp_entails.
+          intros w3 ζ3 _.
+          now rewrite ext_trans, peq_persist.
+      Qed.
 
       Lemma boxmgu_sound_assignment : BoxUnifierSound boxmgu.
       Proof.
         intros t1 t2. pattern (boxmgu t1 t2).
         apply boxmgu_elim; clear t1 t2.
         - intros. apply boxflex_sound_assignment.
-        - intros. generalize (boxflex_sound_assignment xIn t ζ01 ι1).
-          now apply wlp_monotonic.
+        - intros. generalize (boxflex_sound_assignment xIn t ζ01).
+          now apply proper_pvalid_entails, proper_wlp_entails.
         - intros *. now rewrite wlp_pure.
         - constructor.
         - constructor.
         - intros * IH1 IH2 *. rewrite wlp_bind.
-          specialize (IH1 _ ζ01 ι1). revert IH1.
-          apply wlp_monotonic; intros w2 ζ12 _ ι2 ? ?.
+          specialize (IH1 _ ζ01). revert IH1.
+          apply proper_pvalid_entails, proper_wlp_entails.
+          intros w2 ζ12 _.
           rewrite wlp_bind.
-          specialize (IH2 _ (ζ01 ⊙ ζ12) ι2). revert IH2.
-          apply wlp_monotonic; intros w3 ζ23 _ ι3 ? ?.
-          rewrite wlp_pure. hnf. cbn. subst.
-          rewrite inst_trans in *. now f_equal.
+          setoid_rewrite wlp_pure. unfold T, _4.
+          intros ι Heq1.
+          specialize (IH2 _ (ζ01 ⊙ ζ12) ι). revert IH2.
+          apply wlp_monotonic; intros w3 ζ23 _ ι3 <-.
+          revert Heq1. clear.
+          unfold Ext, PEq. cbn.
+          rewrite !inst_trans, !inst_refl.
+          congruence.
       Qed.
 
       Lemma boxmgu_complete_assignment : BoxUnifierComplete boxmgu.
       Proof.
         intros t1 t2. pattern (boxmgu t1 t2).
         apply boxmgu_elim; clear t1 t2.
-        - cbn. admit.
         - admit.
-        - intros * _. now rewrite wp_pure.
+        - admit.
+        - intros *. now rewrite wp_pure.
         - cbn; discriminate.
         - cbn; discriminate.
-        - intros * IH1 IH2 * Heq. cbn in Heq.
+        - intros * IH1 IH2 *.
           rewrite wp_bind.
-          generalize (IH1 _ ζ01 ι1). clear IH1.
       Admitted.
 
     End AssignmentBased.
@@ -1325,8 +1474,8 @@ Module Variant1.
     unfold UnifierSpec, mgu. intros t1 t2.
     specialize (bmgu_spec t1 t2 Tri.refl).
     apply option.spec_monotonic; cbn.
-    - intros [w1 [ζ1 []]]. now rewrite ?Sub.subst_refl.
-    - now rewrite ?Sub.subst_refl.
+    - intros [w1 [ζ1 []]]. now rewrite !Sub.persist_refl.
+    - now rewrite ?Sub.persist_refl.
   Qed.
 
   Definition boxsolve : ⊢ List (Prod Ty Ty) -> □◆Unit :=

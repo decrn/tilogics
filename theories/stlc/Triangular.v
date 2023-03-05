@@ -99,6 +99,10 @@ Module Tri.
   #[global] Arguments refl {_}.
   #[global] Arguments cons {_ _} x {_} t ζ.
 
+  Definition thick {w} x {xIn : x ∈ w} (t : Ty (w - x)) : w ⊒⁻ w - x :=
+    cons x t refl.
+  #[global] Arguments thick {w} x {xIn} t.
+
   #[export] Instance InstTri : forall w, Inst (Tri w) (Assignment w) :=
     fix insttri {w0 w1} (r : Tri w0 w1) :=
       match r with
@@ -120,34 +124,36 @@ Module Tri.
       | cons x t ζ1 => fun ζ2 => cons x t (trans ζ1 ζ2)
       end.
 
-  Definition Tri_rect :=
-fun (P : forall w c : World, w ⊒⁻ c -> Type) (f : forall w : World, P w w Definitions.refl)
-  (f0 : forall (w w' : World) (x : nat) (xIn : x ∈ w) (t : Ty (w - x)) (ζ : w - x ⊒⁻ w'), P (w - x) w' ζ -> P w w' (cons x t ζ)) =>
-fix F (w c : World) (t : w ⊒⁻ c) {struct t} : P w c t :=
-  match t as t0 in (_ ⊒⁻ c0) return (P w c0 t0) with
-  | refl => f w
-  | @cons _ w' x xIn t0 ζ => f0 w w' x xIn t0 ζ (F (w - x) w' ζ)
-  end.
+  Definition Tri_case [w] (P : forall w', w ⊒⁻ w' -> Type)
+    (p_refl : P w Definitions.refl)
+    (p_cons : forall w' x (xIn : x ∈ w) t r, P w' (thick x t ⊙ r))
+    {w'} (r : w ⊒⁻ w') : P w' r :=
+    match r with
+    | refl       => p_refl
+    | cons x t r => p_cons _ x _ t r
+    end.
 
-  Definition Tri_ind :=
-fun (P : forall w c : World, w ⊒⁻ c -> Prop) (f : forall w : World, P w w Definitions.refl)
-  (f0 : forall (w w' : World) (x : nat) (xIn : x ∈ w) (t : Ty (w - x)) (ζ : w - x ⊒⁻ w'), P (w - x) w' ζ -> P w w' (cons x t ζ)) =>
-fix F (w c : World) (t : w ⊒⁻ c) {struct t} : P w c t :=
-  match t as t0 in (_ ⊒⁻ c0) return (P w c0 t0) with
-  | refl => f w
-  | @cons _ w' x xIn t0 ζ => f0 w w' x xIn t0 ζ (F (w - x) w' ζ)
-  end.
+  Definition Tri_rect (P : forall w w', w ⊒⁻ w' -> Type)
+    (p_refl : forall w : World, P w w Definitions.refl)
+    (p_cons : forall w w' x (xIn : x ∈ w) t r,
+        P (w - x) w' r -> P w w' (thick x t ⊙ r)) :
+    forall w w' (r : w ⊒⁻ w'), P w w' r :=
+    fix rect {w w'} (r : w ⊒⁻ w') {struct r} : P w w' r :=
+      Tri_case (P w) (p_refl w)
+        (fun _ x _ t r' =>
+           p_cons _ _ x _ t r' (rect r')) r.
+  Definition Tri_ind (P : forall w w', w ⊒⁻ w' -> Prop) := Tri_rect P.
+  Definition Tri_rec (P : forall w w', w ⊒⁻ w' -> Set) := Tri_rect P.
 
-  Definition Tri_rec := fun P : forall w c : World, w ⊒⁻ c -> Set => Tri_rect P.
-
-  Definition Tri_sind :=
-fun (P : forall w c : World, w ⊒⁻ c -> SProp) (f : forall w : World, P w w Definitions.refl)
-  (f0 : forall (w w' : World) (x : nat) (xIn : x ∈ w) (t : Ty (w - x)) (ζ : w - x ⊒⁻ w'), P (w - x) w' ζ -> P w w' (cons x t ζ)) =>
-fix F (w c : World) (t : w ⊒⁻ c) {struct t} : P w c t :=
-  match t as t0 in (_ ⊒⁻ c0) return (P w c0 t0) with
-  | refl => f w
-  | @cons _ w' x xIn t0 ζ => f0 w w' x xIn t0 ζ (F (w - x) w' ζ)
-  end.
+  Definition Tri_sind (P : forall w w' : World, w ⊒⁻ w' -> Type)
+    (p_refl : forall w : World, P w w Definitions.refl)
+    (p_cons : forall w w' x (xIn : x ∈ w) t r,
+        P (w - x) w' r -> P w w' (thick x t ⊙ r)) :=
+    fix sind {w w'} (r : w ⊒⁻ w') {struct r} : P w w' r :=
+      match r with
+      | refl => p_refl w
+      | cons x t r => p_cons _ _ x _ t r (sind r)
+      end.
 
   #[export] Instance preorder_tri : PreOrder Tri.
   Proof.
@@ -157,10 +163,6 @@ fix F (w c : World) (t : w ⊒⁻ c) {struct t} : P w c t :=
     - induction r1; cbn; congruence.
   Qed.
 
-
-  Definition single {w} x {xIn : x ∈ w} (t : Ty (w - x)) : w ⊒⁻ w - x :=
-    cons x t refl.
-  Global Arguments single {w} x {xIn} t.
 
   (* Definition geq {w0 w1} (ζ1 : w0 ⊒⁻ w1) [w2] (ζ2 : w0 ⊒⁻ w2) : Prop := *)
   (*   exists ζ12 : w1 ⊒⁻ w2, ζ2 = ζ1 ⊙ ζ12. *)
