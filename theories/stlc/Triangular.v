@@ -241,6 +241,15 @@ Module Tri.
   (*       now rewrite subst_comp. *)
   (* Qed. *)
 
+  #[local] Notation "□ A" := (Box Tri A) (at level 9, format "□ A", right associativity).
+  Definition box_intro_split {A} :
+    ⊢ A -> ▶□A -> □A :=
+    fun w0 a la w1 ζ =>
+      match ζ with
+      | Tri.refl => a
+      | Tri.cons x t ζ' => la x _ t _ ζ'
+      end.
+
 End Tri.
 Export (hints) Tri.
 Export Tri (Tri).

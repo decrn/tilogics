@@ -245,21 +245,13 @@ Section OccursCheck.
 
 End OccursCheck.
 
-Definition box_intro_split {A} :
-  ⊢ A -> ▶□A -> □A :=
-  fun w0 a la w1 ζ =>
-    match ζ with
-    | Tri.refl => a
-    | Tri.cons x t ζ' => la x _ t _ ζ'
-    end.
-
 Definition SUBST : TYPE := Ty -> □Ty.
 Section Subst.
 
   Context [w] (lsubst : ▷(Ty -> □Ty) w).
 
   Definition subst_in {x} (xIn : In x w) : □Ty w :=
-    box_intro_split
+    Tri.box_intro_split
       (Ty_hole xIn)
       (fun y yIn s =>
          match occurs_check_view yIn xIn with
@@ -1461,7 +1453,7 @@ Module Variant1.
     Context [w] (lmgu : ▷BoxUnifier w).
 
     Definition boxflex {x} (xIn : x ∈ w) (t : Ty w) : □◆Unit w :=
-      box_intro_split
+      Tri.box_intro_split
         (flex t xIn)
         (fun z zIn u =>
            let ζ := Sub.thick zIn u in
@@ -1690,7 +1682,7 @@ Module Variant1.
         {w1} (ζ01 : w ⊒⁻ w1) :
         ⊩ WLP (boxflex xIn t ζ01) (Fun _ => Ext (Ext (Ty_hole xIn ≃ t) ζ01)).
       Proof.
-        unfold boxflex, box_intro_split.
+        unfold boxflex, Tri.box_intro_split.
         destruct ζ01 as [|w2 y yIn ty].
         - change (@Tri.refl ?w) with (@refl Tri _ w).
           generalize (flex_sound_assignment xIn t).
@@ -1772,7 +1764,7 @@ Module Variant1.
           (Ext (Ty_hole xIn ≃ t) ζ01)
           (WP (boxflex xIn t ζ01) (fun (w0 : World) (_ : w1 ⊒⁻ w0) (_ : Unit w0) => ⊤%P)).
       Proof.
-        unfold boxflex, box_intro_split.
+        unfold boxflex, Tri.box_intro_split.
         destruct ζ01 as [|w2 y yIn ty].
         - rewrite ext_refl. apply flex_complete_assignment.
         - change (Tri.cons ?x ?t ?r) with (Tri.thick x t ⊙ r).
@@ -1962,7 +1954,7 @@ Module Variant2.
     Context [w] (lmgu : ▷BoxUnifier w).
 
     Definition boxflex {x} (xIn : x ∈ w) (t : Ty w) : □◆Ty w :=
-      box_intro_split
+      Tri.box_intro_split
         (flex t xIn)
         (fun z zIn u =>
            let ζ := Sub.thick zIn u in
