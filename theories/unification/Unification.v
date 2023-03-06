@@ -1193,6 +1193,7 @@ Module Variant1.
     Definition Ext : ⊢ Pred -> □Pred :=
       fun w0 p w1 r ι => p (inst r ι).
     #[global] Arguments Ext [w] _%P [w1].
+    #[global] Instance params_ext : Params (@Ext) 4 := {}.
 
     #[export] Instance proper_ext_bientails {w : World} :
       Proper (BiEntails ==> forall_relation (fun _ => eq ==> BiEntails)) (@Ext w).
@@ -1257,7 +1258,11 @@ Module Variant1.
     Proof. unfold Entails, PAnd, PImpl. intuition. Qed.
 
     Lemma ext_and {w0 w1} (ζ01 : Tri w0 w1) (P Q : Pred w0) :
-      Ext (P ∧ Q) ζ01 ⊣⊢ Ext P ζ01 ∧ Ext Q ζ01.
+      Ext P ζ01 ∧ Ext Q ζ01 ⊣⊢ Ext (P ∧ Q) ζ01 .
+    Proof. unfold BiEntails, Ext, PAnd. intuition. Qed.
+
+    Lemma ext_impl {w0 w1} (ζ01 : Tri w0 w1) (P Q : Pred w0) :
+      Ext P ζ01 ⇒ Ext Q ζ01 ⊣⊢ Ext (P ⇒ Q) ζ01 .
     Proof. unfold BiEntails, Ext, PAnd. intuition. Qed.
 
     Notation "'Fun' x => b" :=
@@ -1267,6 +1272,9 @@ Module Variant1.
     Definition PTri {w0 w1} (r : Tri w0 w1) : Pred w0 :=
       fun ι0 => exists ι1, ι0 = inst r ι1.
 
+    #[global] Typeclasses Opaque Entails.
+    #[global] Typeclasses Opaque BiEntails.
+
     Definition WP {A} : ⊢ ◆A -> □(A -> Pred) -> Pred :=
       fun w0 d Q ι0 =>
         option.wp
@@ -1274,6 +1282,7 @@ Module Variant1.
              exists (ι1 : Assignment w1),
                inst ζ01 ι1 = ι0 /\ Q w1 ζ01 a ι1) d.
     #[global] Arguments WP {A}%indexed_scope [w] _ _%P _.
+    #[global] Instance params_wp : Params (@WP) 4 := {}.
 
     Lemma wp_pure {A w0} (a : A w0) (Q : □(A -> Pred) w0) :
       WP (η a) Q ⊣⊢ T Q a.
@@ -1380,26 +1389,29 @@ Module Variant1.
       revert e1 H; apply pq.
     Qed.
 
-    #[export] Instance proper_wlp_bientails {A w} (d : ◆A w) :
+    #[global] Instance params_wlp : Params (@WLP) 4 := {}.
+    #[export] Instance proper_wlp_bientails {A w} :
       Proper
-        (forall_relation
+        (pointwise_relation _
+           (forall_relation
            (fun _ => pointwise_relation _
-                       (pointwise_relation _ BiEntails)) ==> BiEntails)
-        (WLP d).
+                       (pointwise_relation _ BiEntails)) ==> BiEntails))
+        (@WLP A w).
     Proof.
-      intros p q pq ι.
+      intros d p q pq ι.
       split; apply wlp_monotonic;
         intros * ?; now apply pq.
     Qed.
 
-    #[export] Instance proper_wlp_entails {A w} (d : ◆A w) :
+    #[export] Instance proper_wlp_entails {A w} :
       Proper
-        (forall_relation
-           (fun _ => pointwise_relation _
-                       (pointwise_relation _ Entails)) ==> Entails)
-        (WLP d).
+        (pointwise_relation _
+           (forall_relation
+              (fun _ => pointwise_relation _
+                          (pointwise_relation _ Entails)) ==> Entails))
+        (@WLP A w).
     Proof.
-      intros p q pq ι.
+      intros d p q pq ι.
       apply wlp_monotonic;
         intros * ?; now apply pq.
     Qed.
@@ -1434,6 +1446,13 @@ Module Variant1.
       fun w0 bu =>
         forall (t1 t2 : Ty w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1),
           Entails (Ext (t1 ≃ t2) ζ01) (WP (bu t1 t2 w1 ζ01) (fun _ _ _ => PTrue)).
+
+    Lemma apply_wlp {A w} (d : ◆A w) (R : Pred w) (P Q : forall w1 : World, w ⊒⁻ w1 -> A w1 -> Pred w1) :
+      (forall w1 (r : w ⊒⁻ w1) (a : A w1), Entails (Ext R r) (P w1 r a ⇒ Q w1 r a)%P) -> ⊩ WLP d P -> Entails R (WLP d Q).
+    Proof.
+      unfold Entails, Ext, PValid, PImpl. intros Hrpq Hp ι Hr. specialize (Hp ι). revert Hp.
+      apply wlp_monotonic. intros * <-. now apply Hrpq.
+    Qed.
 
   End ProofAssignmentBased.
 
@@ -1703,14 +1722,15 @@ Module Variant1.
           apply proper_pvalid_entails, proper_wlp_entails.
           intros w2 ζ12 _.
           rewrite wlp_bind.
-          setoid_rewrite wlp_pure. unfold T, _4.
-          intros ι Heq1.
-          specialize (IH2 _ (ζ01 ⊙ ζ12) ι). revert IH2.
-          apply wlp_monotonic; intros w3 ζ23 _ ι3 <-.
-          revert Heq1. clear.
-          unfold Ext, PEq. cbn.
-          rewrite !inst_trans, !inst_refl.
-          congruence.
+          specialize (IH2 _ (ζ01 ⊙ ζ12)).
+          revert IH2.
+          apply apply_wlp. intros ? ? _.
+          rewrite wlp_pure. unfold T, _4.
+          rewrite ?trans_refl_r, ?ext_trans, ?ext_impl.
+          apply proper_ext_entails; auto.
+          apply proper_ext_entails; auto.
+          apply proper_ext_entails; auto.
+          now rewrite peq_func.
       Qed.
 
       Context (lmgu_complete : forall x (xIn : x ∈ w),
