@@ -1791,7 +1791,7 @@ Module Variant1.
         - cbn; discriminate.
         - intros * IH1 IH2 *.
           rewrite wp_bind, peq_func.
-          rewrite ext_and.
+          rewrite <- ext_and.
           apply pimpl_and_adjoint.
           specialize (IH1 w1 ζ01). revert IH1.
           apply proper_entails_entails. easy.
