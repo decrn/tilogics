@@ -53,32 +53,15 @@ Definition SoonerTm (A : TYPE) : TYPE :=
 Notation "◁ A" := (Sooner A) (at level 9, right associativity).
 Notation "◀ A" := (SoonerTm A) (at level 9, right associativity).
 
-Section Thick.
+Module Sng.
 
-  Definition thick1 : ⊢ Ty -> ▶Ty :=
-    fun w =>
-      fix thick (S : Ty w) (x : nat) (xIn : x ∈ w) (T : Ty (w - x)) {struct S} : Ty (w - x) :=
-      match S with
-      | Ty_hole σIn   => thickIn xIn T σIn
-      | Ty_bool       => Ty_bool
-      | Ty_func S1 S2 => Ty_func (thick S1 x xIn T) (thick S2 x xIn T)
-      end.
+  Inductive Sng (w : World) : World -> Set :=
+  | sng {x} (xIn : x ∈ w) (t : Ty (w - x)) : Sng w (w - x).
 
-End Thick.
+  #[export] Instance lk_sng : Lk Sng :=
+    fun w0 w1 r => match r with sng xIn t => thickIn xIn t end.
 
-Section Thin.
-
-  Fixpoint thin {w x} (xIn : x ∈ w) (T : Ty (w - x)) : Ty w :=
-    match T with
-    | Ty_hole yIn => Ty_hole (ctx.in_thin xIn yIn)
-    | Ty_bool => Ty_bool
-    | Ty_func T1 T2 => Ty_func (thin xIn T1) (thin xIn T2)
-    end.
-
-  Definition fancy_thin : ⊢ ◁Ty -> Ty :=
-    fun w '(x; (xIn; T)) => thin xIn T.
-
-End Thin.
+End Sng.
 
 Module Tri.
 
@@ -240,25 +223,48 @@ Module Tri.
   (*       now rewrite subst_comp. *)
   (* Qed. *)
 
-  Definition persist_slow : ⊢ Ty -> □Ty :=
+  Import Sng.
+  Definition persist' : ⊢ Ty -> □Ty :=
     fix pers {w0} (t : Ty w0) {w1} (r : w0 ⊒⁻ w1) {struct r} : Ty w1 :=
       match r with
       | refl       => t
-      | cons x s r => pers (thick1 t _ s) r
+      | cons x s r => pers (persist _ t _ (sng _ s)) r
       end.
 
+  Lemma persist'_trans {w0 w1 w2} {ζ1 : w0 ⊒⁻ w1} {ζ2 : w1 ⊒⁻ w2} :
+    forall t, persist' t (ζ1 ⊙ ζ2) = persist' (persist' t ζ1) ζ2.
+  Proof. induction ζ1; intros u; cbn; auto. Qed.
+
   #[export] Instance lk_tri : Lk Tri :=
-    fun w0 w1 r x xIn => persist_slow (Ty_hole xIn) r.
-  #[global] Arguments lk_tri : simpl never.
+    fun w0 w1 r x xIn => persist' (Ty_hole xIn) r.
+
+  Lemma persist'_fix {w0 w1} (t : Ty w0) (r : Tri w0 w1) :
+     persist' t r = match t with
+                    | Ty_bool => Ty_bool
+                    | Ty_func t1 t2 => Ty_func (persist' t1 r) (persist' t2 r)
+                    | Ty_hole xIn => lk r xIn
+                    end.
+  Proof. induction r; destruct t; cbn; auto; now rewrite IHr. Qed.
+
+  Lemma persist_persist' {w0 w1} (t : Ty w0) (r : Tri w0 w1) :
+    persist _ t _ r = persist' t r.
+  Proof. induction t; cbn; rewrite persist'_fix; now f_equal. Qed.
+
+  #[export] Instance lk_preorder_tri : LkPreOrder Tri.
+  Proof.
+    constructor; cbn; intros.
+    - reflexivity.
+    - unfold lk, lk_tri.
+      now rewrite persist'_trans, persist_persist'.
+  Qed.
 
   #[export] Instance persist_preorder_tri : PersistPreOrder Tri Ty.
   Proof. Admitted.
 
-  #[export] Instance lk_preorder_tri : LkPreOrder Tri.
-  Proof. Admitted.
-
   #[export] Instance inst_thick : InstThick Tri.
   Proof. Admitted.
+
+  #[global] Arguments lk_tri : simpl never.
 
 End Tri.
 Export Tri (Tri).

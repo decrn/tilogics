@@ -435,3 +435,17 @@ Class PersistPreOrder {R A} `{Persistent R A, Refl R, Trans R} : Prop :=
 
 Lemma no_cycle {w} (t : Ty w) : ~ Ty_subterm t t.
 Proof. induction (wellfounded (R:=@Ty_subterm w) t). intuition. Qed.
+
+Section Thin.
+
+  Fixpoint thin {w x} (xIn : x ∈ w) (T : Ty (w - x)) : Ty w :=
+    match T with
+    | Ty_hole _ _ yIn => Ty_hole _ _ (ctx.in_thin xIn yIn)
+    | Ty_bool _ => Ty_bool _
+    | Ty_func _ T1 T2 => Ty_func _ (thin xIn T1) (thin xIn T2)
+    end.
+
+  (* Definition fancy_thin : ⊢ ◁Ty -> Ty := *)
+  (*   fun w '(x; (xIn; T)) => thin xIn T. *)
+
+End Thin.

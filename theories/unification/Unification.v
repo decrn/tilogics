@@ -242,34 +242,6 @@ Section OccursCheck.
 
 End OccursCheck.
 
-Definition SUBST : TYPE := Ty -> □Ty.
-Section Subst.
-
-  Context [w] (lsubst : ▷(Ty -> □Ty) w).
-
-  Definition subst_in {x} (xIn : In x w) : □Ty w :=
-    Tri.box_intro_split
-      (Ty_hole xIn)
-      (fun y yIn s =>
-         match occurs_check_view yIn xIn with
-         | Same _     => lsubst yIn s
-         | Diff _ xIn => lsubst yIn (Ty_hole xIn)
-         end).
-
-  Definition subst : Ty w -> □Ty w :=
-    fix subst (t : Ty w) : □Ty w :=
-      match t with
-      | Ty_hole xIn   => subst_in xIn
-      | Ty_bool       => fun _ _ => Ty_bool
-      | Ty_func T1 T2 => fun _ ζ => Ty_func (subst T1 _ ζ) (subst T2 _ ζ)
-      end.
-
-End Subst.
-
-(* Definition realsubst_fast : ⊢ Ty -> □Ty := *)
-(*   Löb SUBST subst. *)
-
-
 Definition Hom (A B : TYPE) := ⊢ A -> B.
 
 Definition fmap {A B} (f : Hom A B) : Hom ◆A ◆B.

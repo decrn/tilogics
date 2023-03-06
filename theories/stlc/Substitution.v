@@ -135,7 +135,7 @@ Module Sub.
   Proof. now rewrite <- persist_trans, comp_thin_thick, persist_refl. Qed.
 
   Lemma subst_thin {w x} (xIn : x ∈ w) (T : Ty (w - x)) :
-    Triangular.thin xIn T = subst T (thin xIn).
+    STLC.thin xIn T = subst T (thin xIn).
   Proof. induction T; cbn; f_equal; now rewrite ?lk_thin. Qed.
 
   Section Triangular.
