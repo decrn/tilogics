@@ -316,14 +316,16 @@ Section WithBinding.
       lookup (insert bIn E v) bIn = v.
     Proof. induction Γ; destroy bIn; destroy E; cbn; auto. Qed.
 
-    Lemma lookup_insert_thin {b Γ} {bIn : b ∈ Γ}
-          {E : Env (Γ - b)} {v : D b}
-          (b' : B) (i : b' ∈ Γ - b) :
-      lookup (insert bIn E v) (ctx.in_thin bIn i) = lookup E i.
+    Lemma lookup_thin {b Γ} {E : Env Γ} {bIn : b ∈ Γ} (b' : B) (i : b' ∈ Γ - b) :
+      lookup E (ctx.in_thin bIn i) = lookup (remove b E bIn) i.
     Proof.
-      induction Γ; destroy bIn; destroy E; destroy i; auto.
-      exact (IHΓ _ _ _).
+      induction Γ; destroy bIn; destroy E; destroy i; auto. exact (IHΓ _ _ _).
     Qed.
+
+    Lemma lookup_insert_thin {b Γ} {bIn : b ∈ Γ} {E : Env (Γ - b)}
+      {v : D b} (b' : B) (i : b' ∈ Γ - b) :
+      lookup (insert bIn E v) (ctx.in_thin bIn i) = lookup E i.
+    Proof. now rewrite lookup_thin, remove_insert. Qed.
 
     (* Slower implementation of insert that is easier to reason about. *)
     Definition insert' {Γ : Ctx B} {b} (bIn : b ∈ Γ) (E : Env (Γ - b)) (v : D b) : Env Γ :=
