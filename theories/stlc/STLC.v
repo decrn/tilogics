@@ -232,6 +232,10 @@ Class Lk (R : ACC) : Type :=
   lk w1 w2 (r : R w1 w2) x (xIn : ctx.In x w1) : Ty w2.
 #[global] Arguments lk {R _ w1 w2} r {x} xIn.
 
+Class Thick (R : ACC) : Type :=
+  thick w x {xIn : x ∈ w} (t : Ty (w - x)) : R w (w - x).
+#[global] Arguments thick {R _ w} x {xIn} t.
+
 #[export] Instance lk_alloc : Lk Alloc :=
   fun w1 w2 r x xIn => Ty_hole _ x (persist _ xIn _ r).
 
@@ -397,3 +401,37 @@ Lemma inst_step_snoc {R} {stepR : Step R} {instR : forall w, Inst (R w) (Assignm
   {w x} (ι : Assignment w) (t : ty) :
   inst (step (R := R)) (env.snoc ι x t) = ι.
 Proof. rewrite inst_step. reflexivity. Qed.
+
+Definition thickIn [w x] (xIn : x ∈ w) (s : Ty (w - x)) :
+  forall y, y ∈ w -> Ty (w - x) :=
+  fun y yIn =>
+    match ctx.occurs_check_view xIn yIn with
+    | ctx.Same _     => s
+    | ctx.Diff _ yIn => Ty_hole (w - x) _ yIn
+    end.
+#[global] Arguments thickIn [w x] xIn s [y] yIn.
+
+Class InstThick {R} `{forall w, Inst (R w) (Assignment w), Thick R} : Prop :=
+  inst_thick :
+    forall {w} {x} (xIn : x ∈ w) (t : Ty (w - x)) (ι : Assignment (w - x)),
+      inst (thick (R := R) x t) ι = env.insert xIn ι (inst t ι).
+#[global] Arguments InstThick R {_ _}.
+
+Class LkPreOrder {R} `{Lk R, Persistent R Ty, Refl R, Trans R} : Prop :=
+  { lk_refl {w x} (xIn : x ∈ w) :
+      lk refl xIn = Ty_hole w x xIn;
+    lk_trans {w1 w2 w3 x} (xIn : x ∈ w1) (ζ1 : R w1 w2) (ζ2 : R w2 w3) :
+      lk (trans ζ1 ζ2) xIn = persist _ (lk ζ1 xIn) _ ζ2;
+  }.
+#[global] Arguments LkPreOrder R {_ _ _ _}.
+
+Class PersistPreOrder {R A} `{Persistent R A, Refl R, Trans R} : Prop :=
+  { persist_refl {w} (a : A w) :
+      persist _ a _ refl = a;
+    persist_trans {w1} (a : A w1) {w2 w3} (ζ1 : R w1 w2) (ζ2 : R w2 w3) :
+      persist _ a _ (trans ζ1 ζ2) = persist _ (persist _ a _ ζ1) _ ζ2;
+  }.
+#[global] Arguments PersistPreOrder R A {_ _ _}.
+
+Lemma no_cycle {w} (t : Ty w) : ~ Ty_subterm t t.
+Proof. induction (wellfounded (R:=@Ty_subterm w) t). intuition. Qed.

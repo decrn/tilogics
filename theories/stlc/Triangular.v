@@ -55,15 +55,7 @@ Notation "◀ A" := (SoonerTm A) (at level 9, right associativity).
 
 Section Thick.
 
-  Definition thickIn {w x} (xIn : x ∈ w) (s : Ty (w - x)) :
-    forall y, y ∈ w -> Ty (w - x) :=
-    fun y yIn =>
-      match ctx.occurs_check_view xIn yIn with
-      | ctx.Same _     => s
-      | ctx.Diff _ yIn => Ty_hole yIn
-      end.
-
-  Definition thick : ⊢ Ty -> ▶Ty :=
+  Definition thick1 : ⊢ Ty -> ▶Ty :=
     fun w =>
       fix thick (S : Ty w) (x : nat) (xIn : x ∈ w) (T : Ty (w - x)) {struct S} : Ty (w - x) :=
       match S with
@@ -99,24 +91,10 @@ Module Tri.
   #[global] Arguments refl {_}.
   #[global] Arguments cons {_ _} x {_} t ζ.
 
-  Definition thick {w} x {xIn : x ∈ w} (t : Ty (w - x)) : w ⊒⁻ w - x :=
-    cons x t refl.
-  #[global] Arguments thick {w} x {xIn} t.
-
-  #[export] Instance InstTri : forall w, Inst (Tri w) (Assignment w) :=
-    fix insttri {w0 w1} (r : Tri w0 w1) :=
-      match r with
-      | Tri.refl => fun ι => ι
-      | @Tri.cons _ w' x xIn t r =>
-          fun ι =>
-            let ι' := inst (Inst := @insttri _) r ι in
-            env.insert xIn ι' (inst t ι')
-      end.
-
+  #[export] Instance thick_tri : Thick Tri :=
+    fun w x xIn t => cons x t refl.
   #[export] Instance refl_tri : Refl Tri :=
     fun w => refl.
-  #[export] Instance instrefl_tri : InstRefl Tri :=
-    fun _ _ => eq_refl.
   #[export] Instance trans_tri : Trans Tri :=
     fix trans [w0 w1 w2] (ζ1 : w0 ⊒⁻ w1) {struct ζ1} : w1 ⊒⁻ w2 -> w0 ⊒⁻ w2 :=
       match ζ1 with
@@ -155,6 +133,15 @@ Module Tri.
       | cons x t r => p_cons _ _ x _ t r (sind r)
       end.
 
+  #[local] Notation "□ A" := (Box Tri A) (at level 9, format "□ A", right associativity).
+  Definition box_intro_split {A} :
+    ⊢ A -> ▶□A -> □A :=
+    fun w0 a la w1 ζ =>
+      match ζ with
+      | Tri.refl => a
+      | Tri.cons x t ζ' => la x _ t _ ζ'
+      end.
+
   #[export] Instance preorder_tri : PreOrder Tri.
   Proof.
     constructor.
@@ -163,6 +150,18 @@ Module Tri.
     - induction r1; cbn; congruence.
   Qed.
 
+  #[export] Instance InstTri : forall w, Inst (Tri w) (Assignment w) :=
+    fix insttri {w0 w1} (r : Tri w0 w1) :=
+      match r with
+      | Tri.refl => fun ι => ι
+      | @Tri.cons _ w' x xIn t r =>
+          fun ι =>
+            let ι' := inst (Inst := @insttri _) r ι in
+            env.insert xIn ι' (inst t ι')
+      end.
+
+  #[export] Instance instrefl_tri : InstRefl Tri :=
+    fun _ _ => eq_refl.
 
   (* Definition geq {w0 w1} (ζ1 : w0 ⊒⁻ w1) [w2] (ζ2 : w0 ⊒⁻ w2) : Prop := *)
   (*   exists ζ12 : w1 ⊒⁻ w2, ζ2 = ζ1 ⊙ ζ12. *)
@@ -241,17 +240,27 @@ Module Tri.
   (*       now rewrite subst_comp. *)
   (* Qed. *)
 
-  #[local] Notation "□ A" := (Box Tri A) (at level 9, format "□ A", right associativity).
-  Definition box_intro_split {A} :
-    ⊢ A -> ▶□A -> □A :=
-    fun w0 a la w1 ζ =>
-      match ζ with
-      | Tri.refl => a
-      | Tri.cons x t ζ' => la x _ t _ ζ'
+  Definition persist_slow : ⊢ Ty -> □Ty :=
+    fix pers {w0} (t : Ty w0) {w1} (r : w0 ⊒⁻ w1) {struct r} : Ty w1 :=
+      match r with
+      | refl       => t
+      | cons x s r => pers (thick1 t _ s) r
       end.
 
+  #[export] Instance lk_tri : Lk Tri :=
+    fun w0 w1 r x xIn => persist_slow (Ty_hole xIn) r.
+  #[global] Arguments lk_tri : simpl never.
+
+  #[export] Instance persist_preorder_tri : PersistPreOrder Tri Ty.
+  Proof. Admitted.
+
+  #[export] Instance lk_preorder_tri : LkPreOrder Tri.
+  Proof. Admitted.
+
+  #[export] Instance inst_thick : InstThick Tri.
+  Proof. Admitted.
+
 End Tri.
-Export (hints) Tri.
 Export Tri (Tri).
 Notation "w1 ⊒⁻ w2" := (Tri w1 w2) (at level 80).
 Infix "⊙⁻" := (trans (R := Tri)) (at level 60, right associativity).

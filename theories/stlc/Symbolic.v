@@ -77,7 +77,7 @@ End Generate.
 Section RunTI.
 
   Import SigTNotations.
-  Import (hints) Sub.
+  Import (hints) Tri.
 
   (* infer_schematic defines inference without grounding
      of remaining unification variables. *)
@@ -140,7 +140,7 @@ Section TypeReconstruction.
     end.
 
   Import SigTNotations.
-  Import (hints) Sub.
+  Import (hints) Tri.
 
   (* reconstruct_schematic defines type reconstruction without grounding
      of remaining unification variables. *)
@@ -160,6 +160,8 @@ Section TypeReconstruction.
 End TypeReconstruction.
 
 Module acc.
+
+  Import (hints) Tri.
 
   Record Acc (w w' : World) : Type := mkAcc
     { iw : World
@@ -569,7 +571,7 @@ Module StrongMonotonicity.
       destruct H as [_ H].
       unfold P.unifies in *.
       specialize (H _ (r01 ⊙ Sub.triangular r13)).
-      rewrite ?Sub.persist_trans in H.
+      rewrite ?persist_trans in H.
       specialize (H H0).
       destruct H as (r23 & ?).
       exists r23. split; auto.
@@ -578,7 +580,7 @@ Module StrongMonotonicity.
       destruct H0 as [H0 _].
       unfold RTy in *.
       subst. unfold P.unifies in *.
-      now rewrite ?Sub.persist_trans, H0.
+      now rewrite ?persist_trans, H0.
     - auto.
   Qed.
 

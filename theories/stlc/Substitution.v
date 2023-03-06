@@ -57,8 +57,8 @@ Module Sub.
   #[export] Instance lk_sub : Lk Sub :=
     fun w1 w2 r x xIn => env.lookup r xIn.
 
-  Definition thick {w x} (xIn : x ∈ w) (s : Ty (w - x)) : w ⊒ˢ w - x :=
-    env.tabulate (thickIn xIn s).
+  #[export] Instance thick_sub : Thick Sub :=
+    fun w x xIn s => env.tabulate (thickIn xIn s).
   Definition thin {w x} (xIn : x ∈ w) : w - x ⊒ˢ w :=
     env.tabulate (fun y yIn => Ty_hole (ctx.in_thin xIn yIn)).
 
@@ -76,12 +76,6 @@ Module Sub.
   Definition up1 {w0 w1} (r01 : Sub w0 w1) {n} : Sub (w0 ▻ n) (w1 ▻ n) :=
     env.snoc (env.map (fun _ (t : Ty _) => persist _ t _ step) r01) n (Ty_hole ctx.in_zero).
 
-  Fixpoint triangular {w1 w2} (ζ : w1 ⊒⁻ w2) : w1 ⊒ˢ w2 :=
-    match ζ with
-    | Tri.refl       => refl
-    | Tri.cons x t ζ => trans (thick _ t) (triangular ζ)
-    end.
-
   Ltac foldlk :=
     change_no_check (env.lookup ?x ?y) with (lk x y).
 
@@ -98,16 +92,15 @@ Module Sub.
   Proof. unfold lk, lk_sub, thin. now rewrite env.lookup_tabulate. Qed.
 
   Lemma lk_thick {w x y} (xIn : x ∈ w) (t : Ty _) (yIn : y ∈ w) :
-    lk (thick xIn t) yIn = thickIn xIn t yIn.
-  Proof. unfold lk, lk_sub, thick. now rewrite env.lookup_tabulate. Qed.
+    lk (thick x t) yIn = thickIn xIn t yIn.
+  Proof. unfold lk, lk_sub, thick, thick_sub. now rewrite env.lookup_tabulate. Qed.
 
-  Lemma persist_refl {w} (t : Ty w) :
-    persist _ t _ refl = t.
-  Proof. (* induction t; cbn; f_equal; now rewrite ?lookup_refl. *) Admitted.
-
-  Lemma persist_trans {w1} (t : Ty w1) {w2 w3} (ζ2 : w2 ⊒ˢ w3) (ζ1 : w1 ⊒ˢ w2) :
-    subst t (trans ζ1 ζ2) = subst (subst t ζ1) ζ2.
-  Proof. (* induction t; cbn; f_equal; now rewrite ?lookup_trans. *) Admitted.
+  #[export] Instance persist_preorder_sub : PersistPreOrder Sub Ty.
+  Proof.
+    constructor; intros w t *.
+    - induction t; cbn; f_equal; now rewrite ?lk_refl.
+    - induction t; cbn; f_equal; now rewrite ?lk_trans.
+  Qed.
 
   #[export] Instance preorder_sub : PreOrder Sub.
   Proof.
@@ -128,17 +121,8 @@ Module Sub.
     (*   | env.snoc r _ t => env.snoc (inst (Inst := @instsub _) r ι) _ (inst t ι) *)
     (*   end. *)
 
-  Lemma triangular_trans {w0 w1 w2} (ζ01 : w0 ⊒⁻ w1) (ζ12 : w1 ⊒⁻ w2) :
-    triangular (trans ζ01 ζ12) =
-      trans (triangular ζ01) (triangular ζ12).
-  Proof.
-    induction ζ01; cbn.
-    - now rewrite trans_refl_l.
-    - now rewrite trans_assoc, IHζ01.
-  Qed.
-
   Lemma comp_thin_thick {w x} (xIn : x ∈ w) (s : Ty (w - x)) :
-    trans (thin xIn) (thick xIn s) = refl.
+    trans (thin xIn) (thick x s) = refl.
   Proof.
     apply env.lookup_extensional. intros y yIn. foldlk.
     rewrite lk_trans, lk_refl, lk_thin. cbn.
@@ -147,12 +131,36 @@ Module Sub.
   Qed.
 
   Lemma thin_thick_pointful {w x} (xIn : x ∈ w) (s : Ty (w - x)) (t : Ty (w - x)) :
-    subst (subst t (thin xIn)) (thick xIn s) = t.
+    subst (subst t (thin xIn)) (thick x s) = t.
   Proof. now rewrite <- persist_trans, comp_thin_thick, persist_refl. Qed.
 
   Lemma subst_thin {w x} (xIn : x ∈ w) (T : Ty (w - x)) :
     Triangular.thin xIn T = subst T (thin xIn).
   Proof. induction T; cbn; f_equal; now rewrite ?lk_thin. Qed.
+
+  Section Triangular.
+    Import (hints) Tri.
+
+    Fixpoint triangular {w1 w2} (ζ : w1 ⊒⁻ w2) : w1 ⊒ˢ w2 :=
+      match ζ with
+      | Tri.refl       => refl
+      | Tri.cons x t ζ => trans (thick _ t) (triangular ζ)
+      end.
+
+    Lemma triangular_trans {w0 w1 w2} (ζ01 : w0 ⊒⁻ w1) (ζ12 : w1 ⊒⁻ w2) :
+      triangular (trans ζ01 ζ12) =
+        trans (triangular ζ01) (triangular ζ12).
+    Proof.
+      induction ζ01; cbn.
+      - now rewrite trans_refl_l.
+      - now rewrite trans_assoc, IHζ01.
+    Qed.
+
+    Lemma persist_triangular {w0 w1} (t : Ty w0) (r : Tri w0 w1) :
+      persist _ t _ (triangular r) = persist _ t _ r.
+    Proof. Admitted.
+
+  End Triangular.
 
   Definition geq {w0 w1} (ζ1 : w0 ⊒ˢ w1) [w2] (ζ2 : w0 ⊒ˢ w2) : Prop :=
     exists ζ12 : w1 ⊒ˢ w2, ζ2 = ζ1 ⊙ ζ12.
@@ -227,8 +235,22 @@ Module Sub.
     now rewrite env.lookup_map, ?env.lookup_tabulate.
   Qed.
 
-  #[export] Instance persistenttri_ty : Persistent Tri Ty :=
-    fun w1 t w2 r => persist _ t _ (Sub.triangular r).
+  #[export] Instance inst_thick_sub : InstThick Sub.
+  Proof.
+    intros w x xIn s ι. apply env.lookup_extensional. intros y yIn.
+    rewrite env.insert_insert'.
+    unfold inst at 1, InstSub, thick, thick_sub, env.insert'.
+    rewrite env.lookup_map, !env.lookup_tabulate.
+    unfold thickIn. now destruct ctx.occurs_check_view.
+  Qed.
+
+  Lemma Ty_subterm_subst {w1 w2} (s t : Ty w1) (ζ : Sub w1 w2) :
+    Ty_subterm s t -> Ty_subterm (persist _ s _ ζ) (persist _ t _ ζ).
+  Proof.
+    unfold Ty_subterm. induction 1; cbn.
+    - constructor 1; destruct H; constructor.
+    - econstructor 2; eauto.
+  Qed.
 
 End Sub.
 Export Sub (Sub).
