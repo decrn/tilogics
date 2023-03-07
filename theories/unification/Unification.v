@@ -1169,6 +1169,8 @@ Module Variant1.
     Notation "P ⇒ Q" := (PImpl P Q) (at level 94, right associativity) : pred_scope.
     Notation "P ∧ Q" := (PAnd P Q) (at level 80, right associativity) : pred_scope.
 
+    Lemma pand_comm {w} (P Q : Pred w) : P ∧ Q ⊣⊢ Q ∧ P.
+    Proof. unfold BiEntails, PAnd. intuition. Qed.
     Lemma pand_true_l {w} (P : Pred w) : ⊤ ∧ P ⊣⊢ P.
     Proof. now unfold BiEntails, PAnd, PTrue. Qed.
     Lemma pand_true_r {w} (P : Pred w) : P ∧ P ⊣⊢ P.
@@ -1258,13 +1260,13 @@ Module Variant1.
         split; [rewrite inst_trans|]; firstorder.
     Qed.
 
-    Lemma wp_monotonic {A w0} (m : ◆A w0) :
-      forall (p q : □(A -> Pred) w0)
-             (ι0 : Assignment w0)
-             (pq : forall w1 ζ1 a1 ι1, inst ζ1 ι1 = ι0 -> PImpl (p w1 ζ1 a1) (q w1 ζ1 a1) ι1),
-        PImpl (WP m p) (WP m q) ι0.
+    Lemma wp_monotonic {A w0} (m : ◆A w0) (p q : □(A -> Pred) w0) :
+      Entails
+        (fun ι0 => forall w1 ζ1 a1 ι1, inst ζ1 ι1 = ι0 -> PImpl (p w1 ζ1 a1) (q w1 ζ1 a1) ι1)
+        (WP m p ⇒ WP m q)%P.
     Proof.
-      unfold PImpl, WP; intros * pq. apply option.wp_monotonic.
+      unfold Entails, PImpl, WP. intros ι0 pq.
+      apply option.wp_monotonic.
       intros (w1 & ζ01 & a1) (ι1 & e1 & H).
       exists ι1; split; [assumption|].
       revert e1 H; apply pq.
@@ -1326,13 +1328,13 @@ Module Variant1.
         now rewrite inst_trans. easy.
     Qed.
 
-    Lemma wlp_monotonic {A w0} (m : ◆A w0) :
-      forall (p q : □(A -> Pred) w0)
-             (ι0 : Assignment w0)
-             (pq : forall w1 ζ1 a1 ι1, inst ζ1 ι1 = ι0 -> p w1 ζ1 a1 ι1 -> q w1 ζ1 a1 ι1),
-        WLP m p ι0 -> WLP m q ι0.
+    Lemma wlp_monotonic {A w0} (m : ◆A w0) (p q : □(A -> Pred) w0) :
+      Entails
+        (fun ι0 => forall w1 ζ1 a1 ι1, inst ζ1 ι1 = ι0 -> PImpl (p w1 ζ1 a1) (q w1 ζ1 a1) ι1)
+        (WLP m p ⇒ WLP m q)%P.
     Proof.
-      unfold WLP; intros * pq. apply option.wlp_monotonic.
+      unfold Entails, PImpl, WLP; intros ι pq.
+      apply option.wlp_monotonic.
       intros (w1 & ζ01 & a1) H ι1 e1. specialize (H ι1 e1).
       revert e1 H; apply pq.
     Qed.
@@ -1348,7 +1350,8 @@ Module Variant1.
     Proof.
       intros d p q pq ι.
       split; apply wlp_monotonic;
-        intros * ?; now apply pq.
+        intros * ?; unfold PImpl;
+        now apply pq.
     Qed.
 
     #[export] Instance proper_wlp_entails {A w} :
@@ -1361,7 +1364,8 @@ Module Variant1.
     Proof.
       intros d p q pq ι.
       apply wlp_monotonic;
-        intros * ?; now apply pq.
+        intros * ?; unfold PImpl;
+        now apply pq.
     Qed.
 
     Lemma wlp_tell1 {w x} (xIn : x ∈ w) (t : Ty (w - x)) (Q : □(Unit -> Pred) w) :
@@ -1399,7 +1403,7 @@ Module Variant1.
       (forall w1 (r : w ⊒⁻ w1) (a : A w1), Entails (Ext R r) (P w1 r a ⇒ Q w1 r a)%P) -> ⊩ WLP d P -> Entails R (WLP d Q).
     Proof.
       unfold Entails, Ext, PValid, PImpl. intros Hrpq Hp ι Hr. specialize (Hp ι). revert Hp.
-      apply wlp_monotonic. intros * <-. now apply Hrpq.
+      apply wlp_monotonic. intros * <-; unfold PImpl; now apply Hrpq.
     Qed.
 
   End ProofAssignmentBased.
