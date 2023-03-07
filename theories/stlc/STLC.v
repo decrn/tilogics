@@ -434,7 +434,10 @@ Class PersistPreOrder {R A} `{Persistent R A, Refl R, Trans R} : Prop :=
 #[global] Arguments PersistPreOrder R A {_ _ _}.
 
 Lemma no_cycle {w} (t : Ty w) : ~ Ty_subterm t t.
-Proof. induction (wellfounded (R:=@Ty_subterm w) t). intuition. Qed.
+Proof.
+  induction (well_founded_Ty_subterm t) as [? _ IH].
+  intros Hx. apply (IH _ Hx Hx).
+Qed.
 
 Section Thin.
 

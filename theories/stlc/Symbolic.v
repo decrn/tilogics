@@ -233,12 +233,12 @@ Module acc.
 
   Lemma persist_bool {w1 w2} (r : Acc w1 w2) :
     persist _ (Ty_bool _) _ r = Ty_bool _.
-  Proof. destruct r; reflexivity. Qed.
+  Proof. destruct r; cbn; now rewrite Tri.persist_bool. Qed.
 
   Lemma persist_func {w1 w2} (r : Acc w1 w2) (t1 t2 : Ty _) :
     persist _ (Ty_func _ t1 t2) _ r =
     Ty_func _ (persist _ t1 _ r) (persist _ t2 _ r).
-  Proof. destruct r; reflexivity. Qed.
+  Proof. destruct r; cbn; now rewrite Tri.persist_func. Qed.
 
   (* unify with PersistLaws about ↑ *)
   Class PersistLaws A `{Persistent Acc A} : Type :=

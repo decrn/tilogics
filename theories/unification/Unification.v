@@ -661,13 +661,13 @@ Module StrongMonotonicity.
 
   Lemma rty_bool {w0 w1} {r01 : Tri w0 w1} :
     RTy r01 Ty_bool Ty_bool.
-  Proof. reflexivity. Qed.
+  Proof. unfold RTy. now rewrite Tri.persist_bool. Qed.
 
-  Lemma rty_func {w0 w1} (r01 : Tri w0 w1) (t1_0 t1_1 t2_0 t2_1 : Ty _)  :
+  Lemma rty_func {w0 w1} (r01 : Tri w0 w1) (t1_0 t2_0 : Ty w0) (t1_1 t2_1 : Ty w1) :
     RTy r01 t1_0 t1_1 ->
     RTy r01 t2_0 t2_1 ->
     RTy r01 (Ty_func t1_0 t2_0) (Ty_func t1_1 t2_1).
-  Proof. unfold RTy; cbn; intros; now f_equal. Qed.
+  Proof. unfold RTy; intros. now rewrite Tri.persist_func; f_equal. Qed.
 
   Definition RValid {A} (R : RELATION A) (a : ⊢ A) : Prop :=
     forall w0 w1 r01,
@@ -789,7 +789,34 @@ Module Variant1.
   Import NoGhostState.
   Import (hints) Sub Tri.
 
-  Definition flex : ⊢ Ty -> ∀ x, In x -> ◆Unit :=
+  Definition Flex : TYPE :=
+    Ty -> ∀ x, In x -> ◆Unit.
+  Definition Unifier : TYPE :=
+    Ty -> Ty -> ◆Unit.
+  Definition BoxFlex : TYPE :=
+    Ty -> ∀ x, In x -> □◆Unit.
+  Definition BoxUnifier : TYPE :=
+    Ty -> Ty -> □◆Unit.
+
+  Definition UnifierSpec : ⊢ Unifier -> PROP :=
+    fun w u =>
+      forall t1 t2,
+        let P := P.unifies t1 t2 in
+        spec
+          (u t1 t2)
+          (fun w2 ζ2 _ => P.max P (Sub.triangular ζ2))
+          (P.nothing P).
+
+  Definition BoxUnifierSpec : ⊢ BoxUnifier -> PROP :=
+    fun w bu =>
+      forall t1 t2 w1 (ζ1 : w ⊒⁻ w1),
+        let P := P.unifies t1[ζ1] t2[ζ1] in
+        spec
+          (bu t1 t2 w1 ζ1)
+          (fun w2 ζ2 _ => P.max P (Sub.triangular ζ2))
+          (P.nothing P).
+
+  Definition flex : ⊢ Flex :=
     fun w t x xIn =>
       match varview t with
       | is_var yIn =>
@@ -798,9 +825,10 @@ Module Variant1.
           | Diff _ yIn' => tell1 xIn (Ty_hole yIn')
           end
       | not_var _ =>
-          option_map
-            (fun t' => sooner2diamond (x; (xIn; (t', tt))))
-            (occurs_check t xIn)
+          match occurs_check t xIn with
+          | Some t' => tell1 xIn t'
+          | None    => None
+          end
       end.
 
   Lemma flex_sound {w y} (t : Ty w) (yIn : y ∈ w) :
@@ -814,7 +842,7 @@ Module Variant1.
         rewrite trans_refl_r.
         rewrite ?Sub.lk_thick. unfold thickIn.
         now rewrite ?occurs_check_view_refl, ?occurs_check_view_thin.
-    - repeat rewrite ?option.wlp_aplazy, ?option.wlp_map.
+    - apply option.wlp_map.
       generalize (occurs_check_sound t yIn).
       apply option.wlp_monotonic.
       intros t' ->. cbn. Sub.foldlk.
@@ -866,7 +894,7 @@ Module Variant1.
         rewrite trans_refl_r.
         change (Ty_hole (in_thin xIn yIn)) with (thin xIn (Ty_hole yIn)).
         apply P.varelim.
-    - unfold spec. rewrite option.spec_map.
+    - apply option.spec_map.
       generalize (occurs_check_spec xIn t).
       apply option.spec_monotonic.
       + intros t' ->. cbn.
@@ -1039,28 +1067,6 @@ Module Variant1.
   (*   intros w. apply Löb. unfold Valid, Impl. intros w1. Check gcmgu. *)
   (*   fun w s t => T (@Löb _ @gcmgu w s t). *)
 
-  Definition Unifier : TYPE :=
-    Ty -> Ty -> ◆Unit.
-  Definition BoxUnifier : TYPE :=
-    Ty -> Ty -> □◆Unit.
-
-  Definition UnifierSpec : ⊢ Unifier -> PROP :=
-    fun w u =>
-      forall t1 t2,
-        let P := P.unifies t1 t2 in
-        spec
-          (u t1 t2)
-          (fun w2 ζ2 _ => P.max P (Sub.triangular ζ2))
-          (P.nothing P).
-
-  Definition BoxUnifierSpec : ⊢ BoxUnifier -> PROP :=
-    fun w bu =>
-      forall t1 t2 w1 (ζ1 : w ⊒⁻ w1),
-        let P := P.unifies t1[ζ1] t2[ζ1] in
-        spec
-          (bu t1 t2 w1 ζ1)
-          (fun w2 ζ2 _ => P.max P (Sub.triangular ζ2))
-          (P.nothing P).
 
   Module ProofAssignmentBased.
 
@@ -1408,13 +1414,20 @@ Module Variant1.
 
   End ProofAssignmentBased.
 
+  Lemma thin_thick {w x} (xIn : x ∈ w) (s t : Ty (w - x)) :
+    (thin xIn t)[thick x s] = t.
+  Proof.
+    induction t; cbn - [thick]; try rewrite Tri.persist_fix; f_equal; auto.
+    cbn. unfold thickIn. now rewrite occurs_check_view_thin.
+  Qed.
+
   Section MguO.
 
     Import (hints) Tri.
 
     Context [w] (lmgu : ▷BoxUnifier w).
 
-    Definition boxflex {x} (xIn : x ∈ w) (t : Ty w) : □◆Unit w :=
+    Definition boxflex (t : Ty w) {x} (xIn : x ∈ w) : □◆Unit w :=
       Tri.box_intro_split
         (flex t xIn)
         (fun z zIn u =>
@@ -1429,19 +1442,19 @@ Module Variant1.
 
       Lemma boxflex_spec {x} (xIn : x ∈ w) (t : Ty w) (w1 : World) (ζ1 : w ⊒⁻ w1) :
         let P := P.unifies (Ty_hole xIn)[ζ1] t[ζ1] in
-        spec (boxflex xIn t ζ1) (fun w2 ζ2 _ => P.max P (Sub.triangular ζ2)) (P.nothing P).
+        spec (boxflex t xIn ζ1) (fun w2 ζ2 _ => P.max P (Sub.triangular ζ2)) (P.nothing P).
       Proof.
         unfold boxflex, Tri.box_intro_split.
-        destruct ζ1; cbn; folddefs.
-        - rewrite persist_refl, lk_refl. apply flex_spec.
-        - rewrite !persist_trans, !lk_trans. apply lmgu_spec.
+        destruct ζ1; cbn - [persist]; folddefs.
+        - rewrite !persist_refl. apply flex_spec.
+        - rewrite !persist_trans. apply lmgu_spec.
       Qed.
 
       Definition boxmgu : BoxUnifier w :=
         fix bmgu s t {struct s} :=
           match s , t with
-          | Ty_hole xIn   , t            => boxflex xIn t
-          | s            , Ty_hole yIn   => boxflex yIn s
+          | Ty_hole xIn   , t            => boxflex t xIn
+          | s            , Ty_hole yIn   => boxflex s yIn
           | Ty_bool       , Ty_bool       => fun _ _ => η tt
           | Ty_func s1 s2 , Ty_func t1 t2 =>
               fun _ ζ1 =>
@@ -1454,8 +1467,8 @@ Module Variant1.
       Section boxmgu_elim.
 
         Context (P : Ty w -> Ty w -> □◆Unit w -> Type).
-        Context (fflex1 : forall (x : nat) (xIn : x ∈ w) (t : Ty w), P (Ty_hole xIn) t (boxflex xIn t)).
-        Context (fflex2 : forall (x : nat) (xIn : x ∈ w) (t : Ty w), P t (Ty_hole xIn) (boxflex xIn t)).
+        Context (fflex1 : forall (x : nat) (xIn : x ∈ w) (t : Ty w), P (Ty_hole xIn) t (boxflex t xIn)).
+        Context (fflex2 : forall (x : nat) (xIn : x ∈ w) (t : Ty w), P t (Ty_hole xIn) (boxflex t xIn)).
         Context (fbool : P Ty_bool Ty_bool (fun (w1 : World) (_ : w ⊒⁻ w1) => η tt)).
         Context (fbool_func : forall T1 T2 : Ty w, P Ty_bool (Ty_func T1 T2) (fun (w1 : World) (_ : w ⊒⁻ w1) => None)).
         Context (ffunc_bool : forall T1 T2 : Ty w, P (Ty_func T1 T2) Ty_bool (fun (w1 : World) (_ : w ⊒⁻ w1) => None)).
@@ -1539,6 +1552,7 @@ Module Variant1.
           constructor. unfold _4.
           rewrite trans_refl_r.
           rewrite Sub.triangular_trans.
+          rewrite !Tri.persist_func.
           apply unifiesX_equiv. cbn.
           split.
           + revert H. apply dclosed_unifies. apply Sub.geq_extend.
@@ -1554,6 +1568,7 @@ Module Variant1.
         pattern (boxmgu t1 t2).
         apply boxmgu_elim; clear t1 t2;
           cbn; intros; try (now constructor);
+          rewrite ?Tri.persist_bool, ?Tri.persist_func in *;
           try discriminate.
         - destruct (boxflex_spec xIn t ζ0).
           + constructor. destruct a as [w2 [ζ2 []]]. now apply H0.
@@ -1624,38 +1639,25 @@ Module Variant1.
         unfold flex. destruct (varview t) as [y yIn|].
         - destruct (occurs_check_view xIn yIn).
           + rewrite wlp_pure. unfold T. now rewrite ext_refl.
-          + rewrite wlp_tell1, <- peq_persist. cbn.
-            unfold PValid, PEq. intros ι. f_equal.
-            unfold thick, Tri.thick_tri.
-            unfold lk, Tri.lk_tri. cbn.
-            unfold thickIn.
+          + rewrite wlp_tell1, <- peq_persist. cbn. unfold thickIn.
             now rewrite occurs_check_view_refl, occurs_check_view_thin.
-        - unfold PValid, WLP. intros ι. rewrite !option.wlp_map.
-          generalize (occurs_check_sound t xIn).
-          apply option.wlp_monotonic.
-          unfold Ext, PEq. cbn. intros t' -> * <-.
-          rewrite env.lookup_insert.
-          rewrite Sub.subst_thin.
-          rewrite inst_persist_ty.
-          rewrite Sub.inst_thin.
-          rewrite env.remove_insert.
-          reflexivity.
+        - destruct (occurs_check_sound t xIn); subst; [|constructor].
+          rewrite wlp_tell1, <- peq_persist, thin_thick. cbn.
+          unfold thickIn. now rewrite occurs_check_view_refl.
       Qed.
 
       Lemma boxflex_sound_assignment {x} (xIn : x ∈ w) (t : Ty w)
         {w1} (ζ01 : w ⊒⁻ w1) :
-        ⊩ WLP (boxflex xIn t ζ01) (Fun _ => Ext (Ext (Ty_hole xIn ≃ t) ζ01)).
+        ⊩ WLP (boxflex t xIn ζ01) (Fun _ => Ext (Ext (Ty_hole xIn ≃ t) ζ01)).
       Proof.
         unfold boxflex, Tri.box_intro_split.
-        destruct ζ01 as [|w2 y yIn ty].
-        - change (@Tri.refl ?w) with (@refl Tri _ w).
-          generalize (flex_sound_assignment xIn t).
+        destruct ζ01 as [|w2 y yIn ty]; folddefs.
+        - generalize (flex_sound_assignment xIn t).
           apply proper_pvalid_entails.
           apply proper_wlp_entails.
           intros w2 ζ2 _.
           now rewrite ext_refl.
-        - change (Tri.cons ?x ?t ?r) with (thick x t ⊙ r).
-          generalize (lmgu_sound yIn (Ty_hole xIn)[thick y ty] t[thick y ty] ζ01). clear.
+        - generalize (lmgu_sound yIn (Ty_hole xIn)[thick y ty] t[thick y ty] ζ01). clear.
           apply proper_pvalid_entails.
           apply proper_wlp_entails.
           intros w3 ζ3 _.
@@ -1707,11 +1709,8 @@ Module Variant1.
             rewrite inst_thick. cbn.
             rewrite <- Heq.
             now rewrite env.insert_remove.
-        - unfold Entails, WP, PEq. cbn. intros ι Heq.
-          rewrite !option.wp_map.
-          generalize (occurs_check_spec xIn t).
-          rewrite option.wp_match, option.spec_match.
-          destruct occurs_check; intros; subst.
+        - unfold Entails, PEq, WP, tell1; cbn; intros ι Heq.
+          rewrite option.wp_match. destruct (occurs_check_spec xIn t); subst.
           + exists (env.remove _ ι xIn). split; [|easy].
             rewrite inst_thick.
             rewrite Sub.subst_thin in Heq.
@@ -1725,7 +1724,7 @@ Module Variant1.
       Lemma boxflex_complete_assignment {x} (xIn : x ∈ w) (t : Ty w) {w1} (ζ01 : w ⊒⁻ w1) :
         Entails
           (Ext (Ty_hole xIn ≃ t) ζ01)
-          (WP (boxflex xIn t ζ01) (fun (w0 : World) (_ : w1 ⊒⁻ w0) (_ : Unit w0) => ⊤%P)).
+          (WP (boxflex t xIn ζ01) (fun (w0 : World) (_ : w1 ⊒⁻ w0) (_ : Unit w0) => ⊤%P)).
       Proof.
         unfold boxflex, Tri.box_intro_split.
         destruct ζ01 as [|w2 y yIn ty].
@@ -1800,8 +1799,8 @@ Module Variant1.
           + now rewrite wlp_pure, peq_refl, pimpl_true_l.
           + rewrite wlp_tell'; auto. cbn.
             now rewrite Sub.lk_thin.
-        - unfold PValid, WLP, PEq, PImpl. intros ι. rewrite !option.wlp_map.
-          destruct (occurs_check_spec xIn t); cbn; rewrite option.wlp_match; subst.
+        - unfold PValid, WLP, PEq, PImpl. intros ι. rewrite option.wlp_match.
+          destruct (occurs_check_spec xIn t); cbn; subst.
           + split.
             * intros HQ Heq. specialize (HQ (env.remove _ ι xIn)).
               rewrite Sub.subst_thin, inst_persist_ty, Sub.inst_thin in Heq.

@@ -26,6 +26,10 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
+From Coq Require Import
+  Classes.Morphisms
+  Program.Basics
+  Relations.Relation_Definitions.
 From Em Require Import
      Definitions Context Environment STLC.
 Import ctx.notations.
@@ -116,20 +120,20 @@ Module Tri.
       | cons x t r => p_cons _ _ x _ t r (sind r)
       end.
 
-  Definition onsubterms (P : forall w w', w ⊒⁻ w' -> Type) :
-    forall {w w'}, w ⊒⁻ w' -> Type :=
-    fun w w' r =>
-      match r with
-      | refl       => unit
-      | cons x _ r => P (w - x) _ r
-      end.
+  Inductive onsubterms (P : forall w w', w ⊒⁻ w' -> Type) {w} :
+    forall w', w ⊒⁻ w' -> Type :=
+  | on_refl : onsubterms P refl
+  | on_cons {x} (xIn : x ∈ w) (t : Ty (w - x)) {w'} (r : Tri (w - x) w') :
+    P (w - x) w' r -> onsubterms P (cons x t r).
+  Arguments on_refl {P w}.
+  Arguments on_cons {P w} x {xIn} t {w' r} _.
 
   Definition Tri_löb (P : forall w w', w ⊒⁻ w' -> Type)
     (step : forall w w' r, onsubterms P r -> P w w' r) :
     forall w w' r, P w w' r :=
     fix löb w w' (r : w ⊒⁻ w') {struct r} : P w w' r :=
-      Tri_case (P w) (step w w Definitions.refl tt)
-        (fun w' x xIn t r => step w w' (thick x t ⊙ r) (löb (w - x) w' r)) r.
+      Tri_case (P w) (step w w Definitions.refl on_refl)
+        (fun w' x xIn t r => step w w' (thick x t ⊙ r) (on_cons x t (löb (w - x) w' r))) r.
 
   #[local] Notation "□ A" := (Box Tri A) (at level 9, format "□ A", right associativity).
   Definition box_intro_split {A} :
@@ -238,48 +242,68 @@ Module Tri.
   (*       now rewrite subst_comp. *)
   (* Qed. *)
 
-  Import Sng.
-  Definition persist' : ⊢ Ty -> □Ty :=
-    fix pers {w0} (t : Ty w0) {w1} (r : w0 ⊒⁻ w1) {struct r} : Ty w1 :=
-      match r with
-      | refl       => t
-      | cons x s r => pers (persist _ t _ (sng _ s)) r
+  Section InnerRecursion.
+
+    Definition Sim : ACC := fun w0 w1 => forall y (yIn : y ∈ w0), Ty w1.
+    Definition RSim (w0 w1 : World) : relation (Sim w0 w1) :=
+      forall_relation (fun y => pointwise_relation (y ∈ w0) eq).
+    #[global] Arguments RSim : clear implicits.
+
+    Context [w w' : World] (rec : Sim w w').
+
+    Fixpoint persist_inner (t : Ty w) : Ty w' :=
+      match t with
+      | Ty_bool       => Ty_bool
+      | Ty_func t1 t2 => Ty_func (persist_inner t1) (persist_inner t2)
+      | Ty_hole xIn   => rec xIn
       end.
 
-  Lemma persist'_trans {w0 w1 w2} {ζ1 : w0 ⊒⁻ w1} {ζ2 : w1 ⊒⁻ w2} :
-    forall t, persist' t (ζ1 ⊙ ζ2) = persist' (persist' t ζ1) ζ2.
-  Proof. induction ζ1; intros u; cbn; auto. Qed.
+  End InnerRecursion.
 
-  #[export] Instance lk_tri : Lk Tri :=
-    fun w0 w1 r x xIn => persist' (Ty_hole xIn) r.
+  #[export] Instance proper_persist_inner {w0 w1} :
+    Proper (@RSim w0 w1 ==> pointwise_relation _ eq) (@persist_inner w0 w1).
+  Proof. intros r1 r2 Hr t; induction t; cbn; now f_equal; auto. Qed.
 
-  Lemma persist'_fix {w0 w1} (t : Ty w0) (r : Tri w0 w1) :
-     persist' t r = match t with
-                    | Ty_bool => Ty_bool
-                    | Ty_func t1 t2 => Ty_func (persist' t1 r) (persist' t2 r)
-                    | Ty_hole xIn => lk r xIn
-                    end.
-  Proof. induction r; destruct t; cbn; auto; now rewrite IHr. Qed.
+  #[export] Instance persist_tri_ty : Persistent Tri Ty :=
+    fix pers {w0} t {w1} (r : w0 ⊒⁻ w1) {struct r} : Ty w1 :=
+      match r with
+      | refl       => t
+      | cons x s r => persist_inner (fun y yIn => pers (thickIn _ s yIn) r) t
+      end.
 
-  Lemma persist_persist' {w0 w1} (t : Ty w0) (r : Tri w0 w1) :
-    persist _ t _ r = persist' t r.
-  Proof. induction t; cbn; rewrite persist'_fix; now f_equal. Qed.
+  Lemma persist_fix {w0 w1} (r : Tri w0 w1) (t : Ty w0) :
+     persist _ t _ r = match t with
+                       | Ty_bool       => Ty_bool
+                       | Ty_func t1 t2 => Ty_func (persist _ t1 _ r) (persist _ t2 _ r)
+                       | Ty_hole xIn   => persist _ (Ty_hole xIn) _ r
+                       end.
+  Proof. induction r; destruct t; cbn; auto. Qed.
 
-  #[export] Instance lk_preorder_tri : LkPreOrder Tri.
-  Proof.
-    constructor; cbn; intros.
-    - reflexivity.
-    - unfold lk, lk_tri.
-      now rewrite persist'_trans, persist_persist'.
-  Qed.
+  Corollary persist_bool {w0 w1} (r : Tri w0 w1) :
+    persist _ Ty_bool _ r = Ty_bool.
+  Proof. apply (persist_fix r). Qed.
+
+  Corollary persist_func {w0 w1} (r : Tri w0 w1) (t1 t2 : Ty w0) :
+    persist _ (Ty_func t1 t2) _ r = Ty_func (persist _ t1 _ r) (persist _ t2 _ r).
+  Proof. apply (persist_fix r). Qed.
+
+  Lemma persist_persist_inner {w0 w1} (t : Ty w0) (rec : forall y (yIn : y ∈ w0), Ty w1) {w2} (r : Tri w1 w2) :
+    persist _ (persist_inner rec t) _ r = persist_inner (fun y yIn => persist _ (rec y yIn) _ r) t.
+  Proof. induction t; cbn; rewrite persist_fix; f_equal; auto. Qed.
 
   #[export] Instance persist_preorder_tri : PersistPreOrder Tri Ty.
-  Proof. Admitted.
+  Proof.
+    constructor.
+    - reflexivity.
+    - intros w0 t w1 w2 ζ1 ζ2.
+      induction ζ1; cbn; intros *.
+      + reflexivity.
+      + rewrite persist_persist_inner.
+        now apply proper_persist_inner.
+  Qed.
 
   #[export] Instance inst_thick : InstThick Tri.
-  Proof. Admitted.
-
-  #[global] Arguments lk_tri : simpl never.
+  Proof. easy. Qed.
 
 End Tri.
 Export Tri (Tri).
