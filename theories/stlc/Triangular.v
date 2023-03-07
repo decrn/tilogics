@@ -116,6 +116,21 @@ Module Tri.
       | cons x t r => p_cons _ _ x _ t r (sind r)
       end.
 
+  Definition onsubterms (P : forall w w', w ⊒⁻ w' -> Type) :
+    forall {w w'}, w ⊒⁻ w' -> Type :=
+    fun w w' r =>
+      match r with
+      | refl       => unit
+      | cons x _ r => P (w - x) _ r
+      end.
+
+  Definition Tri_löb (P : forall w w', w ⊒⁻ w' -> Type)
+    (step : forall w w' r, onsubterms P r -> P w w' r) :
+    forall w w' r, P w w' r :=
+    fix löb w w' (r : w ⊒⁻ w') {struct r} : P w w' r :=
+      Tri_case (P w) (step w w Definitions.refl tt)
+        (fun w' x xIn t r => step w w' (thick x t ⊙ r) (löb (w - x) w' r)) r.
+
   #[local] Notation "□ A" := (Box Tri A) (at level 9, format "□ A", right associativity).
   Definition box_intro_split {A} :
     ⊢ A -> ▶□A -> □A :=
