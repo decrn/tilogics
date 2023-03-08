@@ -407,6 +407,14 @@ Module ProgramLogic.
     Entails P Q -> Entails Q R -> Entails P R.
   Proof. apply transitivity. Qed.
 
+  Lemma pApply_r {w} {P Q R : Pred w} :
+    Entails Q R -> Entails P Q -> Entails P R.
+  Proof. intros; etransitivity; eauto. Qed.
+
+  Lemma pIntro {w} {P Q : Pred w} :
+    Entails P Q -> PValid (P ⇒ Q).
+  Proof. now unfold PValid, Entails, PImpl. Qed.
+
 End ProgramLogic.
 
 Module Correctness.
@@ -569,6 +577,33 @@ Module Correctness.
     Qed.
 
   End BoxedProofs.
+
+  Lemma bmgu_sound w : @BoxUnifierSound w (@bmgu w).
+  Proof.
+    pattern (@bmgu w). revert w. apply Löb_elim.
+    intros w IH. now apply boxmgu_sound_assignment.
+  Qed.
+
+  Lemma bmgu_complete {w} : @BoxUnifierComplete w (@bmgu w).
+  Proof.
+    pattern (@bmgu w). revert w. apply Löb_elim.
+    intros w IH. now apply boxmgu_complete_assignment.
+  Qed.
+
+  Definition mgu_sound w : UnifierSound (@mgu w).
+  Proof.
+    unfold UnifierSound, mgu. intros t1 t2.
+    generalize (bmgu_sound t1 t2 refl).
+    apply proper_pvalid_entails, proper_wlp_entails.
+    intros w' r _. now rewrite ext_refl.
+  Qed.
+
+  Definition mgu_complete w : UnifierComplete (@mgu w).
+  Proof.
+    unfold UnifierComplete, mgu. intros t1 t2. apply pIntro.
+    apply (pApply_r (@bmgu_complete _ t1 t2 _ refl)).
+    now rewrite ext_refl.
+  Qed.
 
 End Correctness.
 
