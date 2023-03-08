@@ -92,17 +92,6 @@ Module BoveCapretta.
 
 End BoveCapretta.
 
-Section MoveMe.
-
-  Import (hints) Sub Tri.
-
-  (* Lemma persist_sub_tri_thick {w x} (xIn : x ∈ w) s (t : Ty _) : *)
-  (*   persist _ t (remove xIn) (Sub.thick xIn s) = *)
-  (*   persist _ t (remove xIn) (Tri.thick x s). *)
-  (* Proof. Admitted. *)
-
-End MoveMe.
-
 Section Löb.
 
   Context (A : TYPE) (step : ⊢ ▷A -> A).
@@ -502,7 +491,7 @@ Module P.
     P.nothing (P.unifies (Ty_hole xIn) t).
   Proof.
     unfold P.nothing, P.unifies; intros.
-    apply no_cycle with t[ζ].
+    apply Ty_no_cycle with t[ζ].
     rewrite <- H0 at 1.
     now apply Sub.Ty_subterm_subst.
   Qed.
@@ -633,6 +622,9 @@ Module StrongMonotonicity.
   Definition RELATION (A : World -> Type) : Type :=
     forall w0 w1 (r1 : w0 ⊒⁻ w1),
       A w0 -> A w1 -> Prop.
+
+  Definition RProper {A} (R : RELATION A) {w} (a : A w) : Prop :=
+    R w w refl a a.
 
   Definition RBox {A} (R : RELATION A) : RELATION □A :=
     fun w0 w1 r01 ba0 ba1 =>
@@ -1175,11 +1167,15 @@ Module Variant1.
     Notation "P ⇒ Q" := (PImpl P Q) (at level 94, right associativity) : pred_scope.
     Notation "P ∧ Q" := (PAnd P Q) (at level 80, right associativity) : pred_scope.
 
+    Lemma split_bientails {w} (P Q : Pred w) :
+      Entails P Q -> Entails Q P -> BiEntails P Q.
+    Proof. intros PQ QP ι. split; [apply PQ|apply QP]. Qed.
+
     Lemma pand_comm {w} (P Q : Pred w) : P ∧ Q ⊣⊢ Q ∧ P.
     Proof. unfold BiEntails, PAnd. intuition. Qed.
     Lemma pand_true_l {w} (P : Pred w) : ⊤ ∧ P ⊣⊢ P.
     Proof. now unfold BiEntails, PAnd, PTrue. Qed.
-    Lemma pand_true_r {w} (P : Pred w) : P ∧ P ⊣⊢ P.
+    Lemma pand_true_r {w} (P : Pred w) : P ∧ ⊤ ⊣⊢ P.
     Proof. now unfold BiEntails, PAnd, PTrue. Qed.
     Lemma pimpl_true_l {w} (P : Pred w) : ⊤ ⇒ P ⊣⊢ P.
     Proof. unfold BiEntails, PImpl, PTrue. intuition. Qed.
@@ -1266,40 +1262,42 @@ Module Variant1.
         split; [rewrite inst_trans|]; firstorder.
     Qed.
 
-    Lemma wp_monotonic {A w0} (m : ◆A w0) (p q : □(A -> Pred) w0) :
-      Entails
-        (fun ι0 => forall w1 ζ1 a1 ι1, inst ζ1 ι1 = ι0 -> PImpl (p w1 ζ1 a1) (q w1 ζ1 a1) ι1)
-        (WP m p ⇒ WP m q)%P.
+    Lemma wp_monotonic {A w} (d : ◆A w) (R : Pred w) (P Q : □(A -> Pred) w) :
+      (forall w1 (r : w ⊒⁻ w1) (a : A w1), Entails (Ext R r) (P w1 r a ⇒ Q w1 r a)%P) ->
+      Entails R (WP d P ⇒ WP d Q)%P.
     Proof.
-      unfold Entails, PImpl, WP. intros ι0 pq.
+      unfold Entails, PImpl, WP, Ext; intros pq ι HR.
       apply option.wp_monotonic.
       intros (w1 & ζ01 & a1) (ι1 & e1 & H).
       exists ι1; split; [assumption|].
-      revert e1 H; apply pq.
+      revert H; apply pq. now rewrite e1.
     Qed.
 
-    #[export] Instance proper_wp_bientails {A w} (d : ◆A w) :
+    #[export] Instance proper_wp_bientails {A w} :
       Proper
-        (forall_relation
+        (pointwise_relation _
+           (forall_relation
            (fun _ => pointwise_relation _
-                       (pointwise_relation _ BiEntails)) ==> BiEntails)
-        (WP d).
+                       (pointwise_relation _ BiEntails)) ==> BiEntails))
+        (@WP A w).
     Proof.
-      intros p q pq ι.
-      split; apply wp_monotonic;
-        intros * ?; hnf; apply pq.
+      intros d p q pq. apply split_bientails;
+        rewrite <- pand_true_l at 1;
+        apply pimpl_and_adjoint, wp_monotonic;
+        intros * ι _; unfold PImpl; apply pq.
     Qed.
 
-    #[export] Instance proper_wp_entails {A w} (d : ◆A w) :
+    #[export] Instance proper_wp_entails {A w} :
       Proper
-        (forall_relation
-           (fun _ => pointwise_relation _
-                       (pointwise_relation _ Entails)) ==> Entails)
-        (WP d).
+        (pointwise_relation _
+           (forall_relation
+              (fun _ => pointwise_relation _
+                          (pointwise_relation _ Entails)) ==> Entails))
+        (@WP A w).
     Proof.
-      intros p q pq ι.
-      apply wp_monotonic;
-        intros * ?; hnf; now apply pq.
+      intros d p q pq. rewrite <- pand_true_l at 1.
+      apply pimpl_and_adjoint, wp_monotonic.
+      intros * ι _. unfold PImpl. apply pq.
     Qed.
 
     Definition WLP {A} : ⊢ ◆A -> □(A -> Pred) -> Pred :=
@@ -1334,15 +1332,14 @@ Module Variant1.
         now rewrite inst_trans. easy.
     Qed.
 
-    Lemma wlp_monotonic {A w0} (m : ◆A w0) (p q : □(A -> Pred) w0) :
-      Entails
-        (fun ι0 => forall w1 ζ1 a1 ι1, inst ζ1 ι1 = ι0 -> PImpl (p w1 ζ1 a1) (q w1 ζ1 a1) ι1)
-        (WLP m p ⇒ WLP m q)%P.
+    Lemma wlp_monotonic {A w} (d : ◆A w) (R : Pred w) (P Q : □(A -> Pred) w) :
+      (forall w1 (r : w ⊒⁻ w1) (a : A w1), Entails (Ext R r) (P w1 r a ⇒ Q w1 r a)%P) ->
+      Entails R (WLP d P ⇒ WLP d Q)%P.
     Proof.
-      unfold Entails, PImpl, WLP; intros ι pq.
+      unfold Entails, PImpl, WLP, Ext; intros pq ι HR.
       apply option.wlp_monotonic.
       intros (w1 & ζ01 & a1) H ι1 e1. specialize (H ι1 e1).
-      revert e1 H; apply pq.
+      revert H; apply pq. now rewrite e1.
     Qed.
 
     #[global] Instance params_wlp : Params (@WLP) 4 := {}.
@@ -1354,10 +1351,10 @@ Module Variant1.
                        (pointwise_relation _ BiEntails)) ==> BiEntails))
         (@WLP A w).
     Proof.
-      intros d p q pq ι.
-      split; apply wlp_monotonic;
-        intros * ?; unfold PImpl;
-        now apply pq.
+      intros d p q pq. apply split_bientails;
+        rewrite <- pand_true_l at 1;
+        apply pimpl_and_adjoint, wlp_monotonic;
+        intros * ι _; unfold PImpl; apply pq.
     Qed.
 
     #[export] Instance proper_wlp_entails {A w} :
@@ -1368,10 +1365,9 @@ Module Variant1.
                           (pointwise_relation _ Entails)) ==> Entails))
         (@WLP A w).
     Proof.
-      intros d p q pq ι.
-      apply wlp_monotonic;
-        intros * ?; unfold PImpl;
-        now apply pq.
+      intros d p q pq. rewrite <- pand_true_l at 1.
+      apply pimpl_and_adjoint, wlp_monotonic.
+      intros * ι _. unfold PImpl. apply pq.
     Qed.
 
     Lemma wlp_tell1 {w x} (xIn : x ∈ w) (t : Ty (w - x)) (Q : □(Unit -> Pred) w) :
@@ -1384,6 +1380,18 @@ Module Variant1.
         rewrite option.wlp_match in H. apply (H ι eq_refl).
       - intros H ι. rewrite option.wlp_match. intros. apply H.
     Qed.
+
+    Lemma pPoseProof {w} {P Q R : Pred w} :
+      PValid Q -> Entails (P ∧ Q)%P R -> Entails P R.
+    Proof. unfold PValid, Entails, PAnd. intuition. Qed.
+
+    Lemma pGeneralize {w} {P Q R : Pred w} :
+      PValid Q -> Entails P (Q ⇒ R)%P -> Entails P R.
+    Proof. unfold PValid, Entails, PAnd. intuition. Qed.
+
+    Lemma pApply {w} {P Q R : Pred w} :
+      Entails P Q -> Entails Q R -> Entails P R.
+    Proof. apply transitivity. Qed.
 
     Definition UnifierSound : ⊢ Unifier -> PROP :=
       fun w0 u =>
@@ -1404,13 +1412,6 @@ Module Variant1.
       fun w0 bu =>
         forall (t1 t2 : Ty w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1),
           Entails (Ext (t1 ≃ t2) ζ01) (WP (bu t1 t2 w1 ζ01) (fun _ _ _ => PTrue)).
-
-    Lemma apply_wlp {A w} (d : ◆A w) (R : Pred w) (P Q : forall w1 : World, w ⊒⁻ w1 -> A w1 -> Pred w1) :
-      (forall w1 (r : w ⊒⁻ w1) (a : A w1), Entails (Ext R r) (P w1 r a ⇒ Q w1 r a)%P) -> ⊩ WLP d P -> Entails R (WLP d Q).
-    Proof.
-      unfold Entails, Ext, PValid, PImpl. intros Hrpq Hp ι Hr. specialize (Hp ι). revert Hp.
-      apply wlp_monotonic. intros * <-; unfold PImpl; now apply Hrpq.
-    Qed.
 
   End ProofAssignmentBased.
 
@@ -1677,12 +1678,9 @@ Module Variant1.
         - intros * IH1 IH2 *. rewrite wlp_bind.
           specialize (IH1 _ ζ01). revert IH1.
           apply proper_pvalid_entails, proper_wlp_entails.
-          intros w2 ζ12 _.
-          rewrite wlp_bind.
-          specialize (IH2 _ (ζ01 ⊙ ζ12)).
-          revert IH2.
-          apply apply_wlp. intros ? ? _.
-          rewrite wlp_pure. unfold T, _4.
+          intros w2 ζ12 _. rewrite wlp_bind.
+          apply (pGeneralize (IH2 _ (ζ01 ⊙ ζ12))), wlp_monotonic.
+          intros ? ? _. rewrite wlp_pure. unfold T, _4.
           rewrite ?trans_refl_r, ?ext_trans, ?ext_impl.
           apply proper_ext_entails; auto.
           apply proper_ext_entails; auto.
@@ -1717,9 +1715,10 @@ Module Variant1.
             rewrite inst_persist_ty in Heq.
             rewrite Sub.inst_thin in Heq. rewrite <- Heq.
             now rewrite env.insert_remove.
-          + destruct H0. exact (H _ _ H0).
-            admit.
-      Admitted.
+          + destruct H0; [exact (H _ _ H0)|].
+            apply (inst_subterm ι) in H0. cbn in H0. rewrite <- Heq in H0.
+            now apply ty_no_cycle in H0.
+      Qed.
 
       Lemma boxflex_complete_assignment {x} (xIn : x ∈ w) (t : Ty w) {w1} (ζ01 : w ⊒⁻ w1) :
         Entails
@@ -1747,20 +1746,27 @@ Module Variant1.
           rewrite wp_bind, peq_func.
           rewrite <- ext_and.
           apply pimpl_and_adjoint.
-          specialize (IH1 w1 ζ01). revert IH1.
-          apply proper_entails_entails. easy.
-      Admitted.
+          apply (pApply (IH1 w1 ζ01)). clear IH1.
+          apply pimpl_and_adjoint.
+          rewrite pand_comm.
+          apply pimpl_and_adjoint.
+          apply wp_monotonic. intros.
+          rewrite pimpl_true_l.
+          rewrite wp_bind.
+          rewrite <- ext_trans.
+          apply (pApply (IH2 _ _)).
+          apply proper_wp_entails. intros ? ? _.
+          rewrite wp_pure. unfold _4, T.
+          reflexivity.
+      Qed.
 
       Import StrongMonotonicity.
 
-      Definition RPred : RELATION Pred.
-        unfold RELATION, Pred.
-        intros w0 w1 r P Q.
-        refine (forall ι, P (inst r ι) <-> Q ι).
-      Defined.
+      Definition RPred : RELATION Pred :=
+        fun w0 w1 r P Q => forall ι, P (inst r ι) <-> Q ι.
 
       Lemma wlp_tell' {x} (xIn : x ∈ w) (t : Ty (w - x)) (Q : □(Unit -> Pred) w)
-        (RQ : RBox (RImpl RUnit RPred) refl Q Q) :
+        (RQ : RProper (RBox (RImpl RUnit RPred)) Q) :
         WLP (tell1 xIn t) Q ⊣⊢ (t[Sub.thin xIn] ≃ Ty_hole xIn ⇒ T Q tt).
       Proof.
         unfold BiEntails, WLP, PEq, PImpl, tell1, T. intros ι.
@@ -1791,7 +1797,7 @@ Module Variant1.
       Qed.
 
       Lemma flex_sound_assignment' {x} (xIn : x ∈ w) (t : Ty w)
-        (Q : □(Unit -> Pred) w) (RQ : RBox (RImpl RUnit RPred) refl Q Q) :
+        (Q : □(Unit -> Pred) w) (RQ : RProper (RBox (RImpl RUnit RPred)) Q) :
         WLP (flex t xIn) Q ⊣⊢ (PEq t (Ty_hole xIn)) ⇒ T Q tt.
       Proof.
         unfold flex. destruct (varview t) as [y yIn|].
@@ -1819,9 +1825,10 @@ Module Variant1.
               apply RQ.
           + destruct H0.
             * destruct (H _ _ H0).
-            * split; auto. intros _ Heq.
-              exfalso.
-      Admitted.
+            * split; auto. intros _ Heq. exfalso.
+              apply (inst_subterm ι) in H0. rewrite Heq in H0.
+              now apply ty_no_cycle in H0.
+      Qed.
 
     End AssignmentBased.
 

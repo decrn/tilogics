@@ -446,6 +446,9 @@ Module StrongMonotonicity.
     forall w0 w1 (r1 : w0 ⊒ˢ w1),
       A w0 -> A w1 -> Prop.
 
+  Definition RProper {A} (R : RELATION A) (w : World) (a : A w) : Prop :=
+    R w w refl a a.
+
   Definition RBox {A} (R : RELATION A) : RELATION □ˢA :=
     fun w0 w1 r01 ba0 ba1 =>
       forall (w2 w3 : World) (r02 : w0 ⊒ˢ w2) (r13 : w1 ⊒ˢ w3) (r23 : w2 ⊒ˢ w3),

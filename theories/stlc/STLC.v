@@ -1,6 +1,7 @@
 From Coq Require Import
      Lists.List
      Relations.Relation_Definitions
+     Relations.Relation_Operators
      Strings.String.
 From Equations Require Import
      Equations.
@@ -22,7 +23,7 @@ Inductive ty : Type :=
   | ty_bool : ty
   | ty_func : ty -> ty -> ty.
 
-Derive NoConfusion for ty.
+Derive NoConfusion Subterm for ty.
 (* Print noConfusion_ty_obligation_1. *)
 (* Print NoConfusion_ty. *)
 
@@ -433,10 +434,28 @@ Class PersistPreOrder {R A} `{Persistent R A, Refl R, Trans R} : Prop :=
   }.
 #[global] Arguments PersistPreOrder R A {_ _ _}.
 
-Lemma no_cycle {w} (t : Ty w) : ~ Ty_subterm t t.
+Lemma Ty_no_cycle {w} (t : Ty w) : ~ Ty_subterm t t.
 Proof.
   induction (well_founded_Ty_subterm t) as [? _ IH].
   intros Hx. apply (IH _ Hx Hx).
+Qed.
+
+Lemma ty_no_cycle (t : ty) : ~ ty_subterm t t.
+Proof.
+  induction (well_founded_ty_subterm t) as [? _ IH].
+  intros Hx. apply (IH _ Hx Hx).
+Qed.
+
+Lemma inst_direct_subterm {w} (t1 t2 : Ty w) (ι : Assignment w) :
+  Ty_direct_subterm t1 t2 -> ty_direct_subterm (inst t1 ι) (inst t2 ι).
+Proof. intros []; constructor. Qed.
+
+Lemma inst_subterm {w} (ι : Assignment w) (t1 t2 : Ty w) :
+  Ty_subterm t1 t2 -> ty_subterm (inst t1 ι) (inst t2 ι).
+Proof.
+  induction 1.
+  - constructor 1. now apply inst_direct_subterm.
+  - eapply t_trans; eauto.
 Qed.
 
 Section Thin.
