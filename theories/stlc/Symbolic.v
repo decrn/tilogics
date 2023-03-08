@@ -1,7 +1,8 @@
 Require Import List.
 Import ListNotations.
 From Em Require Import
-     Definitions Context Environment STLC Prelude Substitution Triangular.
+     Definitions Context Environment STLC Prelude Substitution Triangular
+     unification.CorrectnessWithSubstitutions.
 Import ctx.notations.
 From Em Require
   Unification.
@@ -559,20 +560,21 @@ Module StrongMonotonicity.
       auto.
   Qed.
 
+  Import SubstitutionPredicates.
   Lemma rmgu :
     RValid (RImpl RTy (RImpl RTy (RM RUnit))) mgu.
   Proof.
     unfold RValid, RImpl, RM, RUnit.
     intros w0 w1 r01 t1_0 t1_1 rt1 t2_0 t2_1 rt2.
     unfold mgu.
-    destruct (mgu_spec t1_0 t2_0) as [(w2 & r02 & ?)|],
-        (mgu_spec t1_1 t2_1) as [(w3 & r13 & ?)|]; cbn.
+    destruct (Correctness.mgu_spec t1_0 t2_0) as [(w2 & r02 & ?)|],
+        (Correctness.mgu_spec t1_1 t2_1) as [(w3 & r13 & ?)|]; cbn.
     - unfold RTy in *.
       clear u u0.
       subst.
       destruct H0 as [H0 _].
       destruct H as [_ H].
-      unfold P.unifies in *.
+      unfold unifies in *.
       specialize (H _ (r01 ⊙ Sub.triangular r13)).
       rewrite ?persist_trans in H.
       specialize (H H0).
@@ -582,7 +584,7 @@ Module StrongMonotonicity.
     - apply (H w3 (r01 ⊙ Sub.triangular r13)).
       destruct H0 as [H0 _].
       unfold RTy in *.
-      subst. unfold P.unifies in *.
+      subst. unfold unifies in *.
       now rewrite ?persist_trans, H0.
     - auto.
   Qed.

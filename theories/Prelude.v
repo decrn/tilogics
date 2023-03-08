@@ -377,13 +377,6 @@ Lemma forall_and_compat {A} (P Q : A -> Prop):
   (forall a, P a /\ Q a) <-> (forall a, P a) /\ (forall a, Q a).
 Proof. firstorder. Qed.
 
-Lemma forall_proper {A} (P Q : A -> Prop) :
-  (forall x, P x <-> Q x) -> (forall x, P x) <-> (forall x, Q x).
-Proof. firstorder. Qed.
-Lemma exists_proper {A} (P Q : A -> Prop) :
-  (forall x, P x <-> Q x) -> (exists x, P x) <-> (exists x, Q x).
-Proof. firstorder. Qed.
-
 (* Really short summary on notations in Coq:
    - Coq uses precedence levels from 0 to 100.
    - Lower levels bound tighter than higher levels.

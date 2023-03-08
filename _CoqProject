@@ -11,4 +11,7 @@ theories/stlc/Symbolic.v
 theories/stlc/Refinement.v
 theories/stlc/Substitution.v
 theories/stlc/Triangular.v
+theories/unification/CorrectnessWithAssignments.v
+theories/unification/CorrectnessWithSubstitutions.v
+theories/unification/LogicalRelation.v
 theories/unification/Unification.v
