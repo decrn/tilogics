@@ -31,6 +31,7 @@ From Coq Require Import
      (* Classes.CRelationClasses *)
      Classes.Equivalence
      Classes.Morphisms
+     Classes.Morphisms_Prop
      Classes.RelationClasses
      Program.Equality
      Program.Tactics
@@ -74,6 +75,19 @@ Ltac folddefs :=
     | |- context[Tri.cons ?x ?t ?r] =>
         change_no_check (Tri.cons x t r) with (thick x t ⊙⁻ r)
     end.
+
+Section MoveMe.
+
+  Import (hints) Tri.
+
+  Lemma persist_thin_thick {w x} (xIn : x ∈ w) (s t : Ty (w - x)) :
+    persist _ (thin xIn t) _ (thick (R := Tri) x s) = t.
+  Proof.
+    induction t; cbn - [thick]; try rewrite Tri.persist_fix; f_equal; auto.
+    cbn. unfold thickIn. now rewrite occurs_check_view_thin.
+  Qed.
+
+End MoveMe.
 
 Module BoveCapretta.
 
@@ -1415,13 +1429,6 @@ Module Variant1.
 
   End ProofAssignmentBased.
 
-  Lemma thin_thick {w x} (xIn : x ∈ w) (s t : Ty (w - x)) :
-    (thin xIn t)[thick x s] = t.
-  Proof.
-    induction t; cbn - [thick]; try rewrite Tri.persist_fix; f_equal; auto.
-    cbn. unfold thickIn. now rewrite occurs_check_view_thin.
-  Qed.
-
   Section MguO.
 
     Import (hints) Tri.
@@ -1434,6 +1441,42 @@ Module Variant1.
         (fun z zIn u =>
            let ζ := thick (R := Tri) z u in
            lmgu _ (Ty_hole xIn)[ζ] t[ζ]).
+
+    Definition boxmgu : BoxUnifier w :=
+      fix bmgu s t {struct s} :=
+        match s , t with
+        | Ty_hole xIn   , t            => boxflex t xIn
+        | s            , Ty_hole yIn   => boxflex s yIn
+        | Ty_bool       , Ty_bool       => fun _ _ => η tt
+        | Ty_func s1 s2 , Ty_func t1 t2 =>
+            fun _ ζ1 =>
+              ⟨ ζ2 ⟩ _ <- bmgu s1 t1 _ ζ1 ;;
+              ⟨ ζ3 ⟩ _ <- bmgu s2 t2 _ (ζ1 ⊙⁻ ζ2) ;;
+              η tt
+        | _            , _            => fun _ _ => None
+        end.
+
+      Section boxmgu_elim.
+
+      Context (P : Ty w -> Ty w -> □◆Unit w -> Type).
+      Context (fflex1 : forall (x : nat) (xIn : x ∈ w) (t : Ty w), P (Ty_hole xIn) t (boxflex t xIn)).
+      Context (fflex2 : forall (x : nat) (xIn : x ∈ w) (t : Ty w), P t (Ty_hole xIn) (boxflex t xIn)).
+      Context (fbool : P Ty_bool Ty_bool (fun (w1 : World) (_ : w ⊒⁻ w1) => η tt)).
+      Context (fbool_func : forall T1 T2 : Ty w, P Ty_bool (Ty_func T1 T2) (fun (w1 : World) (_ : w ⊒⁻ w1) => None)).
+      Context (ffunc_bool : forall T1 T2 : Ty w, P (Ty_func T1 T2) Ty_bool (fun (w1 : World) (_ : w ⊒⁻ w1) => None)).
+      Context (ffunc : forall s1 s2 t1 t2 : Ty w,
+        (P s1 t1 (boxmgu s1 t1)) ->
+        (P s2 t2 (boxmgu s2 t2)) ->
+        P (Ty_func s1 s2) (Ty_func t1 t2)
+          (fun (w1 : World) (ζ1 : w ⊒⁻ w1) =>
+           bind (boxmgu s1 t1 ζ1)
+             (fun (w2 : World) (ζ2 : w1 ⊒⁻ w2) (_ : Unit w2) =>
+              bind (boxmgu s2 t2 (ζ1 ⊙⁻ ζ2)) (fun (w3 : World) (_ : w2 ⊒⁻ w3) (_ : Unit w3) => η tt)))).
+
+      Lemma boxmgu_elim : forall (t1 t2 : Ty w), P t1 t2 (boxmgu t1 t2).
+      Proof. induction t1; intros t2; cbn; auto; destruct t2; auto. Qed.
+
+    End boxmgu_elim.
 
     Section SubstitutionBased.
       Import P.
@@ -1450,42 +1493,6 @@ Module Variant1.
         - rewrite !persist_refl. apply flex_spec.
         - rewrite !persist_trans. apply lmgu_spec.
       Qed.
-
-      Definition boxmgu : BoxUnifier w :=
-        fix bmgu s t {struct s} :=
-          match s , t with
-          | Ty_hole xIn   , t            => boxflex t xIn
-          | s            , Ty_hole yIn   => boxflex s yIn
-          | Ty_bool       , Ty_bool       => fun _ _ => η tt
-          | Ty_func s1 s2 , Ty_func t1 t2 =>
-              fun _ ζ1 =>
-                ⟨ ζ2 ⟩ _ <- bmgu s1 t1 _ ζ1 ;;
-                ⟨ ζ3 ⟩ _ <- bmgu s2 t2 _ (ζ1 ⊙⁻ ζ2) ;;
-                η tt
-          | _            , _            => fun _ _ => None
-          end.
-
-      Section boxmgu_elim.
-
-        Context (P : Ty w -> Ty w -> □◆Unit w -> Type).
-        Context (fflex1 : forall (x : nat) (xIn : x ∈ w) (t : Ty w), P (Ty_hole xIn) t (boxflex t xIn)).
-        Context (fflex2 : forall (x : nat) (xIn : x ∈ w) (t : Ty w), P t (Ty_hole xIn) (boxflex t xIn)).
-        Context (fbool : P Ty_bool Ty_bool (fun (w1 : World) (_ : w ⊒⁻ w1) => η tt)).
-        Context (fbool_func : forall T1 T2 : Ty w, P Ty_bool (Ty_func T1 T2) (fun (w1 : World) (_ : w ⊒⁻ w1) => None)).
-        Context (ffunc_bool : forall T1 T2 : Ty w, P (Ty_func T1 T2) Ty_bool (fun (w1 : World) (_ : w ⊒⁻ w1) => None)).
-        Context (ffunc : forall s1 s2 t1 t2 : Ty w,
-          (P s1 t1 (boxmgu s1 t1)) ->
-          (P s2 t2 (boxmgu s2 t2)) ->
-          P (Ty_func s1 s2) (Ty_func t1 t2)
-            (fun (w1 : World) (ζ1 : w ⊒⁻ w1) =>
-             bind (boxmgu s1 t1 ζ1)
-               (fun (w2 : World) (ζ2 : w1 ⊒⁻ w2) (_ : Unit w2) =>
-                bind (boxmgu s2 t2 (ζ1 ⊙⁻ ζ2)) (fun (w3 : World) (_ : w2 ⊒⁻ w3) (_ : Unit w3) => η tt)))).
-
-        Lemma boxmgu_elim : forall (t1 t2 : Ty w), P t1 t2 (boxmgu t1 t2).
-        Proof. induction t1; intros t2; cbn; auto; destruct t2; auto. Qed.
-
-      End boxmgu_elim.
 
       (* Lemma boxmgu_correct (t1 t2 : Ty w) : *)
       (*   forall {w1} (ζ1 : w ⊒⁻ w1) {w2} (ζ2 : w1 ⊒⁻ w2), *)
@@ -1643,7 +1650,7 @@ Module Variant1.
           + rewrite wlp_tell1, <- peq_persist. cbn. unfold thickIn.
             now rewrite occurs_check_view_refl, occurs_check_view_thin.
         - destruct (occurs_check_sound t xIn); subst; [|constructor].
-          rewrite wlp_tell1, <- peq_persist, thin_thick. cbn.
+          rewrite wlp_tell1, <- peq_persist, persist_thin_thick. cbn.
           unfold thickIn. now rewrite occurs_check_view_refl.
       Qed.
 
@@ -1798,7 +1805,7 @@ Module Variant1.
 
       Lemma flex_sound_assignment' {x} (xIn : x ∈ w) (t : Ty w)
         (Q : □(Unit -> Pred) w) (RQ : RProper (RBox (RImpl RUnit RPred)) Q) :
-        WLP (flex t xIn) Q ⊣⊢ (PEq t (Ty_hole xIn)) ⇒ T Q tt.
+        WLP (flex t xIn) Q ⊣⊢ (t ≃ Ty_hole xIn) ⇒ T Q tt.
       Proof.
         unfold flex. destruct (varview t) as [y yIn|].
         - destruct (occurs_check_view xIn yIn).
