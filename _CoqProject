@@ -4,6 +4,7 @@ theories/aelet/AELetMonadic.v
 theories/common/Context.v
 theories/common/Environment.v
 theories/Example.v
+theories/Predicates.v
 theories/Prelude.v
 theories/stlc/STLC.v
 theories/stlc/Shallow.v

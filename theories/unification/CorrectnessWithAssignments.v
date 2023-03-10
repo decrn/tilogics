@@ -39,6 +39,7 @@ From Em Require Import
   Definitions
   Environment
   LogicalRelation
+  Predicates
   Prelude
   STLC
   Substitution
@@ -67,179 +68,10 @@ Reserved Notation "w1 ⊒ w2" (at level 80).
     (at level 8, left associativity,
       format "s [ ζ ]").
 
-Module AssignmentPredicates.
-
-  Import (hints) Tri.
-  Declare Scope pred_scope.
-  Delimit Scope pred_scope with P.
-
-  Definition Pred (w : World) : Type :=
-    Assignment w -> Prop.
-  Bind Scope pred_scope with Pred.
-
-  Section Connectives.
-
-    Context {w : World}.
-
-    Definition PValid {w} (P : Pred w) : Prop :=
-      forall ι, P ι.
-    Definition PUnsatisfiable {w} (P : Pred w) : Prop :=
-      forall ι, ~ P ι.
-
-    Definition BiEntails : relation (Pred w) :=
-      fun P Q => forall ι, P ι <-> Q ι.
-    Definition Entails : relation (Pred w) :=
-      fun P Q => forall ι, P ι -> Q ι.
-
-    #[export] Instance equivalence_bientails : Equivalence BiEntails.
-    Proof.
-      constructor; unfold Reflexive, Symmetric, Transitive, BiEntails;
-        [ reflexivity | now symmetry | now etransitivity ].
-    Qed.
-    #[export] Instance preorder_entails : RelationClasses.PreOrder Entails.
-    Proof. constructor; unfold Reflexive, Transitive, Entails; auto. Qed.
-
-    #[export] Instance subrelation_bientails_entails :
-      subrelation BiEntails Entails.
-    Proof. intros x y xy ι. apply xy. Qed.
-
-    #[export] Instance subrelation_bientails_flip_entails :
-      subrelation BiEntails (Basics.flip Entails).
-    Proof. intros x y xy ι. apply xy. Qed.
-
-    (* #[export] Instance proper_bientails : *)
-    (*   Proper (BiEntails ==> BiEntails ==> iff) BiEntails. *)
-    (* Proof. intuition. Qed. *)
-    #[export] Instance proper_entails_bientails :
-      Proper (BiEntails ==> BiEntails ==> iff) Entails.
-    Proof. unfold Proper, respectful, BiEntails, Entails. intuition. Qed.
-    #[export] Instance proper_entails_entails :
-      Proper (Basics.flip Entails ==> Entails ==> Basics.impl) Entails.
-    Proof. unfold Proper, respectful, Basics.impl, Entails. intuition. Qed.
-
-    Definition PTrue : Pred w :=
-      fun _ => True.
-    Definition PIff (P Q : Pred w) : Pred w :=
-      fun ι => P ι <-> Q ι.
-    Definition PImpl (P Q : Pred w) : Pred w :=
-      fun ι => (P ι -> Q ι)%type.
-    Definition PAnd (P Q : Pred w) : Pred w :=
-      fun ι => (P ι /\ Q ι)%type.
-
-    #[export] Instance proper_pvalid_bientails : Proper (BiEntails ==> iff) PValid.
-    Proof. firstorder. Qed.
-    #[export] Instance proper_pvalid_entails : Proper (Entails ==> Basics.impl) PValid.
-    Proof. firstorder. Qed.
-    #[export] Instance proper_piff : Proper (BiEntails ==> BiEntails ==> BiEntails) PIff.
-    Proof. firstorder. Qed.
-    #[export] Instance proper_pimpl : Proper (BiEntails ==> BiEntails ==> BiEntails) PImpl.
-    Proof. firstorder. Qed.
-    #[export] Instance proper_pand : Proper (BiEntails ==> BiEntails ==> BiEntails) PAnd.
-    Proof. firstorder. Qed.
-
-  End Connectives.
-
-  (* #[export] Instance proper_iff_impl {w} : *)
-  (*   Proper (BiEntails ==> BiEntails ==> Basics.flip Basics.impl) (@BiEntails w). *)
-  (* Proof. firstorder. Qed. *)
-
-  Definition Ext : ⊢ Pred -> □Pred :=
-    fun w0 p w1 r ι => p (inst r ι).
-  #[global] Arguments Ext [w] _%P [w1].
-  #[global] Instance params_ext : Params (@Ext) 4 := {}.
-
-  #[export] Instance proper_ext_bientails {w : World} :
-    Proper (BiEntails ==> forall_relation (fun _ => eq ==> BiEntails)) (@Ext w).
-  Proof. intros p q pq w1 ? ? ? ι; subst; apply pq. Qed.
-  #[export] Instance proper_ext_entails {w : World} :
-    Proper (Entails ==> forall_relation (fun _ => eq ==> Entails)) (@Ext w).
-  Proof. intros p q pq w1 ? ? ? ι; subst; apply pq. Qed.
-
-  Lemma ext_refl {w} (P : Pred w) :
-    BiEntails (Ext P refl) P.
-  Proof. unfold BiEntails, Ext. intros ι. now rewrite inst_refl. Qed.
-
-  Lemma ext_trans {w0 w1 w2} (r1 : Tri w0 w1) (r2 : Tri w1 w2)
-    (P : Pred w0) :
-    BiEntails (Ext P (trans r1 r2)) (Ext (Ext P r1) r2).
-  Proof. unfold BiEntails, Ext. intros ι. now rewrite inst_trans. Qed.
-
-  Notation "⊩ P" := (PValid P) (at level 95).
-  (* Notation "⊩ P" := (forall ι, P%P ι) (at level 95). *)
-
-  #[global] Arguments BiEntails {w} (_ _)%P.
-  Notation "P ⊣⊢ Q" := (BiEntails P Q) (at level 95).
-  Notation "⊤" := PTrue : pred_scope.
-  Notation "P ⇔ Q" := (PIff P Q) (at level 94) : pred_scope.
-  Notation "P ⇒ Q" := (PImpl P Q) (at level 94, right associativity) : pred_scope.
-  Notation "P ∧ Q" := (PAnd P Q) (at level 80, right associativity) : pred_scope.
-
-  Lemma split_bientails {w} (P Q : Pred w) :
-    Entails P Q -> Entails Q P -> BiEntails P Q.
-  Proof. intros PQ QP ι. split; [apply PQ|apply QP]. Qed.
-
-  Lemma pand_comm {w} (P Q : Pred w) : P ∧ Q ⊣⊢ Q ∧ P.
-  Proof. unfold BiEntails, PAnd. intuition. Qed.
-  Lemma pand_true_l {w} (P : Pred w) : ⊤ ∧ P ⊣⊢ P.
-  Proof. now unfold BiEntails, PAnd, PTrue. Qed.
-  Lemma pand_true_r {w} (P : Pred w) : P ∧ ⊤ ⊣⊢ P.
-  Proof. now unfold BiEntails, PAnd, PTrue. Qed.
-  Lemma pimpl_true_l {w} (P : Pred w) : ⊤ ⇒ P ⊣⊢ P.
-  Proof. unfold BiEntails, PImpl, PTrue. intuition. Qed.
-  Lemma pimpl_true_r {w} (P : Pred w) : P ⇒ ⊤ ⊣⊢ ⊤.
-  Proof. unfold BiEntails, PImpl, PTrue. intuition. Qed.
-
-  Definition PEq : ⊢ Ty -> Ty -> Pred :=
-    fun w t1 t2 ι => inst t1 ι = inst t2 ι.
-  Notation "t1 ≃ t2" := (PEq t1 t2) (at level 90) : pred_scope.
-
-  Lemma peq_refl {w} (t : Ty w) :
-    PEq t t ⊣⊢ ⊤.
-  Proof. easy. Qed.
-
-  Lemma peq_symmetry {w} (s t : Ty w) :
-    PEq s t ⊣⊢ PEq t s.
-  Proof. easy. Qed.
-
-  Lemma peq_persist {w0 w1} (r : Tri w0 w1) (t1 t2 : Ty w0) :
-    PEq (persist _ t1 _ r) (persist _ t2 _ r) ⊣⊢ Ext (PEq t1 t2) r.
-  Proof.
-    unfold BiEntails, PEq, Ext. intros ι.
-    now rewrite !inst_persist_ty.
-  Qed.
-
-  Lemma peq_func {w} (s1 s2 t1 t2 : Ty w) :
-    Ty_func s1 s2 ≃ Ty_func t1 t2 ⊣⊢ PEq s1 t1 ∧ PEq s2 t2.
-  Proof. unfold PEq, PAnd, BiEntails. cbn. intuition congruence. Qed.
-
-  Lemma pimpl_and_adjoint {w} (P Q R : Pred w) :
-    (Entails (P ∧ Q)%P R) <-> (Entails P (Q ⇒ R)%P).
-  Proof. unfold Entails, PAnd, PImpl. intuition. Qed.
-
-  Lemma ext_and {w0 w1} (ζ01 : Tri w0 w1) (P Q : Pred w0) :
-    Ext P ζ01 ∧ Ext Q ζ01 ⊣⊢ Ext (P ∧ Q) ζ01 .
-  Proof. unfold BiEntails, Ext, PAnd. intuition. Qed.
-
-  Lemma ext_impl {w0 w1} (ζ01 : Tri w0 w1) (P Q : Pred w0) :
-    Ext P ζ01 ⇒ Ext Q ζ01 ⊣⊢ Ext (P ⇒ Q) ζ01 .
-  Proof. unfold BiEntails, Ext, PAnd. intuition. Qed.
-
-  Notation "'Fun' x => b" :=
-    (fun w ζ x => b%P w ζ)
-      (x binder, at level 100) : pred_scope.
-
-  Definition PTri {w0 w1} (r : Tri w0 w1) : Pred w0 :=
-    fun ι0 => exists ι1, ι0 = inst r ι1.
-
-  #[global] Typeclasses Opaque Entails.
-  #[global] Typeclasses Opaque BiEntails.
-
-End AssignmentPredicates.
-
 Module ProgramLogic.
 
   Import (hints) Tri.
-  Import AssignmentPredicates.
+  Import Pred.
 
   Definition WP {A} : ⊢ ◆A -> □(A -> Pred) -> Pred :=
     fun w0 d Q ι0 =>
@@ -420,7 +252,7 @@ End ProgramLogic.
 Module Correctness.
 
   Import (hints) Tri.
-  Import AssignmentPredicates ProgramLogic.
+  Import Pred ProgramLogic.
 
   Definition UnifierSound : ⊢ Unifier -> PROP :=
     fun w0 u =>
@@ -542,7 +374,7 @@ Module Correctness.
         (WP (boxflex lmgu t xIn ζ01) (fun (w0 : World) (_ : w1 ⊒⁻ w0) (_ : Unit w0) => ⊤%P)).
     Proof.
       unfold boxflex, Tri.box_intro_split.
-      destruct ζ01 as [|w2 y yIn ty].
+      destruct ζ01 as [|w2 y yIn ty]; folddefs.
       - rewrite ext_refl. apply flex_complete_assignment.
       - change (Tri.cons ?x ?t ?r) with (thick x t ⊙ r).
         rewrite ext_trans, <- peq_persist.
@@ -610,7 +442,7 @@ End Correctness.
 Module Generalized.
 
   Import (hints) Sub Tri.
-  Import AssignmentPredicates ProgramLogic LR.
+  Import Pred ProgramLogic LR.
 
   Definition RPred : LR.RELATION Pred :=
     fun w0 w1 r P Q => forall ι, P (inst r ι) <-> Q ι.
