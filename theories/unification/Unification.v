@@ -286,10 +286,14 @@ Module Variant1.
     Ty -> ∀ x, ctx.In x -> ◆Unit.
   Definition Unifier : TYPE :=
     Ty -> Ty -> ◆Unit.
+  Definition SolveList : TYPE :=
+    List (Prod Ty Ty) -> ◆Unit.
   Definition BoxFlex : TYPE :=
     Ty -> ∀ x, ctx.In x -> □◆Unit.
   Definition BoxUnifier : TYPE :=
     Ty -> Ty -> □◆Unit.
+  Definition BoxSolveList : TYPE :=
+    List (Prod Ty Ty) -> □◆Unit.
 
   Definition flex : ⊢ Flex :=
     fun w t x xIn =>
@@ -364,8 +368,7 @@ Module Variant1.
   Definition mgu : ⊢ Unifier :=
     fun w s t => T (@bmgu w s t).
 
-
-  Definition boxsolve : ⊢ List (Prod Ty Ty) -> □◆Unit :=
+  Definition boxsolvelist : ⊢ BoxSolveList :=
     fix solve {w} cs {struct cs} :=
       match cs with
       | List.nil => fun w1 ζ1 => η tt
@@ -375,8 +378,8 @@ Module Variant1.
             solve cs _ (ζ1 ⊙⁻ ζ2)
          end.
 
-  Definition solve : ⊢ List (Prod Ty Ty) -> ◆Unit :=
-    fun w cs => boxsolve cs Tri.refl.
+  Definition solvelist : ⊢ SolveList :=
+    fun w cs => boxsolvelist cs Tri.refl.
 
   Import option.notations.
 
@@ -397,11 +400,11 @@ Module Variant1.
         Some (w1; (step ⊙ r1, csa))
     end.
 
-  Definition solve_ng {A} {pA : Persistent Tri.Tri A} :
+  Definition solvefree {A} {pA : Persistent Tri.Tri A} :
     FreeM A ctx.nil -> ?◇⁺ A ctx.nil :=
     fun m =>
       '(w1; (r, (cs, a))) <- prenex m ;;
-      '(w2; (ζ, tt))      <- solve cs;;
+      '(w2; (ζ, tt))      <- solvelist cs;;
       Some (w2; (alloc.nil_l,persist _ a _ ζ)).
 
 End Variant1.

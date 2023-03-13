@@ -90,6 +90,8 @@ Module Pred.
       Proper (Basics.flip Entails ==> Entails ==> Basics.impl) Entails.
     Proof. unfold Proper, respectful, Basics.impl, Entails. intuition. Qed.
 
+    Definition PFalse : Pred w :=
+      fun _ => False.
     Definition PTrue : Pred w :=
       fun _ => True.
     Definition PIff (P Q : Pred w) : Pred w :=
@@ -214,6 +216,22 @@ Module Pred.
 
   #[global] Typeclasses Opaque Entails.
   #[global] Typeclasses Opaque BiEntails.
+
+  (* A type class for things that can be interpreted as a predicate. *)
+  Class InstPred (A : TYPE) :=
+    instpred : ⊢ A -> Pred.
+
+  #[export] Instance instpred_option {A} `{ipA : InstPred A} :
+    InstPred (Option A) :=
+    fun w o => match o with Some p => instpred p | None => PFalse end.
+  #[export] Instance instpred_list {A} `{ipA : InstPred A} :
+    InstPred (List A) :=
+    fun w =>
+      fix ip xs {struct xs} :=
+      match xs with
+      | nil       => PTrue
+      | cons y ys => PAnd (instpred y) (ip ys)
+      end.
 
 End Pred.
 Export Pred (Pred).

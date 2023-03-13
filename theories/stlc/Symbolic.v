@@ -83,7 +83,7 @@ Section RunTI.
   (* infer_schematic defines inference without grounding
      of remaining unification variables. *)
   Definition infer_schematic (e : expr) : option (Schematic Ty) :=
-    match Unification.Variant1.solve_ng (generate e []%list) with
+    match Unification.Variant1.solvefree (generate e []%list) with
     | Some (w; (_, t)) => Some (w; t)
     | None             => None
     end.
@@ -146,7 +146,7 @@ Section TypeReconstruction.
   (* reconstruct_schematic defines type reconstruction without grounding
      of remaining unification variables. *)
   Definition reconstruct_schematic (e : expr) : option (Schematic (Prod Ty Expr)) :=
-    match Unification.Variant1.solve_ng (reconstruct e []%list) with
+    match Unification.Variant1.solvefree (reconstruct e []%list) with
     | Some (w; (_, te)) => Some (w; te)
     | None              => None
     end.

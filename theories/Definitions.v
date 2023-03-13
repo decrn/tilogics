@@ -104,7 +104,7 @@ Module alloc.
   Qed.
 
   Lemma nil_l {w} : Alloc ctx.nil w.
-  Proof. induction w; [constructor|now apply snoc_r]. Qed.
+  Proof. induction w; [constructor|now apply snoc_r]. Defined.
 
 End alloc.
 

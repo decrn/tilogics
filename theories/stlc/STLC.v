@@ -81,6 +81,7 @@ Inductive expr : Type :=
   | e_absu  : string -> expr -> expr
   | e_abst  : string -> ty -> expr -> expr
   | e_app   : expr -> expr -> expr.
+Derive NoConfusion for expr.
 
 (* ===== Typing Context ===== *)
 

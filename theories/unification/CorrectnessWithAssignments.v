@@ -437,6 +437,153 @@ Module Correctness.
     now rewrite ext_refl.
   Qed.
 
+  Import Pred.
+
+  #[local] Instance instpred_prod_ty : InstPred (Prod Ty Ty) :=
+    fun w '(t1,t2) => PEq t1 t2.
+
+  Definition BoxSolveListSound : ⊢ BoxSolveList -> PROP :=
+    fun w0 bsl =>
+      forall (C : List (Prod Ty Ty) w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1),
+        ⊩ WLP (bsl C w1 ζ01) (Fun _ => Ext (Ext (instpred C) ζ01)).
+
+  Definition SolveListSound : ⊢ SolveList -> PROP :=
+    fun w0 sl =>
+      forall (C : List (Prod Ty Ty) w0),
+        ⊩ WLP (sl C) (Fun _ => Ext (instpred C)).
+
+  Definition BoxSolveListComplete : ⊢ BoxSolveList -> PROP :=
+    fun w0 bsl =>
+      forall (C : List (Prod Ty Ty) w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1),
+        Entails (Ext (instpred C) ζ01) (WP (bsl C w1 ζ01) (fun _ _ _ => PTrue)).
+
+  Definition SolveListComplete : ⊢ SolveList -> PROP :=
+    fun w0 sl =>
+      forall (C : List (Prod Ty Ty) w0),
+        Entails (instpred C) (WP (sl C) (fun _ _ _ => PTrue)).
+
+  Lemma boxsolvelist_sound {w} : BoxSolveListSound (boxsolvelist (w := w)).
+  Proof.
+    intros C. induction C as [|[t1 t2]]; cbn; intros.
+    - rewrite wlp_pure. unfold T. now rewrite ext_refl.
+    - rewrite wlp_bind. generalize (bmgu_sound t1 t2 ζ01).
+      apply proper_pvalid_entails, proper_wlp_entails.
+      intros w2 r2 _. apply (pGeneralize (IHC _ (ζ01 ⊙⁻ r2))).
+      apply wlp_monotonic. unfold _4. intros w3 r3 _.
+      rewrite ?trans_refl_r, ?ext_trans, ?ext_impl.
+      apply proper_ext_entails; auto.
+      apply proper_ext_entails; auto.
+      apply proper_ext_entails; auto.
+      now apply pimpl_and_adjoint.
+  Qed.
+
+  Lemma solvelist_sound {w} : SolveListSound (solvelist (w := w)).
+  Proof.
+    unfold SolveListSound, solvelist. intros C.
+    generalize (boxsolvelist_sound C refl).
+    apply proper_pvalid_entails, proper_wlp_entails.
+    intros w' r _. now rewrite ext_refl.
+  Qed.
+
+  Lemma boxsolvelist_complete {w} : BoxSolveListComplete (boxsolvelist (w := w)).
+  Proof.
+    intros C. induction C as [|[t1 t2]]; cbn; intros.
+    - rewrite wp_pure. unfold T. easy.
+    - rewrite wp_bind. rewrite <- ext_and.
+      apply pimpl_and_adjoint.
+      apply (pApply (@bmgu_complete _ t1 t2 _ ζ01)).
+      apply pimpl_and_adjoint.
+      rewrite pand_comm.
+      apply pimpl_and_adjoint.
+      apply wp_monotonic. intros.
+      rewrite pimpl_true_l, <- ext_trans.
+      apply IHC.
+  Qed.
+
+  Lemma solvelist_complete {w} : SolveListComplete (solvelist (w := w)).
+  Proof.
+    unfold SolveListComplete, solvelist. intros C.
+    apply (pApply_r (@boxsolvelist_complete _ C _ refl)).
+    now rewrite ext_refl.
+  Qed.
+
+  Definition wp_prenex {A} : ⊢ ?◇⁺(List (Ty * Ty) * A) -> □⁺(A -> Pred) -> Pred :=
+    fun w o Q =>
+      fun ι =>
+      option.wp (fun '(w'; (r, (C, a))) =>
+          exists ι', inst r ι' = ι /\ instpred C ι' /\ Q w' r a ι') o.
+
+  Lemma prenex_correct {A w} (m : FreeM A w) (Q : □⁺(A -> Pred) w) :
+    forall ι,
+      wp_prenex (prenex m) Q ι <-> STLC.WP m Q ι.
+  Proof.
+    unfold wp_prenex.
+    induction m; intros ι; cbn.
+    - rewrite option.wp_match. unfold T. firstorder. now subst.
+    - rewrite option.wp_match. reflexivity.
+    - rewrite <- IHm. clear IHm.
+      rewrite option.wp_bind. do 2 rewrite option.wp_match.
+      destruct (prenex m) as [(w' & r & C & a)|]; [|easy].
+      rewrite option.wp_match. cbn. unfold PAnd, PEq.
+      firstorder; subst.
+      + now rewrite <- ?inst_persist_ty.
+      + exists x. now rewrite ?inst_persist_ty.
+    - setoid_rewrite <- IHm. clear IHm.
+      rewrite option.wp_bind. repeat setoid_rewrite option.wp_match.
+      destruct (prenex m) as [(w' & r & C & a)|]; [|firstorder].
+      rewrite option.wp_match. cbn. unfold PAnd, PEq, _4.
+      split.
+      + intros (ι' & Heq & HC & HQ). subst. remember (inst r ι') as ι.
+        destruct (Environment.env.view ι).
+        exists v. exists ι'. rewrite Heqι. auto.
+      + intros (t & ι' & Heq & HC & HQ).
+        exists ι'. rewrite Heq. cbn. auto.
+  Qed.
+
+  Definition wp_optiondiamond {A} : ⊢ ?◇⁺ A -> □⁺(A -> Pred) -> Pred.
+  Proof.
+    intros w m Q ι.
+    refine (option.wp _ m).
+    intros (w1 & r1 & a1).
+    refine (exists ι1, inst r1 ι1 = ι /\ Q _ r1 a1 ι1).
+  Defined.
+
+  Lemma solvefree_equiv {A} {pA : Persistent Tri.Tri A}
+    (m : FreeM A ctx.nil) (Q : □⁺(A -> Pred) [ctx]) :
+    wp_optiondiamond (solvefree m) Q ⊣⊢ STLC.WP m Q.
+  Proof.
+    intros ι. unfold wp_optiondiamond, solvefree.
+    rewrite option.wp_bind, <- prenex_correct.
+    unfold wp_prenex. apply option.wp_proper.
+    intros (w1 & r1 & C & a).
+    rewrite option.wp_bind.
+    pose proof (solvelist_complete C) as Hcompl.
+    pose proof (solvelist_sound C) as Hsound.
+    rewrite option.wp_match.
+    destruct solvelist as [(w2 & r2 & [])|].
+    - rewrite option.wp_match. split.
+      + intros (ι2 & Heq & HQ); subst.
+        exists (inst r2 ι2). specialize (Hsound (inst r2 ι2)).
+        unfold WLP, Ext in Hsound. rewrite option.wlp_match in Hsound.
+        specialize (Hsound ι2 eq_refl). repeat split.
+        * destruct (env.view (inst r1 (inst r2 ι2))).
+          destruct (env.view (inst alloc.nil_l ι2)).
+          reflexivity.
+        * assumption.
+        * clear - HQ. admit.
+      + intros (ι1 & Heq1 & HC & HQ).
+        specialize (Hcompl ι1 HC). unfold WP in Hcompl.
+        rewrite option.wp_match in Hcompl. destruct Hcompl as (ι2 & Heq2 & _).
+        exists ι2. split. subst.
+        * destruct (env.view (inst r1 (inst r2 ι2))).
+          destruct (env.view (inst alloc.nil_l ι2)).
+          reflexivity.
+        * clear - HQ. admit.
+    - split; [easy|]. intros (ι1 & Heq1 & HC & HQ).
+      specialize (Hcompl ι1 HC). unfold WP in Hcompl.
+      now rewrite option.wp_match in Hcompl.
+  Admitted.
+
 End Correctness.
 
 Module Generalized.
