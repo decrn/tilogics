@@ -382,9 +382,8 @@ Module Correctness.
         rewrite !Sub.lk_thick. unfold thickIn.
         now rewrite !ctx.occurs_check_view_refl, !ctx.occurs_check_view_thin.
     - apply option.wlp_map.
-      generalize (occurs_check_sound t yIn).
-      apply option.wlp_monotonic.
-      intros t' ->. cbn. Sub.foldlk.
+      destruct (occurs_check_spec yIn t); constructor.
+      subst. cbn. Sub.foldlk.
       rewrite trans_refl_r.
       rewrite Sub.subst_thin.
       rewrite <- persist_trans.

@@ -174,28 +174,6 @@ Section OccursCheck.
       | Ty_func T1 T2 => Some Ty_func <*> oc T1 y yIn <*> oc T2 y yIn
       end.
 
-  Lemma occurs_check_thin {w x} (xIn : x ∈ w) (t : Ty (w - x)) :
-    option.wp (eq t) (occurs_check (thin xIn t) xIn).
-  Proof.
-    induction t; cbn.
-    - now constructor.
-    - repeat rewrite ?option.wp_aplazy, ?option.wp_map.
-      repeat option.tactics.mixin. congruence.
-    - rewrite option.wp_map. unfold occurs_check_in.
-      rewrite ctx.occurs_check_view_thin. now constructor.
-  Qed.
-
-  Lemma occurs_check_sound {w} (t : Ty w) {x} (xIn : x ∈ w) :
-    option.wlp (fun t' => t = thin xIn t') (occurs_check t xIn).
-  Proof.
-    induction t; cbn.
-    - now constructor.
-    - repeat rewrite ?option.wlp_aplazy, ?option.wlp_map.
-      repeat option.tactics.mixin. cbn. congruence.
-    - unfold occurs_check_in.
-      now destruct ctx.occurs_check_view; constructor.
-  Qed.
-
   Lemma occurs_check_spec {w x} (xIn : x ∈ w) (t : Ty w) :
     option.spec
       (fun t' => t = thin xIn t')
