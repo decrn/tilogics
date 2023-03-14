@@ -283,24 +283,6 @@ Section MoveMe.
     induction t; intros w1 w2 r; cbn; now f_equal.
   Qed.
 
-  Lemma resolve_lift (g : env) (x : String.string) (w : World) :
-    resolve x (liftEnv g w) =
-      option.map (fun t => lift t w) (resolve x g).
-  Proof.
-    induction g as [|[y t]]; cbn.
-    - reflexivity.
-    - now destruct String.string_dec.
-  Qed.
-
-  Lemma resolve_inst (w : World) (g : Env w) (x : String.string) (ι : Assignment w) :
-    resolve x (inst g ι) =
-      option.map (fun t => inst t ι) (resolve x g).
-  Proof.
-    induction g as [|[y t]]; cbn.
-    - reflexivity.
-    - now destruct String.string_dec.
-  Qed.
-
 End MoveMe.
 
 Module StrongMonotonicity.
