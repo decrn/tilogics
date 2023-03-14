@@ -43,56 +43,56 @@ Module LR.
 
   Import (hints) Tri.
 
-  Definition RELATION (A : World -> Type) : Type :=
-    forall w0 w1 (r1 : w0 ⊒⁻ w1),
+  Definition RELATION (Θ : ACC) (A : TYPE) : Type :=
+    forall w0 w1 (θ01 : Θ w0 w1),
       A w0 -> A w1 -> Prop.
 
-  Definition RProper {A} (R : RELATION A) {w} (a : A w) : Prop :=
+  Definition RProper {Θ A} {reflΘ : Refl Θ} (R : RELATION Θ A) {w} (a : A w) : Prop :=
     R w w refl a a.
 
-  Definition RBox {A} (R : RELATION A) : RELATION (Box Tri A) :=
-    fun w0 w1 r01 ba0 ba1 =>
-      forall (w2 w3 : World) (r02 : w0 ⊒⁻ w2) (r13 : w1 ⊒⁻ w3) (r23 : w2 ⊒⁻ w3),
-        r01 ⊙ r13 = r02 ⊙ r23 ->
-        R w2 w3 r23 (ba0 w2 r02) (ba1 w3 r13).
+  Definition RBox {Θ A} {transΘ : Trans Θ} (R : RELATION Θ A) : RELATION Θ (Box Θ A) :=
+    fun w0 w1 θ01 ba0 ba1 =>
+      forall (w2 w3 : World) (θ02 : Θ w0 w2) (θ13 : Θ w1 w3) (θ23 : Θ w2 w3),
+        θ01 ⊙ θ13 = θ02 ⊙ θ23 ->
+        R w2 w3 θ23 (ba0 w2 θ02) (ba1 w3 θ13).
 
-  (*         r01 *)
-  (*    w0 -------> w1 *)
-  (*     |          | *)
-  (* r02 |          | r13 *)
-  (*     |    //    | *)
-  (*     ↓          ↓ *)
-  (*    w2 -------> w3 *)
-  (*         r23 *)
+  (*         Θ01          *)
+  (*    w0 -------> w1    *)
+  (*     |          |     *)
+  (* Θ02 |          | Θ13 *)
+  (*     |    //    |     *)
+  (*     ↓          ↓     *)
+  (*    w2 -------> w3    *)
+  (*         θ23          *)
 
-  Definition RImpl {A B} (RA : RELATION A) (RB : RELATION B) : RELATION (Impl A B) :=
-    fun w0 w1 r01 f0 f1 =>
+  Definition RImpl {Θ A B} (RA : RELATION Θ A) (RB : RELATION Θ B) : RELATION Θ (Impl A B) :=
+    fun w0 w1 θ01 f0 f1 =>
       forall a0 a1,
-        RA w0 w1 r01 a0 a1 ->
-        RB w0 w1 r01 (f0 a0) (f1 a1).
+        RA w0 w1 θ01 a0 a1 ->
+        RB w0 w1 θ01 (f0 a0) (f1 a1).
 
-  Definition RTy : RELATION Ty :=
-    fun w0 w1 r01 t0 t1 =>
-      t1 = persist _ t0 _ r01.
+  Definition RTy {Θ} {pers : Persistent Θ Ty} : RELATION Θ Ty :=
+    fun w0 w1 θ01 t0 t1 =>
+      t1 = persist _ t0 _ θ01.
 
-  Lemma rty_bool {w0 w1} {r01 : Tri w0 w1} :
-    RTy r01 Ty_bool Ty_bool.
+  Lemma rty_bool {w0 w1} {θ01 : Tri w0 w1} :
+    RTy θ01 Ty_bool Ty_bool.
   Proof. unfold RTy. now rewrite Tri.persist_bool. Qed.
 
-  Lemma rty_func {w0 w1} (r01 : Tri w0 w1) (t1_0 t2_0 : Ty w0) (t1_1 t2_1 : Ty w1) :
-    RTy r01 t1_0 t1_1 ->
-    RTy r01 t2_0 t2_1 ->
-    RTy r01 (Ty_func t1_0 t2_0) (Ty_func t1_1 t2_1).
+  Lemma rty_func {w0 w1} (θ01 : Tri w0 w1) (t1_0 t2_0 : Ty w0) (t1_1 t2_1 : Ty w1) :
+    RTy θ01 t1_0 t1_1 ->
+    RTy θ01 t2_0 t2_1 ->
+    RTy θ01 (Ty_func t1_0 t2_0) (Ty_func t1_1 t2_1).
   Proof. unfold RTy; intros. now rewrite Tri.persist_func; f_equal. Qed.
 
-  Definition RValid {A} (R : RELATION A) (a : ⊢ A) : Prop :=
-    forall w0 w1 r01,
-      R w0 w1 r01 (a w0) (a w1).
+  Definition RValid {Θ A} (R : RELATION Θ A) (a : ⊢ A) : Prop :=
+    forall w0 w1 θ01,
+      R w0 w1 θ01 (a w0) (a w1).
 
-  Definition RUnit : RELATION Unit :=
+  Definition RUnit {Θ} : RELATION Θ Unit :=
     fun _ _ _ _ _ => True.
 
-  Definition RIff : RELATION PROP :=
-    fun w0 w1 r01 p q => (q <-> p)%type.
+  Definition RIff {Θ} : RELATION Θ PROP :=
+    fun w0 w1 θ01 p q => (q <-> p)%type.
 
 End LR.

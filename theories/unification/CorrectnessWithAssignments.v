@@ -537,7 +537,7 @@ Module Generalized.
   Import (hints) Sub Tri.
   Import Pred ProgramLogic LR.
 
-  Definition RPred : LR.RELATION Pred :=
+  Definition RPred : LR.RELATION Tri Pred :=
     fun w0 w1 r P Q => forall ι, P (inst r ι) <-> Q ι.
 
   Lemma wlp_tell' {w x} (xIn : x ∈ w) (t : Ty (w - x)) (Q : □(Unit -> Pred) w)
