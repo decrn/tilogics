@@ -4,6 +4,7 @@ theories/aelet/AELetMonadic.v
 theories/common/Context.v
 theories/common/Environment.v
 theories/Example.v
+theories/LogicalRelation.v
 theories/Predicates.v
 theories/Prelude.v
 theories/stlc/STLC.v
@@ -14,5 +15,4 @@ theories/stlc/Substitution.v
 theories/stlc/Triangular.v
 theories/unification/CorrectnessWithAssignments.v
 theories/unification/CorrectnessWithSubstitutions.v
-theories/unification/LogicalRelation.v
 theories/unification/Unification.v
