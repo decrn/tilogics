@@ -2,7 +2,7 @@ Require Import List.
 Import ListNotations.
 From Em Require Import
      Definitions Context Environment STLC Prelude Substitution Triangular
-     unification.CorrectnessWithSubstitutions.
+     unification.CorrectnessWithSubstitutions LogicalRelation.
 Import ctx.notations.
 From Em Require
   Unification.
@@ -425,44 +425,17 @@ Module StrongMonotonicity.
   (*       admit. *)
   (* Abort. *)
 
-  Definition RELATION (A : World -> Type) : Type :=
-    forall w0 w1 (r1 : w0 ⊒ˢ w1),
-      A w0 -> A w1 -> Prop.
+  Import LR.
 
-  Definition RProper {A} (R : RELATION A) (w : World) (a : A w) : Prop :=
-    R w w refl a a.
+  Definition RDSub {Θ A} {transΘ : Trans Θ} (R : RELATION Θ A) :
+    RELATION Θ (Diamond Θ A) :=
+    fun w0 w1 θ01 d1 d2 =>
+      match d1 , d2 with
+      | (w2; (θ02,a2)) , (w3; (θ13,a3)) =>
+          exists θ23, θ01 ⊙ θ13 = θ02 ⊙ θ23 /\ R _ _ θ23 a2 a3
+      end.
 
-  Definition RBox {A} (R : RELATION A) : RELATION □ˢA :=
-    fun w0 w1 r01 ba0 ba1 =>
-      forall (w2 w3 : World) (r02 : w0 ⊒ˢ w2) (r13 : w1 ⊒ˢ w3) (r23 : w2 ⊒ˢ w3),
-        r01 ⊙ r13 = r02 ⊙ r23 ->
-        R w2 w3 r23 (ba0 w2 r02) (ba1 w3 r13).
-
-   (*         r01 *)
-   (*    w0 -------> w1 *)
-   (*     |          | *)
-   (* r02 |          | r13 *)
-   (*     |    //    | *)
-   (*     ↓          ↓ *)
-   (*    w2 -------> w3 *)
-   (*         r23 *)
-
-  Definition RDSub {A} (R : RELATION A) : RELATION (Diamond Sub A).
-  Proof.
-    intros w0 w1 r01.
-    intros (w2 & r02 & a2).
-    intros (w3 & r13 & a3).
-    refine (exists r23,
-               r01 ⊙ r13 = r02 ⊙ r23 /\ R _ _ r23 a2 a3).
-  Defined.
-
-  Definition RImpl {A B} (RA : RELATION A) (RB : RELATION B) : RELATION (Impl A B) :=
-    fun w0 w1 r01 f0 f1 =>
-      forall a0 a1,
-        RA w0 w1 r01 a0 a1 ->
-        RB w0 w1 r01 (f0 a0) (f1 a1).
-
-  Definition ROption {A} (R : RELATION A) : RELATION (Option A) :=
+  Definition ROption {Θ A} (R : RELATION Θ A) : RELATION Θ (Option A) :=
     fun w0 w1 r01 m0 m1 =>
       match m0 , m1 with
       | Some a0 , Some a1 => R w0 w1 r01 a0 a1
@@ -471,49 +444,36 @@ Module StrongMonotonicity.
       | None    , None    => True
       end.
 
-  Definition RTy : RELATION Ty :=
-    fun w0 w1 r01 t0 t1 =>
-      t1 = persist _ t0 _ r01.
+  Lemma rty_bool {Θ} {lkΘ : Lk Θ} {w0 w1} {θ01 : Θ w0 w1} :
+    RTy θ01 (Ty_bool _) (Ty_bool _).
+  Proof. reflexivity. Qed.
 
-  Lemma rty_bool {w0 w1 r01} :
-    RTy w0 w1 r01 (Ty_bool _) (Ty_bool _).
-  Proof.
-    reflexivity.
-  Qed.
-
-  Lemma rty_func {w0 w1 r01} t1_0 t1_1 t2_0 t2_1 :
-    RTy w0 w1 r01 t1_0 t1_1 ->
-    RTy w0 w1 r01 t2_0 t2_1 ->
-    RTy w0 w1 r01 (Ty_func _ t1_0 t2_0) (Ty_func _ t1_1 t2_1).
+  Lemma rty_func {Θ} {lkΘ : Lk Θ} {w0 w1} {θ01 : Θ w0 w1} t1_0 t1_1 t2_0 t2_1 :
+    RTy θ01 t1_0 t1_1 ->
+    RTy θ01 t2_0 t2_1 ->
+    RTy θ01 (Ty_func _ t1_0 t2_0) (Ty_func _ t1_1 t2_1).
   Proof. unfold RTy; cbn; intros; now f_equal. Qed.
 
-  Definition REnv : RELATION Env.
+  Definition REnv {Θ} : RELATION Θ Env.
   Admitted.
 
-  Definition RM {A} (R : RELATION A) : RELATION (M A) :=
+  Definition RM {A} (R : RELATION Sub A) : RELATION Sub (M A) :=
     ROption (RDSub R).
 
-  Definition RValid {A} (R : RELATION A) (a : ⊢ A) : Prop :=
-    forall w0 w1 r01,
-      R w0 w1 r01 (a w0) (a w1).
-
-  Definition RUnit : RELATION Unit :=
-    fun _ _ _ _ _ => True.
-
-  Lemma rsome {A} (R : RELATION A) w0 w1 (r01 : Sub w0 w1) (a0 : A w0) (a1 : A w1) (ra : R w0 w1 r01 a0 a1) :
-    ROption R w0 w1 r01 (Some a0) (Some a1).
+  Lemma rsome {Θ A} (R : RELATION Θ A) w0 w1 (θ01 : Θ w0 w1) (a0 : A w0) (a1 : A w1) (ra : R w0 w1 θ01 a0 a1) :
+    ROption R w0 w1 θ01 (Some a0) (Some a1).
   Proof. apply ra. Qed.
 
-  Lemma rpure {A} (R : RELATION A) :
+  Lemma rpure {A} (R : RELATION Sub A) :
     RValid (RImpl R (RM R)) pure.
   Proof.
     intros w0 w1 r01 a0 a1 ra.
-    refine (@rsome _ (RDSub R) w0 w1 r01 _ _ _).
+    refine (@rsome _ _ (RDSub R) w0 w1 r01 _ _ _).
     unfold RDSub. exists r01. split; auto.
     now rewrite trans_refl_l, trans_refl_r.
   Qed.
 
-  Lemma rbind {A B} (RA : RELATION A) (RB : RELATION B) :
+  Lemma rbind {A B} (RA : RELATION Sub A) (RB : RELATION Sub B) :
     RValid (RImpl (RM RA) (RImpl (RBox (RImpl RA (RM RB))) (RM RB))) bind.
   Proof.
     unfold RValid, RImpl, RBox, RM.
@@ -571,7 +531,7 @@ Module StrongMonotonicity.
     - auto.
   Qed.
 
-  Definition rexists {A} (R : RELATION A) w0 w1 (r01 : Sub w0 w1) {n} (m0 : M A (w0 ▻ n)) (m1 : M A (w1 ▻ n)) :
+  Definition rexists {A} (R : RELATION Sub A) w0 w1 (r01 : Sub w0 w1) {n} (m0 : M A (w0 ▻ n)) (m1 : M A (w1 ▻ n)) :
     RM R (w0 ▻ n) (w1 ▻ n) (Sub.up1 r01) m0 m1 ->
     RM R w0 w1 r01 (mexists m0) (mexists m1).
   Proof.
@@ -587,10 +547,10 @@ Module StrongMonotonicity.
 
   Arguments mexists : simpl never.
 
-  Definition RPropImpl : RELATION PROP :=
+  Definition RPropImpl {Θ} : RELATION Θ PROP :=
     fun w0 w1 r01 p q => (q -> p)%type.
 
-  Lemma wp_monotonic_strong {A} (R : RELATION A) :
+  Lemma wp_monotonic_strong {A} (R : RELATION Sub A) :
     RValid (RImpl (RM R) (RImpl (RBox (RImpl R RPropImpl)) RPropImpl)) WP.
   Proof.
     intros w0 w1 r01 m0 m1 rm p0 p1 rp.
