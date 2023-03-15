@@ -235,6 +235,14 @@ Module Pred.
       Ext P ζ01 ⇒ Ext Q ζ01 ⊣⊢ Ext (P ⇒ Q) ζ01 .
     Proof. unfold BiEntails, Ext, PAnd. intuition. Qed.
 
+    Lemma ext_false {w0 w1} (ζ01 : R w0 w1) :
+      Ext PFalse ζ01 ⊣⊢ PFalse.
+    Proof. unfold BiEntails, Ext, PFalse. reflexivity. Qed.
+
+    Lemma ext_true {w0 w1} (ζ01 : R w0 w1) :
+      Ext PTrue ζ01 ⊣⊢ PTrue.
+    Proof. unfold BiEntails, Ext, PTrue. reflexivity. Qed.
+
   End Ext.
   #[global] Instance params_ext : Params (@Ext) 6 := {}.
 
@@ -259,9 +267,18 @@ Module Pred.
       now rewrite !inst_persist_ty.
     Qed.
 
-    Lemma peq_func {w} (s1 s2 t1 t2 : Ty w) :
-      PEq (Ty_func s1 s2) (Ty_func t1 t2) ⊣⊢ PEq s1 t1 ∧ PEq s2 t2.
-    Proof. unfold PEq, PAnd, BiEntails. cbn. intuition congruence. Qed.
+    Lemma peq_noconfusion {w} (t1 t2 : Ty w) :
+      PEq t1 t2 ⊣⊢ match t1 , t2 with
+                   | Ty_bool         , Ty_bool         => PTrue
+                   | Ty_func t11 t12 , Ty_func t21 t22 => PEq t11 t21 ∧ PEq t12 t22
+                   | Ty_hole _       , _               => PEq t1 t2
+                   | _               , Ty_hole _       => PEq t1 t2
+                   | _               , _               => PFalse
+                   end.
+    Proof.
+      intros ι; unfold PEq, PFalse, PTrue, PAnd; destruct t1, t2;
+        cbn; try reflexivity; intuition congruence.
+    Qed.
 
   End Eq.
 

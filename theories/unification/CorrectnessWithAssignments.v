@@ -287,7 +287,7 @@ Module Correctness.
           apply proper_ext_entails; auto.
           apply proper_ext_entails; auto.
           apply proper_ext_entails; auto.
-          rewrite peq_func.
+          rewrite (peq_noconfusion (Ty_func s1 s2)).
           now apply pimpl_and_adjoint.
       Qed.
 
@@ -334,10 +334,10 @@ Module Correctness.
         - intros. apply boxflex_complete_assignment.
         - intros. rewrite peq_symmetry. apply boxflex_complete_assignment.
         - intros *. rewrite wp_pure. apply entails_true.
-        - admit. (* cbn; discriminate. *)
-        - admit. (* cbn; discriminate. *)
+        - intros. now rewrite peq_noconfusion, ext_false.
+        - intros. now rewrite peq_noconfusion, ext_false.
         - intros * IH1 IH2 *.
-          rewrite wp_bind, peq_func.
+          rewrite wp_bind, peq_noconfusion.
           rewrite <- ext_and.
           apply pimpl_and_adjoint.
           apply (pApply (IH1 w1 ζ01)). clear IH1.
@@ -352,7 +352,7 @@ Module Correctness.
           apply proper_wp_entails. intros ? ? _.
           rewrite wp_pure. unfold _4, T.
           reflexivity.
-      Admitted.
+      Qed.
 
     End Completeness.
 
