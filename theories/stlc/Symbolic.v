@@ -16,11 +16,11 @@ Local Notation "<{ A ~ w }>" := (persist _ A _ w).
 #[export] Instance persistent_prod {R A B} {pRA : Persistent R A} {pRB : Persistent R B} : Persistent R (Prod A B) :=
   fun w1 '(a,b) w2 r => (persist _ a _ r, persist _ b _ r).
 
-Notation Expr := (Lifted expr).
+Notation Expr := (Sem expr).
 (* TODO: define reader applicative to use ctor of expr to create Expr *)
 
-#[export] Instance Persistent_Lifted {R : ACC} {A}
-  {instR : forall w, Inst (R w) (Assignment w)} : Persistent R (Lifted A) :=
+#[export] Instance Persistent_Sem {R : ACC} {A}
+  {instR : forall w, Inst (R w) (Assignment w)} : Persistent R (Sem A) :=
   fun w0 a w1 r1 ι1 => a (inst r1 ι1).
 
 Fixpoint grounding (w : World) : Assignment w :=
@@ -246,10 +246,10 @@ Module acc.
     { refl_persist w (V : A w) :
           persist w V w refl = V }.
 
-  (* Class PersistLift A `{Persistent Acc A} : Type := *)
-  (*   { lift_persist (w w': World) t r : *)
-  (*     persist w (lift t _) w' r = lift t _ }. *)
-  (* (* TODO: make lift generic (liftEnv is needed for Env) *) *)
+  (* Class PersistSem A `{Persistent Acc A} : Type := *)
+  (*   { sem_persist (w w': World) t r : *)
+  (*     persist w (sem t _) w' r = sem t _ }. *)
+  (* (* TODO: make sem generic (semEnv is needed for Env) *) *)
 
 End acc.
 
@@ -1138,9 +1138,9 @@ End ProofWorlds.
         rewrite ?inst_trans. cbn.
         rewrite <- H4, <- H2.
         rewrite Heqp in H1. cbn in H1.
-        rewrite H1 in H0. unfold inst, inst_lifted in H0.
+        rewrite H1 in H0. unfold inst, inst_sem in H0.
         apply H0.
-      + rewrite Heqp0. cbn. rewrite <- H4. rewrite inst_trans. cbn. rewrite <- H4. cbn in H3. rewrite <- H in H3. unfold inst, inst_lifted in H3. apply H3.
+      + rewrite Heqp0. cbn. rewrite <- H4. rewrite inst_trans. cbn. rewrite <- H4. cbn in H3. rewrite <- H in H3. unfold inst, inst_sem in H3. apply H3.
       + rewrite Heqp0, Heqp1. cbn. rewrite <- H4. cbn in H5. rewrite <- H2, <- H in H5. rewrite Heqp0, Heqp1 in H6. cbn in H6. rewrite <- H4 in H6. rewrite H6. apply H5.
     - destruct (resolve s G0) eqn:?; [|easy].
       cbn. unfold T. split. auto. constructor.

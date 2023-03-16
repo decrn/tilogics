@@ -173,20 +173,25 @@ Inductive solvedM (A : Type) : Type :=
 
 Notation Assignment := (env.Env (fun _ => ty)).
 
-Definition Lifted (A : Type) : TYPE :=
-  fun w => Assignment w -> A.
+Module S.
 
-(* pure  :: a -> f a *)
-Definition pure {A} (a : A) : Valid (Lifted A) := fun _ _ => a.
-#[global] Arguments pure {A} _ {w} _/.
+  Definition Sem (A : Type) : TYPE :=
+    fun w => Assignment w -> A.
 
-(* app :: f (a -> b) -> f a -> f b *)
-Definition app (A B : Type) : ⊢ (Lifted (A -> B)) -> Lifted A -> Lifted B :=
-  fun w fab fa ass => fab ass (fa ass).
+  (* pure  :: a -> f a *)
+  Definition pure {A} (a : A) : Valid (Sem A) := fun _ _ => a.
+  #[global] Arguments pure {A} _ {w} _/.
 
-(* <*> : f a -> f b -> f (a * b) *)
-Definition spaceship (A B : Type) : ⊢ (Lifted A) -> (Lifted B) -> (Lifted (A * B)) :=
-  fun w fa fb ass => (fa ass, fb ass).
+  (* app :: f (a -> b) -> f a -> f b *)
+  Definition app (A B : Type) : ⊢ (Sem (A -> B)) -> Sem A -> Sem B :=
+    fun w fab fa ass => fab ass (fa ass).
+
+  (* <*> : f a -> f b -> f (a * b) *)
+  Definition spaceship (A B : Type) : ⊢ (Sem A) -> (Sem B) -> (Sem (A * B)) :=
+    fun w fa fb ass => (fa ass, fb ass).
+
+End S.
+Export S (Sem).
 
 Class Inst (A : TYPE) (a : Type) : Type :=
   inst : forall {w}, A w -> Assignment w -> a.
@@ -227,8 +232,8 @@ Class Inst (A : TYPE) (a : Type) : Type :=
   | (s,T) :: sTs => (s, inst T ass) :: inst_env sTs ass
   end%list.
 
-#[export] Instance inst_lifted {A} :
-  Inst (Lifted A) A :=
+#[export] Instance inst_sem {A} :
+  Inst (Sem A) A :=
   fun w x ass => x ass.
 
 Class Lk (R : ACC) : Type :=

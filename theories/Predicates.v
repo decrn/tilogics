@@ -428,7 +428,7 @@ Module Pred.
     rewrite <- Heq in Hsub. now apply ty_no_cycle in Hsub.
   Qed.
 
-  #[local] Notation Expr := (Lifted expr).
+  #[local] Notation Expr := (Sem expr).
 
   Definition TPB : ⊢ Env -> Const expr -> Ty -> Expr -> Pred :=
     fun w G e t ee ι => inst G ι |-- e ; inst t ι ~> inst ee ι.
@@ -487,12 +487,12 @@ Module Pred.
       {pfalse : forall w, PValid (w := w)
          (∀ G ∶ Env, ∀ t ∶ Ty, ∀ e' ∶ Expr,
              PEq t Ty_bool ⇒
-             PEq e' (pure v_false) ⇒
+             PEq e' (S.pure v_false) ⇒
              P G v_false t e')%P }
       {ptrue : forall w, PValid (w := w)
          (∀ G ∶ Env, ∀ t ∶ Ty, ∀ e' ∶ Expr,
              PEq t Ty_bool ⇒
-             PEq e' (pure v_true) ⇒
+             PEq e' (S.pure v_true) ⇒
              P G v_true t e')%P }
       {pif : forall w, PValid (w := w)
          (∀⁺ G e1 e2 e3 e' e1' e2' e3' t,
@@ -552,7 +552,7 @@ Module Pred.
         cbn in IHT. rewrite ?inst_lift in IHT.
         specialize (IHT eq_refl eq_refl eq_refl).
         eapply pabsu; cbn; eauto; rewrite ?inst_lift; eauto.
-        change (@inst _ _ (@inst_lifted expr) _ ?e ?ι) with (e ι); cbn.
+        change (@inst _ _ (@inst_sem expr) _ ?e ?ι) with (e ι); cbn.
         now rewrite inst_lift.
       - specialize (IHT w ι (cons (v, lift vt _) G) (lift t _) (fun _ => e')).
         cbn in IHT. rewrite ?inst_lift in IHT.
