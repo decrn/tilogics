@@ -118,6 +118,10 @@ Module Pred.
     Proof. firstorder. Qed.
 
   End Connectives.
+  #[global] Arguments BiEntails {w} (_ _)%P.
+  #[global] Arguments Entails {w} (_ _)%P.
+  #[global] Arguments PAnd {_} _ _ _/.
+  #[global] Arguments PImpl {_} _ _ _/.
 
   Definition Forall {I : TYPE} : ⊢ (I -> Pred) -> Pred :=
     fun w A ι => forall i : I w, A i ι.
@@ -126,40 +130,15 @@ Module Pred.
   #[global] Arguments Forall {I w} A ι.
   #[global] Arguments Exists {I w} A ι.
 
-  Notation "'∀' x ∶ T , Q" :=
-      (@Forall T _ (fun x => Q%P))
-        (at level 99, x binder, right associativity,
-          format "'∀'  x  ∶  T ,  Q")
-      : pred_scope.
-
-  (* Notation "'∃' x .. y , Q " := *)
-  (*     (Exists (fun x => .. (Exists (fun y => Q%P)) ..)) *)
-  (*       (at level 94, x binder, y binder, right associativity) *)
-  (*     : pred_scope. *)
-
-  Notation "'∃' x ∶ T , Q" :=
-      (@Exists T _ (fun x => Q%P))
-        (at level 99, x binder, right associativity,
-          format "'∃'  x  ∶  T ,  Q")
-      : pred_scope.
-
-
-  (* #[export] Instance proper_iff_impl {w} : *)
-  (*   Proper (BiEntails ==> BiEntails ==> Basics.flip Basics.impl) (@BiEntails w). *)
-  (* Proof. firstorder. Qed. *)
-
-  Notation "⊩ P" := (PValid P) (at level 95).
-  (* Notation "⊩ P" := (forall ι, P%P ι) (at level 95). *)
-
-  #[global] Arguments BiEntails {w} (_ _)%P.
-  Notation "P ⊣⊢ Q" := (BiEntails P Q) (at level 95).
-  Notation "⊤" := PTrue : pred_scope.
-  Notation "P ⇔ Q" := (PIff P Q) (at level 94) : pred_scope.
-  Notation "P ⇒ Q" := (PImpl P Q) (at level 94, right associativity) : pred_scope.
-  Notation "P ∧ Q" := (PAnd P Q) (at level 80, right associativity) : pred_scope.
+  #[local] Notation "⊩ P" := (PValid P) (at level 95).
+  #[local] Notation "P ⊣⊢ Q" := (BiEntails P Q) (at level 95).
+  #[local] Notation "⊤" := PTrue : pred_scope.
+  #[local] Notation "P ⇔ Q" := (PIff P Q) (at level 94) : pred_scope.
+  #[local] Notation "P ⇒ Q" := (PImpl P Q) (at level 94, right associativity) : pred_scope.
+  #[local] Notation "P ∧ Q" := (PAnd P Q) (at level 80, right associativity) : pred_scope.
 
   Lemma pimpl_and_adjoint {w} (P Q R : Pred w) :
-    (Entails (P ∧ Q)%P R) <-> (Entails P (Q ⇒ R)%P).
+    Entails (P ∧ Q) R <-> Entails P (Q ⇒ R).
   Proof. unfold Entails, PAnd, PImpl. intuition. Qed.
 
   Lemma split_bientails {w} (P Q : Pred w) :
@@ -184,11 +163,11 @@ Module Pred.
   Proof. easy. Qed.
 
   Lemma pPoseProof {w} {P Q R : Pred w} :
-    PValid Q -> Entails (P ∧ Q)%P R -> Entails P R.
+    PValid Q -> Entails (P ∧ Q) R -> Entails P R.
   Proof. unfold PValid, Entails, PAnd. intuition. Qed.
 
   Lemma pGeneralize {w} {P Q R : Pred w} :
-    PValid Q -> Entails P (Q ⇒ R)%P -> Entails P R.
+    PValid Q -> Entails P (Q ⇒ R) -> Entails P R.
   Proof. unfold PValid, Entails, PAnd. intuition. Qed.
 
   Lemma pApply {w} {P Q R : Pred w} :
@@ -244,48 +223,51 @@ Module Pred.
     Proof. unfold BiEntails, Ext, PTrue. reflexivity. Qed.
 
   End Ext.
+  #[global] Arguments Ext {_ _} [w] _ [_] _ _/.
   #[global] Instance params_ext : Params (@Ext) 6 := {}.
 
   Section Eq.
-    Definition PEq : ⊢ Ty -> Ty -> Pred :=
-      fun w t1 t2 ι => inst t1 ι = inst t2 ι.
 
-    Lemma peq_refl {w} (t : Ty w) :
+    Context {T : TYPE} {A : Type} {instTA : Inst T A}.
+
+    Definition PEq : ⊢ T -> T -> Pred :=
+      fun w t1 t2 ι => inst t1 ι = inst t2 ι.
+    #[local] Infix "=" := PEq : pred_scope.
+
+    Lemma peq_refl {w} (t : T w) :
       PEq t t ⊣⊢ ⊤.
     Proof. easy. Qed.
 
-    Lemma peq_symmetry {w} (s t : Ty w) :
+    Lemma peq_symmetry {w} (s t : T w) :
       PEq s t ⊣⊢ PEq t s.
     Proof. easy. Qed.
 
-    Lemma peq_persist {R : ACC} {persR : Persistent R Ty}
+    Lemma peq_persist {R : ACC} {persR : Persistent R T}
       (instR : forall w : World, Inst (R w) (Assignment w))
-      {w0 w1} (r : R w0 w1) (t1 t2 : Ty w0) :
+      {w0 w1} (r : R w0 w1) (t1 t2 : T w0) :
       PEq (persist _ t1 _ r) (persist _ t2 _ r) ⊣⊢ Ext (PEq t1 t2) r.
     Proof.
       unfold BiEntails, PEq, Ext. intros ι.
-      now rewrite !inst_persist_ty.
-    Qed.
-
-    Lemma peq_noconfusion {w} (t1 t2 : Ty w) :
-      PEq t1 t2 ⊣⊢ match t1 , t2 with
-                   | Ty_bool         , Ty_bool         => PTrue
-                   | Ty_func t11 t12 , Ty_func t21 t22 => PEq t11 t21 ∧ PEq t12 t22
-                   | Ty_hole _       , _               => PEq t1 t2
-                   | _               , Ty_hole _       => PEq t1 t2
-                   | _               , _               => PFalse
-                   end.
-    Proof.
-      intros ι; unfold PEq, PFalse, PTrue, PAnd; destruct t1, t2;
-        cbn; try reflexivity; intuition congruence.
-    Qed.
+      (* now rewrite !inst_persist. *)
+    Admitted.
 
   End Eq.
+  #[global] Arguments PEq {T A _} [w] _ _ _/.
+  #[local] Infix "=" := PEq : pred_scope.
 
-  Notation "t1 ≃ t2" := (PEq t1 t2) (at level 90) : pred_scope.
-  Notation "'Fun' x => b" :=
-    (fun w ζ x => b%P w ζ)
-      (x binder, at level 100) : pred_scope.
+  Lemma peq_ty_noconfusion {w} (t1 t2 : Ty w) :
+    t1 = t2 ⊣⊢
+      match t1 , t2 with
+      | Ty_bool         , Ty_bool         => PTrue
+      | Ty_func t11 t12 , Ty_func t21 t22 => PEq t11 t21 ∧ PEq t12 t22
+      | Ty_hole _       , _               => PEq t1 t2
+      | _               , Ty_hole _       => PEq t1 t2
+      | _               , _               => PFalse
+      end.
+  Proof.
+    intros ι; unfold PEq, PFalse, PTrue, PAnd; destruct t1, t2;
+      cbn; try reflexivity; intuition congruence.
+  Qed.
 
   #[global] Typeclasses Opaque Entails.
   #[global] Typeclasses Opaque BiEntails.
@@ -306,13 +288,6 @@ Module Pred.
       | cons y ys => PAnd (instpred y) (ip ys)
       end.
 
-  Notation Expr := (Lifted expr).
-
-  Definition TPB : ⊢ Env -> Const expr -> Ty -> Expr -> Pred :=
-    fun w G e t ee ι => inst G ι |-- e ; inst t ι ~> inst ee ι.
-  #[global] Arguments TPB [w] G e t ee ι.
-  Notation "G |-- E ; T ~> EE" := (TPB G E T EE) : pred_scope.
-
   Module Acc.
     Import (hints) Sub.
     Section WithAccessibilityRelation.
@@ -325,10 +300,6 @@ Module Pred.
 
       #[local] Arguments wp {_ _} _ _ _/.
       #[local] Arguments wlp {_ _} _ _ _/.
-      #[local] Arguments PAnd {_} _ _ _/.
-      #[local] Arguments PImpl {_} _ _ _/.
-      #[local] Arguments Ext {_ _} [w] _ [_] _ _/.
-      #[local] Arguments PEq [w] _ _ _/.
 
       #[export] Instance proper_wp_bientails {w0 w1} (r01 : R w0 w1) :
         Proper (BiEntails ==> BiEntails) (@wp w0 w1 r01).
@@ -392,7 +363,7 @@ Module Pred.
 
       Lemma wp_thick {thickR : Thick R} {instThickR : InstThick R}
         {w x} (xIn : ctx.In x w) (t : Ty (ctx.remove xIn)) Q :
-        Entails ((Ty_hole xIn ≃ thin xIn t) ∧ wlp (thick x t) Q)%P (wp (thick x t) Q).
+        Entails ((Ty_hole xIn = thin xIn t) ∧ wlp (thick x t) Q) (wp (thick x t) Q).
       Proof.
         intros ι. cbn. intros [Heq HQ].
         exists (env.remove _ ι xIn).
@@ -450,14 +421,151 @@ Module Pred.
 
   Lemma pno_cycle {w x} (xIn : ctx.In x w) (t : Ty w) :
     Ty_subterm (Ty_hole xIn) t ->
-    Entails (Ty_hole xIn ≃ t)%P PFalse.
+    Entails (Ty_hole xIn = t) PFalse.
   Proof.
     intros Hsub ι Heq.
     apply (inst_subterm ι) in Hsub. cbn in Hsub.
     rewrite <- Heq in Hsub. now apply ty_no_cycle in Hsub.
   Qed.
 
+  #[local] Notation Expr := (Lifted expr).
+
+  Definition TPB : ⊢ Env -> Const expr -> Ty -> Expr -> Pred :=
+    fun w G e t ee ι => inst G ι |-- e ; inst t ι ~> inst ee ι.
+  #[global] Arguments TPB [w] G e t ee ι/.
+
   (* #[global] Opaque BiEntails Entails PAnd PImpl PEq. *)
+
+  Module Import notations.
+
+    Notation "t1 ≃ t2" :=
+      (PEq t1 t2) (at level 90) : pred_scope.
+    Notation "'Fun' x => b" :=
+      (fun w ζ x => b%P w ζ)
+        (x binder, at level 100) : pred_scope.
+    Notation "⊩ P" := (PValid P) (at level 95).
+    Notation "P ⊣⊢ Q" := (BiEntails P Q) (at level 95).
+    Notation "⊤" := PTrue : pred_scope.
+    Notation "⊥" := PFalse : pred_scope.
+    Notation "P ⇔ Q" := (PIff P Q) (at level 94) : pred_scope.
+    Notation "P ⇒ Q" := (PImpl P Q) (at level 94, right associativity) : pred_scope.
+    Notation "P ∧ Q" := (PAnd P Q) (at level 80, right associativity) : pred_scope.
+
+    Notation "'∀' x ∶ T , Q" :=
+      (@Forall T _ (fun x => Q%P))
+        (at level 99, x binder, x at next level, T at level 95,
+          right associativity,
+          format "'∀'  x  ∶  T ,  Q")
+      : pred_scope.
+
+    Notation "'∀⁺' x .. y , Q " :=
+      (Forall (fun x => .. (Forall (fun y => Q%P)) ..))
+        (at level 99, x binder, y binder, right associativity,
+        only parsing)
+      : pred_scope.
+
+    (* Notation "'∃' x .. y , Q " := *)
+    (*     (Exists (fun x => .. (Exists (fun y => Q%P)) ..)) *)
+    (*       (at level 94, x binder, y binder, right associativity) *)
+    (*     : pred_scope. *)
+
+    Notation "'∃' x ∶ T , Q" :=
+      (@Exists T _ (fun x => Q%P))
+        (at level 99, x binder, right associativity,
+          format "'∃'  x  ∶  T ,  Q")
+        : pred_scope.
+
+    Notation "G |-- E ; T ~> EE" := (TPB G E T EE) : pred_scope.
+
+  End notations.
+
+  (* A predicate-based induction scheme for the typing relation. *)
+  Section InductionScheme.
+
+    Context (P : ⊢ Env -> Const expr -> Ty -> Expr -> Pred).
+    Context
+      {pfalse : forall w, PValid (w := w)
+         (∀ G ∶ Env, ∀ t ∶ Ty, ∀ e' ∶ Expr,
+             PEq t Ty_bool ⇒
+             PEq e' (pure v_false) ⇒
+             P G v_false t e')%P }
+      {ptrue : forall w, PValid (w := w)
+         (∀ G ∶ Env, ∀ t ∶ Ty, ∀ e' ∶ Expr,
+             PEq t Ty_bool ⇒
+             PEq e' (pure v_true) ⇒
+             P G v_true t e')%P }
+      {pif : forall w, PValid (w := w)
+         (∀⁺ G e1 e2 e3 e' e1' e2' e3' t,
+             (G |-- e1; Ty_bool ~> e1') ⇒
+             (G |-- e2; t ~> e2') ⇒
+             (G |-- e3; t ~> e3') ⇒
+             P G e1 Ty_bool e1' ⇒
+             P G e2 t e2' ⇒
+             P G e3 t e3' ⇒
+             PEq e' (fun ι0 => e_if (e1' ι0) (e2' ι0) (e3' ι0)) ⇒
+             P G (e_if e1 e2 e3) t e')%P }
+      {pvar : forall w (G : Env w) x t e', PValid
+         (PEq (resolve x G) (Some t) ⇒
+          PEq e' (fun _ => e_var x) ⇒
+          P G (e_var x) t e') }
+      {pabsu : forall w (G : Env w) x t1 t2 t e1 e1' e',
+        PValid
+          ((cons (x, t1) G |-- e1; t2 ~> e1') ⇒
+           P (cons (x, t1) G) e1 t2 e1' ⇒
+           PEq t (Ty_func t1 t2) ⇒
+           PEq e' (fun ι0 => e_abst x (inst t1 ι0) (e1' ι0)) ⇒
+           P G (e_absu x e1) t e' )}
+      {pabst : forall w (G : Env w) x t1 t2 e1 e1' e' t,
+          PValid
+            ((cons (x, lift t1 w) G |-- e1; t2 ~> e1') ⇒
+             P (cons (x, lift t1 w) G) e1 t2 e1' ⇒
+             PEq t (Ty_func (lift t1 w) t2) ⇒
+             PEq e' (fun ι0 => e_abst x t1 (e1' ι0)) ⇒
+             P G (e_abst x t1 e1) t e')}
+      {papp : forall w (G : Env w) e1 t1 e1' e2 t2 e2' e',
+          PValid
+            ((G |-- e1; Ty_func t2 t1 ~> e1') ⇒
+             (G |-- e2; t2 ~> e2') ⇒
+             P G e1 (Ty_func t2 t1) e1' ⇒
+             P G e2 t2 e2' ⇒
+             PEq e' (fun ι0 => e_app (e1' ι0) (e2' ι0)) ⇒
+             P G (e_app e1 e2) t1 e')%P }.
+
+    Lemma TPB_ind w G (e : expr) (t : Ty w) (ee : Expr w) :
+      Entails (G |-- e; t ~> ee)%P (P G e t ee).
+    Proof.
+      intros ι T. hnf in T.
+      remember (inst G ι) as G'.
+      remember (inst t ι) as t'.
+      remember (inst ee ι) as ee'.
+      revert HeqG' Heqt' Heqee'. revert G t ee. revert w ι.
+      induction T; cbn; intros; subst.
+      - apply pfalse; cbn; auto.
+      - apply ptrue; cbn; auto.
+      - specialize (IHT1 w ι G Ty_bool (fun _ => cnd') eq_refl eq_refl eq_refl).
+        specialize (IHT2 w ι G t0      (fun _ => coq') eq_refl eq_refl eq_refl).
+        specialize (IHT3 w ι G t0      (fun _ => alt') eq_refl eq_refl eq_refl).
+        eapply pif; cbn; eauto; eauto.
+      - apply pvar; cbn; auto.
+        now rewrite resolve_inst in H.
+      - specialize (IHT w ι (cons (v, lift vt _) G) (lift t _) (fun _ => e')).
+        cbn in IHT. rewrite ?inst_lift in IHT.
+        specialize (IHT eq_refl eq_refl eq_refl).
+        eapply pabsu; cbn; eauto; rewrite ?inst_lift; eauto.
+        change (@inst _ _ (@inst_lifted expr) _ ?e ?ι) with (e ι); cbn.
+        now rewrite inst_lift.
+      - specialize (IHT w ι (cons (v, lift vt _) G) (lift t _) (fun _ => e')).
+        cbn in IHT. rewrite ?inst_lift in IHT.
+        specialize (IHT eq_refl eq_refl eq_refl).
+        eapply pabst; cbn; eauto; rewrite ?inst_lift; eauto.
+      - specialize (IHT1 w ι G (Ty_func (lift t2 _) t) (fun _ => e1')). cbn in IHT1.
+        rewrite ?inst_lift in IHT1. specialize (IHT1 eq_refl eq_refl eq_refl).
+        specialize (IHT2 w ι G (lift t2 _) (fun _ => e2')).
+        rewrite ?inst_lift in IHT2. specialize (IHT2 eq_refl eq_refl eq_refl).
+        eapply papp; cbn; eauto; rewrite ?inst_lift; eauto.
+    Qed.
+
+  End InductionScheme.
 
 End Pred.
 Export Pred (Pred).

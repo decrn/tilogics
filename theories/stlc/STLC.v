@@ -178,6 +178,7 @@ Definition Lifted (A : Type) : TYPE :=
 
 (* pure  :: a -> f a *)
 Definition pure {A} (a : A) : Valid (Lifted A) := fun _ _ => a.
+#[global] Arguments pure {A} _ {w} _/.
 
 (* app :: f (a -> b) -> f a -> f b *)
 Definition app (A B : Type) : ⊢ (Lifted (A -> B)) -> Lifted A -> Lifted B :=

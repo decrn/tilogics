@@ -72,6 +72,7 @@ Module ProgramLogic.
 
   Import (hints) Tri.
   Import Pred.
+  Import Pred.notations.
 
   Definition WP {A} : ⊢ ◆A -> □(A -> Pred) -> Pred :=
     fun w0 d Q =>
@@ -200,7 +201,7 @@ End ProgramLogic.
 Module Correctness.
 
   Import (hints) Tri.
-  Import Pred ProgramLogic.
+  Import Pred Pred.notations ProgramLogic.
 
   Definition UnifierSound : ⊢ Unifier -> PROP :=
     fun w0 u =>
@@ -287,7 +288,7 @@ Module Correctness.
           apply proper_ext_entails; auto.
           apply proper_ext_entails; auto.
           apply proper_ext_entails; auto.
-          rewrite (peq_noconfusion (Ty_func s1 s2)).
+          rewrite (peq_ty_noconfusion (Ty_func s1 s2)).
           now apply pimpl_and_adjoint.
       Qed.
 
@@ -334,10 +335,10 @@ Module Correctness.
         - intros. apply boxflex_complete_assignment.
         - intros. rewrite peq_symmetry. apply boxflex_complete_assignment.
         - intros *. rewrite wp_pure. apply entails_true.
-        - intros. now rewrite peq_noconfusion, ext_false.
-        - intros. now rewrite peq_noconfusion, ext_false.
+        - intros. now rewrite peq_ty_noconfusion, ext_false.
+        - intros. now rewrite peq_ty_noconfusion, ext_false.
         - intros * IH1 IH2 *.
-          rewrite wp_bind, peq_noconfusion.
+          rewrite wp_bind, peq_ty_noconfusion.
           rewrite <- ext_and.
           apply pimpl_and_adjoint.
           apply (pApply (IH1 w1 ζ01)). clear IH1.
@@ -535,7 +536,7 @@ End Correctness.
 Module Generalized.
 
   Import (hints) Sub Tri.
-  Import Pred ProgramLogic LR.
+  Import Pred Pred.notations ProgramLogic LR.
 
   Definition RPred : LR.RELATION Tri Pred :=
     fun w0 w1 r P Q => forall ι, P (inst r ι) <-> Q ι.
