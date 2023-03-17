@@ -427,145 +427,145 @@ Module StrongMonotonicity.
 
   Import LR.
 
-  Definition RDSub {Θ A} {transΘ : Trans Θ} (R : RELATION Θ A) :
-    RELATION Θ (Diamond Θ A) :=
-    fun w0 w1 θ01 d1 d2 =>
-      match d1 , d2 with
-      | (w2; (θ02,a2)) , (w3; (θ13,a3)) =>
-          exists θ23, θ01 ⊙ θ13 = θ02 ⊙ θ23 /\ R _ _ θ23 a2 a3
-      end.
+  (* Definition RDSub {Θ A} {transΘ : Trans Θ} (R : RELATION Θ A) : *)
+  (*   RELATION Θ (Diamond Θ A) := *)
+  (*   fun w0 w1 θ01 d1 d2 => *)
+  (*     match d1 , d2 with *)
+  (*     | (w2; (θ02,a2)) , (w3; (θ13,a3)) => *)
+  (*         exists θ23, θ01 ⊙ θ13 = θ02 ⊙ θ23 /\ R _ _ θ23 a2 a3 *)
+  (*     end. *)
 
-  Definition ROption {Θ A} (R : RELATION Θ A) : RELATION Θ (Option A) :=
-    fun w0 w1 r01 m0 m1 =>
-      match m0 , m1 with
-      | Some a0 , Some a1 => R w0 w1 r01 a0 a1
-      | Some _  , None    => True
-      | None    , Some _  => False
-      | None    , None    => True
-      end.
+  (* Definition ROption {Θ A} (R : RELATION Θ A) : RELATION Θ (Option A) := *)
+  (*   fun w0 w1 r01 m0 m1 => *)
+  (*     match m0 , m1 with *)
+  (*     | Some a0 , Some a1 => R w0 w1 r01 a0 a1 *)
+  (*     | Some _  , None    => True *)
+  (*     | None    , Some _  => False *)
+  (*     | None    , None    => True *)
+  (*     end. *)
 
-  Lemma rty_bool {Θ} {lkΘ : Lk Θ} {w0 w1} {θ01 : Θ w0 w1} :
-    RTy θ01 (Ty_bool _) (Ty_bool _).
-  Proof. reflexivity. Qed.
+  (* Lemma rty_bool {Θ} {lkΘ : Lk Θ} {w0 w1} {θ01 : Θ w0 w1} : *)
+  (*   RTy θ01 (Ty_bool _) (Ty_bool _). *)
+  (* Proof. reflexivity. Qed. *)
 
-  Lemma rty_func {Θ} {lkΘ : Lk Θ} {w0 w1} {θ01 : Θ w0 w1} t1_0 t1_1 t2_0 t2_1 :
-    RTy θ01 t1_0 t1_1 ->
-    RTy θ01 t2_0 t2_1 ->
-    RTy θ01 (Ty_func _ t1_0 t2_0) (Ty_func _ t1_1 t2_1).
-  Proof. unfold RTy; cbn; intros; now f_equal. Qed.
+  (* Lemma rty_func {Θ} {lkΘ : Lk Θ} {w0 w1} {θ01 : Θ w0 w1} t1_0 t1_1 t2_0 t2_1 : *)
+  (*   RTy θ01 t1_0 t1_1 -> *)
+  (*   RTy θ01 t2_0 t2_1 -> *)
+  (*   RTy θ01 (Ty_func _ t1_0 t2_0) (Ty_func _ t1_1 t2_1). *)
+  (* Proof. unfold RTy; cbn; intros; now f_equal. Qed. *)
 
-  Definition REnv {Θ} : RELATION Θ Env.
-  Admitted.
+  (* Definition REnv {Θ} : RELATION Θ Env. *)
+  (* Admitted. *)
 
-  Definition RM {A} (R : RELATION Sub A) : RELATION Sub (M A) :=
-    ROption (RDSub R).
+  (* Definition RM {A} (R : RELATION Sub A) : RELATION Sub (M A) := *)
+  (*   ROption (RDSub R). *)
 
-  Lemma rsome {Θ A} (R : RELATION Θ A) w0 w1 (θ01 : Θ w0 w1) (a0 : A w0) (a1 : A w1) (ra : R w0 w1 θ01 a0 a1) :
-    ROption R w0 w1 θ01 (Some a0) (Some a1).
-  Proof. apply ra. Qed.
+  (* Lemma rsome {Θ A} (R : RELATION Θ A) w0 w1 (θ01 : Θ w0 w1) (a0 : A w0) (a1 : A w1) (ra : R w0 w1 θ01 a0 a1) : *)
+  (*   ROption R w0 w1 θ01 (Some a0) (Some a1). *)
+  (* Proof. apply ra. Qed. *)
 
-  Lemma rpure {A} (R : RELATION Sub A) :
-    RValid (RImpl R (RM R)) pure.
-  Proof.
-    intros w0 w1 r01 a0 a1 ra.
-    refine (@rsome _ _ (RDSub R) w0 w1 r01 _ _ _).
-    unfold RDSub. exists r01. split; auto.
-    now rewrite trans_refl_l, trans_refl_r.
-  Qed.
+  (* Lemma rpure {A} (R : RELATION Sub A) : *)
+  (*   RValid (RImpl R (RM R)) pure. *)
+  (* Proof. *)
+  (*   intros w0 w1 r01 a0 a1 ra. *)
+  (*   refine (@rsome _ _ (RDSub R) w0 w1 r01 _ _ _). *)
+  (*   unfold RDSub. exists r01. split; auto. *)
+  (*   now rewrite trans_refl_l, trans_refl_r. *)
+  (* Qed. *)
 
-  Lemma rbind {A B} (RA : RELATION Sub A) (RB : RELATION Sub B) :
-    RValid (RImpl (RM RA) (RImpl (RBox (RImpl RA (RM RB))) (RM RB))) bind.
-  Proof.
-    unfold RValid, RImpl, RBox, RM.
-    intros w0 w1 r01.
-    intros [(w2 & r2 & a2)|] [(w3 & r3 & a3)|] rm f0 f1 rf; cbn in rm.
-    - destruct rm as (r23 & Heqr & ra).
-      specialize (rf _ _ r2 r3 r23 Heqr _ _ ra).
-      cbn. revert rf.
-      destruct f0 as [(w4 & r4 & b4)|], f1 as [(w5 & r5 & b5)|]; cbn.
-      + intros (r45 & Heqr2 & rb).
-        exists r45.
-        rewrite <- ?trans_assoc.
-        rewrite Heqr.
-        rewrite ?trans_assoc.
-        now rewrite Heqr2.
-      + auto.
-      + auto.
-      + auto.
-    - cbn. destruct f0 as [(w4 & r4 & b4)|]; cbn.
-      + auto.
-      + auto.
-    - cbn. destruct f1 as [(w5 & r5 & b5)|]; cbn.
-      + auto.
-      + auto.
-    - cbn.
-      auto.
-  Qed.
+  (* Lemma rbind {A B} (RA : RELATION Sub A) (RB : RELATION Sub B) : *)
+  (*   RValid (RImpl (RM RA) (RImpl (RBox (RImpl RA (RM RB))) (RM RB))) bind. *)
+  (* Proof. *)
+  (*   unfold RValid, RImpl, RBox, RM. *)
+  (*   intros w0 w1 r01. *)
+  (*   intros [(w2 & r2 & a2)|] [(w3 & r3 & a3)|] rm f0 f1 rf; cbn in rm. *)
+  (*   - destruct rm as (r23 & Heqr & ra). *)
+  (*     specialize (rf _ _ r2 r3 r23 Heqr _ _ ra). *)
+  (*     cbn. revert rf. *)
+  (*     destruct f0 as [(w4 & r4 & b4)|], f1 as [(w5 & r5 & b5)|]; cbn. *)
+  (*     + intros (r45 & Heqr2 & rb). *)
+  (*       exists r45. *)
+  (*       rewrite <- ?trans_assoc. *)
+  (*       rewrite Heqr. *)
+  (*       rewrite ?trans_assoc. *)
+  (*       now rewrite Heqr2. *)
+  (*     + auto. *)
+  (*     + auto. *)
+  (*     + auto. *)
+  (*   - cbn. destruct f0 as [(w4 & r4 & b4)|]; cbn. *)
+  (*     + auto. *)
+  (*     + auto. *)
+  (*   - cbn. destruct f1 as [(w5 & r5 & b5)|]; cbn. *)
+  (*     + auto. *)
+  (*     + auto. *)
+  (*   - cbn. *)
+  (*     auto. *)
+  (* Qed. *)
 
-  Import SubstitutionPredicates.
-  Lemma rmgu :
-    RValid (RImpl RTy (RImpl RTy (RM RUnit))) mgu.
-  Proof.
-    unfold RValid, RImpl, RM, RUnit.
-    intros w0 w1 r01 t1_0 t1_1 rt1 t2_0 t2_1 rt2.
-    unfold mgu.
-    destruct (Correctness.mgu_spec t1_0 t2_0) as [(w2 & r02 & ?)|],
-        (Correctness.mgu_spec t1_1 t2_1) as [(w3 & r13 & ?)|]; cbn.
-    - unfold RTy in *.
-      clear u u0.
-      subst.
-      destruct H0 as [H0 _].
-      destruct H as [_ H].
-      unfold unifies in *.
-      specialize (H _ (r01 ⊙ Sub.triangular r13)).
-      rewrite ?persist_trans in H.
-      specialize (H H0).
-      destruct H as (r23 & ?).
-      exists r23. split; auto.
-    - auto.
-    - apply (H w3 (r01 ⊙ Sub.triangular r13)).
-      destruct H0 as [H0 _].
-      unfold RTy in *.
-      subst. unfold unifies in *.
-      now rewrite ?persist_trans, H0.
-    - auto.
-  Qed.
+  (* Import SubstitutionPredicates. *)
+  (* Lemma rmgu : *)
+  (*   RValid (RImpl RTy (RImpl RTy (RM RUnit))) mgu. *)
+  (* Proof. *)
+  (*   unfold RValid, RImpl, RM, RUnit. *)
+  (*   intros w0 w1 r01 t1_0 t1_1 rt1 t2_0 t2_1 rt2. *)
+  (*   unfold mgu. *)
+  (*   destruct (Correctness.mgu_spec t1_0 t2_0) as [(w2 & r02 & ?)|], *)
+  (*       (Correctness.mgu_spec t1_1 t2_1) as [(w3 & r13 & ?)|]; cbn. *)
+  (*   - unfold RTy in *. *)
+  (*     clear u u0. *)
+  (*     subst. *)
+  (*     destruct H0 as [H0 _]. *)
+  (*     destruct H as [_ H]. *)
+  (*     unfold unifies in *. *)
+  (*     specialize (H _ (r01 ⊙ Sub.triangular r13)). *)
+  (*     rewrite ?persist_trans in H. *)
+  (*     specialize (H H0). *)
+  (*     destruct H as (r23 & ?). *)
+  (*     exists r23. split; auto. *)
+  (*   - auto. *)
+  (*   - apply (H w3 (r01 ⊙ Sub.triangular r13)). *)
+  (*     destruct H0 as [H0 _]. *)
+  (*     unfold RTy in *. *)
+  (*     subst. unfold unifies in *. *)
+  (*     now rewrite ?persist_trans, H0. *)
+  (*   - auto. *)
+  (* Qed. *)
 
-  Definition rexists {A} (R : RELATION Sub A) w0 w1 (r01 : Sub w0 w1) {n} (m0 : M A (w0 ▻ n)) (m1 : M A (w1 ▻ n)) :
-    RM R (w0 ▻ n) (w1 ▻ n) (Sub.up1 r01) m0 m1 ->
-    RM R w0 w1 r01 (mexists m0) (mexists m1).
-  Proof.
-    unfold RM, ROption, mexists.
-    destruct m0 as [(w2 & r02 & a2)|], m1 as [(w3 & r13 & a3)|]; cbn - [step Sub.up1]; auto.
-    intros (r23 & Heqr & ra).
-    exists r23. split; auto.
-    rewrite trans_assoc, <- Heqr.
-    clear.
-    rewrite <- ?trans_assoc. f_equal.
-    admit.
-  Admitted.
+  (* Definition rexists {A} (R : RELATION Sub A) w0 w1 (r01 : Sub w0 w1) {n} (m0 : M A (w0 ▻ n)) (m1 : M A (w1 ▻ n)) : *)
+  (*   RM R (w0 ▻ n) (w1 ▻ n) (Sub.up1 r01) m0 m1 -> *)
+  (*   RM R w0 w1 r01 (mexists m0) (mexists m1). *)
+  (* Proof. *)
+  (*   unfold RM, ROption, mexists. *)
+  (*   destruct m0 as [(w2 & r02 & a2)|], m1 as [(w3 & r13 & a3)|]; cbn - [step Sub.up1]; auto. *)
+  (*   intros (r23 & Heqr & ra). *)
+  (*   exists r23. split; auto. *)
+  (*   rewrite trans_assoc, <- Heqr. *)
+  (*   clear. *)
+  (*   rewrite <- ?trans_assoc. f_equal. *)
+  (*   admit. *)
+  (* Admitted. *)
 
-  Arguments mexists : simpl never.
+  (* Arguments mexists : simpl never. *)
 
-  Definition RPropImpl {Θ} : RELATION Θ PROP :=
-    fun w0 w1 r01 p q => (q -> p)%type.
+  (* Definition RPropImpl {Θ} : RELATION Θ PROP := *)
+  (*   fun w0 w1 r01 p q => (q -> p)%type. *)
 
-  Lemma wp_monotonic_strong {A} (R : RELATION Sub A) :
-    RValid (RImpl (RM R) (RImpl (RBox (RImpl R RPropImpl)) RPropImpl)) WP.
-  Proof.
-    intros w0 w1 r01 m0 m1 rm p0 p1 rp.
-    unfold RBox, RImpl, RPropImpl in *.
-    unfold RM, ROption, RDSub in rm.
-    destruct m0 as [(w2 & r02 & a2)|], m1 as [(w3 & r13 & a3)|].
-    - unfold RM, ROption, RDSub in rm.
-      destruct rm as (r23 & Heqr & ra).
-      unfold WP. rewrite option.wp_match.
-      intros Hp1. constructor. revert Hp1.
-      eapply rp; eauto.
-    - inversion 1.
-    - destruct rm.
-    - inversion 1.
-  Qed.
+  (* Lemma wp_monotonic_strong {A} (R : RELATION Sub A) : *)
+  (*   RValid (RImpl (RM R) (RImpl (RBox (RImpl R RPropImpl)) RPropImpl)) WP. *)
+  (* Proof. *)
+  (*   intros w0 w1 r01 m0 m1 rm p0 p1 rp. *)
+  (*   unfold RBox, RImpl, RPropImpl in *. *)
+  (*   unfold RM, ROption, RDSub in rm. *)
+  (*   destruct m0 as [(w2 & r02 & a2)|], m1 as [(w3 & r13 & a3)|]. *)
+  (*   - unfold RM, ROption, RDSub in rm. *)
+  (*     destruct rm as (r23 & Heqr & ra). *)
+  (*     unfold WP. rewrite option.wp_match. *)
+  (*     intros Hp1. constructor. revert Hp1. *)
+  (*     eapply rp; eauto. *)
+  (*   - inversion 1. *)
+  (*   - destruct rm. *)
+  (*   - inversion 1. *)
+  (* Qed. *)
 
 End StrongMonotonicity.
 

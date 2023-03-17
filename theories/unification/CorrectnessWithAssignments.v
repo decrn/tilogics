@@ -536,72 +536,33 @@ Module Generalized.
   Import (hints) Sub Tri.
   Import Pred Pred.notations ProgramLogic LR.
 
-  Definition RPred : LR.RELATION Tri Pred :=
-    fun w0 w1 r P Q => forall ι, P (inst r ι) <-> Q ι.
-
   Lemma wlp_tell' {w x} (xIn : x ∈ w) (t : Ty (w - x)) (Q : □(Unit -> Pred) w)
-    (RQ : RProper (RBox (RImpl RUnit RPred)) Q) :
-    WLP (tell1 xIn t) Q ⊣⊢ (t[Sub.thin xIn] ≃ Ty_hole xIn ⇒ T Q tt).
+    (RQ : RProper (RBox (RImpl RUnit (RPred Tri))) Q) :
+    WLP (tell1 xIn t) Q ⊣⊢ (Ty_hole xIn ≃ thin xIn t ⇒ T Q tt).
   Proof.
-    rewrite wlp_tell1. unfold BiEntails, Acc.wlp, PEq, PImpl, T.
-    intros ι. cbn. split.
-    - intros HQ Heq.
-      rewrite inst_persist_ty, Sub.inst_thin in Heq.
-      specialize (HQ (env.remove _ ι xIn)).
-      rewrite Heq, env.insert_remove in HQ.
-      specialize (HQ eq_refl). revert HQ.
-      hnf in RQ.
-      unfold RImpl, RUnit, RPred in RQ.
-      specialize (RQ _ _ refl (thick x t) (thick x t) eq_refl tt tt I).
-      specialize (RQ (env.remove x ι xIn)).
-      rewrite inst_thick, Heq, env.insert_remove in RQ.
-      apply RQ.
-    - intros HQ ι1 Heq. subst.
-      rewrite inst_persist_ty in HQ.
-      rewrite Sub.inst_thin in HQ.
-      rewrite env.remove_insert in HQ.
-      rewrite env.lookup_insert in HQ.
-      specialize (HQ eq_refl). revert HQ.
-      hnf in RQ.
-      unfold RImpl, RUnit, RPred in RQ.
-      specialize (RQ _ _ refl (thick x t) (thick x t) eq_refl tt tt I).
-      specialize (RQ ι1).
-      rewrite inst_thick in RQ.
-      apply RQ.
+    unfold WLP, tell1. rewrite Acc.wlp_thick. intros ι. cbn.
+    rewrite Sub.subst_thin, inst_persist_ty, Sub.inst_thin.
+    apply imp_iff_compat_l'. intros Heq.
+    cbv [RProper PValid RBox Forall Const PImpl Acc.wlp PEq
+      RImpl RUnit PTrue RPred PIff Ext] in RQ.
+    specialize (RQ ι w (w - x) refl (thick x t) (thick x t) (env.remove _ ι xIn)).
+    cbn in RQ. rewrite <- Heq, env.insert_remove in RQ.
+    now specialize (RQ eq_refl eq_refl tt tt I).
   Qed.
 
   Lemma flex_sound_assignment' {w x} (xIn : x ∈ w) (t : Ty w)
-    (Q : □(Unit -> Pred) w) (RQ : RProper (RBox (RImpl RUnit RPred)) Q) :
-    WLP (flex t xIn) Q ⊣⊢ (t ≃ Ty_hole xIn) ⇒ T Q tt.
+    (Q : □(Unit -> Pred) w) (RQ : RProper (RBox (RImpl RUnit (RPred Tri))) Q) :
+    WLP (flex t xIn) Q ⊣⊢ (Ty_hole xIn ≃ t) ⇒ T Q tt.
   Proof.
     unfold flex. destruct (varview t) as [y yIn|].
     - destruct (ctx.occurs_check_view xIn yIn).
       + now rewrite wlp_pure, peq_refl, pimpl_true_l.
-      + rewrite wlp_tell'; auto. cbn.
-        now rewrite Sub.lk_thin.
-    - unfold PValid, WLP, PEq, PImpl. intros ι.
-      destruct (occurs_check_spec xIn t); cbn; subst.
-      + split.
-        * intros HQ Heq. specialize (HQ (env.remove _ ι xIn)).
-          rewrite Sub.subst_thin, inst_persist_ty, Sub.inst_thin in Heq.
-          rewrite inst_thick, Heq in HQ. rewrite env.insert_remove in HQ.
-          specialize (HQ eq_refl). revert HQ. unfold T.
-          specialize (RQ _ _ refl (thick x a) (thick x a) eq_refl tt tt I).
-          specialize (RQ (env.remove x ι xIn)).
-          rewrite inst_thick, Heq, env.insert_remove in RQ.
-          apply RQ.
-        * intros Heq ι1 <-.
-          rewrite inst_thick, Sub.subst_thin, inst_persist_ty, Sub.inst_thin in Heq.
-          rewrite env.remove_insert, env.lookup_insert in Heq.
-          specialize (Heq eq_refl). revert Heq. unfold T.
-          specialize (RQ _ _ refl (thick x a) (thick x a) eq_refl tt tt I).
-          specialize (RQ ι1). rewrite inst_thick in RQ.
-          apply RQ.
-      + destruct H0.
-        * destruct (H _ _ H0).
-        * split; [|easy]. intros _ Heq. exfalso.
-          apply (inst_subterm ι) in H0. rewrite Heq in H0.
-          now apply ty_no_cycle in H0.
+      + now rewrite wlp_tell'.
+    - destruct (occurs_check_spec xIn t) as [|[HOC|HOC]]; cbn - [tell1].
+      + rewrite wlp_tell'; now subst.
+      + destruct (H _ _ HOC).
+      + apply pno_cycle in HOC. apply split_bientails. split; [|apply entails_true].
+        now rewrite HOC, pimpl_false_l.
   Qed.
 
 End Generalized.

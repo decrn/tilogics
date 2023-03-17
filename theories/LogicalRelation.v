@@ -29,8 +29,11 @@
 From Em Require Import
      Context
      Definitions
+     Predicates
      STLC
      Triangular.
+From Equations Require Import
+  Equations.
 
 Set Implicit Arguments.
 
@@ -42,57 +45,72 @@ Set Implicit Arguments.
 Module LR.
 
   Import (hints) Tri.
+  Import Pred.
+  Import Pred.notations.
 
   Definition RELATION (Θ : ACC) (A : TYPE) : Type :=
     forall w0 w1 (θ01 : Θ w0 w1),
-      A w0 -> A w1 -> Prop.
+      A w0 -> A w1 -> Pred w1.
 
   Definition RProper {Θ A} {reflΘ : Refl Θ} (R : RELATION Θ A) {w} (a : A w) : Prop :=
-    R w w refl a a.
+    PValid (R w w refl a a).
 
-  Definition RBox {Θ A} {transΘ : Trans Θ} (R : RELATION Θ A) : RELATION Θ (Box Θ A) :=
+  Definition RPred (Θ : ACC) {instΘ : forall w, Inst (Θ w) (Assignment w)} :
+    RELATION Θ Pred := fun w0 w1 r01 p0 p1 => PIff (Ext p0 r01) p1.
+
+  Definition RBox {Θ A} {transΘ : Trans Θ} {instΘ : forall w, Inst (Θ w) (Assignment w)}
+    (R : RELATION Θ A) : RELATION Θ (Box Θ A) :=
     fun w0 w1 θ01 ba0 ba1 =>
-      forall (w2 w3 : World) (θ02 : Θ w0 w2) (θ13 : Θ w1 w3) (θ23 : Θ w2 w3),
-        θ01 ⊙ θ13 = θ02 ⊙ θ23 ->
-        R w2 w3 θ23 (ba0 w2 θ02) (ba1 w3 θ13).
+      (∀ w2 ∶ Const World,
+       ∀ w3 ∶ Const World,
+       ∀ θ02 ∶ Const (Θ w0 w2),
+       ∀ θ13 ∶ Const (Θ w1 w3),
+       ∀ θ23 ∶ Const (Θ w2 w3),
+         Acc.wlp θ13
+           (θ01 ⊙ θ13 ≃ θ02 ⊙ θ23 ⇒
+            R w2 w3 θ23 (ba0 w2 θ02) (ba1 w3 θ13)))%P.
 
   (*         Θ01          *)
   (*    w0 -------> w1    *)
   (*     |          |     *)
-  (* Θ02 |          | Θ13 *)
-  (*     |    //    |     *)
+  (* Θ02 |    //    | Θ13 *)
+  (*     |          |     *)
   (*     ↓          ↓     *)
   (*    w2 -------> w3    *)
   (*         θ23          *)
 
   Definition RImpl {Θ A B} (RA : RELATION Θ A) (RB : RELATION Θ B) : RELATION Θ (Impl A B) :=
     fun w0 w1 θ01 f0 f1 =>
-      forall a0 a1,
-        RA w0 w1 θ01 a0 a1 ->
-        RB w0 w1 θ01 (f0 a0) (f1 a1).
+      (∀ a0 ∶ Const (A w0),
+       ∀ a1 ∶ Const (A w1),
+         RA w0 w1 θ01 a0 a1 ⇒
+         RB w0 w1 θ01 (f0 a0) (f1 a1))%P.
 
   Definition RTy {Θ} {pers : Persistent Θ Ty} : RELATION Θ Ty :=
     fun w0 w1 θ01 t0 t1 =>
-      t1 = persist _ t0 _ θ01.
+      PEq (persist _ t0 _ θ01) t1.
 
   Lemma rty_bool {w0 w1} {θ01 : Tri w0 w1} :
-    RTy θ01 Ty_bool Ty_bool.
+    PValid (RTy θ01 Ty_bool Ty_bool).
   Proof. unfold RTy. now rewrite Tri.persist_bool. Qed.
 
   Lemma rty_func {w0 w1} (θ01 : Tri w0 w1) (t1_0 t2_0 : Ty w0) (t1_1 t2_1 : Ty w1) :
-    RTy θ01 t1_0 t1_1 ->
-    RTy θ01 t2_0 t2_1 ->
-    RTy θ01 (Ty_func t1_0 t2_0) (Ty_func t1_1 t2_1).
-  Proof. unfold RTy; intros. now rewrite Tri.persist_func; f_equal. Qed.
+    PValid
+      (RTy θ01 t1_0 t1_1 ⇒
+       RTy θ01 t2_0 t2_1 ⇒
+       RTy θ01 (Ty_func t1_0 t2_0) (Ty_func t1_1 t2_1)).
+  Proof.
+    unfold RTy. rewrite Tri.persist_func.
+    rewrite (peq_ty_noconfusion (Ty_func _ _)).
+    (* TODO: Don't break the abstraction. *)
+    firstorder.
+  Qed.
 
   Definition RValid {Θ A} (R : RELATION Θ A) (a : ⊢ A) : Prop :=
     forall w0 w1 θ01,
-      R w0 w1 θ01 (a w0) (a w1).
+      PValid (R w0 w1 θ01 (a w0) (a w1)).
 
   Definition RUnit {Θ} : RELATION Θ Unit :=
-    fun _ _ _ _ _ => True.
-
-  Definition RIff {Θ} : RELATION Θ PROP :=
-    fun w0 w1 θ01 p q => (q <-> p)%type.
+    fun _ _ _ _ _ => PTrue.
 
 End LR.
