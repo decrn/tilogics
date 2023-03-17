@@ -536,33 +536,33 @@ Module Generalized.
   Import (hints) Sub Tri.
   Import Pred Pred.notations ProgramLogic LR.
 
-  Lemma wlp_tell' {w x} (xIn : x ∈ w) (t : Ty (w - x)) (Q : □(Unit -> Pred) w)
+  Lemma wp_tell {w x} (xIn : x ∈ w) (t : Ty (w - x)) (Q : □(Unit -> Pred) w)
     (RQ : RProper (RBox (RImpl RUnit (RPred Tri))) Q) :
-    WLP (tell1 xIn t) Q ⊣⊢ (Ty_hole xIn ≃ thin xIn t ⇒ T Q tt).
+    WP (tell1 xIn t) Q ⊣⊢ (Ty_hole xIn ≃ thin xIn t) ∧ T Q tt.
   Proof.
-    unfold WLP, tell1. rewrite Acc.wlp_thick. intros ι. cbn.
+    unfold WP, tell1. rewrite Acc.wp_thick. intros ι. cbn.
     rewrite Sub.subst_thin, inst_persist_ty, Sub.inst_thin.
-    apply imp_iff_compat_l'. intros Heq.
+    apply and_iff_compat_l'. intros Heq.
+    specialize (RQ ι w (w - x) refl (thick x t) (thick x t) (env.remove _ ι xIn)).
     cbv [RProper PValid RBox Forall Const PImpl Acc.wlp PEq
       RImpl RUnit PTrue RPred PIff Ext] in RQ.
-    specialize (RQ ι w (w - x) refl (thick x t) (thick x t) (env.remove _ ι xIn)).
     cbn in RQ. rewrite <- Heq, env.insert_remove in RQ.
     now specialize (RQ eq_refl eq_refl tt tt I).
   Qed.
 
-  Lemma flex_sound_assignment' {w x} (xIn : x ∈ w) (t : Ty w)
+  Lemma flex_correct {w x} (xIn : x ∈ w) (t : Ty w)
     (Q : □(Unit -> Pred) w) (RQ : RProper (RBox (RImpl RUnit (RPred Tri))) Q) :
-    WLP (flex t xIn) Q ⊣⊢ (Ty_hole xIn ≃ t) ⇒ T Q tt.
+    WP (flex t xIn) Q ⊣⊢ (Ty_hole xIn ≃ t) ∧ T Q tt.
   Proof.
     unfold flex. destruct (varview t) as [y yIn|].
     - destruct (ctx.occurs_check_view xIn yIn).
-      + now rewrite wlp_pure, peq_refl, pimpl_true_l.
-      + now rewrite wlp_tell'.
+      + now rewrite wp_pure, peq_refl, pand_true_l.
+      + now rewrite wp_tell.
     - destruct (occurs_check_spec xIn t) as [|[HOC|HOC]]; cbn - [tell1].
-      + rewrite wlp_tell'; now subst.
+      + rewrite wp_tell; now subst.
       + destruct (H _ _ HOC).
-      + apply pno_cycle in HOC. apply split_bientails. split; [|apply entails_true].
-        now rewrite HOC, pimpl_false_l.
+      + apply pno_cycle in HOC. apply split_bientails. split; [apply entails_false|].
+        now rewrite HOC, pand_false_l.
   Qed.
 
 End Generalized.

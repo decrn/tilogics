@@ -165,6 +165,8 @@ Module Pred.
   Proof. unfold BiEntails, PImpl, PTrue. intuition. Qed.
   Lemma pimpl_false_l {w} (P : Pred w) : ⊥ ⇒ P ⊣⊢ ⊤.
   Proof. unfold BiEntails, PImpl, PTrue, PFalse. intuition. Qed.
+  Lemma entails_false {w} (P : Pred w) : Entails PFalse P.
+  Proof. easy. Qed.
   Lemma entails_true {w} (P : Pred w) : Entails P PTrue.
   Proof. easy. Qed.
 
