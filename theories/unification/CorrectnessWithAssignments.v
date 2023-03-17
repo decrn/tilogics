@@ -306,13 +306,11 @@ Module Correctness.
         unfold flex. destruct (varview t) as [y yIn|].
         - destruct (ctx.occurs_check_view xIn yIn).
           + rewrite wp_pure. unfold T. apply entails_true.
-          + unfold WP, tell1. rewrite <- Acc.wp_thick.
-            now rewrite Acc.wlp_true, pand_true_r.
-        - destruct (occurs_check_spec xIn t); subst; cbn.
-          + unfold WP, tell1. rewrite <- Acc.wp_thick.
-            now rewrite Acc.wlp_true, pand_true_r.
-          + destruct H0; [destruct (H _ _ H0)|].
-            now apply pno_cycle in H0.
+          + unfold WP, tell1. now rewrite Acc.wp_thick, ext_true, pand_true_r.
+        - destruct (occurs_check_spec xIn t) as [|[HOC|HOC]]; cbn.
+          + subst. now rewrite Acc.wp_thick, ext_true, pand_true_r.
+          + destruct (H _ _ HOC).
+          + now apply pno_cycle in HOC.
       Qed.
 
       Lemma boxflex_complete_assignment {x} (xIn : x ∈ w) (t : Ty w) {w1} (ζ01 : w ⊒⁻ w1) :

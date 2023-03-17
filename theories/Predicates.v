@@ -110,7 +110,9 @@ Module Pred.
     Proof. firstorder. Qed.
     #[export] Instance proper_piff : Proper (BiEntails ==> BiEntails ==> BiEntails) PIff.
     Proof. firstorder. Qed.
-    #[export] Instance proper_pimpl : Proper (BiEntails ==> BiEntails ==> BiEntails) PImpl.
+    #[export] Instance proper_pimpl_bientails : Proper (BiEntails ==> BiEntails ==> BiEntails) PImpl.
+    Proof. firstorder. Qed.
+    #[export] Instance proper_pimpl_entails : Proper (Entails --> Entails ==> Entails) PImpl.
     Proof. firstorder. Qed.
     #[export] Instance proper_pand_bientails : Proper (BiEntails ==> BiEntails ==> BiEntails) PAnd.
     Proof. firstorder. Qed.
@@ -122,6 +124,7 @@ Module Pred.
   #[global] Arguments Entails {w} (_ _)%P.
   #[global] Arguments PAnd {_} _ _ _/.
   #[global] Arguments PImpl {_} _ _ _/.
+  #[global] Arguments PFalse {_} _/.
 
   Definition Forall {I : TYPE} : ⊢ (I -> Pred) -> Pred :=
     fun w A ι => forall i : I w, A i ι.
@@ -133,6 +136,7 @@ Module Pred.
   #[local] Notation "⊩ P" := (PValid P) (at level 95).
   #[local] Notation "P ⊣⊢ Q" := (BiEntails P Q) (at level 95).
   #[local] Notation "⊤" := PTrue : pred_scope.
+  #[local] Notation "⊥" := PFalse : pred_scope.
   #[local] Notation "P ⇔ Q" := (PIff P Q) (at level 94) : pred_scope.
   #[local] Notation "P ⇒ Q" := (PImpl P Q) (at level 94, right associativity) : pred_scope.
   #[local] Notation "P ∧ Q" := (PAnd P Q) (at level 80, right associativity) : pred_scope.
@@ -159,6 +163,8 @@ Module Pred.
   Proof. unfold BiEntails, PImpl, PTrue. intuition. Qed.
   Lemma pimpl_true_r {w} (P : Pred w) : P ⇒ ⊤ ⊣⊢ ⊤.
   Proof. unfold BiEntails, PImpl, PTrue. intuition. Qed.
+  Lemma pimpl_false_l {w} (P : Pred w) : ⊥ ⇒ P ⊣⊢ ⊤.
+  Proof. unfold BiEntails, PImpl, PTrue, PFalse. intuition. Qed.
   Lemma entails_true {w} (P : Pred w) : Entails P PTrue.
   Proof. easy. Qed.
 
@@ -362,21 +368,15 @@ Module Pred.
       Proof. now rewrite pand_comm, and_wp_l, pand_comm. Qed.
 
       Lemma wp_thick {thickR : Thick R} {instThickR : InstThick R}
-        {w x} (xIn : ctx.In x w) (t : Ty (ctx.remove xIn)) Q :
-        Entails ((Ty_hole xIn = thin xIn t) ∧ wlp (thick x t) Q) (wp (thick x t) Q).
+        {w x} (xIn : ctx.In x w) (t : Ty (ctx.remove xIn)) (Q : Pred (ctx.remove xIn))  :
+        wp (thick x t) Q ⊣⊢ PEq (Ty_hole xIn) (thin xIn t) ∧ Ext Q (Sub.thin xIn).
       Proof.
-        intros ι. cbn. intros [Heq HQ].
-        exists (env.remove _ ι xIn).
-        rewrite inst_thick.
-        rewrite Sub.subst_thin in Heq.
-        rewrite inst_persist_ty in Heq.
-        rewrite Sub.inst_thin in Heq.
-        rewrite <- Heq.
-        rewrite env.insert_remove.
-        split. easy. apply HQ.
-        rewrite inst_thick.
-        rewrite <- Heq.
-        now rewrite env.insert_remove.
+        intros ι; cbn. rewrite Sub.subst_thin, inst_persist_ty, Sub.inst_thin.
+        split.
+        - intros (ι1 & Heq & HQ). subst.
+          now rewrite inst_thick, env.remove_insert, env.lookup_insert.
+        - intros [Heq HQ]. exists (env.remove x ι xIn).
+          now rewrite inst_thick, <- Heq, env.insert_remove.
       Qed.
 
       Lemma wlp_refl {reflR : Refl R} {instReflR : InstRefl R}
@@ -413,6 +413,19 @@ Module Pred.
       Lemma pvalid_wlp {w0 w1} (r01 : R w0 w1) Q :
         PValid Q -> PValid (wlp r01 Q).
       Proof. unfold PValid; cbn. firstorder. Qed.
+
+      Lemma wlp_thick {thickR : Thick R} {instThickR : InstThick R}
+        {w x} (xIn : ctx.In x w) (t : Ty (ctx.remove xIn)) (Q : Pred (ctx.remove xIn))  :
+        wlp (thick x t) Q ⊣⊢ PEq (Ty_hole xIn) (thin xIn t) ⇒ Ext Q (Sub.thin xIn).
+      Proof.
+        intros ι; cbn. rewrite Sub.subst_thin, inst_persist_ty, Sub.inst_thin.
+        split; intros HQ.
+        - specialize (HQ (env.remove x ι xIn)). intros Heq.
+          rewrite inst_thick, <- Heq, env.insert_remove in HQ. auto.
+        - intros ι1 Heq. subst.
+          rewrite inst_thick, env.remove_insert, env.lookup_insert in HQ.
+          now apply HQ.
+      Qed.
 
     End WithAccessibilityRelation.
     (* #[global] Opaque wp. *)
