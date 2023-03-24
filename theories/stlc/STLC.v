@@ -247,6 +247,9 @@ Class Thick (R : ACC) : Type :=
 #[export] Instance lk_alloc : Lk Alloc :=
   fun w1 w2 r x xIn => Ty_hole _ x (persist _ xIn _ r).
 
+#[export] Instance persistent_sem {R} {instR : forall w, Inst (R w) (Assignment w)} {A} :
+  Persistent R (Sem A) := fun w0 t w1 r01 ι1 => t (inst r01 ι1).
+
 #[export] Instance Persistent_Ty {R} {lkR : Lk R} : Persistent R Ty :=
   fix per {w} (t : Ty w) {w'} (r : R w w') : Ty w' :=
     match t with
@@ -289,14 +292,14 @@ Qed.
     end.
 
 Class InstRefl (R : ACC) {reflR : Refl R} {instR : forall w, Inst (R w) (Assignment w)} : Prop :=
-  inst_refl : forall {w} (ι : Assignment w), inst (refl (R := R)) ι = ι.
+  inst_refl : forall [w] (ι : Assignment w), inst (refl (R := R)) ι = ι.
 #[global] Arguments InstRefl R {_ _}.
 
 #[export] Instance instrefl_alloc : InstRefl Alloc :=
   fun _ _ => eq_refl.
 
 Lemma inst_trans {R} {transR : Trans R} {instR : forall w, Inst (R w) (Assignment w)}
-  {w1 w2 w3} (r12 : R w1 w2) (r23 : R w2 w3) (ass : Assignment w3) :
+  [w1 w2 w3] (r12 : R w1 w2) (r23 : R w2 w3) (ass : Assignment w3) :
   inst (trans r12 r23) ass = inst r12 (inst r23 ass).
 Proof. Admitted.
 
@@ -326,8 +329,8 @@ Section WeakestPre.
       end.
 
 
-#[global] Arguments WP  {A} {w} _ _ _.
-#[global] Arguments WLP {A} {w} _ _ _.
+  #[global] Arguments WP  {A} {w} _ _ _.
+  #[global] Arguments WLP {A} {w} _ _ _.
 
   Lemma wlp_monotonic {A w} (m : FreeM A w) (p q : □⁺(A -> Assignment -> PROP) w)
     (pq : forall w1 r1 a1 ι1, p w1 r1 a1 ι1 -> q w1 r1 a1 ι1) :

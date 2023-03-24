@@ -7,47 +7,12 @@ Import ctx.
 Import ctx.notations.
 
 Notation World := (Ctx nat).
-Definition TYPE : Type := World -> Type.
+
+Polymorphic Definition TYPE : Type := World -> Type.
 (* The type of accessibility relations between worlds. Because we work with
    multiple different definitions of accessibility, we generalize many
    definitions over the accessibility relation. *)
 Definition ACC : Type := World -> TYPE.
-Definition Valid (A : TYPE) : Type :=
-  forall w, A w.
-Definition Impl (A B : TYPE) : TYPE :=
-  fun w => A w -> B w.
-Definition Forall {I : Type} (A : I -> TYPE) : TYPE :=
-  fun w => forall i : I, A i w.
-
-Declare Scope indexed_scope.
-Bind    Scope indexed_scope with TYPE.
-
-Notation "⊢ A" := (Valid A) (at level 100).
-Notation "A -> B" := (Impl A B) : indexed_scope.
-Notation "'∀' x .. y , P " :=
-  (Forall (fun x => .. (Forall (fun y => P)) ..))
-    (at level 99, x binder, y binder, right associativity) : indexed_scope.
-
-Definition Const (A : Type) : TYPE := fun _ => A.
-Definition PROP : TYPE := fun _ => Prop.
-Definition Unit : TYPE := fun _ => unit.
-Definition Option (A : TYPE) : TYPE := fun w => option (A w).
-Definition List (A : TYPE) : TYPE := fun w => list (A w).
-Definition Prod (A B : TYPE) : TYPE := fun w => prod (A w) (B w).
-Definition Sum (A B : TYPE) : TYPE := fun w => sum (A w) (B w).
-
-Definition Box (R : ACC) (A : TYPE) : TYPE :=
-  fun w0 => forall w1, R w0 w1 -> A w1.
-
-(* Notation "◻A" := BoxR A *)
-
-Definition Diamond (R : ACC) (A : TYPE) : TYPE :=
-  fun w0 => {w1 & R w0 w1 * A w1}%type.
-Definition DiamondT (R : ACC) (M : TYPE -> TYPE) : TYPE -> TYPE :=
-  fun A => M (Diamond R A).
-
-Definition Schematic (A : TYPE) : Type :=
-  { w : World & A w }.
 
 Class Refl (R : ACC) : Type :=
   refl : forall w, R w w.
@@ -112,6 +77,72 @@ End alloc.
 Export alloc (Alloc).
 Export (hints) alloc.
 
+Definition Valid (A : TYPE) : Type :=
+  forall w, A w.
+Polymorphic Definition Impl (A B : TYPE) : TYPE :=
+  fun w => A w -> B w.
+Definition Forall {I : Type} (A : I -> TYPE) : TYPE :=
+  fun w => forall i : I, A i w.
+
+Declare Scope indexed_scope.
+Bind    Scope indexed_scope with TYPE.
+
+Notation "⊢ A" := (Valid A) (at level 100).
+Notation "A -> B" := (Impl A B) : indexed_scope.
+Notation "'∀' x .. y , P " :=
+  (Forall (fun x => .. (Forall (fun y => P)) ..))
+    (at level 99, x binder, y binder, right associativity) : indexed_scope.
+
+Definition Const (A : Type) : TYPE := fun _ => A.
+Definition PROP : TYPE := fun _ => Prop.
+Definition Unit : TYPE := fun _ => unit.
+Definition Option (A : TYPE) : TYPE := fun w => option (A w).
+Definition List (A : TYPE) : TYPE := fun w => list (A w).
+Definition Prod (A B : TYPE) : TYPE := fun w => prod (A w) (B w).
+Definition Sum (A B : TYPE) : TYPE := fun w => sum (A w) (B w).
+
+Definition Box (R : ACC) (A : TYPE) : TYPE :=
+  fun w0 => forall w1, R w0 w1 -> A w1.
+
+(* Notation "◻A" := BoxR A *)
+
+Class Pure (M : TYPE -> TYPE) : Type :=
+  pure : forall A, ⊢ A -> M A.
+#[global] Arguments pure {M _ A} [w].
+Class Bind (R : ACC) (M : TYPE -> TYPE) : Type :=
+  bind : forall A B, ⊢ M A -> Box R (A -> M B) -> M B.
+#[global] Arguments bind {R M _ A B} [w].
+
+Module MonadNotations.
+  Notation "[ r ] x <- ma ;; mb" :=
+    (bind ma (fun _ r x => mb))
+      (at level 80, x at next level,
+        ma at next level, mb at level 200,
+        right associativity).
+End MonadNotations.
+
+Module Diamond.
+  Import SigTNotations.
+
+  Definition Diamond (R : ACC) (A : TYPE) : TYPE :=
+    fun w0 => {w1 & R w0 w1 * A w1}%type.
+  Definition DiamondT (R : ACC) (M : TYPE -> TYPE) : TYPE -> TYPE :=
+    fun A => M (Diamond R A).
+
+  #[export] Instance pure {R} {reflR : Refl R} : Pure (Diamond R) :=
+    fun A w a => (w;(refl,a)).
+  #[export] Instance bind {R} {transR : Trans R} : Bind R (Diamond R) :=
+    fun A B w0 m f =>
+      let '(w1;(r01,a1)) := m in
+      let '(w2;(r12,b2)) := f w1 r01 a1 in
+      (w2; (trans r01 r12, b2)).
+
+End Diamond.
+Export Diamond (Diamond, DiamondT).
+
+Definition Schematic (A : TYPE) : Type :=
+  { w : World & A w }.
+
 Notation "w1 .> w2" := (trans (R := Alloc) w1 w2) (at level 80, only parsing).
 Infix "⊙" := trans (at level 60, right associativity).
 
@@ -161,14 +192,5 @@ Definition K {R A B} :
 #[export] Instance PersistLaws_In {x} : PersistLaws (ctx.In x).
 Proof. constructor; [easy|induction r12; cbn; auto]. Qed.
 
-Class Bind (R : ACC) (M : TYPE -> TYPE) : Type :=
-  bind : forall A B, ⊢ M A -> Box R (A -> M B) -> M B.
-#[global] Arguments bind {R M _ A B} [w].
-
-Module MonadNotations.
-  Notation "[ r ] x <- ma ;; mb" :=
-    (bind ma (fun _ r x => mb))
-      (at level 80, x at next level,
-        ma at next level, mb at level 200,
-        right associativity).
-End MonadNotations.
+#[export] Instance persistent_const {R A} : Persistent R (Const A) :=
+  fun _ a _ _ => a.

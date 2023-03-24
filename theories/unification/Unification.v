@@ -27,12 +27,17 @@
 (******************************************************************************)
 
 From Coq Require Import
-  Arith.PeanoNat.
+  Arith.PeanoNat
+  Classes.Morphisms
+  Classes.Morphisms_Prop
+  Relations.Relation_Definitions.
 From Equations Require Import
   Equations.
 From Em Require Import
   Definitions
   Context
+  LogicalRelation
+  Predicates
   Prelude
   STLC
   Triangular.
@@ -120,6 +125,7 @@ End Löb.
 
 Section Operations.
   Import (hints) Tri.
+  Import Pred Pred.notations.
 
   Definition box2later {A} : ⊢ □A -> ▶A.
     intros w a x xIn t. apply a. econstructor.
@@ -140,18 +146,66 @@ Section Operations.
     econstructor 2. auto. constructor 1.
   Defined.
 
-  Definition η {A} : ⊢ A -> ◆A :=
-    fun w a => Some (existT _ w (refl, a)).
-  #[global] Arguments η {A w} a.
+  Import LR.
+  Import (hints) Diamond.
+
+  Definition M := DiamondT Tri Option.
+  Definition RM {A} (R : LR.RELATION Tri A) := LR.ROption (LR.RDiamond R).
+
+  Definition pure {A} : ⊢ A -> M A :=
+    fun w a => Some (pure a).
+  #[global] Arguments pure {A} [w] a.
+
+  Definition fail {A} : ⊢ ◆A :=
+    fun w => None.
+
+  Definition acc {A} {w0 w1} (ζ1 : w0 ⊒⁻ w1) : ◆A w1 -> ◆A w0 :=
+    option.map (fun '(existT _ w2 (ζ2 , a)) => existT _ w2 (ζ1 ⊙⁻ ζ2, a)).
+
+  Lemma proper_pure {A} {RA : RELATION Tri A} :
+    RValid (RImpl RA (RM RA)) pure.
+  Proof.
+    intros w0 w1 r01. cbv [RValid pure].
+    apply forall_r. intros a0.
+    apply forall_r. intros a1.
+    apply impl_and_adjoint. rewrite and_true_l.
+    apply exists_r. exists r01.
+    rewrite Acc.wp_refl, ?trans_refl_l, trans_refl_r.
+    now rewrite eqₚ_refl, and_true_l.
+  Qed.
+
+  Lemma proper_fail {A} {RA : RELATION Tri A} :
+    RValid (RM RA) fail.
+  Proof. easy. Qed.
+  #[global] Arguments fail {A w}.
 
   Definition η1 {A} {w x} {xIn : x ∈ w} (t : Ty (w - x)) (a : A (w - x)) : ◆A w :=
     sooner2diamondtm (existT _ x (existT _ xIn (t, a))).
 
-  Definition tell {w0 w1} (r : Tri w0 w1) : ◆Unit w0 :=
-    Some (w1; (r, tt)).
-
   Definition tell1 {w x} (xIn : x ∈ w) (t : Ty (w - x)) : ◆Unit w :=
     Some ((w - x); (thick (R := Tri) x t, tt)).
+
+  Definition bind {A B} : ⊢ ◆A -> □(A -> ◆B) -> ◆B :=
+    fun w a0 f => option.bind a0 (fun '(w1; (ζ1, a1)) => acc ζ1 (f w1 ζ1 a1)).
+
+  Lemma proper_bind {A B} {RA : RELATION Tri A} {RB : RELATION Tri B} :
+    RValid (RImpl (RM RA) (RImpl (RBox (RImpl RA (RM RB))) (RM RB))) bind.
+  Proof.
+  Admitted.
+  (* Proof. *)
+  (*   intros w0 w1 r01. cbv [RValid bind]. *)
+  (*   apply forall_r. intros m0. *)
+  (*   apply forall_r. intros m1. *)
+  (*   apply impl_and_adjoint. rewrite and_true_l. *)
+  (*   apply forall_r. intros f0. *)
+  (*   apply forall_r. intros f1. *)
+  (*   apply impl_and_adjoint. unfold RM at 3. *)
+  (*   unfold ROption. *)
+
+  (*   Search option.bind. *)
+  (*   rewrite Acc.wp_refl, ?trans_refl_l, trans_refl_r. *)
+  (*   now rewrite eqₚ_refl, and_true_l. *)
+  (* Qed. *)
 
 End Operations.
 
@@ -218,8 +272,6 @@ Section Mult.
   Import option.notations.
   Import (hints) Tri.
 
-  Definition acc {A} {w0 w1} (ζ1 : w0 ⊒⁻ w1) : ◆A w1 -> ◆A w0 :=
-    option.map (fun '(existT _ w2 (ζ2 , a)) => existT _ w2 (ζ1 ⊙⁻ ζ2, a)).
 
   Definition μ {A} : Hom ◆◆A ◆A :=
     fun w0 a0 => '(w1; (ζ1 , a1)) <- a0;; acc ζ1 a1.
@@ -227,12 +279,9 @@ Section Mult.
   Definition ebind {A B} : Hom A ◆B -> Hom ◆A ◆B :=
     fun f w0 a0 => '(w1; (ζ1, a1)) <- a0 ;; acc ζ1 (f w1 a1).
 
-  Definition bind {A B} : ⊢ ◆A -> □(A -> ◆B) -> ◆B :=
-    fun w a0 f => '(w1; (ζ1 , a1)) <- a0 ;; acc ζ1 (f w1 ζ1 a1).
-
   (* see Kobayashi, S. (1997). Monad as modality. *)
   Definition strength {A B} : Hom (□A * ◆B) (◆(□A * B)) :=
-    fun w0 '(a0,b0) => bind b0 (fun w1 ζ1 b1 => η (_4 a0 ζ1, b1)).
+    fun w0 '(a0,b0) => bind b0 (fun w1 ζ1 b1 => pure (_4 a0 ζ1, b1)).
 
 End Mult.
 
@@ -259,6 +308,153 @@ End VarView.
 Module Variant1.
 
   Import (hints) Tri.
+  Import Pred Pred.notations.
+
+  Definition C := Box Tri (M Unit).
+  Definition RC := LR.RBox (RM LR.RUnit).
+
+  Definition ctrue : ⊢ C :=
+    fun w0 w1 r01 => pure tt.
+  Definition cfalse : ⊢ C :=
+    fun w0 w1 r01 => None.
+  Definition cand : ⊢ C -> C -> C :=
+    fun w0 c1 c2 w1 r01 =>
+      bind (c1 w1 r01) (fun w2 r12 _ => _4 c2 r01 r12).
+
+  Lemma proper_ctrue : LR.RValid RC ctrue.
+  Proof.
+    unfold LR.RValid, RC, LR.RBox, ctrue. intros w0 w1 r01.
+    apply forall_r. intros w2.
+    apply forall_r. intros w3.
+    apply forall_r. intros r02.
+    apply forall_r. intros r13.
+    apply forall_r. intros r23.
+    apply Acc.entails_wlp. rewrite ext_true.
+    apply impl_and_adjoint. rewrite and_true_l. cbn.
+    eapply exists_r. exists r23.
+    rewrite Acc.wp_refl, trans_refl_r, ?trans_refl_l.
+    rewrite eqₚ_refl, and_true_l. apply true_r.
+  Qed.
+
+  Lemma proper_cfalse : LR.RValid RC cfalse.
+  Proof.
+    unfold LR.RValid, LR.RBox, cfalse. intros w0 w1 r01.
+    apply forall_r. intros w2.
+    apply forall_r. intros w3.
+    apply forall_r. intros r02.
+    apply forall_r. intros r13.
+    apply forall_r. intros r23.
+    apply Acc.entails_wlp, impl_and_adjoint, true_r.
+  Qed.
+
+  Lemma ext_rbox {A} {RA : LR.RELATION Tri A} {w0 w1 w2}
+    {r01 : w0 ⊒⁻ w1} {r12 : w1 ⊒⁻ w2} (a0 : □A w0) (a1 : □A w1) :
+    Ext (LR.RBox RA r01 a0 a1) r12 ⊣⊢ₚ LR.RBox RA (r01 ⊙⁻ r12) a0 (_4 a1 r12).
+  Proof.
+    unfold LR.RBox.
+    rewrite ext_forall_const. apply proper_bientails_forall. intros w3.
+    rewrite ext_forall_const. apply proper_bientails_forall. intros w4.
+    rewrite ext_forall_const. apply proper_bientails_forall. intros r03.
+    rewrite ext_forall_const.
+    setoid_rewrite ext_forall_const.
+    apply split_bientails; split.
+    - apply forall_r. intros r24.
+      apply forall_r. intros r34.
+      cbv [Const entails Forall Ext Acc.wlp implₚ eqₚ] in *.
+      intros ι2 HQ ι4 <- Heq.
+      apply HQ; now rewrite ?inst_trans in *.
+    - apply forall_r. intros r14.
+      apply forall_r. intros r34.
+      cbv [Const entails Forall Ext Acc.wlp implₚ eqₚ] in *.
+      intros ι2 HQ ι4 Heq1 Heq2.
+  Abort.
+
+  Opaque Ext.
+  Opaque entails.
+
+  Lemma proper_bind' {A B} {RA : LR.RELATION _ A} {RB : LR.RELATION _ B}
+    {w0 w1} (r01 : w0 ⊒⁻ w1) (P : Pred w1)
+    (m1 : ◆A w1)
+    (m0 : ◆A w0)
+    (Q0 : □(A -> ◆B) w0)
+    (Q1 : □(A -> ◆B) w1) :
+    entails P (RM RA r01 m0 m1) ->
+    entails P (LR.RBox (LR.RImpl RA (RM RB)) r01 Q0 Q1) ->
+    entails P (RM RB r01 (bind m0 Q0) (bind m1 Q1)).
+  Proof.
+    intros rm rq.
+    pose proof (@proper_bind A B RA RB w0 w1 r01).
+    unfold LR.RImpl at 1 in H.
+    rewrite forall_r in H. specialize (H m0).
+    rewrite forall_r in H. specialize (H m1).
+    apply impl_and_adjoint in H. rewrite and_true_l in H.
+    unfold LR.RImpl at 1 in H.
+    rewrite forall_r in H. specialize (H Q0).
+    rewrite forall_r in H. specialize (H Q1).
+    apply impl_and_adjoint in H.
+    rewrite <- H.
+    now apply and_right.
+  Qed.
+
+  Lemma proper_cand : LR.RValid (LR.RImpl RC (LR.RImpl RC RC)) cand.
+  Proof.
+    intros w0 w1 r01.
+    apply forall_r. intros c11.
+    apply forall_r. intros c12.
+    apply impl_and_adjoint. rewrite and_true_l.
+    apply forall_r. intros c21.
+    apply forall_r. intros c22.
+    apply impl_and_adjoint.
+    unfold RC at 3, LR.RBox.
+    apply forall_r. intros w2.
+    apply forall_r. intros w3.
+    apply forall_r. intros r02.
+    apply forall_r. intros r13.
+    apply forall_r. intros r23.
+    apply Acc.entails_wlp. cbn.
+    apply impl_and_adjoint.
+    unfold Const in *.
+    unfold cand.
+    eapply proper_bind'; eauto using LR.RUnit.
+    Unshelve. 3: apply LR.RUnit.
+    - rewrite ext_and.
+      Transparent entails Ext.
+      cbv [entails andₚ RM LR.RUnit RC Ext LR.RBox LR.ROption Forall implₚ eqₚ Const Falseₚ Trueₚ
+        Acc.wlp].
+      intros ι3 [[H1 H2] Heq].
+      specialize (H1 _ _ r02 r13 r23 ι3 eq_refl Heq).
+      now destruct (c11 w2 r02), (c12 w3 r13).
+    - unfold LR.RBox.
+      apply forall_r. intros w4.
+      apply forall_r. intros w5.
+      apply forall_r. intros r24.
+      apply forall_r. intros r35.
+      apply forall_r. intros r45.
+      apply Acc.entails_wlp.
+      rewrite <- impl_and_adjoint.
+      unfold LR.RImpl.
+      apply forall_r. intros ru4.
+      apply forall_r. intros ru5.
+      rewrite <- impl_and_adjoint.
+      unfold LR.RUnit at 1.
+      rewrite and_true_r.
+      unfold RM, RC.
+      rewrite <- ?ext_and.
+      rewrite <- ?ext_trans.
+      unfold _4.
+      cbv [entails andₚ RM LR.RUnit RC Ext LR.RBox LR.ROption Forall implₚ eqₚ Const Falseₚ Trueₚ
+        Acc.wlp LR.RDiamond Exists Acc.wp].
+      intros ι5; intros [[[] ?] ?].
+      specialize (H0 _ _ (r02 ⊙⁻ r24) (r13 ⊙⁻ r35) r45 ι5).
+      rewrite ?inst_trans in *.
+      rewrite H1, H2 in H0.
+      specialize (H0 eq_refl eq_refl).
+      destruct (c21 w4 (r02 ⊙⁻ r24)) as
+        [(w6 & r46 & [])|], (c22 w5 (r13 ⊙⁻ r35)) as [(w7 & r57 & [])|]; try easy.
+  Qed.
+
+  #[global] Arguments cfalse {w} [w1] _.
+  #[global] Arguments ctrue {w} [w1] _.
 
   Definition Flex : TYPE :=
     Ty -> ∀ x, ctx.In x -> ◆Unit.
@@ -267,18 +463,18 @@ Module Variant1.
   Definition SolveList : TYPE :=
     List (Prod Ty Ty) -> ◆Unit.
   Definition BoxFlex : TYPE :=
-    Ty -> ∀ x, ctx.In x -> □◆Unit.
+    Ty -> ∀ x, ctx.In x -> C.
   Definition BoxUnifier : TYPE :=
-    Ty -> Ty -> □◆Unit.
+    Ty -> Ty -> C.
   Definition BoxSolveList : TYPE :=
-    List (Prod Ty Ty) -> □◆Unit.
+    List (Prod Ty Ty) -> C.
 
   Definition flex : ⊢ Flex :=
     fun w t x xIn =>
       match varview t with
       | is_var yIn =>
           match ctx.occurs_check_view xIn yIn with
-          | ctx.Same _      => η tt
+          | ctx.Same _      => pure tt
           | ctx.Diff _ yIn' => tell1 xIn (Ty_hole yIn')
           end
       | not_var _ =>
@@ -294,7 +490,7 @@ Module Variant1.
 
     Context [w] (lmgu : ▷BoxUnifier w).
 
-    Definition boxflex (t : Ty w) {x} (xIn : x ∈ w) : □◆Unit w :=
+    Definition boxflex (t : Ty w) {x} (xIn : x ∈ w) : C w :=
       Tri.box_intro_split
         (flex t xIn)
         (fun z zIn u =>
@@ -304,39 +500,31 @@ Module Variant1.
     Definition boxmgu : BoxUnifier w :=
       fix bmgu s t {struct s} :=
         match s , t with
-        | Ty_hole xIn   , t            => boxflex t xIn
-        | s            , Ty_hole yIn   => boxflex s yIn
-        | Ty_bool       , Ty_bool       => fun _ _ => η tt
-        | Ty_func s1 s2 , Ty_func t1 t2 =>
-            fun _ ζ1 =>
-              ⟨ ζ2 ⟩ _ <- bmgu s1 t1 _ ζ1 ;;
-              ⟨ ζ3 ⟩ _ <- bmgu s2 t2 _ (ζ1 ⊙⁻ ζ2) ;;
-              η tt
-        | _            , _            => fun _ _ => None
+        | Ty_hole xIn   , t             => boxflex t xIn
+        | s             , Ty_hole yIn   => boxflex s yIn
+        | Ty_bool       , Ty_bool       => ctrue
+        | Ty_func s1 s2 , Ty_func t1 t2 => cand (bmgu s1 t1) (bmgu s2 t2)
+        | _             , _             => cfalse
         end.
 
-      Section boxmgu_elim.
+    Section boxmgu_elim.
 
-      Context (P : Ty w -> Ty w -> □◆Unit w -> Type).
+      Context (P : Ty w -> Ty w -> C w -> Type).
       Context (fflex1 : forall (x : nat) (xIn : x ∈ w) (t : Ty w), P (Ty_hole xIn) t (boxflex t xIn)).
       Context (fflex2 : forall (x : nat) (xIn : x ∈ w) (t : Ty w), P t (Ty_hole xIn) (boxflex t xIn)).
-      Context (fbool : P Ty_bool Ty_bool (fun (w1 : World) (_ : w ⊒⁻ w1) => η tt)).
-      Context (fbool_func : forall T1 T2 : Ty w, P Ty_bool (Ty_func T1 T2) (fun (w1 : World) (_ : w ⊒⁻ w1) => None)).
-      Context (ffunc_bool : forall T1 T2 : Ty w, P (Ty_func T1 T2) Ty_bool (fun (w1 : World) (_ : w ⊒⁻ w1) => None)).
+      Context (fbool : P Ty_bool Ty_bool ctrue).
+      Context (fbool_func : forall T1 T2 : Ty w, P Ty_bool (Ty_func T1 T2) cfalse).
+      Context (ffunc_bool : forall T1 T2 : Ty w, P (Ty_func T1 T2) Ty_bool cfalse).
       Context (ffunc : forall s1 s2 t1 t2 : Ty w,
         (P s1 t1 (boxmgu s1 t1)) ->
         (P s2 t2 (boxmgu s2 t2)) ->
         P (Ty_func s1 s2) (Ty_func t1 t2)
-          (fun (w1 : World) (ζ1 : w ⊒⁻ w1) =>
-           bind (boxmgu s1 t1 ζ1)
-             (fun (w2 : World) (ζ2 : w1 ⊒⁻ w2) (_ : Unit w2) =>
-              bind (boxmgu s2 t2 (ζ1 ⊙⁻ ζ2)) (fun (w3 : World) (_ : w2 ⊒⁻ w3) (_ : Unit w3) => η tt)))).
+          (cand (boxmgu s1 t1) (boxmgu s2 t2))).
 
       Lemma boxmgu_elim : forall (t1 t2 : Ty w), P t1 t2 (boxmgu t1 t2).
       Proof. induction t1; intros t2; cbn; auto; destruct t2; auto. Qed.
 
     End boxmgu_elim.
-
 
   End MguO.
 
@@ -349,12 +537,9 @@ Module Variant1.
   Definition boxsolvelist : ⊢ BoxSolveList :=
     fix solve {w} cs {struct cs} :=
       match cs with
-      | List.nil => fun w1 ζ1 => η tt
-      | List.cons (t1,t2) cs =>
-          fun w1 ζ1 =>
-            ⟨ ζ2 ⟩ _ <- bmgu t1 t2 ζ1 ;;
-            solve cs _ (ζ1 ⊙⁻ ζ2)
-         end.
+      | List.nil             => ctrue
+      | List.cons (t1,t2) cs => cand (bmgu t1 t2) (solve cs)
+      end.
 
   Definition solvelist : ⊢ SolveList :=
     fun w cs => boxsolvelist cs Tri.refl.
@@ -402,7 +587,7 @@ Module Variant2.
       match t with
       | Ty_hole yIn =>
           match ctx.occurs_check_view xIn yIn with
-          | ctx.Same _      => η (Ty_hole xIn)
+          | ctx.Same _      => pure (Ty_hole xIn)
           | ctx.Diff _ yIn' => Some (sooner2diamond (x; (xIn; (Ty_hole yIn', Ty_hole yIn'))))
           end
       | _ => option_map
@@ -423,13 +608,13 @@ Module Variant2.
 
     Equations boxmgu : BoxUnifier w :=
     | Ty_hole xIn   | t            := boxflex xIn t;
-    | s            | Ty_hole yIn   := boxflex yIn s;
-    | Ty_bool       | Ty_bool       := fun _ _ => η Ty_bool;
+    | s             | Ty_hole yIn   := boxflex yIn s;
+    | Ty_bool       | Ty_bool       := fun _ _ => pure Ty_bool;
     | Ty_func s1 s2 | Ty_func t1 t2 := fun _ ζ1 =>
                                        ⟨ ζ2 ⟩ r1 <- boxmgu s1 t1 ζ1 ;;
                                        ⟨ ζ3 ⟩ r2 <- boxmgu s2 t2 (ζ1 ⊙⁻ ζ2) ;;
-                                       η (Ty_func (persist _ r1 _ ζ3) r2);
-    | _            | _            := fun _ _ => None.
+                                       pure (Ty_func (persist _ r1 _ ζ3) r2);
+    | _             | _             := fun _ _ => None.
 
   End MguO.
 

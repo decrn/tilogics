@@ -301,9 +301,9 @@ Module NoGhostState.
   Definition spec {A} : ⊢ ◆A -> □(A -> PROP) -> PROP -> PROP :=
     fun w0 a0 SPOST NPOST => option.spec (fun '(w1; (ζ1 , a1)) => SPOST w1 ζ1 a1) NPOST a0.
 
-  Lemma wp_η {A w} (a : A w) (POST : □(A -> PROP) w) :
-    wp (η a) POST <-> T POST a.
-  Proof. unfold wp, η. now option.tactics.mixin. Qed.
+  Lemma wp_pure {A w} (a : A w) (POST : □(A -> PROP) w) :
+    wp (pure a) POST <-> T POST a.
+  Proof. unfold wp, pure. now option.tactics.mixin. Qed.
 
   Lemma wp_μ {A B w} (a : ◆A w) (f : □(A -> ◆B) w) (POST : □(B -> PROP) w) :
     wp (bind a f) POST <-> wp a (fun _ ζ1 a1 => wp (f _ ζ1 a1) (_4 POST ζ1)).
@@ -315,9 +315,9 @@ Module NoGhostState.
        intros; try destruct_conjs).
   Qed.
 
-  Lemma wlp_η {A w} (a : A w) (POST : □(A -> PROP) w) :
-    wlp (η a) POST <-> T POST a.
-  Proof. unfold wlp, η. now option.tactics.mixin. Qed.
+  Lemma wlp_pure {A w} (a : A w) (POST : □(A -> PROP) w) :
+    wlp (pure a) POST <-> T POST a.
+  Proof. unfold wlp, pure. now option.tactics.mixin. Qed.
 
   Lemma wlp_μ {A B w} (a : ◆A w) (f : □(A -> ◆B) w) (POST : □(B -> PROP) w) :
     wlp (bind a f) POST <-> wlp a (fun _ ζ1 a1 => wlp (f _ ζ1 a1) (_4 POST ζ1)).
@@ -329,10 +329,10 @@ Module NoGhostState.
        intros; try destruct_conjs).
   Qed.
 
-  Lemma spec_η {A w} (a : A w) (SPOST : □(A -> PROP) w) (NPOST : PROP w) :
-    spec (η a) SPOST NPOST <-> T SPOST a.
+  Lemma spec_pure {A w} (a : A w) (SPOST : □(A -> PROP) w) (NPOST : PROP w) :
+    spec (pure a) SPOST NPOST <-> T SPOST a.
   Proof.
-    unfold spec, η. now option.tactics.mixin.
+    unfold spec, pure. now option.tactics.mixin.
   Qed.
 
   Lemma spec_μ {A B w} (a : ◆A w) (f : □(A -> ◆B) w) (SPOST : □(B -> PROP) w) (NPOST : PROP w) :
@@ -518,12 +518,10 @@ Module Correctness.
           destruct a as [w2 [ζ2 []]]. apply H.
         - destruct (boxflex_spec xIn t ζ1); constructor.
           destruct a as [w2 [ζ2 []]]. apply unifies_sym. apply H.
-        - rewrite wlp_μ. generalize (H _ ζ1). clear H.
-          apply option.wlp_monotonic. intros [w2 [ζ2 _]] ?.
-          rewrite wlp_μ. generalize (H0 _ (ζ1 ⊙⁻ ζ2)).
+        - unfold cand. rewrite wlp_μ. generalize (H _ ζ1). clear H.
+          apply option.wlp_monotonic. intros [w2 [ζ2 _]] ?. unfold _4.
+          generalize (H0 _ (ζ1 ⊙⁻ ζ2)).
           apply option.wlp_monotonic. intros [w3 [ζ3 _]] ?.
-          constructor. unfold _4.
-          rewrite trans_refl_r.
           rewrite Sub.triangular_trans.
           rewrite !Tri.persist_func.
           apply unifiesX_equiv. cbn.
@@ -551,19 +549,18 @@ Module Correctness.
           + now apply unifies_sym, H0 in H.
         - constructor. apply Sub.geq_max.
         - apply unifiesX_equiv in H1. destruct H1 as [HU1 HU2].
-          rewrite wp_μ. generalize (H _ ζ0 _ ζ1 HU1). clear H.
+          unfold cand. rewrite wp_μ. generalize (H _ ζ0 _ ζ1 HU1). clear H.
           apply option.wp_monotonic. intros [mgw1 [mgζ1 _]] [ζ1' ->].
           assert (unifies s2[ζ0 ⊙⁻ mgζ1] t2[ζ0 ⊙⁻ mgζ1] ζ1') as HU2'.
           { revert HU2. unfold unifies.
             now rewrite ?persist_trans, ?Sub.persist_triangular.
           }
-          rewrite wp_μ. generalize (H0 _ (ζ0 ⊙⁻ mgζ1) _ ζ1' HU2').
+          unfold _4.
+          generalize (H0 _ (ζ0 ⊙⁻ mgζ1) _ ζ1' HU2').
           apply option.wp_monotonic. intros [mgw2 [mgζ2 _]] [ζ2' ->].
-          constructor. unfold _4.
           rewrite ?Sub.triangular_trans.
           apply Sub.geq_precom.
-          apply Sub.geq_precom.
-          apply Sub.geq_max.
+          apply Sub.geq_extend.
       Qed.
 
       Lemma boxmgu_spec' : BoxUnifierSpec (boxmgu lmgu).
@@ -640,7 +637,7 @@ Module Correctness.
     order (spec' (flex t xIn)) (flexspec t xIn).
   Proof.
     unfold flex. destruct (varview t) as [y yIn|].
-    - destruct (ctx.occurs_check_view xIn yIn); unfold order, spec', flexspec, η;
+    - destruct (ctx.occurs_check_view xIn yIn); unfold order, spec', flexspec, pure;
         cbn - [eq_dec]; intros P Q PQ HP.
       + exists w. exists refl. rewrite eq_dec_refl. auto.
       + exists (w - x). exists (thick (R := Tri) x (Ty_hole yIn)).
@@ -671,7 +668,7 @@ Module Correctness.
         match varview t with
         | is_var yIn =>
             match ctx.occurs_check_view xIn yIn with
-            | ctx.Same _      => η tt
+            | ctx.Same _      => pure tt
             | ctx.Diff _ yIn' => Some (sooner2diamond (_; (xIn; (Ty_hole yIn', tt))))
             end
         | not_var _ =>
