@@ -499,3 +499,20 @@ Proof.
   - reflexivity.
   - now destruct String.string_dec.
 Qed.
+
+Inductive TyF (w : World) : Type :=
+| TyF_bool       : TyF w
+| TyF_func {x y} : x ∈ w -> y ∈ w -> TyF w.
+#[global] Arguments TyF_bool {w}.
+#[global] Arguments TyF_func {w x y}.
+
+Definition inj : ⊢ TyF -> Ty :=
+  fun w t =>
+    match t with
+    | TyF_bool     => Ty_bool _
+    | TyF_func x y => Ty_func _ (Ty_hole _ _ x) (Ty_hole _ _ y)
+    end.
+
+Variant ShallowConstraint (w : World) : Type :=
+  | FlexFlex {x y} (xIn : x ∈ w) (yIn : y ∈ w)
+  | FlexRigid {x} (xIn : x ∈ w) (t : TyF w).
