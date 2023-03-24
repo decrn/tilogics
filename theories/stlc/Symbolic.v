@@ -2,6 +2,7 @@ Require Import List.
 Import ListNotations.
 From Em Require Import
      Definitions Context Environment STLC Prelude Substitution Triangular
+     Predicates
      unification.CorrectnessWithSubstitutions LogicalRelation.
 Import ctx.notations.
 From Em Require
@@ -1205,13 +1206,16 @@ End ProofWorlds.
       apply H0.
   Qed.
 
-  Lemma completeness_aux {G e t ee} (T : G |-- e; t ~> ee) :
-    forall (w0 : World) (ι0 : Assignment w0) (G0 : Env w0),
-      G = inst G0 ι0 ->
+  Lemma completeness_aux e :
+    forall (w0 : World) (G0 : Env w0) (ι0 : Assignment w0),
+    forall {G}, G = inst G0 ι0 ->
+      forall {t ee} (T : G |-- e; t ~> ee),
+
       WP (reconstruct e G0) (fun w1 r01 '(t',ee) ι1 =>
                                              ι0 = inst r01 ι1 /\
                                              t = inst t' ι1) ι0.
   Proof.
+    intros. revert w0 ι0 G0 H.
     Set Printing Depth 17.
     induction T; cbn; intros w0 ι0 G0 ?; subst.
     + easy.
@@ -1309,3 +1313,50 @@ End ProofWorlds.
                 -> ?inst_trans. cbn.
         now rewrite <- H1, <- H.
   Qed.
+
+Section Correctness.
+
+  Import Pred Pred.notations.
+
+  Lemma wp_impl {A w} (m : FreeM A w) (P : □⁺(A -> Pred) w) (Q : Pred w) :
+    (WP m P ->ₚ Q) ⊣⊢ₚ WLP m (fun w1 r01 a1 => P w1 r01 a1 ->ₚ Ext Q r01)%P.
+  Proof.
+    unfold Ext, bientails, implₚ. revert P Q.
+    induction m; cbn; unfold T, _4, Basics.impl.
+    - easy.
+    - intros. intuition.
+    - split; intuition. now apply IHm.
+    - intros. specialize (IHm (_4 P step) (Ext Q step)).
+      cbn. split.
+      + intros HQ t. specialize (IHm (env.snoc ι _ t)).
+        apply IHm. intros Hwp. apply HQ. exists t. apply Hwp.
+      + intros Hwlp (t & Hwp). specialize (Hwlp t).
+        apply IHm in Hwlp; auto.
+  Qed.
+
+  Theorem correctness e :
+    forall w (G : Env w) Q (RQ : ProperPost Q),
+      WP (reconstruct e G) Q ⊣⊢ₚ
+      ∃ₚ t ∶ Ty, ∃ₚ ee ∶ Expr, TPB G e t ee /\ₚ T Q (t,ee).
+  Proof.
+    intros w G Q RQ ι. unfold T. split.
+    - apply wp_impl. generalize (@soundness e w ι G). apply wlp_monotonic.
+      intros w1 r01 [t e'] ι1 (Heq & HT) HQ. subst. cbn.
+      exists (lift (inst t ι1) _).
+      exists (fun _ => inst e' ι1). cbn.
+      rewrite inst_lift. cbn. split. apply HT. unfold T.
+      change (Ext (T Q (lift (inst t ι1) w, fun _ : Assignment w => inst e' ι1)) r01 ι1).
+      specialize (RQ _ r01 (lift (inst t ι1) w, fun _ : Assignment w => inst e' ι1) (t, e') ι1).
+      unfold entails, implₚ in RQ. cbn in RQ.
+      rewrite inst_persist_ty, inst_lift in RQ.
+      specialize (RQ eq_refl). intuition.
+    - intros (t & e' & HT & HQ).
+      generalize (@completeness_aux e w G ι (inst G ι) eq_refl (inst t ι) (inst e' ι) HT).
+      apply wp_monotonic. intros w1 r01 [t1 e1'] ι1 (Heq & Heqt). subst.
+      specialize (RQ _ r01 (t,e') (t1,e1') ι1). cbn in RQ.
+      rewrite inst_persist_ty, Heqt in RQ.
+      apply RQ; auto. f_equal. clear.
+      admit.
+  Admitted.
+
+End Correctness.
