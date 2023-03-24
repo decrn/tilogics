@@ -1,9 +1,12 @@
-Require Import List.
-Require Import String.
+From Coq Require Import
+  Lists.List
+  Program.Tactics
+  Strings.String.
 From Equations Require Import Equations.
-Import ListNotations.
 From Em Require Import
      STLC.
+
+Import ListNotations.
 
 (* This module implements type inference for STLC
    using a shallow representation of constraints.
@@ -110,6 +113,17 @@ Fixpoint wp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
   | fail_free _ => False
   | bind_exists_free _ tf => exists t : ty, wp_freeM (tf t) Q
   end.
+
+Lemma from_wp {A} (m : freeM A) Q R :
+  (Basics.impl (wp_freeM m Q) R) <-> wlp_freeM m (fun et => Q et -> R).
+Proof.
+  unfold Basics.impl. revert Q R.
+  induction m; cbn; intros.
+  - reflexivity.
+  - intuition.
+  - rewrite <- IHm. intuition.
+  - setoid_rewrite <- H.  firstorder.
+Qed.
 
 Lemma wlp_ty_eqb : forall (t1 t2 : ty) (Q : unit -> Prop),
   wlp_freeM (assert t1 t2) Q <-> (t1 = t2 -> Q tt).
@@ -224,6 +238,100 @@ Proof.
       end; try firstorder).
 Qed.
 
+Ltac head t :=
+  match t with
+  | ?t' _ => head t'
+  | _ => t
+  end.
+
+Ltac constructor_congruence :=
+  repeat
+    match goal with
+    | H: ?x = ?y |- _ =>
+        let hx := head x in
+        let hy := head y in
+        is_constructor hx; is_constructor hy;
+        dependent elimination H
+    | |- ?x = ?y =>
+        let hx := head x in
+        let hy := head y in
+        is_constructor hx; is_constructor hy;
+        f_equal
+    end.
+
+Lemma unused_wp_match {A B} (m : option B) S N Q :
+        @wp_freeM A
+        match m with
+        | Some x => S x
+        | None => N
+        end Q <-> match m with
+                  | Some x => @wp_freeM A (S x) Q
+                  | None   => @wp_freeM A N Q
+                  end.
+Proof. now destruct m. Qed.
+
+Lemma unused_typing_inversion {G e t ee} :
+  G |-- e; t ~> ee <-> match e with
+                       | v_true        => t = ty_bool /\ ee = v_true
+                       | v_false       => t = ty_bool /\ ee = v_false
+                       | e_if e1 e2 e3 => exists e1' e2' e3',
+                           e_if e1' e2' e3' = ee /\
+                           G |-- e1; ty_bool ~> e1' /\
+                           G |-- e2; t ~> e2' /\
+                           G |-- e3; t ~> e3'
+                       | e_var x => e_var x = ee /\ resolve x G = Some t
+                       | e_absu x e1 => exists e1' t1 t2,
+                           ty_func t1 t2 = t /\
+                           e_abst x t1 e1' = ee /\
+                           ((x, t1) :: G) |-- e1; t2 ~> e1'
+                       | e_abst x t1 e1 => exists e1' t2,
+                           ty_func t1 t2 = t /\
+                           e_abst x t1 e1' = ee /\
+                           ((x, t1) :: G) |-- e1; t2 ~> e1'
+                       | e_app e1 e2 => exists e1' e2' t1,
+                           e_app e1' e2' = ee /\
+                           G |-- e1; ty_func t1 t ~> e1' /\
+                           G |-- e2; t1 ~> e2'
+                       end.
+Proof.
+  split; intros HT.
+  - destruct HT; firstorder.
+  - destruct e; destruct_conjs; subst; try econstructor; eauto.
+Qed.
+
+Ltac solve :=
+  repeat
+    (rewrite ?wp_bind, ?wp_ty_eqb, ?wp_ret, ?wp_fail, ?wp_exists_type in *;
+     match goal with
+     | H: False |- _ => destruct H
+     | H: exists _, _ |- _ => destruct H
+     | H: _ /\ _ |- _ => destruct H; subst
+     | H: ?G |-- ?e; ?t ~> ?ee |- _ =>
+         let he := head e in
+         is_constructor he;
+         dependent elimination H
+     | IH: (forall G Q, wp_freeM (generate ?e G) Q <-> _),
+       H: wp_freeM (generate ?e ?G) ?Q |- _ =>
+         apply (IH G Q) in H
+     | H: wp_freeM (match resolve ?s ?G with _ => _ end) _ |- _ =>
+         destruct (resolve s G) eqn:?
+     | |- _ <-> _ => split; intro
+     | |- _ /\ _ => split; eauto
+     | |- exists _, _ => eexists
+     | |- ?G |-- ?e; ?t ~> ?ee => econstructor
+     | IH: forall G Q, wp_freeM (generate ?e G) Q <-> _ |- wp_freeM (generate ?e ?G) ?Q =>
+         apply (IH G Q)
+     end; eauto).
+
+
+Lemma generate_correct (e : expr) :
+  forall G Q,
+  wp_freeM (generate e G) Q <->
+    exists t ee, G |-- e ; t ~> ee /\ Q (t,ee).
+Proof.
+  induction e; cbn [generate]; intros G Q; solve. now rewrite e.
+Qed.
+
 Lemma generate_complete : forall  (G : env) (e ee : expr) (t : ty),
   (G |-- e ; t ~> ee) ->
   wp_freeM (generate e G) (fun '(t',ee') => t = t' /\ ee = ee').
@@ -244,32 +352,54 @@ Proof.
       - exists t1. firstorder.
 Qed.
 
-Fixpoint gensem (ctx : list (string * ty)) (expression : expr) (type : ty) : Prop :=
-  match expression with
-  | v_true  => type = ty_bool
-  | v_false => type = ty_bool
+Fixpoint gensem (G : list (string * ty)) (e : expr) (t : ty) : Prop :=
+  match e with
+  | v_true  => t = ty_bool
+  | v_false => t = ty_bool
   | e_if cnd coq alt =>
-      gensem ctx cnd ty_bool /\
-      gensem ctx coq type    /\
-      gensem ctx alt type
+      gensem G cnd ty_bool /\
+      gensem G coq t    /\
+      gensem G alt t
   | e_var var =>
-      match (resolve var ctx) with
+      match (resolve var G) with
       | None => False
-      | Some t => t = type
+      | Some t' => t = t'
       end
   | e_app e1 e2 =>
       exists t2,
-      gensem ctx e1 (ty_func t2 type) /\
-      gensem ctx e2 t2
+      gensem G e1 (ty_func t2 t) /\
+      gensem G e2 t2
   | e_absu var e =>
       exists t_e t_var,
-      gensem ((var, t_var) :: ctx) e t_e /\
-      type = (ty_func t_var t_e)
+      gensem ((var, t_var) :: G) e t_e /\
+      t = (ty_func t_var t_e)
   | e_abst var t_var e =>
       exists t_e,
-      gensem ((var, t_var) :: ctx) e t_e /\
-      type = (ty_func t_var t_e)
+      gensem ((var, t_var) :: G) e t_e /\
+      t = (ty_func t_var t_e)
   end.
+
+Lemma gensem_correct (e : expr) (G : list (string * ty)) (t : ty) :
+  gensem G e t <-> exists e', G |-- e ; t ~> e'.
+Proof.
+  split.
+  - revert G t. induction e; cbn; intros; destruct_conjs; subst;
+      repeat
+        match goal with
+        | [IH: forall G t, gensem G ?e t -> _, H: gensem _ ?e _ |- _] =>
+            specialize (IH _ _ H); destruct_conjs
+        end.
+    + eexists. econstructor.
+    + eexists. econstructor.
+    + eexists. econstructor; eauto.
+    + destruct resolve eqn:?; [|easy].
+      subst. econstructor. econstructor. auto.
+    + eexists. econstructor; eauto.
+    + eexists. econstructor; eauto.
+    + eexists. econstructor; eauto.
+  - intros [e' T]. induction T; cbn; auto; try (firstorder; fail).
+    rewrite H; auto.
+Qed.
 
 Example ex_gensem1 :
   gensem nil (e_app (e_absu "x" (e_var "x")) v_false) ty_bool.
@@ -325,28 +455,6 @@ Fixpoint solve {a} (m : freeM a) : solvedM a :=
 
 Definition infer_ng : expr -> solvedM ty :=
   fun e => solve (generate_no_elab e []).
-
-Ltac head t :=
-  match t with
-  | ?t' _ => head t'
-  | _ => t
-  end.
-
-Ltac constructor_congruence :=
-  repeat
-    match goal with
-    | H: ?x = ?y |- _ =>
-        let hx := head x in
-        let hy := head y in
-        is_constructor hx; is_constructor hy;
-        dependent elimination H
-    | |- ?x = ?y =>
-        let hx := head x in
-        let hy := head y in
-        is_constructor hx; is_constructor hy;
-        f_equal
-    end.
-
 
 Lemma generate_no_elab_sound : forall (G : env) (e : expr),
   wlp_freeM (generate_no_elab e G) (fun '(t) => exists ee, G |-- e ; t ~> ee).
