@@ -1358,7 +1358,6 @@ Section Correctness.
       apply RQ; auto. f_equal. clear.
       admit.
   Admitted.
-  Print WP.
 
 End Correctness.
 
@@ -1367,20 +1366,14 @@ Section WithPredicates.
 
   Import Pred Pred.notations.
 
-  Definition WP {A} : ⊢ FreeM A -> □⁺(A -> Pred) -> Pred.
-  refine (
+  Fail Definition WP {A} : ⊢ FreeM A -> □⁺(A -> Pred) -> Pred :=
     fix WP (w : World) (m : FreeM A w) (POST : □⁺(A -> Pred) w) {struct m} :=
       match m with
       | Ret_Free _ _ v => T POST v
       | Fail_Free _ _ => ⊥ₚ%P
       | Bind_AssertEq_Free _ _ t1 t2 k => (t1 =ₚ t2 /\ₚ WP w k POST)%P
-      | Bind_Exists_Free _ _ i k => (∃ₚ t ∶ Ty, Ext _ (@thick _ _ _ i ctx.in_zero t))%P
-      end).
-  Proof. admit.
-     apply WP. apply k. Print Alloc. Check alloc.fresh w i _ _. apply (_4 POST (alloc.fresh w i _ refl)).
-     admit.
-     Unshelve. admit.
-  Admitted.
-
+      | Bind_Exists_Free _ _ i k =>
+         (∃ₚ t ∶ Ty, Ext (WP (w ▻ i) k (_4 POST step)) (thick i t))%P
+      end.
 
 End WithPredicates.
