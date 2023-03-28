@@ -1366,14 +1366,29 @@ Section WithPredicates.
 
   Import Pred Pred.notations.
 
-  Fail Definition WP {A} : ⊢ FreeM A -> □⁺(A -> Pred) -> Pred :=
+  Definition WP {A} : ⊢ FreeM A -> □⁺(A -> Pred) -> Pred :=
     fix WP (w : World) (m : FreeM A w) (POST : □⁺(A -> Pred) w) {struct m} :=
       match m with
       | Ret_Free _ _ v => T POST v
       | Fail_Free _ _ => ⊥ₚ%P
       | Bind_AssertEq_Free _ _ t1 t2 k => (t1 =ₚ t2 /\ₚ WP w k POST)%P
       | Bind_Exists_Free _ _ i k =>
-         (∃ₚ t ∶ Ty, Ext (WP (w ▻ i) k (_4 POST step)) (thick i t))%P
+          Acc.wp step (WP (w ▻ i) k (fun w1 r01 => _4 POST step r01))
       end.
 
+  Lemma completeness e : forall (w0 : World) (G : Env w0) {t ee},
+    (TPB G e t ee)
+    ⊢ₚ
+    WP w0 (reconstruct e G)
+        (fun w1 r01 '(t', ee') => (<{ ee ~ r01 }> =ₚ ee' /\ₚ <{ t ~ r01 }> =ₚ t')%P).
+  Proof.
+  Admitted.
+
+  Lemma soundness' e : forall (w0 : World) (G : Env w0),
+    Trueₚ
+    ⊢ₚ
+    WP w0 (reconstruct e G)
+        (fun w1 r01 '(t, ee) => TPB <{G ~ r01}> e t ee).
+  Proof.
+  Admitted.
 End WithPredicates.
