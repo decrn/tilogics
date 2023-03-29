@@ -1462,7 +1462,16 @@ Section WithPredicates.
     - destruct (resolve s G) eqn:?; cbn; try easy.
       unfold T. rewrite refl_persist. constructor.
       now rewrite resolve_inst, Heqo.
-    - admit.
+    - Search Acc.wlp. rewrite <- Acc.entails_wlp.
+      unfold T, _4. rewrite wlp_bind. rewrite <- and_true_r.
+      setoid_rewrite IHe at 3. (* wtf is this behaviour, see: https://github.com/coq/coq/issues/2474 *)
+      apply impl_and_adjoint.
+      apply wlp_monotonic'.
+      intros. destruct a. cbn -[step]. unfold T, _4.
+      rewrite trans_refl_r, trans_refl_r. intro.
+      unfold Ext, andₚ, implₚ, TPB. intros.
+      constructor.
+      admit.
     - admit.
     - admit.
   Admitted.
