@@ -1365,6 +1365,7 @@ End Correctness.
 Section WithPredicates.
 
   Import Pred Pred.notations.
+  Import (hints) Pred Pred.Acc.
 
   Definition WP {A} : ⊢ FreeM A -> □⁺(A -> Pred) -> Pred :=
     fix WP (w : World) (m : FreeM A w) (POST : □⁺(A -> Pred) w) {struct m} :=
@@ -1375,6 +1376,40 @@ Section WithPredicates.
       | Bind_Exists_Free _ _ i k =>
           Acc.wp step (WP (w ▻ i) k (fun w1 r01 => _4 POST step r01))
       end.
+
+  Definition WLP {A} : ⊢ FreeM A -> □⁺(A -> Pred) -> Pred :=
+    fix WLP (w : World) (m : FreeM A w) (POST : □⁺(A -> Pred) w) {struct m} :=
+      match m with
+      | Ret_Free _ _ v => T POST v
+      | Fail_Free _ _ => ⊤ₚ%P
+      | Bind_AssertEq_Free _ _ t1 t2 k => (t1 =ₚ t2 ->ₚ WLP w k POST)%P
+      | Bind_Exists_Free _ _ i k =>
+          Acc.wlp step (WLP (w ▻ i) k (fun w1 r01 => _4 POST step r01))
+      end.
+
+  Lemma wp_bind {A B w1} (m : FreeM A w1) (f : □⁺(A -> FreeM B) w1) :
+    forall (Q : □⁺(B -> Pred) w1),
+      WP w1 (bind m f) Q ⊣⊢ₚ
+      WP w1 m (fun w1 r01 a => WP w1 (f _ r01 a) (_4 Q r01)).
+  Proof. split; intros; induction m; cbn; firstorder; exists x; firstorder. Qed.
+
+  Lemma wlp_bind {A B w1} (m : FreeM A w1) (f : □⁺(A -> FreeM B) w1) :
+    forall (Q : □⁺(B -> Pred) w1),
+      WLP w1 (bind m f) Q ⊣⊢ₚ
+      WLP w1 m (fun w1 r01 a => WLP w1 (f _ r01 a) (_4 Q r01)).
+  Proof. split; intros; induction m; cbn; firstorder; exists x; firstorder. Qed.
+
+  Lemma wlp_monotonic' {A w} (m : FreeM A w) (R : Pred w) (P Q : □⁺(A -> Pred) w) :
+    (forall w1 (r : Alloc w w1) (a : A w1),
+        Ext R r ⊢ₚ P w1 r a ->ₚ Q w1 r a) ->
+    R ⊢ₚ WLP w m P ->ₚ WLP w m Q.
+  Proof.
+    intros pq. destruct m; cbn.
+    - specialize (pq w refl a). rewrite ext_refl in pq. apply pq.
+    - apply impl_and_adjoint. apply true_r.
+    - admit.
+    - apply impl_and_adjoint. admit.
+  Admitted.
 
   Lemma completeness e : forall (w0 : World) (G : Env w0) {t ee},
     (TPB G e t ee)
@@ -1387,8 +1422,10 @@ Section WithPredicates.
   Lemma soundness' e : forall (w0 : World) (G : Env w0),
     Trueₚ
     ⊢ₚ
-    WP w0 (reconstruct e G)
+    WLP w0 (reconstruct e G)
         (fun w1 r01 '(t, ee) => TPB <{G ~ r01}> e t ee).
   Proof.
+    Set Printing Depth 20.
+    induction e; cbn; intros; subst.
   Admitted.
 End WithPredicates.
