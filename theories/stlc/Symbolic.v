@@ -1426,6 +1426,46 @@ Section WithPredicates.
         (fun w1 r01 '(t, ee) => TPB <{G ~ r01}> e t ee).
   Proof.
     Set Printing Depth 20.
-    induction e; cbn; intros; subst.
+    induction e; cbn; intros; subst; try constructor.
+    - rewrite wlp_bind. rewrite IHe1.
+      Search (?X /\ₚ ?Y)%P. rewrite <- and_true_l. apply impl_and_adjoint. apply wlp_monotonic'.
+      intros. Search Ext. rewrite ext_true.
+      destruct a. Search (?X ⊢ₚ ?Y ->ₚ ?Z)%P. rewrite <- impl_and_adjoint.
+      cbn. rewrite <- impl_and_adjoint. unfold T. rewrite wlp_bind.
+      specialize (IHe2 w1 <{ G ~ r ⊙ refl }>). rewrite IHe2. Search andₚ.
+      Unset Printing Notations.
+      (* probably doable with some kind of tactic, perhaps change or replace X with Y is easier? *)
+      assert (MASSAGE: forall w (X Y Z : Pred w), bientails (andₚ (andₚ X Y) Z) (andₚ (andₚ Y Z) X)).
+      { intros. now rewrite (and_assoc X _), (and_comm _ X). }
+      rewrite MASSAGE. clear MASSAGE.
+      Set Printing Notations.
+      apply impl_and_adjoint. apply wlp_monotonic'.
+      intros. destruct a. rewrite wlp_bind.
+      rewrite <- impl_and_adjoint. Search Trueₚ. rewrite <- and_true_r.
+      rewrite IHe3.
+      apply impl_and_adjoint. apply wlp_monotonic'.
+      intros. destruct a. cbn. unfold T, _4. clear.
+      Search (trans ?x refl).
+      rewrite trans_refl_r, trans_refl_r.
+      intro. unfold Ext. unfold andₚ, implₚ, TPB. intros.
+      destruct H as [[]].
+      constructor.
+      + rewrite inst_persist_env, inst_trans, inst_trans.
+        rewrite inst_persist_env, H2 in H. cbn in H.
+        apply H.
+      + rewrite inst_persist_env, inst_trans, inst_trans, inst_persist_ty.
+        rewrite inst_persist_env, inst_persist_env in H3.
+        apply H3.
+      + rewrite inst_persist_env, inst_trans, inst_trans.
+        rewrite inst_persist_env, inst_persist_env, inst_trans, <- H1 in H0.
+        apply H0.
+    - destruct (resolve s G) eqn:?; cbn; try easy.
+      unfold T. rewrite refl_persist. constructor.
+      now rewrite resolve_inst, Heqo.
+    - admit.
+    - admit.
+    - admit.
   Admitted.
+
 End WithPredicates.
+
