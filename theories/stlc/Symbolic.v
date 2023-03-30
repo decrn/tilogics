@@ -1399,6 +1399,12 @@ Section WithPredicates.
       WLP w1 m (fun w1 r01 a => WLP w1 (f _ r01 a) (_4 Q r01)).
   Proof. split; intros; induction m; cbn; firstorder; exists x; firstorder. Qed.
 
+  Lemma wp_monotonic' {A w} (m : FreeM A w) (R : Pred w) (P Q : □⁺(A -> Pred) w) :
+    (forall w1 (r : Alloc w w1) (a : A w1),
+        Ext R r ⊢ₚ P w1 r a ->ₚ Q w1 r a) ->
+    R ⊢ₚ WP w m P ->ₚ WP w m Q.
+  Proof. Admitted.
+
   Lemma wlp_monotonic' {A w} (m : FreeM A w) (R : Pred w) (P Q : □⁺(A -> Pred) w) :
     (forall w1 (r : Alloc w w1) (a : A w1),
         Ext R r ⊢ₚ P w1 r a ->ₚ Q w1 r a) ->
@@ -1417,6 +1423,51 @@ Section WithPredicates.
     WP w0 (reconstruct e G)
         (fun w1 r01 '(t', ee') => (<{ ee ~ r01 }> =ₚ ee' /\ₚ <{ t ~ r01 }> =ₚ t')%P).
   Proof.
+    Set Printing Depth 20.
+    intros. Check TPB_ind. revert w0 G e t ee. apply TPB_ind; cbn.
+    - intro w.
+      apply forall_r. intros _.
+      apply forall_r. intros t.
+      apply forall_r. intros ee ι.
+      unfold T. cbn. intros _ Ht Hee.
+      now rewrite inst_persist_ty, inst_refl.
+    - intro w.
+      apply forall_r. intros _.
+      apply forall_r. intros t.
+      apply forall_r. intros ee ι.
+      unfold T. cbn. intros _ Ht Hee.
+      now rewrite inst_persist_ty, inst_refl.
+    - intro w1.
+      do 9 (apply forall_r; intros ?).
+      do 7 (rewrite <- impl_and_adjoint).
+      Unset Printing Notations.
+      assert (MASSAGE: forall w (A B C D E F G : Pred w),
+  bientails (andₚ (andₚ (andₚ (andₚ (andₚ (andₚ A B) C) D) E) F) G)
+            (andₚ (andₚ (andₚ (andₚ (andₚ (andₚ A B) C) G) E) F) D)) by admit.
+      rewrite MASSAGE. clear MASSAGE.
+      Set Printing Notations.
+      rewrite wp_bind. apply impl_and_adjoint. apply wp_monotonic'.
+      intros w2 r12 [t1 ee1]. cbn -[step]. unfold Definitions.T, _4.
+      rewrite wp_bind.
+      Search implₚ.
+      Search eqₚ.
+      Search andₚ.
+      rewrite <- impl_and_adjoint.
+      rewrite (eqₚ_symmetry t1).
+      Unset Printing Notations.
+      assert (MASSAGE: forall w (A B C D : Pred w),
+                 entails (andₚ A (andₚ B C)) (andₚ C D) <-> entails (andₚ A (andₚ B ⊤ₚ)) D) by admit.
+      rewrite (MASSAGE _ _ (eqₚ (persist w1 x4 w2 r12) ee1) (eqₚ (Ty_bool w2) t1) _).
+      rewrite and_true_r.
+      Set Printing Notations.
+      rewrite and_right.
+      admit.
+    - intros w G s t e' ι. cbn.
+      intros _ Heqo Hvar. destruct (resolve s G) eqn:?; cbn; inversion Heqo.
+      unfold T. firstorder. now rewrite refl_persist.
+    - admit.
+    - admit.
+    - admit.
   Admitted.
 
   Lemma soundness' e : forall (w0 : World) (G : Env w0),
