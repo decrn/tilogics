@@ -1462,19 +1462,38 @@ Section WithPredicates.
     - destruct (resolve s G) eqn:?; cbn; try easy.
       unfold T. rewrite refl_persist. constructor.
       now rewrite resolve_inst, Heqo.
-    - Search Acc.wlp. rewrite <- Acc.entails_wlp.
-      unfold T, _4. rewrite wlp_bind. rewrite <- and_true_r.
-      setoid_rewrite IHe at 3. (* wtf is this behaviour, see: https://github.com/coq/coq/issues/2474 *)
+    - Search Acc.wlp.
+      rewrite <- Acc.entails_wlp. rewrite ext_true. rewrite IHe.
+      rewrite <- and_true_l.
+      apply impl_and_adjoint. unfold T, _4. rewrite wlp_bind.
+      apply wlp_monotonic'.
+      intros. rewrite ext_true.
+      destruct a. cbn -[step]. unfold T, _4.
+      rewrite trans_refl_r, trans_refl_r. Search Refl Alloc. Print HintDb typeclass_instances. Locate PersistPreOrder. intro. cbn -[step].
+      unfold Ext, andₚ, implₚ, TPB. intros. cbn -[step] in *.
+      constructor. rewrite ?inst_persist_env in *. exact H0.
+    - rewrite wlp_bind. specialize (IHe w0 ((s, lift t w0) :: G)). rewrite IHe.
+      rewrite <- and_true_l.
       apply impl_and_adjoint.
       apply wlp_monotonic'.
-      intros. destruct a. cbn -[step]. unfold T, _4.
-      rewrite trans_refl_r, trans_refl_r. intro.
-      unfold Ext, andₚ, implₚ, TPB. intros.
-      constructor.
-      admit.
-    - admit.
-    - admit.
-  Admitted.
+      intros. rewrite ext_true. destruct a. rewrite <- impl_and_adjoint.
+      rewrite and_true_l. cbn in *. unfold T, _4.
+      intros ι He. cbn in *. rewrite ?inst_persist_env, ?inst_persist_ty, ?trans_refl_r, ?inst_lift in *. now constructor.
+
+
+    - rewrite <- Acc.entails_wlp, ext_true, IHe2, <- and_true_l.
+      apply impl_and_adjoint. unfold T, _4. rewrite wlp_bind. apply wlp_monotonic'.
+      intros w1 r [t2 e2'].
+      rewrite ext_true, wlp_bind, <- impl_and_adjoint, and_comm, IHe1.
+      apply impl_and_adjoint. apply wlp_monotonic'.
+      intros w2 r12 [t1 e1']. cbn -[step]. unfold T, _4.
+      rewrite ?trans_refl_r.
+      unfold Ext, eqₚ, TPB, entails.
+      cbn -[step] in *.
+      intros ι He2 He1 Ht1.
+      rewrite ?inst_persist_ty, ?inst_persist_env, ?inst_trans, ?assoc_persist in *.
+      rewrite Ht1 in He1. econstructor.
+      exact He1. exact He2.
+  Qed.
 
 End WithPredicates.
-
