@@ -1417,6 +1417,10 @@ Section WithPredicates.
     - apply impl_and_adjoint. admit.
   Admitted.
 
+  Lemma wp_frame2 {A w} (m : FreeM A w) (P : □⁺(A -> Pred) w) (Q : Pred w) :
+    WP w m P /\ₚ Q ⊣⊢ₚ WP w m (fun _ θ a => P _ θ a /\ₚ Ext Q θ)%P.
+  Proof. Admitted.
+
   Lemma completeness e : forall (w0 : World) (G : Env w0) {t ee},
     (TPB G e t ee)
     ⊢ₚ

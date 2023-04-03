@@ -257,6 +257,8 @@ Module Pred.
     Proof. obligation. Qed.
     Lemma true_r {w} (P : Pred w) : P ⊢ₚ ⊤ₚ.
     Proof. obligation. Qed.
+    Lemma impl_forget {w} (P Q R : Pred w) : P ⊢ₚ R -> P ⊢ₚ (Q ->ₚ R).
+    Proof. obligation. Qed.
 
     Lemma forall_l {I : TYPE} {w} (P : I w -> Pred w) Q :
       (exists x : I w, P x ⊢ₚ Q) -> (∀ₚ x ∶ I, P x) ⊢ₚ Q.
