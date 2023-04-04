@@ -101,10 +101,22 @@ Section TypeReconstruction.
 
   Import MonadNotations.
 
-  Fixpoint reconstruct (e : expr) {Σ : World} (Γ : Env Σ) : FreeM (Prod Ty Expr) Σ :=
+  Definition K {A B : Type} : B -> A -> B := fun b a => b.
+
+  Definition F1 {A T Z : Type} : (A -> T) -> (Z -> A) -> Z -> T :=
+    fun f a z => f (a z).
+
+  Definition F2 {A B T Z : Type} : (A -> B -> T) -> (Z -> A) -> (Z -> B) -> Z -> T :=
+    fun f a b z => f (a z) (b z).
+
+  Definition F3 {A B C T Z : Type} : (A -> B -> C -> T) -> (Z -> A) -> (Z -> B) -> (Z -> C) -> Z -> T :=
+    fun f a b c z => f (a z) (b z) (c z).
+
+
+ Fixpoint reconstruct (e : expr) {Σ : World} (Γ : Env Σ) : FreeM (Prod Ty Expr) Σ :=
     match e with
-    | v_true  => ret (Ty_bool Σ, (fun _ => v_true))
-    | v_false => ret (Ty_bool Σ, (fun _ => v_false))
+    | v_true  => ret (Ty_bool Σ, K v_true)
+    | v_false => ret (Ty_bool Σ, K v_false)
     | e_if cnd coq alt =>
         [ ω1 ] r_cnd <- reconstruct cnd Γ ;;
         [ ω2 ] _     <- assert (fst r_cnd) (Ty_bool _) ;;
@@ -115,10 +127,10 @@ Section TypeReconstruction.
            let e_coq := <{ (snd r_coq) ~ ω4 ⊙ ω5 }> in
            let t_coq := <{ (fst r_coq) ~ ω4 ⊙ ω5 }> in
            let e_alt := <{ (snd r_alt) ~ ω5 }> in
-           ret (t_coq, fun a => (e_if (e_cnd a) (e_coq a) (e_alt a)))
+           ret (t_coq, F3 e_if e_cnd e_coq e_alt)
     | e_var var =>
         match (resolve var Γ) with
-        | Some t_var => ret (t_var, fun a => e_var var)
+        | Some t_var => ret (t_var, F1 e_var (K var))
         | None => fail
         end
     | e_app f a =>
@@ -129,16 +141,17 @@ Section TypeReconstruction.
            let e_fun := <{ (snd r_fun) ~ ω4 }> in
            let t_cod := <{ T_cod ~ ω2 ⊙ ω3 ⊙ ω4 }> in
            let e_dom := <{ (snd r_dom) ~ ω3 ⊙ ω4 }> in
-            ret ( t_cod , fun a => e_app (e_fun a) (e_dom a))
+            ret (t_cod , F2 e_app e_fun e_dom)
     | e_abst var t_var e =>
         let t_var' := (lift t_var Σ) in (* t_var lives in ty, not in (Ty w) *)
         [ ω1 ] t_e <- reconstruct e ((var, t_var') :: Γ) ;;
-          ret (Ty_func _ <{ t_var' ~ ω1 }> (fst t_e), fun a => e_abst var t_var (snd t_e a))
+          ret (Ty_func _ <{ t_var' ~ ω1 }> (fst t_e),
+              F3 e_abst (K var) (K t_var) (snd t_e))
     | e_absu var e =>
         [ ω1 ] t_var <- exists_Ty Σ ;;
         [ ω2 ] t_e <- reconstruct e ((var, t_var) :: <{ Γ ~ ω1 }>) ;;
           ret (Ty_func _ <{ t_var ~ ω2 }> (fst t_e),
-              fun a => e_abst var (inst <{ t_var ~ ω2 }> a) (snd t_e a))
+              F3 e_abst (K var) (inst <{ t_var ~ ω2 }>) (snd t_e))
     end.
 
   Import SigTNotations.
