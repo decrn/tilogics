@@ -112,6 +112,21 @@ Section TypeReconstruction.
   Definition F3 {A B C T Z : Type} : (A -> B -> C -> T) -> (Z -> A) -> (Z -> B) -> (Z -> C) -> Z -> T :=
     fun f a b c z => f (a z) (b z) (c z).
 
+  Definition decode_Ty : ⊢ Ty -> Sem ty :=
+  fix decode_Ty w t a {struct t} :=
+    match t with
+    | Ty_bool _ => ty_bool
+    | Ty_func _ t1 t2 => ty_func (decode_Ty w t1 a) (decode_Ty w t2 a)
+    | Ty_hole _ x xIn => env.lookup a xIn
+    end.
+
+  Definition decode_Env : ⊢ Env -> Sem env :=
+  fix decode_Env w e a {struct e} :=
+    match e with
+    | (s, t) :: e' => (s, decode_Ty w t a) :: decode_Env w e' a
+    | nil          => nil
+    end.
+
 
  Fixpoint reconstruct (e : expr) {Σ : World} (Γ : Env Σ) : FreeM (Prod Ty Expr) Σ :=
     match e with
