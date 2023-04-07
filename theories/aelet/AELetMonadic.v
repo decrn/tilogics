@@ -508,6 +508,7 @@ Notation "G |-- E ; T ~> EE" := (tpb G E T EE) (at level 50).
 Lemma infer_sound : forall {m} `{TypeCheckAxioms m} (G : env) (e : expr),
  wlp (infer G e) (fun '(t,ee) => G |-- e ; t ~> ee).
 Proof.
+(*
   intros. generalize dependent G.
   induction e; cbn [infer].
   - intro. apply wlp_ret. constructor.
@@ -556,6 +557,7 @@ Proof.
     + apply wlp_ret. constructor. apply Heqo.
     + apply wlp_fail. auto.
 Restart.
+*)
   intros. generalize dependent G. induction e; cbn [infer]; intro;
   repeat (rewrite ?wlp_bind, ?wlp_ty_eqb, ?wlp_ret, ?wlp_fail; try destruct o;
       try match goal with
@@ -586,6 +588,7 @@ Qed.
 
 Definition three := (v_S (v_S (v_S v_O))).
 Definition two := (v_S (v_S (v_S v_O))).
+(*
 Compute (infer nil (e_plus three two)).
 Compute (infer nil
   (e_let "x" three
@@ -594,6 +597,7 @@ Compute (infer nil
 Compute (@infer option TC_option nil (e_plus three two)).
 Compute (@infer (option_writer (list cstr)) TC_writer nil (e_plus three two)).
 Compute (@infer freeM TC_free nil (e_plus three two)).
+*)
 
 Theorem infer_elaborates : forall G e t ee,
   G |-- e ; t ~> ee -> is_annotated ee.

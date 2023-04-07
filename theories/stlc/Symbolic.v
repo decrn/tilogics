@@ -210,6 +210,7 @@ Section TypeReconstruction.
 
 End TypeReconstruction.
 
+(*
 Module acc.
 
   Import World.notations.
@@ -303,6 +304,7 @@ Module acc.
   (* (* TODO: make sem generic (semEnv is needed for Env) *) *)
 
 End acc.
+*)
 
 Section MoveMe.
 

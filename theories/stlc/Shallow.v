@@ -86,6 +86,7 @@ Fixpoint generate {m} `{TypeCheckM m} (expression : expr) (ctx : env) : m (prod 
       ret (ty_func Tvar T, e_abst var Tvar E)
   end.
 
+(*
 Compute (generate (e_app (e_abst "x" ty_bool (e_var "x")) v_true) nil).
 Compute (generate (e_app (e_absu "x" (e_var "x")) v_true) nil).
 
@@ -95,6 +96,7 @@ Example I := (e_absu "i" (e_var "i")).
 
 Example KKI := (e_app K1 (e_app K2 I)).
 Compute (generate KKI nil).
+*)
 
 Fixpoint wlp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) : Prop :=
   match m with

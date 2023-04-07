@@ -328,7 +328,7 @@ Section Soundness.
     (* revert H. apply ground_is_sound. *)
   Admitted.
 
-  Print Assumptions symbolic_infer_schematic_sound.
+  (* Print Assumptions symbolic_infer_schematic_sound. *)
 
 End Soundness.
 
@@ -389,6 +389,6 @@ Section Completeness.
     (* revert H. apply ground_is_sound. *)
   Admitted.
 
-  Print Assumptions symbolic_infer_schematic_complete.
+  (* Print Assumptions symbolic_infer_schematic_complete. *)
 
 End Completeness.
