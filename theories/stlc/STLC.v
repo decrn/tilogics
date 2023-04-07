@@ -8,6 +8,8 @@ From Equations Require Import
 From Em Require Import
      Definitions Context Environment Prelude.
 
+#[local] Set Transparent Obligations.
+
 Import ListNotations.
 Import SigTNotations.
 Import ctx.notations.
@@ -23,24 +25,19 @@ Inductive ty : Type :=
   | ty_bool : ty
   | ty_func : ty -> ty -> ty.
 
-Derive NoConfusion Subterm for ty.
-(* Print noConfusion_ty_obligation_1. *)
-(* Print NoConfusion_ty. *)
-
 Inductive Ty (Σ : World) : Type :=
   | Ty_bool : Ty Σ
   | Ty_func : Ty Σ -> Ty Σ -> Ty Σ
   | Ty_hole : forall (i : nat), i ∈ Σ -> Ty Σ.
 
-Definition ty_eqb (a b : ty) : {a = b} + {a <> b}.
-Proof. decide equality. Defined.
-
 Section DecEquality.
 
   #[local] Set Implicit Arguments.
-  #[local] Set Equations With UIP.
 
+  Derive NoConfusion EqDec Subterm for ty.
   Derive NoConfusion Subterm for Ty.
+
+  #[local] Set Equations With UIP.
 
   #[export] Instance In_eqdec {w} : EqDec (sigT (fun x : nat => ctx.In x w)).
   Proof.
@@ -81,6 +78,7 @@ Inductive expr : Type :=
   | e_absu  : string -> expr -> expr
   | e_abst  : string -> ty -> expr -> expr
   | e_app   : expr -> expr -> expr.
+
 Derive NoConfusion for expr.
 
 (* ===== Typing Context ===== *)
@@ -174,6 +172,7 @@ Inductive solvedM (A : Type) : Type :=
 Notation Assignment := (env.Env (fun _ => ty)).
 
 Module S.
+  Import World.notations.
 
   Definition Sem (A : Type) : TYPE :=
     fun w => Assignment w -> A.
@@ -304,7 +303,7 @@ Lemma inst_trans {R} {transR : Trans R} {instR : forall w, Inst (R w) (Assignmen
 Proof. Admitted.
 
 Section WeakestPre.
-  Open Scope indexed_scope.
+  Import World.notations.
 
   Definition WLP {A} : ⊢ FreeM A -> □⁺(A -> Assignment -> PROP) -> Assignment -> PROP :=
     fix WLP w m POST ı {struct m} :=
@@ -331,6 +330,8 @@ Section WeakestPre.
 
   #[global] Arguments WP  {A} {w} _ _ _.
   #[global] Arguments WLP {A} {w} _ _ _.
+
+  Open Scope indexed_scope.
 
   Lemma wlp_monotonic {A w} (m : FreeM A w) (p q : □⁺(A -> Assignment -> PROP) w)
     (pq : forall w1 r1 a1 ι1, p w1 r1 a1 ι1 -> q w1 r1 a1 ι1) :
@@ -368,28 +369,33 @@ Section WeakestPre.
 
 End WeakestPre.
 
-(* Indexes a given ty by a world Σ *)
-Fixpoint lift (t : ty) : ⊢ Ty :=
-  fun w =>
-    match t with
-    | ty_bool       => Ty_bool w
-    | ty_func t1 t2 => Ty_func w (lift t1 w) (lift t2 w)
-    end.
+Section Lift.
+  Import World.notations.
 
-Fixpoint liftEnv (E : env) : ⊢ Env :=
-  fun w =>
-    match E with
-    | List.nil               => List.nil
-    | List.cons (pair s t) E => cons (pair s (lift t w)) (liftEnv E w)
-    end.
+  (* Indexes a given ty by a world Σ *)
+  Fixpoint lift (t : ty) : ⊢ Ty :=
+    fun w =>
+      match t with
+      | ty_bool       => Ty_bool w
+      | ty_func t1 t2 => Ty_func w (lift t1 w) (lift t2 w)
+      end.
 
-Lemma inst_lift (w : World) (t : ty) (ι : Assignment w) :
-  inst (lift t w) ι = t.
-Proof. Admitted.
+  Fixpoint liftEnv (E : env) : ⊢ Env :=
+    fun w =>
+      match E with
+      | List.nil               => List.nil
+      | List.cons (pair s t) E => cons (pair s (lift t w)) (liftEnv E w)
+      end.
 
-Lemma inst_lift_env (w : World) (G : env) (ι : Assignment w) :
-  inst (liftEnv G w) ι = G.
-Proof. Admitted.
+  Lemma inst_lift (w : World) (t : ty) (ι : Assignment w) :
+    inst (lift t w) ι = t.
+  Proof. Admitted.
+
+  Lemma inst_lift_env (w : World) (G : env) (ι : Assignment w) :
+    inst (liftEnv G w) ι = G.
+  Proof. Admitted.
+
+End Lift.
 
 Lemma inst_persist_env {R} {persR : Persistent R Env}
   {instR : forall w, Inst (R w) (Assignment w)}
@@ -500,19 +506,24 @@ Proof.
   - now destruct String.string_dec.
 Qed.
 
-Inductive TyF (w : World) : Type :=
-| TyF_bool       : TyF w
-| TyF_func {x y} : x ∈ w -> y ∈ w -> TyF w.
-#[global] Arguments TyF_bool {w}.
-#[global] Arguments TyF_func {w x y}.
+Section ShallowConstraints.
+  Import World.notations.
 
-Definition inj : ⊢ TyF -> Ty :=
-  fun w t =>
-    match t with
-    | TyF_bool     => Ty_bool _
-    | TyF_func x y => Ty_func _ (Ty_hole _ _ x) (Ty_hole _ _ y)
-    end.
+  Inductive TyF (w : World) : Type :=
+  | TyF_bool       : TyF w
+  | TyF_func {x y} : x ∈ w -> y ∈ w -> TyF w.
+  #[global] Arguments TyF_bool {w}.
+  #[global] Arguments TyF_func {w x y}.
 
-Variant ShallowConstraint (w : World) : Type :=
-  | FlexFlex {x y} (xIn : x ∈ w) (yIn : y ∈ w)
-  | FlexRigid {x} (xIn : x ∈ w) (t : TyF w).
+  Definition inj : ⊢ TyF -> Ty :=
+    fun w t =>
+      match t with
+      | TyF_bool     => Ty_bool _
+      | TyF_func x y => Ty_func _ (Ty_hole _ _ x) (Ty_hole _ _ y)
+      end.
+
+  Variant ShallowConstraint (w : World) : Type :=
+    | FlexFlex {x y} (xIn : x ∈ w) (yIn : y ∈ w)
+    | FlexRigid {x} (xIn : x ∈ w) (t : TyF w).
+
+End ShallowConstraints.

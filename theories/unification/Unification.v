@@ -44,6 +44,7 @@ From Em Require Import
 
 Import ctx.notations.
 Import SigTNotations.
+Import World.notations.
 
 Set Implicit Arguments.
 
@@ -54,11 +55,10 @@ Set Implicit Arguments.
 
 Reserved Notation "w1 ⊒ w2" (at level 80).
 
-Notation "□ A" := (Box Tri A) (at level 9, format "□ A", right associativity).
-Notation "◇ A" := (DiamondT Tri id A) (at level 9, format "◇ A", right associativity).
-Notation "? A" := (Option A) (at level 9, format "? A", right associativity).
-Notation "◆ A" := (DiamondT Tri Option A) (at level 9, format "◆ A", right associativity).
-Notation "A * B" := (Prod A B).
+#[local] Notation "◇ A" := (DiamondT Tri id A) (at level 9, format "◇ A", right associativity).
+#[local] Notation "? A" := (Option A) (at level 9, format "? A", right associativity).
+#[local] Notation "◆ A" := (DiamondT Tri Option A) (at level 9, format "◆ A", right associativity).
+#[local] Notation "A * B" := (Prod A B).
 
 Ltac folddefs :=
   repeat
@@ -103,6 +103,8 @@ End BoveCapretta.
 
 Section Löb.
 
+  Import Tri.notations.
+
   Context (A : TYPE) (step : ⊢ ▷A -> A).
 
   Obligation Tactic := auto using Nat.eq_le_incl, ctx.length_remove.
@@ -124,10 +126,11 @@ Section Löb.
 End Löb.
 
 Section Operations.
+  Import Tri.notations.
   Import (hints) Tri.
   Import Pred Pred.notations.
 
-  Definition box2later {A} : ⊢ □A -> ▶A.
+  Definition box2later {A} : ⊢ □⁻A -> ▶A.
     intros w a x xIn t. apply a. econstructor.
     apply t. constructor.
   Defined.
@@ -135,8 +138,8 @@ Section Operations.
   Definition sooner2diamond {A} : ⊢ ◀A -> ◇A :=
     fun w a =>
       match a with
-        existT _ x (existT _ xIn (t , a)) =>
-        existT _ (w - x) (pair (thick (R := Tri) x t) a)
+        existT x (existT xIn (t , a)) =>
+        existT (w - x) (pair (thick (R := Tri) x t) a)
       end.
 
   Definition sooner2diamondtm {A} : ⊢ ◀A -> ◆A.
@@ -160,7 +163,7 @@ Section Operations.
     fun w => None.
 
   Definition acc {A} {w0 w1} (ζ1 : w0 ⊒⁻ w1) : ◆A w1 -> ◆A w0 :=
-    option.map (fun '(existT _ w2 (ζ2 , a)) => existT _ w2 (ζ1 ⊙⁻ ζ2, a)).
+    option.map (fun '(existT w2 (ζ2 , a)) => existT w2 (ζ1 ⊙⁻ ζ2, a)).
 
   Lemma proper_pure {A} {RA : RELATION Tri A} :
     RValid (RImpl RA (RM RA)) pure.
@@ -180,7 +183,7 @@ Section Operations.
   #[global] Arguments fail {A w}.
 
   Definition η1 {A} {w x} {xIn : x ∈ w} (t : Ty (w - x)) (a : A (w - x)) : ◆A w :=
-    sooner2diamondtm (existT _ x (existT _ xIn (t, a))).
+    sooner2diamondtm (existT x (existT xIn (t, a))).
 
   Definition tell1 {w x} (xIn : x ∈ w) (t : Ty (w - x)) : ◆Unit w :=
     Some ((w - x); (thick (R := Tri) x t, tt)).
@@ -211,6 +214,7 @@ End Operations.
 
 Section OccursCheck.
   Import option.notations.
+  Import Tri.notations.
 
   Definition occurs_check_in : ⊢ ∀ x, ctx.In x -> ▷(Option (ctx.In x)) :=
     fun w x xIn y yIn =>
@@ -307,6 +311,7 @@ End VarView.
 
 Module Variant1.
 
+  Import Tri.notations.
   Import (hints) Tri.
   Import Pred Pred.notations.
 
@@ -352,20 +357,20 @@ Module Variant1.
     Ext (LR.RBox RA r01 a0 a1) r12 ⊣⊢ₚ LR.RBox RA (r01 ⊙⁻ r12) a0 (_4 a1 r12).
   Proof.
     unfold LR.RBox.
-    rewrite ext_forall_const. apply proper_bientails_forall. intros w3.
-    rewrite ext_forall_const. apply proper_bientails_forall. intros w4.
-    rewrite ext_forall_const. apply proper_bientails_forall. intros r03.
-    rewrite ext_forall_const.
-    setoid_rewrite ext_forall_const.
+    rewrite ext_forall. apply proper_bientails_forall. intros w3.
+    rewrite ext_forall. apply proper_bientails_forall. intros w4.
+    rewrite ext_forall. apply proper_bientails_forall. intros r03.
+    rewrite ext_forall.
+    setoid_rewrite ext_forall.
     apply split_bientails; split.
     - apply forall_r. intros r24.
       apply forall_r. intros r34.
-      cbv [Const entails Forall Ext Acc.wlp implₚ eqₚ] in *.
+      cbv [entails Forall Ext Acc.wlp implₚ eqₚ] in *.
       intros ι2 HQ ι4 <- Heq.
       apply HQ; now rewrite ?inst_trans in *.
     - apply forall_r. intros r14.
       apply forall_r. intros r34.
-      cbv [Const entails Forall Ext Acc.wlp implₚ eqₚ] in *.
+      cbv [entails Forall Ext Acc.wlp implₚ eqₚ] in *.
       intros ι2 HQ ι4 Heq1 Heq2.
   Abort.
 
@@ -413,7 +418,6 @@ Module Variant1.
     apply forall_r. intros r23.
     apply Acc.entails_wlp. cbn.
     apply impl_and_adjoint.
-    unfold Const in *.
     unfold cand.
     eapply proper_bind'; eauto using LR.RUnit.
     Unshelve. 3: apply LR.RUnit.
@@ -485,8 +489,6 @@ Module Variant1.
       end.
 
   Section MguO.
-
-    Import (hints) Tri.
 
     Context [w] (lmgu : ▷BoxUnifier w).
 
@@ -575,12 +577,13 @@ Export Variant1.
 
 Module Variant2.
 
+  Import Tri.notations.
   Import (hints) Tri.
 
   Definition Unifier : TYPE :=
     Ty -> Ty -> ◆Ty.
   Definition BoxUnifier : TYPE :=
-    Ty -> Ty -> □◆Ty.
+    Ty -> Ty -> □⁻◆Ty.
 
   Definition flex : ⊢ Ty -> ∀ x, ctx.In x -> ◆Ty :=
     fun w t x xIn =>

@@ -479,7 +479,7 @@ Section WithBinding.
 
     Definition kvsnoc {Γ} (E : Env Γ) (kv : sigT D) : Env (Γ ▻ projT1 kv) :=
       match kv with
-      | existT _ k v => @snoc Γ E k v
+      | existT k v => @snoc Γ E k v
       end.
 
   End WithDom.

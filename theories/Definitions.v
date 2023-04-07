@@ -87,12 +87,6 @@ Definition Forall {I : Type} (A : I -> TYPE) : TYPE :=
 Declare Scope indexed_scope.
 Bind    Scope indexed_scope with TYPE.
 
-Notation "⊢ A" := (Valid A) (at level 100).
-Notation "A -> B" := (Impl A B) : indexed_scope.
-Notation "'∀' x .. y , P " :=
-  (Forall (fun x => .. (Forall (fun y => P)) ..))
-    (at level 99, x binder, y binder, right associativity) : indexed_scope.
-
 Definition Const (A : Type) : TYPE := fun _ => A.
 Definition PROP : TYPE := fun _ => Prop.
 Definition Unit : TYPE := fun _ => unit.
@@ -104,7 +98,8 @@ Definition Sum (A B : TYPE) : TYPE := fun w => sum (A w) (B w).
 Definition Box (R : ACC) (A : TYPE) : TYPE :=
   fun w0 => forall w1, R w0 w1 -> A w1.
 
-(* Notation "◻A" := BoxR A *)
+#[local] Notation "⊢ A" := (Valid A) (at level 100).
+#[local] Notation "A -> B" := (Impl A B) : indexed_scope.
 
 Class Pure (M : TYPE -> TYPE) : Type :=
   pure : forall A, ⊢ A -> M A.
@@ -112,14 +107,6 @@ Class Pure (M : TYPE -> TYPE) : Type :=
 Class Bind (R : ACC) (M : TYPE -> TYPE) : Type :=
   bind : forall A B, ⊢ M A -> Box R (A -> M B) -> M B.
 #[global] Arguments bind {R M _ A B} [w].
-
-Module MonadNotations.
-  Notation "[ r ] x <- ma ;; mb" :=
-    (bind ma (fun _ r x => mb))
-      (at level 80, x at next level,
-        ma at next level, mb at level 200,
-        right associativity).
-End MonadNotations.
 
 Module Diamond.
   Import SigTNotations.
@@ -140,19 +127,41 @@ Module Diamond.
 End Diamond.
 Export Diamond (Diamond, DiamondT).
 
+Module World.
+  Module notations.
+    Notation "⊢ A" := (Valid A) (at level 100).
+    Notation "A -> B" := (Impl A B) : indexed_scope.
+    Notation "'∀' x .. y , P " :=
+      (Forall (fun x => .. (Forall (fun y => P)) ..))
+        (at level 200, x binder, y binder, right associativity) : indexed_scope.
+
+    Notation "w1 .> w2" := (trans (R := Alloc) w1 w2) (at level 80, only parsing).
+    Infix "⊙" := trans (at level 60, right associativity).
+
+    (* TODO: switch to superscript *)
+    (* \^s \^+ *)
+
+    Notation "□ A" := (Box _ A) (at level 9, format "□ A", right associativity).
+    Notation "□⁺ A" := (Box Alloc A) (at level 9, format "□⁺ A", right associativity)
+        : indexed_scope.
+    Notation "◇⁺ A" := (Diamond Alloc A) (at level 9, format "◇⁺ A", right associativity)
+        : indexed_scope.
+
+    (* Notation "◻A" := BoxR A *)
+  End notations.
+End World.
+
+Module MonadNotations.
+  Notation "[ r ] x <- ma ;; mb" :=
+    (bind ma (fun _ r x => mb))
+      (at level 80, x at next level,
+        ma at next level, mb at level 200,
+        right associativity).
+End MonadNotations.
+
 Definition Schematic (A : TYPE) : Type :=
   { w : World & A w }.
 
-Notation "w1 .> w2" := (trans (R := Alloc) w1 w2) (at level 80, only parsing).
-Infix "⊙" := trans (at level 60, right associativity).
-
-(* TODO: switch to superscript *)
-(* \^s \^+ *)
-
-Notation "□⁺ A" := (Box Alloc A) (at level 9, format "□⁺ A", right associativity)
-    : indexed_scope.
-Notation "◇⁺ A" := (Diamond Alloc A) (at level 9, format "◇⁺ A", right associativity)
-    : indexed_scope.
 
 Class Persistent (R : ACC) (A : TYPE) : Type :=
   persist : ⊢ A -> Box R A.

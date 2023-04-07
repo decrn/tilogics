@@ -70,6 +70,7 @@ Reserved Notation "w1 ⊒ w2" (at level 80).
 
 Module ProgramLogic.
 
+  Import World.notations.
   Import (hints) Tri.
   Import Pred.
   Import Pred.notations.
@@ -200,6 +201,7 @@ End ProgramLogic.
 
 Module Correctness.
 
+  Import World.notations.
   Import (hints) Pred.Acc Tri.
   Import Pred Pred.notations ProgramLogic.
 
@@ -292,6 +294,7 @@ Module Correctness.
 
   Section BoxedProofs.
 
+    Import Tri.notations.
     Import (hints) Pred.Acc Sub.
 
     Context [w] (lmgu : ▷BoxUnifier w).
@@ -370,7 +373,7 @@ Module Correctness.
         - intros. generalize (boxflex_sound_assignment xIn t ζ01).
           apply proper_entails_entails; [easy|].
           apply proper_wlp_entails.
-          intros w2 r12 _. now rewrite eqₚ_symmetry.
+          intros w2 r12 _. now rewrite eqₚ_sym.
         - intros *. now rewrite wlp_ctrue.
         - intros *. now rewrite wlp_cfalse.
         - intros *. now rewrite wlp_cfalse.
@@ -427,7 +430,7 @@ Module Correctness.
         intros t1 t2. pattern (boxmgu lmgu t1 t2).
         apply boxmgu_elim; clear t1 t2.
         - intros. apply boxflex_complete_assignment.
-        - intros. rewrite eqₚ_symmetry. apply boxflex_complete_assignment.
+        - intros. rewrite eqₚ_sym. apply boxflex_complete_assignment.
         - intros *. rewrite wp_ctrue. apply true_r.
         - intros. now rewrite peq_ty_noconfusion, ext_false.
         - intros. now rewrite peq_ty_noconfusion, ext_false.
@@ -634,6 +637,7 @@ End Correctness.
 
 Module Generalized.
 
+  Import World.notations.
   Import (hints) Sub Tri.
   Import Pred Pred.notations ProgramLogic LR.
 

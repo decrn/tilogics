@@ -46,6 +46,7 @@ From Em Require Import
 
 Import ctx.notations.
 Import SigTNotations.
+Import World.notations.
 
 Set Implicit Arguments.
 
@@ -137,7 +138,7 @@ Module Import SubstitutionPredicates.
       | s               , Ty_hole yIn as t => unifies s t
       | Ty_bool          , Ty_bool          => fun _ _ => True
       | Ty_func s1 s2    , Ty_func t1 t2    => and (unifies s1 t1) (unifies s2 t2)
-      | s               , t               => fun _ _ => False
+      | _               , _               => fun _ _ => False
       end.
 
   Definition unifiesY : ⊢ Ty -> Ty -> SubPred :=
@@ -350,6 +351,7 @@ End NoGhostState.
 Import NoGhostState.
 
 Module Correctness.
+  Import Tri.notations.
   Import (hints) Sub Tri.
 
   Definition UnifierSpec : ⊢ Unifier -> PROP :=
@@ -649,9 +651,9 @@ Module Correctness.
   Definition mg : ⊢ ◆Unit -> □(Option Unit -> PROP) :=
     fun w0 d w1 ζ1 o =>
       match o , d with
-      | Some _ , Some (existT _ mgw (mgζ , _)) => Sub.triangular mgζ ≽ˢ Sub.triangular ζ1
-      | None   , _                             => True
-      | Some _ , None                          => False
+      | Some _ , Some (existT mgw (mgζ , _)) => Sub.triangular mgζ ≽ˢ Sub.triangular ζ1
+      | None   , _                           => True
+      | Some _ , None                        => False
       end.
 
   Module Related.

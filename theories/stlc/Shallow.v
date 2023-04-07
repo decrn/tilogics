@@ -449,7 +449,7 @@ Fixpoint solve {a} (m : freeM a) : solvedM a :=
   match m with
   | fail_free _ => fail_solved _
   | ret_free _ v => ret_solved _ v
-  | bind_asserteq_free _ t1 t2 k => if ty_eqb t1 t2 then solve k else fail_solved _
+  | bind_asserteq_free _ t1 t2 k => if eq_dec t1 t2 then solve k else fail_solved _
   | bind_exists_free _ k => bind_exists_solved a (fun t => solve (k t))
   end.
 

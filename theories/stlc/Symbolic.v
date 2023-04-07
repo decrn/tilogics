@@ -1,13 +1,20 @@
-Require Import List.
-Import ListNotations.
+From Coq Require Import
+  Classes.Morphisms
+  Classes.Morphisms_Prop
+  Lists.List.
+
+From Equations Require Import
+  Equations.
+
 From Em Require Import
      Definitions Context Environment STLC Prelude Substitution Triangular
      Predicates
      unification.CorrectnessWithSubstitutions LogicalRelation.
-Import ctx.notations.
 From Em Require
   Unification.
-From Equations Require Import Equations.
+
+Import ctx.notations.
+Import ListNotations.
 
 Local Notation "<{ A ~ w }>" := (persist _ A _ w).
 
@@ -23,6 +30,18 @@ Notation Expr := (Sem expr).
 #[export] Instance Persistent_Sem {R : ACC} {A}
   {instR : forall w, Inst (R w) (Assignment w)} : Persistent R (Sem A) :=
   fun w0 a w1 r1 ι1 => a (inst r1 ι1).
+
+#[export] Instance persistpreorder_alloc_ty : PersistPreOrder Alloc Ty.
+Proof.
+Admitted.
+
+#[export] Instance persistpreorder_alloc_env : PersistPreOrder Alloc Env.
+Proof.
+Admitted.
+
+#[export] Instance persistpreorder_alloc_expr : PersistPreOrder Alloc Expr.
+Proof.
+Admitted.
 
 Fixpoint grounding (w : World) : Assignment w :=
   match w with
@@ -41,6 +60,7 @@ Definition exists_Ty : forall Σ, FreeM Ty Σ :=
 
 Section Generate.
   Import MonadNotations.
+  Import World.notations.
 
   Fixpoint generate (e : expr) {Σ : World} (Γ : Env Σ) : FreeM Ty Σ :=
     match e with
@@ -100,6 +120,7 @@ Section TypeReconstruction.
   Definition fail {w} := Fail_Free (Prod Ty Expr) w.
 
   Import MonadNotations.
+  Import World.notations.
 
   Definition K {A B : Type} : B -> A -> B := fun b a => b.
 
@@ -191,6 +212,7 @@ End TypeReconstruction.
 
 Module acc.
 
+  Import World.notations.
   Import (hints) Tri.
 
   Record Acc (w w' : World) : Type := mkAcc
@@ -319,6 +341,7 @@ Module StrongMonotonicity.
   Import option.notations.
   Import Unification.
   Import SigTNotations.
+  Import World.notations.
   Import (hints) Sub.
 
   #[local] Arguments Sub.thin : simpl never.
@@ -331,17 +354,17 @@ Module StrongMonotonicity.
     Option (Diamond Sub A).
 
   Definition pure {A} : ⊢ A -> M A :=
-    fun w a => Some (existT _ w (refl, a)).
+    fun w a => Some (existT w (refl, a)).
 
   Definition bind {A B} : ⊢ M A -> □ˢ(A -> (M B)) -> M B :=
     fun w m f =>
-      '(existT _ w1 (r1,a1)) <- m;;
-      '(existT _ w2 (r2,b2)) <- f w1 r1 a1;;
-      Some (existT _ w2 (r1 ⊙ r2, b2)).
+      '(existT w1 (r1,a1)) <- m;;
+      '(existT w2 (r2,b2)) <- f w1 r1 a1;;
+      Some (existT w2 (r1 ⊙ r2, b2)).
 
   Definition mexists {A w n} (m : M A (w ▻ n)) : M A w :=
     '(w';(r,a)) <- m ;;
-    Some (existT _ w' (step ⊙ r, a)).
+    Some (existT w' (step ⊙ r, a)).
 
   Definition mgu : ⊢ Ty -> Ty -> M Unit :=
     fun w t1 t2 =>
@@ -603,6 +626,7 @@ End StrongMonotonicity.
    an output, i.e. checking instead of synthesizing. *)
 Module ConstraintsOnly.
 
+  Import World.notations.
   Import option.notations.
   Import Unification.
 
@@ -610,6 +634,9 @@ Module ConstraintsOnly.
   #[local] Arguments step : simpl never.
 
   Module C.
+
+    Import Pred Pred.notations.
+    Import (hints) Sub.
 
     Inductive CStr (w : World) : Type :=
     | False
@@ -748,6 +775,8 @@ Module ConstraintsOnly.
 End ConstraintsOnly.
 
 Module CandidateType.
+
+  Import World.notations.
 
   #[local] Set Implicit Arguments.
   #[local] Arguments step : simpl never.
@@ -961,20 +990,22 @@ End CandidateType.
 
 Module ProofWorlds.
 
+  Import World.notations.
+
   #[local] Set Implicit Arguments.
   #[local] Arguments step : simpl never.
 
-  Local Notation "[ ω ] x <- ma ;; mb" :=
+  #[local] Notation "[ ω ] x <- ma ;; mb" :=
     (bind (R := Alloc) ma (fun _ ω x => mb))
       (at level 80, x at next level,
         ma at next level, mb at level 200,
         right associativity).
 
-  Local Notation "∃ n , m" :=
+  #[local] Notation "∃ n , m" :=
     (Bind_Exists_Free _ _ n m)
       (at level 80, right associativity, format "∃ n ,  m").
 
-  Notation "t1 == t2 //\ m" := (Bind_AssertEq_Free _ _ t1 t2 m) (at level 70).
+  #[local] Notation "t1 == t2 //\ m" := (Bind_AssertEq_Free _ _ t1 t2 m) (at level 70).
 
   Fixpoint check (e : expr) : ⊢ Env -> Ty -> FreeM Unit :=
     fun w G tr =>
@@ -1066,7 +1097,7 @@ Module ProofWorlds.
 
   Definition pstep (w : PWorld) (x : nat) (t : ty) :
     ACC2PACC Alloc w {| world := w ▻ x; assign := env.snoc (assign w) x t |} :=
-    existT
+    @existT _
       (fun r => inst r (env.snoc (assign w) x t) = assign w)
       step (inst_step (env.snoc (assign w) x t)).
 
@@ -1136,13 +1167,19 @@ Module ProofWorlds.
 
 End ProofWorlds.
 
+
+Section Correctness.
+
+  Import Pred Pred.notations.
+  Import World.notations.
+
   Lemma soundness e :
     forall (w0 : World) (ι0 : Assignment w0) (G0 : Env w0),
       WLP (reconstruct e G0)
           (fun w1 r01 '(t,ee) ι1 => ι0 = inst r01 ι1 /\
                                    inst G0 ι0 |-- e ; inst t ι1 ~> inst ee ι1)
           ι0.
-  Proof. Set Printing Depth 17.
+  Proof.
     induction e; cbn; intros.
     - repeat constructor.
     - repeat constructor.
@@ -1238,13 +1275,11 @@ End ProofWorlds.
     forall (w0 : World) (G0 : Env w0) (ι0 : Assignment w0),
     forall {G}, G = inst G0 ι0 ->
       forall {t ee} (T : G |-- e; t ~> ee),
-
       WP (reconstruct e G0) (fun w1 r01 '(t',ee) ι1 =>
                                              ι0 = inst r01 ι1 /\
                                              t = inst t' ι1) ι0.
   Proof.
     intros. revert w0 ι0 G0 H.
-    Set Printing Depth 17.
     induction T; cbn; intros w0 ι0 G0 ?; subst.
     + easy.
     + easy.
@@ -1342,10 +1377,6 @@ End ProofWorlds.
         now rewrite <- H1, <- H.
   Qed.
 
-Section Correctness.
-
-  Import Pred Pred.notations.
-
   Lemma wp_impl {A w} (m : FreeM A w) (P : □⁺(A -> Pred) w) (Q : Pred w) :
     (WP m P ->ₚ Q) ⊣⊢ₚ WLP m (fun w1 r01 a1 => P w1 r01 a1 ->ₚ Ext Q r01)%P.
   Proof.
@@ -1365,7 +1396,7 @@ Section Correctness.
   Theorem correctness e :
     forall w (G : Env w) Q (RQ : ProperPost Q),
       WP (reconstruct e G) Q ⊣⊢ₚ
-      ∃ₚ t ∶ Ty, ∃ₚ ee ∶ Expr, TPB G e t ee /\ₚ T Q (t,ee).
+      ∃ₚ t ∶ Ty w, ∃ₚ ee ∶ Expr w, TPB G e t ee /\ₚ T Q (t,ee).
   Proof.
     intros w G Q RQ ι. unfold T. split.
     - apply wp_impl. generalize (@soundness e w ι G). apply wlp_monotonic.
@@ -1389,9 +1420,9 @@ Section Correctness.
 
 End Correctness.
 
-
 Section WithPredicates.
 
+  Import World.notations.
   Import Pred Pred.notations.
   Import (hints) Pred Pred.Acc.
 
@@ -1455,8 +1486,7 @@ Section WithPredicates.
     WP w0 (reconstruct e G)
         (fun w1 r01 '(t', ee') => (<{ ee ~ r01 }> =ₚ ee' /\ₚ <{ t ~ r01 }> =ₚ t')%P).
   Proof.
-    Set Printing Depth 20.
-    intros. Check TPB_ind. revert w0 G e t ee. apply TPB_ind; cbn.
+    intros. revert w0 G e t ee. apply TPB_ind; cbn.
     - intro w.
       apply forall_r. intros _.
       apply forall_r. intros t.
@@ -1472,27 +1502,19 @@ Section WithPredicates.
     - intro w1.
       do 9 (apply forall_r; intros ?).
       do 7 (rewrite <- impl_and_adjoint).
-      Unset Printing Notations.
       assert (MASSAGE: forall w (A B C D E F G : Pred w),
   bientails (andₚ (andₚ (andₚ (andₚ (andₚ (andₚ A B) C) D) E) F) G)
             (andₚ (andₚ (andₚ (andₚ (andₚ (andₚ A B) C) G) E) F) D)) by admit.
       rewrite MASSAGE. clear MASSAGE.
-      Set Printing Notations.
       rewrite wp_bind. apply impl_and_adjoint. apply wp_monotonic'.
       intros w2 r12 [t1 ee1]. cbn -[step]. unfold Definitions.T, _4.
       rewrite wp_bind.
-      Search implₚ.
-      Search eqₚ.
-      Search andₚ.
       rewrite <- impl_and_adjoint.
-      rewrite (eqₚ_symmetry t1).
-      Unset Printing Notations.
+      rewrite (eqₚ_sym t1).
       assert (MASSAGE: forall w (A B C D : Pred w),
                  entails (andₚ A (andₚ B C)) (andₚ C D) <-> entails (andₚ A (andₚ B ⊤ₚ)) D) by admit.
       rewrite (MASSAGE _ _ (eqₚ (persist w1 x4 w2 r12) ee1) (eqₚ (Ty_bool w2) t1) _).
       rewrite and_true_r.
-      Set Printing Notations.
-      rewrite and_right.
       admit.
     - intros w G s t e' ι. cbn.
       intros _ Heqo Hvar. destruct (resolve s G) eqn:?; cbn; inversion Heqo.
@@ -1511,31 +1533,29 @@ Section WithPredicates.
     Set Printing Depth 20.
     induction e; cbn; intros; subst; try constructor.
     - rewrite wlp_bind. rewrite IHe1.
-      Search (?X /\ₚ ?Y)%P. rewrite <- and_true_l. apply impl_and_adjoint. apply wlp_monotonic'.
-      intros. Search Ext. rewrite ext_true.
-      destruct a. Search (?X ⊢ₚ ?Y ->ₚ ?Z)%P. rewrite <- impl_and_adjoint.
+      rewrite <- and_true_l. apply impl_and_adjoint. apply wlp_monotonic'.
+      intros. rewrite ext_true.
+      destruct a. rewrite <- impl_and_adjoint.
       cbn. rewrite <- impl_and_adjoint. unfold T. rewrite wlp_bind.
-      specialize (IHe2 w1 <{ G ~ r ⊙ refl }>). rewrite IHe2. Search andₚ.
-      Unset Printing Notations.
+      specialize (IHe2 w1 <{ G ~ r ⊙ refl }>). rewrite IHe2.
       (* probably doable with some kind of tactic, perhaps change or replace X with Y is easier? *)
       assert (MASSAGE: forall w (X Y Z : Pred w), bientails (andₚ (andₚ X Y) Z) (andₚ (andₚ Y Z) X)).
       { intros. now rewrite (and_assoc X _), (and_comm _ X). }
       rewrite MASSAGE. clear MASSAGE.
-      Set Printing Notations.
       apply impl_and_adjoint. apply wlp_monotonic'.
       intros. destruct a. rewrite wlp_bind.
-      rewrite <- impl_and_adjoint. Search Trueₚ. rewrite <- and_true_r.
+      rewrite <- impl_and_adjoint. rewrite <- and_true_r.
       rewrite IHe3.
       apply impl_and_adjoint. apply wlp_monotonic'.
       intros. destruct a. cbn. unfold T, _4. clear.
-      Search (trans ?x refl).
       rewrite trans_refl_r, trans_refl_r.
       intro. unfold Ext. unfold andₚ, implₚ, TPB. intros.
       destruct H as [[]].
       constructor.
-      + rewrite inst_persist_env, inst_trans, inst_trans.
+      + rewrite inst_persist_env, ?inst_trans.
         rewrite inst_persist_env, H2 in H. cbn in H.
-        apply H.
+        rewrite persist_trans.
+        exact H.
       + rewrite inst_persist_env, inst_trans, inst_trans, inst_persist_ty.
         rewrite inst_persist_env, inst_persist_env in H3.
         apply H3.
@@ -1545,14 +1565,14 @@ Section WithPredicates.
     - destruct (resolve s G) eqn:?; cbn; try easy.
       unfold T. rewrite refl_persist. constructor.
       now rewrite resolve_inst, Heqo.
-    - Search Acc.wlp.
-      rewrite <- Acc.entails_wlp. rewrite ext_true. rewrite IHe.
+    - rewrite <- Acc.entails_wlp. rewrite ext_true. rewrite IHe.
       rewrite <- and_true_l.
       apply impl_and_adjoint. unfold T, _4. rewrite wlp_bind.
       apply wlp_monotonic'.
       intros. rewrite ext_true.
       destruct a. cbn -[step]. unfold T, _4.
-      rewrite trans_refl_r, trans_refl_r. Search Refl Alloc. Print HintDb typeclass_instances. Locate PersistPreOrder. intro. cbn -[step].
+      rewrite trans_refl_r, trans_refl_r.
+      intro. cbn -[step].
       unfold Ext, andₚ, implₚ, TPB. intros. cbn -[step] in *.
       constructor. rewrite ?inst_persist_env in *. exact H0.
     - rewrite wlp_bind. specialize (IHe w0 ((s, lift t w0) :: G)). rewrite IHe.

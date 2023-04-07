@@ -45,6 +45,7 @@ From Em Require Import
 
 Import ctx.notations.
 Import SigTNotations.
+Import World.notations.
 
 Set Implicit Arguments.
 
@@ -141,7 +142,7 @@ Module DS.
          find_isrepr z := _;
       |}.
   Next Obligation.
-    unfold mergeFind, IsRepr, equiv.
+    unfold mergeFind, IsRepr, equiv. intros A w _ d x y z.
     destruct (eq_dec (find d y) (find d z));
       rewrite (find_isrepr d);
       destruct eq_dec; congruence.

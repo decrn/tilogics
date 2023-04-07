@@ -45,7 +45,7 @@ Set Implicit Arguments.
 #[local] Arguments Ty_func {Σ}.
 
 Module Pred.
-
+  Import World.notations.
   #[local] Notation Expr := (Sem expr).
 
   Declare Scope pred_scope.
@@ -108,7 +108,10 @@ Module Pred.
       fun w P Q ι => (P ι -> Q ι)%type.
     Definition andₚ : ⊢ Pred -> Pred -> Pred :=
       fun w P Q ι => (P ι /\ Q ι)%type.
+    Definition orₚ : ⊢ Pred -> Pred -> Pred :=
+      fun w P Q ι => (P ι \/ Q ι)%type.
     #[global] Arguments andₚ {_} (_ _)%P _/.
+    #[global] Arguments orₚ {_} (_ _)%P _/.
     #[global] Arguments iffₚ {_} (_ _)%P _/.
     #[global] Arguments implₚ {_} (_ _)%P _/.
     #[global] Arguments Trueₚ {_} _/.
@@ -119,10 +122,11 @@ Module Pred.
       fun w t1 t2 ι => inst t1 ι = inst t2 ι.
     #[global] Arguments eqₚ {T A _} [w] _ _ _/.
 
-    Definition Forall {I : TYPE} : ⊢ (I -> Pred) -> Pred :=
-      fun w A ι => forall i : I w, A i ι.
-    Definition Exists {I : TYPE} : ⊢ (I -> Pred) -> Pred :=
-      fun w A ι => exists i : I w, A i ι.
+
+    Polymorphic Definition Forall {I : Type} {w} : (I -> Pred w) -> Pred w :=
+      fun A ι => forall i : I, A i ι.
+    Polymorphic Definition Exists {I : Type} {w} : (I -> Pred w) -> Pred w :=
+      fun A ι => exists i : I, A i ι.
     #[global] Arguments Forall {I w} A%P ι/.
     #[global] Arguments Exists {I w} A%P ι/.
 
@@ -148,6 +152,7 @@ Module Pred.
     Infix "<->ₚ"  := (iffₚ) (at level 94) : pred_scope.
     Infix "->ₚ"   := (implₚ) (at level 94, right associativity) : pred_scope.
     Infix "/\ₚ"   := (andₚ) (at level 80, right associativity) : pred_scope.
+    Infix "\/ₚ"   := (orₚ) (at level 85, right associativity) : pred_scope.
 
     Infix "=ₚ" := eqₚ (at level 70, no associativity) : pred_scope.
 
@@ -184,6 +189,12 @@ Module Pred.
 
   End notations.
 
+  Definition ProperPost {R} {reflR : Refl R} {instR : forall w : World, Inst (R w) (Assignment w)}
+    {AT A} {persA : Persistent R AT} {instT : Inst AT A}
+    {w} (Q : Box R (AT -> Pred) w) : Prop :=
+    forall w1 (r01 : R w w1) (te0 : AT w) (te1 : AT w1),
+      (te1 =ₚ (persist _ te0 _ r01)) ⊢ₚ (Ext (Q w refl te0) r01 <->ₚ Q w1 r01 te1).
+
   Section Lemmas.
 
     Create HintDb obligation.
@@ -213,10 +224,14 @@ Module Pred.
       Proper (bientails ==> bientails ==> bientails) (@andₚ w).
     #[export,program] Instance proper_and_entails {w} :
       Proper (entails ==> entails ==> entails) (@andₚ w).
+    #[export,program] Instance proper_or_bientails {w} :
+      Proper (bientails ==> bientails ==> bientails) (@orₚ w).
+    #[export,program] Instance proper_or_entails {w} :
+      Proper (entails ==> entails ==> entails) (@orₚ w).
     #[export,program] Instance proper_bientails_forall {I w} :
-      Proper (pointwise_relation (I w) bientails ==> bientails) Forall.
+      Proper (pointwise_relation I bientails ==> bientails) (@Forall I w).
     #[export,program] Instance proper_bientails_exists {I w} :
-      Proper (pointwise_relation (I w) bientails ==> bientails) Exists.
+      Proper (pointwise_relation I bientails ==> bientails) (@Exists I w).
     #[export,program] Instance proper_ext_bientails
       {R : ACC} {instR : forall w, Inst (R w) (Assignment w)} {w} :
       Proper (bientails ==> forall_relation (fun _ => eq ==> bientails)) (Ext (R:=R) (w:=w)).
@@ -232,6 +247,12 @@ Module Pred.
     Lemma and_left2 {w} {P Q R : Pred w} : Q ⊢ₚ R -> P /\ₚ Q ⊢ₚ R.
     Proof. obligation. Qed.
     Lemma and_right {w} {P Q R : Pred w} : P ⊢ₚ Q -> P ⊢ₚ R -> P ⊢ₚ Q /\ₚ R.
+    Proof. obligation. Qed.
+    Lemma or_right1 {w} {P Q : Pred w} : P ⊢ₚ P \/ₚ Q.
+    Proof. obligation. Qed.
+    Lemma or_right2 {w} {P Q : Pred w} : Q ⊢ₚ P \/ₚ Q.
+    Proof. obligation. Qed.
+    Lemma or_left {w} {P Q R : Pred w} : P ⊢ₚ R -> Q ⊢ₚ R -> P \/ₚ Q ⊢ₚ R.
     Proof. obligation. Qed.
     Lemma impl_and_adjoint {w} (P Q R : Pred w) : (P /\ₚ Q ⊢ₚ R) <-> (P ⊢ₚ Q ->ₚ R).
     Proof. obligation. Qed.
@@ -260,18 +281,18 @@ Module Pred.
     Lemma impl_forget {w} (P Q R : Pred w) : P ⊢ₚ R -> P ⊢ₚ (Q ->ₚ R).
     Proof. obligation. Qed.
 
-    Lemma forall_l {I : TYPE} {w} (P : I w -> Pred w) Q :
-      (exists x : I w, P x ⊢ₚ Q) -> (∀ₚ x ∶ I, P x) ⊢ₚ Q.
+    Lemma forall_l {I : Type} {w} (P : I -> Pred w) Q :
+      (exists x : I, P x ⊢ₚ Q) -> (∀ₚ x ∶ I, P x) ⊢ₚ Q.
     Proof. obligation. firstorder. Qed.
-    Lemma forall_r {I : TYPE} {w} P (Q : I w -> Pred w) :
-      (P ⊢ₚ (∀ₚ x ∶ I, Q x)) <-> (forall x : I w, P ⊢ₚ Q x).
+    Lemma forall_r {I : Type} {w} P (Q : I -> Pred w) :
+      (P ⊢ₚ (∀ₚ x ∶ I, Q x)) <-> (forall x : I, P ⊢ₚ Q x).
     Proof. obligation. Qed.
 
-    Lemma exists_l {I : TYPE} {w} P (Q : I w -> Pred w) :
-      (exists x : I w, P ⊢ₚ Q x) -> P ⊢ₚ (∃ₚ x ∶ I, Q x).
+    Lemma exists_l {I : Type} {w} (P : I -> Pred w) (Q : Pred w) :
+      (forall x : I, P x ⊢ₚ Q) -> (∃ₚ x ∶ I, P x) ⊢ₚ Q.
     Proof. obligation. firstorder. Qed.
-    Lemma exists_r {I : TYPE} {w} P (Q : I w -> Pred w) :
-      (exists x : I w, P ⊢ₚ Q x) -> P ⊢ₚ (∃ₚ x ∶ I, Q x).
+    Lemma exists_r {I : Type} {w} P (Q : I -> Pred w) :
+      (exists x : I, P ⊢ₚ Q x) -> P ⊢ₚ (∃ₚ x ∶ I, Q x).
     Proof. obligation. firstorder. Qed.
     #[global] Arguments exists_r {I w P Q} _.
 
@@ -290,10 +311,14 @@ Module Pred.
       Lemma eqₚ_refl {w} (t : T w) : t =ₚ t ⊣⊢ₚ ⊤ₚ.
       Proof. obligation. Qed.
 
-      Lemma eqₚ_symmetry {w} (s t : T w) : s =ₚ t ⊣⊢ₚ t =ₚ s.
+      Lemma eqₚ_sym {w} (s t : T w) : s =ₚ t ⊣⊢ₚ t =ₚ s.
+      Proof. obligation. Qed.
+
+      Lemma eqₚ_trans {w} (s t u : T w) : s =ₚ t /\ₚ t =ₚ u ⊢ₚ s =ₚ u.
       Proof. obligation. Qed.
 
     End Eq.
+    #[global] Arguments eqₚ_trans {T A _ w} s t u.
 
     Lemma peq_ty_noconfusion {w} (t1 t2 : Ty w) :
       t1 =ₚ t2 ⊣⊢ₚ
@@ -338,9 +363,13 @@ Module Pred.
         (* now rewrite !inst_persist. *)
       Admitted.
 
-      Lemma ext_forall_const {A} {w1 w2} (r12 : R w1 w2) (Q : A -> Pred w1) :
-        Ext (∀ₚ a ∶ Const A, Q a) r12 ⊣⊢ₚ (∀ₚ a ∶ Const A, Ext (Q a) r12).
+      Polymorphic Lemma ext_forall {A} {w1 w2} (r12 : R w1 w2) (Q : A -> Pred w1) :
+        Ext (∀ₚ a ∶ A, Q a) r12 ⊣⊢ₚ (∀ₚ a ∶ A, Ext (Q a) r12).
       Proof. obligation. Qed.
+      Polymorphic Lemma ext_exists {A} {w1 w2} (r12 : R w1 w2) (Q : A -> Pred w1) :
+        Ext (∃ₚ a ∶ A, Q a) r12 ⊣⊢ₚ (∃ₚ a ∶ A, Ext (Q a) r12).
+      Proof. obligation. Qed.
+
       Lemma ext_tpb {persRTy : Persistent R Ty}
         {w1 w2} (r12 : R w1 w2) G (e : expr) (t : Ty w1) (ee : Expr w1) :
         Ext (G |--ₚ e; t ~> ee) r12 ⊣⊢ₚ
@@ -429,7 +458,7 @@ Module Pred.
       Proof. firstorder. Qed.
 
       Lemma wp_step {stepR : Step R} {w} {x} (Q : Pred (ctx.snoc w x)):
-        wp (w0:=w) step Q ⊣⊢ₚ (∃ₚ t ∶ Ty, Ext Q (thick (xIn := ctx.in_zero) x t)).
+        wp (w0:=w) step Q ⊣⊢ₚ (∃ₚ t ∶ Ty w, Ext Q (thick (xIn := ctx.in_zero) x t)).
       Proof.
         intros ι. cbn - [thick]. unfold Exists.
         split.
@@ -527,7 +556,7 @@ Module Pred.
       Qed.
 
       Lemma wlp_step {stepR : Step R} {w} {x} (Q : Pred (ctx.snoc w x)):
-        wlp (w0:=w) step Q ⊣⊢ₚ (∀ₚ t ∶ Ty, Ext Q (thick (xIn := ctx.in_zero) x t)).
+        wlp (w0:=w) step Q ⊣⊢ₚ (∀ₚ t ∶ Ty w, Ext Q (thick (xIn := ctx.in_zero) x t)).
       Proof.
         intros ι. cbn - [thick]. unfold Forall.
         split.
@@ -563,12 +592,12 @@ Module Pred.
     Context
       {pfalse : forall w,
           entails (w := w) Trueₚ
-         (∀ₚ G ∶ Env, ∀ₚ t ∶ Ty, ∀ₚ e' ∶ Expr,
+         (∀ₚ G ∶ Env w, ∀ₚ t ∶ Ty w, ∀ₚ e' ∶ Expr w,
              t =ₚ Ty_bool ->ₚ
              e' =ₚ (S.pure v_false) ->ₚ
              P G v_false t e')%P }
       {ptrue : forall w, entails Trueₚ (w := w)
-         (∀ₚ G ∶ Env, ∀ₚ t ∶ Ty, ∀ₚ e' ∶ Expr,
+         (∀ₚ G ∶ Env w, ∀ₚ t ∶ Ty w, ∀ₚ e' ∶ Expr w,
              t =ₚ Ty_bool ->ₚ
              e' =ₚ (S.pure v_true) ->ₚ
              P G v_true t e')%P }
@@ -645,11 +674,6 @@ Module Pred.
 
   End InductionScheme.
 
-  Definition ProperPost {R} {reflR : Refl R} {instR : forall w : World, Inst (R w) (Assignment w)}
-    {AT A} {persA : Persistent R AT} {instT : Inst AT A}
-    {w} (Q : Box R (AT -> Pred) w) : Prop :=
-    forall {w1} (r01 : R w w1) (te0 : AT w) (te1 : AT w1),
-      (te1 =ₚ (persist _ te0 _ r01)) ⊢ₚ (Ext (Q w refl te0) r01 <->ₚ Q w1 r01 te1).
 
 End Pred.
 Export Pred (Pred).

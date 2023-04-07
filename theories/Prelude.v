@@ -37,8 +37,10 @@ From Coq Require Import
 From Equations Require Import
      Equations.
 
-Local Set Implicit Arguments.
-Local Set Transparent Obligations.
+From stdpp Require base.
+
+#[local] Set Implicit Arguments.
+#[local] Set Transparent Obligations.
 
 (* Equality *)
 
@@ -69,8 +71,8 @@ Definition f_equal2_dec {A1 A2 B : Type} (f : A1 -> A2 -> B) {x1 y1 : A1} {x2 y2
 Proof. eqdec_proof. Defined.
 
 Definition eq_dec_het {I} {A : I -> Type} `{eqdec : EqDec (sigT A)}
-  {i1 i2} (x1 : A i1) (x2 : A i2) : dec_eq (existT _ i1 x1) (existT _ i2 x2) :=
-  eq_dec (existT _ i1 x1) (existT _ i2 x2).
+  {i1 i2} (x1 : A i1) (x2 : A i2) : dec_eq (existT i1 x1) (existT i2 x2) :=
+  eq_dec (existT i1 x1) (existT i2 x2).
 Derive NoConfusion EqDec for Empty_set.
 
 Definition IsSome {A : Type} (m : option A) : Type :=
@@ -315,8 +317,8 @@ Module option.
     Notation "x <- ma ;; mb" :=
       (bind ma (fun x => mb))
         (at level 80, ma at next level, mb at level 200, right associativity).
-    Notation "f <$> a" := (map f a) (at level 40, left associativity).
-    Notation "f <*> a" := (aplazy f a) (at level 40, left associativity).
+    Notation "f <$> a" := (map f a) (at level 61, left associativity).
+    Notation "f <*> a" := (aplazy f a) (at level 61, left associativity).
 
   End notations.
 

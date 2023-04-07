@@ -153,8 +153,6 @@ Class TypeCheckAxioms m {super : TypeCheckM m} : Type :=
    turns m explicit and super implicit & maximally inserted I think *)
 Arguments TypeCheckAxioms _ {super}.
 
-Check TypeCheckAxioms.
-
 Inductive cstr : Set :=
   | CEq (n1 n2 : ty)
   | CTrue.
@@ -163,7 +161,7 @@ Inductive cstr : Set :=
 (*                 OPTION INSTANCE                  *)
 (* ================================================ *)
 
-#[global] Instance TC_option : TypeCheckM option :=
+#[export] Instance TC_option : TypeCheckM option :=
   { bind T1 T2 m f :=
       match m with
       | None   => None
@@ -174,7 +172,7 @@ Inductive cstr : Set :=
     fail _ := None ;
   }.
 
-#[refine] Instance TCF_option : TypeCheckAxioms option :=
+#[export,refine] Instance TCF_option : TypeCheckAxioms option :=
 {
   wlp [O: Type] (m : option O) (Q : O -> Prop) :=
   forall o, m = Some o -> Q o;
@@ -234,13 +232,7 @@ Qed.
 Definition writer (W A : Type) := prod W A.
 Definition option_writer (W A : Type) := option (prod W A).
 
-Unset Printing Universes.
-
-Check (writer (list cstr)).
-
-Check (option_writer (list cstr)).
-
-#[global] Instance TC_writer : TypeCheckM (option_writer (list cstr)) :=
+#[export] Instance TC_writer : TypeCheckM (option_writer (list cstr)) :=
 { bind T1 T2 ma f :=
     match ma with
     | None => None
@@ -256,7 +248,7 @@ Check (option_writer (list cstr)).
   fail _ := None
 }.
 
-Fixpoint sem (c : cstr) : Prop :=
+Definition sem (c : cstr) : Prop :=
   match c with
   | CEq t1 t2  => t1 = t2
   | CTrue  => True
@@ -274,7 +266,7 @@ Proof.
   intros. split.
   - induction cs; cbn.
     + intro. split. apply I. apply H.
-    + intro. Search "and_assoc". rewrite and_assoc. destruct H. split. apply H. apply IHcs. apply H0.
+    + intro. rewrite and_assoc. destruct H. split. apply H. apply IHcs. apply H0.
   - intro. destruct H. induction cs; cbn.
     + apply H0.
     + destruct H. split. apply H. apply IHcs. apply H1.
@@ -282,7 +274,7 @@ Qed.
 
 (* TODO: throughout, replace firstorder by intuition tactic
          firstorder changes between coq versions and takes longer *)
-#[refine] Instance TCF_writer : TypeCheckAxioms (option_writer (list cstr)) :=
+#[export,refine] Instance TCF_writer : TypeCheckAxioms (option_writer (list cstr)) :=
 {
   wlp [A: Type] (m : option_writer (list cstr) A) (Q : A -> Prop) :=
     match m with
@@ -352,7 +344,7 @@ Fixpoint freeM_bind [T1 T2 : Type] (m : freeM T1) (f: T1 -> freeM T2) : freeM T2
   end.
 
 
-#[global] Instance TC_free : TypeCheckM freeM :=
+#[export] Instance TC_free : TypeCheckM freeM :=
   { bind         := freeM_bind ;
     ret T u      := ret_free u ;
     assert t1 t2 := bind_assert_free t1 t2 (ret_free tt); (* equiv. cons (t1, t2) (ret_free tt) *)
@@ -375,7 +367,7 @@ Fixpoint wp_freeM [A : Type] (m : freeM A) (Q: A -> Prop) :=
   | fail_free _ => False
   end.
 
-#[refine] Instance TCF_freeM : TypeCheckAxioms freeM :=
+#[export,refine] Instance TCF_freeM : TypeCheckAxioms freeM :=
 { wlp := wlp_freeM ;
   wp  := wp_freeM  ;
 }. Proof.

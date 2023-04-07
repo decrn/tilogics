@@ -121,7 +121,7 @@ Module Import ctx.
 
     Definition proof_irrelevance_het_nth_is {b1 b2 : B} :
       forall {Γ n} (p1 : nth_is Γ n b1) (p2 : nth_is Γ n b2),
-        existT _ _ p1 = existT _ _ p2 :=
+        existT _ p1 = existT _ p2 :=
        fix pi Γ n {struct Γ} :=
          match Γ with
          | nil => fun p q => match q with end
@@ -169,6 +169,8 @@ Module Import ctx.
       | in_succ {Γ : Ctx B} {b' : B} (bIn : In b Γ) : In b (snoc Γ b').
       Existing Class In.
       Global Arguments in_zero {b Γ}.
+
+      Set Transparent Obligations.
       Derive Signature NoConfusion for In.
 
     End In.

@@ -1,18 +1,20 @@
-Require Import Relation_Definitions String.
+From Coq Require Import
+  Relations.Relation_Definitions
+  Strings.String.
 From Em Require Import
      Definitions Context Environment STLC.
-Import ctx.notations.
 From Em Require Symbolic Shallow.
+
+Import ctx.notations.
 
 (* The refinement proof, relating the deeply-embedded or symbolic `generate`
    to the shallowly-embedded `generate` is accomplished
    using a logical relation similar to [Keuchel22]. *)
 
-(* A  variation on the definition of `Relations.Relation_Definitions.relation` but now
-   relating a World-indexed Type `A` to a regular type `a` *)
-Check relation.
-(* Given a world `w` and an assignment (or valuation) `ass` assigning concrete types to
-   each unification variable in the world, we can relate the world-indexed type `A w`
+(* A variation on the definition of `Relation_Definitions.relation` but now
+   relating a World-indexed Type `A` to a regular type `a`. Given a world `w`
+   and an assignment (or valuation) `ass` assigning concrete types to each
+   unification variable in the world, we can relate the world-indexed type `A w`
    to the regular type `a` *)
 Definition Relation (A : TYPE) (a : Type) : Type :=
   forall (w : World) (ass : Assignment w),
@@ -67,6 +69,12 @@ Inductive REnv w ass : Env w -> env -> Prop :=
    { τ₀ -> Bool ; } is NOT subsumed by { τ₀ -> Nat ; τ₁ -> Arrow τ₀ τ₀ }
    since τ₀ has a different assignment.
  *)
+
+Import World.notations.
+#[local] Notation "□⁺ A" :=
+  (Box Alloc A)
+    (at level 9, format "□⁺ A", right associativity)
+    : indexed_scope.
 
 Open Scope indexed_scope.
 
@@ -279,7 +287,7 @@ Section Soundness.
       Shallow.wlp_freeM m P <-> wlp (Shallow.solve m) P.
   Proof.
     intro. induction m; cbn; intros; try easy.
-    destruct ty_eqb. intuition. intuition. cbn. easy.
+    destruct Classes.eq_dec. intuition. intuition. cbn. easy.
     firstorder.
   Qed.
 
@@ -359,7 +367,7 @@ Section Completeness.
       Shallow.wp_freeM m P <-> wp (Shallow.solve m) P.
   Proof.
     intro. induction m; cbn; intros; try easy.
-    destruct ty_eqb. intuition. intuition. firstorder.
+    destruct Classes.eq_dec. intuition. intuition. firstorder.
   Qed.
 
   Lemma shallow_infer_ng_complete : forall e t ee,

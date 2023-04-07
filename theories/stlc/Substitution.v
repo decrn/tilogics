@@ -32,6 +32,7 @@ From Em Require Import
      Definitions Context Environment Prelude STLC Triangular.
 Import SigTNotations.
 Import ctx.notations.
+Import World.notations.
 
 Set Implicit Arguments.
 
@@ -46,21 +47,12 @@ Module Sub.
 
   Definition Sub (w1 w2 : World) : Type :=
     @env.Env nat (fun _ => Ty w2) w1.
-  Local Notation "w1 ⊒ˢ w2" := (Sub w1 w2).
-
-  Definition Box (A : TYPE) : TYPE :=
-    fun w0 => forall w1, w0 ⊒ˢ w1 -> A w1.
-  Local Notation "□ A" := (Box A) (at level 9, format "□ A", right associativity).
-
+  #[local] Notation "w1 ⊒ˢ w2" := (Sub w1 w2).
+  #[local] Notation "□ˢ A" := (Box Sub A) (at level 9, format "□ˢ A", right associativity).
   #[local] Notation subst t θ := (persist _ t _ θ) (only parsing).
 
   #[export] Instance lk_sub : Lk Sub :=
     fun w1 w2 r x xIn => env.lookup r xIn.
-
-  #[export] Instance thick_sub : Thick Sub :=
-    fun w x xIn s => env.tabulate (thickIn xIn s).
-  Definition thin {w x} (xIn : x ∈ w) : w - x ⊒ˢ w :=
-    env.tabulate (fun y yIn => Ty_hole (ctx.in_thin xIn yIn)).
 
   #[export] Instance refl_sub : Refl Sub :=
     fun w => env.tabulate (fun _ => Ty_hole).
@@ -70,6 +62,10 @@ Module Sub.
       | env.nil         => env.nil
       | env.snoc ζ1 x t => env.snoc (trans ζ1 ζ2) x (persist _ t _ ζ2)
       end.
+  #[export] Instance thick_sub : Thick Sub :=
+    fun w x xIn s => env.tabulate (thickIn xIn s).
+  Definition thin {w x} (xIn : x ∈ w) : w - x ⊒ˢ w :=
+    env.tabulate (fun y yIn => Ty_hole (ctx.in_thin xIn yIn)).
   #[export] Instance step_sub : Step Sub :=
     fun w x => thin ctx.in_zero.
 
@@ -244,6 +240,13 @@ Module Sub.
     unfold thickIn. now destruct ctx.occurs_check_view.
   Qed.
 
+  #[export] Instance inst_refl_sub : InstRefl Sub.
+  Proof.
+    intros w ι. unfold refl, inst, refl_sub, InstSub.
+    apply env.lookup_extensional. intros.
+    now rewrite env.lookup_map, env.lookup_tabulate.
+  Qed.
+
   Lemma Ty_subterm_subst {w1 w2} (s t : Ty w1) (ζ : Sub w1 w2) :
     Ty_subterm s t -> Ty_subterm (persist _ s _ ζ) (persist _ t _ ζ).
   Proof.
@@ -260,4 +263,3 @@ Infix "≽ˢ" := Sub.geq (at level 80).
 
 (* Infix "≽⁻" := Tri.geq (at level 80). *)
 (* Infix "≽?" := Sub.geqb (at level 80). *)
-

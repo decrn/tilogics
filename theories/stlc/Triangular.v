@@ -34,6 +34,7 @@ From Em Require Import
      Definitions Context Environment STLC.
 Import ctx.notations.
 Import SigTNotations.
+Import World.notations.
 
 Set Implicit Arguments.
 
@@ -48,14 +49,11 @@ Definition Later (A : TYPE) : TYPE :=
   fun w => forall x (xIn : x ∈ w), A (w - x).
 Definition LaterTm (A : TYPE) : TYPE :=
   fun w => forall x (xIn : x ∈ w), Ty (w - x) -> A (w - x).
-Notation "▷ A" := (Later A) (at level 9, right associativity).
-Notation "▶ A" := (LaterTm A) (at level 9, right associativity).
+
 Definition Sooner (A : TYPE) : TYPE :=
   fun w => sigT (fun x => sigT (fun (xIn : x ∈ w) => A (w - x))).
 Definition SoonerTm (A : TYPE) : TYPE :=
   fun w => sigT (fun x => sigT (fun (xIn : x ∈ w) => Ty (w - x) * A (w - x)))%type.
-Notation "◁ A" := (Sooner A) (at level 9, right associativity).
-Notation "◀ A" := (SoonerTm A) (at level 9, right associativity).
 
 Module Sng.
 
@@ -103,10 +101,10 @@ Module Tri.
     (p_cons : forall w w' x (xIn : x ∈ w) t r,
         P (w - x) w' r -> P w w' (thick x t ⊙ r)) :
     forall w w' (r : w ⊒⁻ w'), P w w' r :=
-    fix rect {w w'} (r : w ⊒⁻ w') {struct r} : P w w' r :=
+    fix rect w w' (r : w ⊒⁻ w') {struct r} : P w w' r :=
       Tri_case (P w) (p_refl w)
         (fun _ x _ t r' =>
-           p_cons _ _ x _ t r' (rect r')) r.
+           p_cons _ _ x _ t r' (rect _ _ r')) r.
   Definition Tri_ind (P : forall w w', w ⊒⁻ w' -> Prop) := Tri_rect P.
   Definition Tri_rec (P : forall w w', w ⊒⁻ w' -> Set) := Tri_rect P.
 
@@ -135,9 +133,16 @@ Module Tri.
       Tri_case (P w) (step w w Definitions.refl on_refl)
         (fun w' x xIn t r => step w w' (thick x t ⊙ r) (on_cons x t (löb (w - x) w' r))) r.
 
-  #[local] Notation "□ A" := (Box Tri A) (at level 9, format "□ A", right associativity).
+  Module Import notations.
+    Notation "▷ A" := (Later A) (at level 9, right associativity).
+    Notation "▶ A" := (LaterTm A) (at level 9, right associativity).
+    Notation "◁ A" := (Sooner A) (at level 9, right associativity).
+    Notation "◀ A" := (SoonerTm A) (at level 9, right associativity).
+    Notation "□⁻ A" := (Box Tri A) (at level 9, format "□⁻ A", right associativity).
+  End notations.
+
   Definition box_intro_split {A} :
-    ⊢ A -> ▶□A -> □A :=
+    ⊢ A -> ▶□⁻A -> □⁻A :=
     fun w0 a la w1 ζ =>
       match ζ with
       | Tri.refl => a
