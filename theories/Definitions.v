@@ -129,7 +129,7 @@ Export Diamond (Diamond, DiamondT).
 
 Module World.
   Module notations.
-    Notation "⊢ A" := (Valid A) (at level 100).
+    Notation "⊢ʷ A" := (Valid A) (at level 100).
     Notation "A -> B" := (Impl A B) : indexed_scope.
     Notation "'∀' x .. y , P " :=
       (Forall (fun x => .. (Forall (fun y => P)) ..))
@@ -141,7 +141,7 @@ Module World.
     (* TODO: switch to superscript *)
     (* \^s \^+ *)
 
-    Notation "□ A" := (Box _ A) (at level 9, format "□ A", right associativity).
+    (* Notation "□ A" := (Box _ A) (at level 9, format "□ A", right associativity). *)
     Notation "□⁺ A" := (Box Alloc A) (at level 9, format "□⁺ A", right associativity)
         : indexed_scope.
     Notation "◇⁺ A" := (Diamond Alloc A) (at level 9, format "◇⁺ A", right associativity)
@@ -155,6 +155,12 @@ Module MonadNotations.
   Notation "[ r ] x <- ma ;; mb" :=
     (bind ma (fun _ r x => mb))
       (at level 80, x at next level,
+        ma at next level, mb at level 200,
+        right associativity).
+
+  Notation "[ r ] ' x <- ma ;; mb" :=
+    (bind ma (fun _ r x => mb))
+      (at level 80, x pattern,
         ma at next level, mb at level 200,
         right associativity).
 End MonadNotations.

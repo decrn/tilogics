@@ -102,15 +102,15 @@ Module DS.
     }.
   #[global] Arguments cont [A]%indexed_scope [w]%ctx_scope d x _.
 
-  Definition equiv {A} : ⊢ DS A -> Ref -> Ref -> Const bool :=
+  Definition equiv {A} : ⊢ʷ DS A -> Ref -> Ref -> Const bool :=
     fun w d x y =>
       if eq_dec (find d x) (find d y)
       then true else false.
 
-  Definition get {A} : ⊢ DS A -> Ref -> A :=
+  Definition get {A} : ⊢ʷ DS A -> Ref -> A :=
     fun w d x => cont d (find d x) (find_isrepr d x).
 
-  Definition set {A} : ⊢ DS A -> Ref -> A -> DS A :=
+  Definition set {A} : ⊢ʷ DS A -> Ref -> A -> DS A :=
     fun w d x a =>
       {| find        := find d;
          cont r rr   := if equiv d r x then a else cont d r rr;
@@ -118,13 +118,13 @@ Module DS.
       |}.
 
   Definition mergeFind :
-    ⊢ (Ref -> Ref) -> Ref -> Ref -> Ref -> Ref :=
+    ⊢ʷ (Ref -> Ref) -> Ref -> Ref -> Ref -> Ref :=
     fun w fnd x y z =>
       (* Map every z that previously is equivalent to y to x instead *)
       if eq_dec (fnd y) (fnd z) then fnd x else fnd z.
 
   Definition mergeCont {A : TYPE} :
-    ⊢ (A -> A -> A) -> DS A -> Ref -> Ref -> Ref -> A :=
+    ⊢ʷ (A -> A -> A) -> DS A -> Ref -> Ref -> Ref -> A :=
     fun w f d x y z =>
       if equiv d y z
       then (* In this case z was (potentially) retargeted to x. Combine the two
@@ -135,7 +135,7 @@ Module DS.
       else get d z.
 
   Program Definition merge {A : TYPE} :
-    ⊢ (A -> A -> A) -> DS A -> Ref -> Ref -> DS A :=
+    ⊢ʷ (A -> A -> A) -> DS A -> Ref -> Ref -> DS A :=
     fun w f d x y =>
       {| find          := mergeFind (find d) x y;
          cont z _      := mergeCont f d x y z;
@@ -217,7 +217,7 @@ Module DS.
       now rewrite eq_dec_refl.
   Qed.
 
-  Definition compatible : ⊢ DS (Option TyF) -> Pred :=
+  Definition compatible : ⊢ʷ DS (Option TyF) -> Pred :=
     fun w d =>
       Pred.Forall
         (fun x : Ref w =>
@@ -236,23 +236,23 @@ Module DS.
 
   Definition M := StateT (DS (Option TyF)) Option.
 
-  Definition pure {A} : ⊢ A -> M A.
+  Definition pure {A} : ⊢ʷ A -> M A.
   Admitted.
 
-  Definition fail {A} : ⊢ M A.
+  Definition fail {A} : ⊢ʷ M A.
   Admitted.
   #[global] Arguments fail {A w}.
 
-  Definition bind {A B} : ⊢ M A -> (A -> M B) -> M B.
+  Definition bind {A B} : ⊢ʷ M A -> (A -> M B) -> M B.
   Admitted.
 
-  Definition flex : ⊢ Ref -> TyF -> M Unit.
+  Definition flex : ⊢ʷ Ref -> TyF -> M Unit.
   Proof.
     intros w x t. intros s.
     destruct (get s x).
   Admitted.
 
-  Definition WP {A} : ⊢ StateT (DS (Option TyF)) Id A -> Cont Alloc Pred A :=
+  Definition WP {A} : ⊢ʷ StateT (DS (Option TyF)) Id A -> Cont Alloc Pred A :=
     fun w m k =>
        Pred.Forall
          (fun s =>

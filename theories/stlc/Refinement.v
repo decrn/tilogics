@@ -367,7 +367,7 @@ Section Completeness.
       Shallow.wp_freeM m P <-> wp (Shallow.solve m) P.
   Proof.
     intro. induction m; cbn; intros; try easy.
-    destruct Classes.eq_dec. intuition. intuition. firstorder.
+    destruct Classes.eq_dec; cbn. intuition. intuition. firstorder.
   Qed.
 
   Lemma shallow_infer_ng_complete : forall e t ee,

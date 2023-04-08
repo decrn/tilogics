@@ -128,10 +128,10 @@ Module Import SubstitutionPredicates.
 
   Notation "P <-> Q" := (iff P Q).
 
-  Definition unifies : ⊢ Ty -> Ty -> SubPred :=
+  Definition unifies : ⊢ʷ Ty -> Ty -> SubPred :=
     fun w s t w1 (ζ1 : w ⊒ˢ w1) => s[ζ1] = t[ζ1].
 
-  Definition unifiesX : ⊢ Ty -> Ty -> SubPred :=
+  Definition unifiesX : ⊢ʷ Ty -> Ty -> SubPred :=
     fun w0 s t =>
       match s , t with
       | Ty_hole xIn as s , t               => unifies s t
@@ -141,7 +141,7 @@ Module Import SubstitutionPredicates.
       | _               , _               => fun _ _ => False
       end.
 
-  Definition unifiesY : ⊢ Ty -> Ty -> SubPred :=
+  Definition unifiesY : ⊢ʷ Ty -> Ty -> SubPred :=
     fun w0 =>
       fix ufs s t {struct s} :=
       match s , t with
@@ -293,13 +293,13 @@ Export SubstitutionPredicates (SubPred).
 Module NoGhostState.
   Import (hints) Tri.
 
-  Definition wp {A} : ⊢ ◆A -> □(A -> PROP) -> PROP :=
+  Definition wp {A} : ⊢ʷ ◆A -> □(A -> PROP) -> PROP :=
     fun w0 a0 POST => option.wp (fun '(w1; (ζ1 , a1)) => POST w1 ζ1 a1) a0.
 
-  Definition wlp {A} : ⊢ ◆A -> □(A -> PROP) -> PROP :=
+  Definition wlp {A} : ⊢ʷ ◆A -> □(A -> PROP) -> PROP :=
     fun w0 a0 POST => option.wlp (fun '(w1; (ζ1 , a1)) => POST w1 ζ1 a1) a0.
 
-  Definition spec {A} : ⊢ ◆A -> □(A -> PROP) -> PROP -> PROP :=
+  Definition spec {A} : ⊢ʷ ◆A -> □(A -> PROP) -> PROP -> PROP :=
     fun w0 a0 SPOST NPOST => option.spec (fun '(w1; (ζ1 , a1)) => SPOST w1 ζ1 a1) NPOST a0.
 
   Lemma wp_pure {A w} (a : A w) (POST : □(A -> PROP) w) :
@@ -354,7 +354,7 @@ Module Correctness.
   Import Tri.notations.
   Import (hints) Sub Tri.
 
-  Definition UnifierSpec : ⊢ Unifier -> PROP :=
+  Definition UnifierSpec : ⊢ʷ Unifier -> PROP :=
     fun w u =>
       forall t1 t2,
         let P := unifies t1 t2 in
@@ -363,7 +363,7 @@ Module Correctness.
           (fun w2 ζ2 _ => max P (Sub.triangular ζ2))
           (nothing P).
 
-  Definition BoxUnifierSpec : ⊢ BoxUnifier -> PROP :=
+  Definition BoxUnifierSpec : ⊢ʷ BoxUnifier -> PROP :=
     fun w bu =>
       forall t1 t2 w1 (ζ1 : w ⊒⁻ w1),
         let P := unifies t1[ζ1] t2[ζ1] in
@@ -592,7 +592,7 @@ Module Correctness.
     now rewrite !persist_refl.
   Qed.
 
-  Definition spec' {A} : ⊢ ◆A -> □(Option A -> PROP) -> PROP.
+  Definition spec' {A} : ⊢ʷ ◆A -> □(Option A -> PROP) -> PROP.
     refine (fun w0 a0 POST => _).
     destruct a0 as [[w1 [ζ1 a]]|].
     cbv. apply (POST w1 ζ1 (Some a)).
@@ -608,7 +608,7 @@ Module Correctness.
 
   Definition W := DiamondT (OptionT Wpure).
 
-  Definition flexspecw : ⊢ Ty -> ∀ x, ctx.In x -> W Unit.
+  Definition flexspecw : ⊢ʷ Ty -> ∀ x, ctx.In x -> W Unit.
   Proof.
     cbv [Impl Valid Box Forall PROP W OptionT DiamondT Wpure Option].
     intros w0 t x xIn POST.
@@ -618,7 +618,7 @@ Module Correctness.
     apply None.
   Defined.
 
-  Definition flexspec : ⊢ Ty -> ∀ x, ctx.In x -> □(Option Unit -> PROP) -> PROP.
+  Definition flexspec : ⊢ʷ Ty -> ∀ x, ctx.In x -> □(Option Unit -> PROP) -> PROP.
   Proof.
     cbv [Impl Valid Box Forall PROP].
     intros w0 t x xIn POST.
@@ -628,7 +628,7 @@ Module Correctness.
     apply None.
   Defined.
 
-  Definition order {Unit} : ⊢ (□(Option Unit -> PROP) -> PROP) -> (□(Option Unit -> PROP) -> PROP) -> PROP :=
+  Definition order {Unit} : ⊢ʷ (□(Option Unit -> PROP) -> PROP) -> (□(Option Unit -> PROP) -> PROP) -> PROP :=
     fun w0 PT QT =>
       forall (P Q : □(Option Unit -> PROP) w0),
         (forall w1 (ζ1 : w0 ⊒⁻ w1) (x : Option Unit w1),
@@ -645,10 +645,10 @@ Module Correctness.
       + exists (w - x). exists (thick (R := Tri) x (Ty_hole yIn)).
   Admitted.
 
-  Definition cflex : ⊢ Ty -> Ty -> Option Unit :=
+  Definition cflex : ⊢ʷ Ty -> Ty -> Option Unit :=
     fun w s t => if eq_dec s t then Some tt else None.
 
-  Definition mg : ⊢ ◆Unit -> □(Option Unit -> PROP) :=
+  Definition mg : ⊢ʷ ◆Unit -> □(Option Unit -> PROP) :=
     fun w0 d w1 ζ1 o =>
       match o , d with
       | Some _ , Some (existT mgw (mgζ , _)) => Sub.triangular mgζ ≽ˢ Sub.triangular ζ1
@@ -739,7 +739,7 @@ Module Correctness.
     Import option.notations.
     (* Context [w] (lcmgu : ▻CMGU w). *)
 
-    Definition cmgu : ⊢ CMGU :=
+    Definition cmgu : ⊢ʷ CMGU :=
       fun w => fix cmgu s t :=
         match s , t with
         | Ty_hole xIn as s , t               => fun _ ζ => cflex s[Sub.triangular ζ] t[Sub.triangular ζ]

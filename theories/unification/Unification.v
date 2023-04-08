@@ -105,7 +105,7 @@ Section Löb.
 
   Import Tri.notations.
 
-  Context (A : TYPE) (step : ⊢ ▷A -> A).
+  Context (A : TYPE) (step : ⊢ʷ ▷A -> A).
 
   Obligation Tactic := auto using Nat.eq_le_incl, ctx.length_remove.
   Equations Löbaux {w : World} : A w by wf (ctx.length w) :=
@@ -113,7 +113,7 @@ Section Löb.
   Local Arguments Löbaux : clear implicits.
 
   Transparent Löbaux.
-  Definition Löb : ⊢ A := Löbaux.
+  Definition Löb : ⊢ʷ A := Löbaux.
 
   Context (P : forall w : World, A w -> Type).
   Context (pstep : forall w,
@@ -130,19 +130,19 @@ Section Operations.
   Import (hints) Tri.
   Import Pred Pred.notations.
 
-  Definition box2later {A} : ⊢ □⁻A -> ▶A.
+  Definition box2later {A} : ⊢ʷ □⁻A -> ▶A.
     intros w a x xIn t. apply a. econstructor.
     apply t. constructor.
   Defined.
 
-  Definition sooner2diamond {A} : ⊢ ◀A -> ◇A :=
+  Definition sooner2diamond {A} : ⊢ʷ ◀A -> ◇A :=
     fun w a =>
       match a with
         existT x (existT xIn (t , a)) =>
         existT (w - x) (pair (thick (R := Tri) x t) a)
       end.
 
-  Definition sooner2diamondtm {A} : ⊢ ◀A -> ◆A.
+  Definition sooner2diamondtm {A} : ⊢ʷ ◀A -> ◆A.
     intros w a. destruct a as [σ [σIn [t a]]].
     constructor.
     econstructor. split; try eassumption.
@@ -155,11 +155,11 @@ Section Operations.
   Definition M := DiamondT Tri Option.
   Definition RM {A} (R : LR.RELATION Tri A) := LR.ROption (LR.RDiamond R).
 
-  Definition pure {A} : ⊢ A -> M A :=
+  Definition pure {A} : ⊢ʷ A -> M A :=
     fun w a => Some (pure a).
   #[global] Arguments pure {A} [w] a.
 
-  Definition fail {A} : ⊢ ◆A :=
+  Definition fail {A} : ⊢ʷ ◆A :=
     fun w => None.
 
   Definition acc {A} {w0 w1} (ζ1 : w0 ⊒⁻ w1) : ◆A w1 -> ◆A w0 :=
@@ -188,7 +188,7 @@ Section Operations.
   Definition tell1 {w x} (xIn : x ∈ w) (t : Ty (w - x)) : ◆Unit w :=
     Some ((w - x); (thick (R := Tri) x t, tt)).
 
-  Definition bind {A B} : ⊢ ◆A -> □(A -> ◆B) -> ◆B :=
+  Definition bind {A B} : ⊢ʷ ◆A -> □⁻(A -> ◆B) -> ◆B :=
     fun w a0 f => option.bind a0 (fun '(w1; (ζ1, a1)) => acc ζ1 (f w1 ζ1 a1)).
 
   Lemma proper_bind {A B} {RA : RELATION Tri A} {RB : RELATION Tri B} :
@@ -216,14 +216,14 @@ Section OccursCheck.
   Import option.notations.
   Import Tri.notations.
 
-  Definition occurs_check_in : ⊢ ∀ x, ctx.In x -> ▷(Option (ctx.In x)) :=
+  Definition occurs_check_in : ⊢ʷ ∀ x, ctx.In x -> ▷(Option (ctx.In x)) :=
     fun w x xIn y yIn =>
       match ctx.occurs_check_view yIn xIn with
       | ctx.Same _      => None
       | ctx.Diff _ xIn' => Some xIn'
       end.
 
-  Definition occurs_check : ⊢ Ty -> ▷(Option Ty) :=
+  Definition occurs_check : ⊢ʷ Ty -> ▷(Option Ty) :=
     fun w =>
       fix oc (t : Ty w) (y : nat) (yIn : y ∈ w) {struct t} :=
       match t with
@@ -256,7 +256,7 @@ Section OccursCheck.
 
 End OccursCheck.
 
-Definition Hom (A B : TYPE) := ⊢ A -> B.
+Definition Hom (A B : TYPE) := ⊢ʷ A -> B.
 
 Definition fmap {A B} (f : Hom A B) : Hom ◆A ◆B.
 Proof.
@@ -275,7 +275,7 @@ Local Notation "s [ ζ ]" :=
 Section Mult.
   Import option.notations.
   Import (hints) Tri.
-
+  Import Tri.notations.
 
   Definition μ {A} : Hom ◆◆A ◆A :=
     fun w0 a0 => '(w1; (ζ1 , a1)) <- a0;; acc ζ1 a1.
@@ -284,7 +284,7 @@ Section Mult.
     fun f w0 a0 => '(w1; (ζ1, a1)) <- a0 ;; acc ζ1 (f w1 a1).
 
   (* see Kobayashi, S. (1997). Monad as modality. *)
-  Definition strength {A B} : Hom (□A * ◆B) (◆(□A * B)) :=
+  Definition strength {A B} : Hom (□⁻A * ◆B) (◆(□⁻A * B)) :=
     fun w0 '(a0,b0) => bind b0 (fun w1 ζ1 b1 => pure (_4 a0 ζ1, b1)).
 
 End Mult.
@@ -318,11 +318,11 @@ Module Variant1.
   Definition C := Box Tri (M Unit).
   Definition RC := LR.RBox (RM LR.RUnit).
 
-  Definition ctrue : ⊢ C :=
+  Definition ctrue : ⊢ʷ C :=
     fun w0 w1 r01 => pure tt.
-  Definition cfalse : ⊢ C :=
+  Definition cfalse : ⊢ʷ C :=
     fun w0 w1 r01 => None.
-  Definition cand : ⊢ C -> C -> C :=
+  Definition cand : ⊢ʷ C -> C -> C :=
     fun w0 c1 c2 w1 r01 =>
       bind (c1 w1 r01) (fun w2 r12 _ => _4 c2 r01 r12).
 
@@ -353,7 +353,7 @@ Module Variant1.
   Qed.
 
   Lemma ext_rbox {A} {RA : LR.RELATION Tri A} {w0 w1 w2}
-    {r01 : w0 ⊒⁻ w1} {r12 : w1 ⊒⁻ w2} (a0 : □A w0) (a1 : □A w1) :
+    {r01 : w0 ⊒⁻ w1} {r12 : w1 ⊒⁻ w2} (a0 : □⁻A w0) (a1 : □⁻A w1) :
     Ext (LR.RBox RA r01 a0 a1) r12 ⊣⊢ₚ LR.RBox RA (r01 ⊙⁻ r12) a0 (_4 a1 r12).
   Proof.
     unfold LR.RBox.
@@ -365,24 +365,20 @@ Module Variant1.
     apply split_bientails; split.
     - apply forall_r. intros r24.
       apply forall_r. intros r34.
-      cbv [entails Forall Ext Acc.wlp implₚ eqₚ] in *.
-      intros ι2 HQ ι4 <- Heq.
+      constructor. intros ι2 HQ ι4 <- Heq; pred_unfold. cbn in *.
       apply HQ; now rewrite ?inst_trans in *.
     - apply forall_r. intros r14.
       apply forall_r. intros r34.
-      cbv [entails Forall Ext Acc.wlp implₚ eqₚ] in *.
+      constructor. cbn.
       intros ι2 HQ ι4 Heq1 Heq2.
   Abort.
-
-  Opaque Ext.
-  Opaque entails.
 
   Lemma proper_bind' {A B} {RA : LR.RELATION _ A} {RB : LR.RELATION _ B}
     {w0 w1} (r01 : w0 ⊒⁻ w1) (P : Pred w1)
     (m1 : ◆A w1)
     (m0 : ◆A w0)
-    (Q0 : □(A -> ◆B) w0)
-    (Q1 : □(A -> ◆B) w1) :
+    (Q0 : □⁻(A -> ◆B) w0)
+    (Q1 : □⁻(A -> ◆B) w1) :
     entails P (RM RA r01 m0 m1) ->
     entails P (LR.RBox (LR.RImpl RA (RM RB)) r01 Q0 Q1) ->
     entails P (RM RB r01 (bind m0 Q0) (bind m1 Q1)).
@@ -417,17 +413,13 @@ Module Variant1.
     apply forall_r. intros r13.
     apply forall_r. intros r23.
     apply Acc.entails_wlp. cbn.
-    apply impl_and_adjoint.
+    rewrite <- impl_and_adjoint.
     unfold cand.
     eapply proper_bind'; eauto using LR.RUnit.
     Unshelve. 3: apply LR.RUnit.
-    - rewrite ext_and.
-      Transparent entails Ext.
-      cbv [entails andₚ RM LR.RUnit RC Ext LR.RBox LR.ROption Forall implₚ eqₚ Const Falseₚ Trueₚ
-        Acc.wlp].
+    - rewrite ext_and. constructor. cbn.
       intros ι3 [[H1 H2] Heq].
-      specialize (H1 _ _ r02 r13 r23 ι3 eq_refl Heq).
-      now destruct (c11 w2 r02), (c12 w3 r13).
+      exact (H1 _ _ r02 r13 r23 ι3 eq_refl Heq).
     - unfold LR.RBox.
       apply forall_r. intros w4.
       apply forall_r. intros w5.
@@ -446,8 +438,7 @@ Module Variant1.
       rewrite <- ?ext_and.
       rewrite <- ?ext_trans.
       unfold _4.
-      cbv [entails andₚ RM LR.RUnit RC Ext LR.RBox LR.ROption Forall implₚ eqₚ Const Falseₚ Trueₚ
-        Acc.wlp LR.RDiamond Exists Acc.wp].
+      constructor. repeat (pred_unfold; cbn).
       intros ι5; intros [[[] ?] ?].
       specialize (H0 _ _ (r02 ⊙⁻ r24) (r13 ⊙⁻ r35) r45 ι5).
       rewrite ?inst_trans in *.
@@ -473,7 +464,7 @@ Module Variant1.
   Definition BoxSolveList : TYPE :=
     List (Prod Ty Ty) -> C.
 
-  Definition flex : ⊢ Flex :=
+  Definition flex : ⊢ʷ Flex :=
     fun w t x xIn =>
       match varview t with
       | is_var yIn =>
@@ -530,26 +521,26 @@ Module Variant1.
 
   End MguO.
 
-  Definition bmgu : ⊢ BoxUnifier :=
+  Definition bmgu : ⊢ʷ BoxUnifier :=
     fun w s t => Löb boxmgu _ s t.
 
-  Definition mgu : ⊢ Unifier :=
+  Definition mgu : ⊢ʷ Unifier :=
     fun w s t => T (@bmgu w s t).
 
-  Definition boxsolvelist : ⊢ BoxSolveList :=
+  Definition boxsolvelist : ⊢ʷ BoxSolveList :=
     fix solve {w} cs {struct cs} :=
       match cs with
       | List.nil             => ctrue
       | List.cons (t1,t2) cs => cand (bmgu t1 t2) (solve cs)
       end.
 
-  Definition solvelist : ⊢ SolveList :=
+  Definition solvelist : ⊢ʷ SolveList :=
     fun w cs => boxsolvelist cs Tri.refl.
 
   Import option.notations.
 
   Definition prenex {A} :
-    ⊢ FreeM A -> ?◇⁺(List (Ty * Ty) * A) :=
+    ⊢ʷ FreeM A -> ?◇⁺(List (Ty * Ty) * A) :=
     fix pr {w} m {struct m} :=
     match m with
     | Ret_Free _ _ a => Some (w; (refl, (List.nil, a)))
@@ -585,7 +576,7 @@ Module Variant2.
   Definition BoxUnifier : TYPE :=
     Ty -> Ty -> □⁻◆Ty.
 
-  Definition flex : ⊢ Ty -> ∀ x, ctx.In x -> ◆Ty :=
+  Definition flex : ⊢ʷ Ty -> ∀ x, ctx.In x -> ◆Ty :=
     fun w t x xIn =>
       match t with
       | Ty_hole yIn =>
@@ -602,7 +593,7 @@ Module Variant2.
 
     Context [w] (lmgu : ▷BoxUnifier w).
 
-    Definition boxflex {x} (xIn : x ∈ w) (t : Ty w) : □◆Ty w :=
+    Definition boxflex {x} (xIn : x ∈ w) (t : Ty w) : □⁻◆Ty w :=
       Tri.box_intro_split
         (flex t xIn)
         (fun z zIn u =>
@@ -621,7 +612,7 @@ Module Variant2.
 
   End MguO.
 
-  Definition mgu : ⊢ Unifier :=
+  Definition mgu : ⊢ʷ Unifier :=
     fun w s t => T (@Löb _ boxmgu w s t).
 
 End Variant2.

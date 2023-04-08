@@ -169,7 +169,7 @@ Inductive solvedM (A : Type) : Type :=
   | fail_solved          : solvedM A
   | bind_exists_solved   : (ty -> solvedM A) -> solvedM A.
 
-Notation Assignment := (env.Env (fun _ => ty)).
+Notation Assignment := (@env.Env nat (fun _ => ty)).
 
 Module S.
   Import World.notations.
@@ -181,13 +181,17 @@ Module S.
   Definition pure {A} (a : A) : Valid (Sem A) := fun _ _ => a.
   #[global] Arguments pure {A} _ {w} _/.
 
+  Definition fmap {A B} (f : A -> B) : ⊢ʷ Sem A -> Sem B :=
+    fun w a ι => f (a ι).
+
   (* app :: f (a -> b) -> f a -> f b *)
-  Definition app (A B : Type) : ⊢ (Sem (A -> B)) -> Sem A -> Sem B :=
+  Definition app (A B : Type) : ⊢ʷ (Sem (A -> B)) -> Sem A -> Sem B :=
     fun w fab fa ass => fab ass (fa ass).
 
   (* <*> : f a -> f b -> f (a * b) *)
-  Definition spaceship (A B : Type) : ⊢ (Sem A) -> (Sem B) -> (Sem (A * B)) :=
+  Definition spaceship (A B : Type) : ⊢ʷ (Sem A) -> (Sem B) -> (Sem (A * B)) :=
     fun w fa fb ass => (fa ass, fb ass).
+
 
 End S.
 Export S (Sem).
@@ -242,6 +246,10 @@ Class Lk (R : ACC) : Type :=
 Class Thick (R : ACC) : Type :=
   thick w x {xIn : x ∈ w} (t : Ty (w - x)) : R w (w - x).
 #[global] Arguments thick {R _ w} x {xIn} t.
+
+Class Reduce (R : ACC) : Type :=
+  reduce w α (t : Ty w) : R (w ▻ α) w.
+#[global] Arguments reduce {R _ w} α t.
 
 #[export] Instance lk_alloc : Lk Alloc :=
   fun w1 w2 r x xIn => Ty_hole _ x (persist _ xIn _ r).
@@ -302,10 +310,15 @@ Lemma inst_trans {R} {transR : Trans R} {instR : forall w, Inst (R w) (Assignmen
   inst (trans r12 r23) ass = inst r12 (inst r23 ass).
 Proof. Admitted.
 
+Lemma inst_reduce {R} {reduceR : Reduce R} {instR : forall w, Inst (R w) (Assignment w)}
+  {w α t} (ι : Assignment w) :
+  inst (reduce α t) ι = env.snoc ι α (inst t ι).
+Proof. Admitted.
+
 Section WeakestPre.
   Import World.notations.
 
-  Definition WLP {A} : ⊢ FreeM A -> □⁺(A -> Assignment -> PROP) -> Assignment -> PROP :=
+  Definition WLP {A} : ⊢ʷ FreeM A -> □⁺(A -> Assignment -> PROP) -> Assignment -> PROP :=
     fix WLP w m POST ı {struct m} :=
       match m with
       | Ret_Free _ _ v => T POST v ı
@@ -316,7 +329,7 @@ Section WeakestPre.
           forall t, WLP _ k (_4 POST step) (env.snoc ı i t)
       end%type.
 
-  Definition WP {A} : ⊢ FreeM A -> □⁺(A -> Assignment -> PROP) -> Assignment -> PROP :=
+  Definition WP {A} : ⊢ʷ FreeM A -> □⁺(A -> Assignment -> PROP) -> Assignment -> PROP :=
     fix WP w m POST ı {struct m} :=
       match m with
       | Ret_Free _ _ v => T POST v ı
@@ -373,14 +386,14 @@ Section Lift.
   Import World.notations.
 
   (* Indexes a given ty by a world Σ *)
-  Fixpoint lift (t : ty) : ⊢ Ty :=
+  Fixpoint lift (t : ty) : ⊢ʷ Ty :=
     fun w =>
       match t with
       | ty_bool       => Ty_bool w
       | ty_func t1 t2 => Ty_func w (lift t1 w) (lift t2 w)
       end.
 
-  Fixpoint liftEnv (E : env) : ⊢ Env :=
+  Fixpoint liftEnv (E : env) : ⊢ʷ Env :=
     fun w =>
       match E with
       | List.nil               => List.nil
@@ -397,16 +410,10 @@ Section Lift.
 
 End Lift.
 
-Lemma inst_persist_env {R} {persR : Persistent R Env}
-  {instR : forall w, Inst (R w) (Assignment w)}
-  {w0 w1} (r1 : R w0 w1) (G0 : Env w0) (ι1 : Assignment w1) :
-  inst (persist _ G0 _ r1) ι1 = inst G0 (inst r1 ι1).
-Proof. Admitted.
-
-Lemma inst_persist_ty {R} {persR : Persistent R Ty}
-  {instR : forall w, Inst (R w) (Assignment w)}
-  {w0 w1} (r1 : R w0 w1) (t0 : Ty w0) (ι1 : Assignment w1) :
-  inst (persist _ t0 _ r1) ι1 = inst t0 (inst r1 ι1).
+Lemma inst_persist {R} {instR : forall w, Inst (R w) (Assignment w)}
+  {AT A} {persR : Persistent R AT} {instAT : Inst AT A}
+  {w0 w1} (r1 : R w0 w1) (t : AT w0) (ι1 : Assignment w1) :
+  inst (persist _ t _ r1) ι1 = inst t (inst r1 ι1).
 Proof. Admitted.
 
 Lemma inst_step {R} {stepR : Step R} {instR : forall w, Inst (R w) (Assignment w)}
@@ -498,8 +505,7 @@ Proof.
 Qed.
 
 Lemma resolve_inst (w : World) (g : Env w) (x : String.string) (ι : Assignment w) :
-  resolve x (inst g ι) =
-    option.map (fun t => inst t ι) (resolve x g).
+  resolve x (inst g ι) = inst (resolve x g) ι.
 Proof.
   induction g as [|[y t]]; cbn.
   - reflexivity.
@@ -515,7 +521,7 @@ Section ShallowConstraints.
   #[global] Arguments TyF_bool {w}.
   #[global] Arguments TyF_func {w x y}.
 
-  Definition inj : ⊢ TyF -> Ty :=
+  Definition inj : ⊢ʷ TyF -> Ty :=
     fun w t =>
       match t with
       | TyF_bool     => Ty_bool _

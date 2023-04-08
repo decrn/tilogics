@@ -64,11 +64,11 @@ Module LR.
   Definition RBox Θ {transΘ : Trans Θ} {instΘ : forall w, Inst (Θ w) (Assignment w)}
      {A} (R : RELATION Θ A) : RELATION Θ (Box Θ A) :=
     fun w0 w1 θ01 ba0 ba1 =>
-       ∀ₚ w2 ∶ World,
-       ∀ₚ w3 ∶ World,
-       ∀ₚ θ02 ∶ Θ w0 w2,
-       ∀ₚ θ13 ∶ Θ w1 w3,
-       ∀ₚ θ23 ∶ Θ w2 w3,
+       ∀ₚ w2 : World,
+       ∀ₚ w3 : World,
+       ∀ₚ θ02 : Θ w0 w2,
+       ∀ₚ θ13 : Θ w1 w3,
+       ∀ₚ θ23 : Θ w2 w3,
          Acc.wlp θ13
            (θ01 ⊙ θ13 =ₚ θ02 ⊙ θ23 ->ₚ
             R w2 w3 θ23 (ba0 w2 θ02) (ba1 w3 θ13)).
@@ -89,7 +89,7 @@ Module LR.
     fun w0 w1 θ01 da0 da1 =>
       match da0 , da1 with
       | (w2; (θ02,a2)) , (w3; (θ13,a3)) =>
-          ∃ₚ θ23 ∶ Θ w2 w3,
+          ∃ₚ θ23 : Θ w2 w3,
           Acc.wp θ13
             ((θ01 ⊙ θ13) =ₚ (θ02 ⊙ θ23) /\ₚ
              R w2 w3 θ23 a2 a3)
@@ -97,8 +97,8 @@ Module LR.
 
   Definition RImpl {Θ A B} (RA : RELATION Θ A) (RB : RELATION Θ B) : RELATION Θ (Impl A B) :=
     fun w0 w1 θ01 f0 f1 =>
-      (∀ₚ a0 ∶ A w0,
-       ∀ₚ a1 ∶ A w1,
+      (∀ₚ a0 : A w0,
+       ∀ₚ a1 : A w1,
          RA w0 w1 θ01 a0 a1 ->ₚ
          RB w0 w1 θ01 (f0 a0) (f1 a1))%P.
 
@@ -121,7 +121,7 @@ Module LR.
     firstorder.
   Qed.
 
-  Definition RValid {Θ A} (R : RELATION Θ A) (a : ⊢ A) : Prop :=
+  Definition RValid {Θ A} (R : RELATION Θ A) (a : ⊢ʷ A) : Prop :=
     forall w0 w1 θ01,
       ⊤ₚ ⊢ₚ R w0 w1 θ01 (a w0) (a w1).
 
@@ -168,5 +168,8 @@ Module LR.
     Qed.
 
   End Option.
+
+  #[global] Arguments ROption {Θ A} R [w0 w1] θ01 _ _ _/.
+  #[global] Arguments RBox [Θ] {_ _ A} R [w0 w1] θ01 _ _ _/.
 
 End LR.

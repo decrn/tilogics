@@ -142,7 +142,7 @@ Module Tri.
   End notations.
 
   Definition box_intro_split {A} :
-    ⊢ A -> ▶□⁻A -> □⁻A :=
+    ⊢ʷ A -> ▶□⁻A -> □⁻A :=
     fun w0 a la w1 ζ =>
       match ζ with
       | Tri.refl => a
