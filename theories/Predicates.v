@@ -710,6 +710,15 @@ Module Pred.
           now rewrite inst_lift in HQ.
       Qed.
 
+      Lemma wp_impl {w0 w1} (θ1 : R w0 w1) (P : Pred _) (Q : Pred _) :
+        (wp θ1 P ->ₚ Q) ⊣⊢ₚ wlp θ1 (P ->ₚ Ext Q θ1).
+      Proof.
+        constructor. intros ι; unfold wp, wlp, Ext. pred_unfold.
+        split.
+        - intros H ι1 <- HP. apply H. now exists ι1.
+        - intros HPQ (ι1 & <- & HP). now apply HPQ.
+      Qed.
+
     End WithAccessibilityRelation.
     (* #[global] Opaque wp. *)
     (* #[global] Opaque wlp. *)
@@ -796,25 +805,25 @@ Module Pred.
       induction T; cbn; intros; subst.
       - apply pfalse; cbn; easy.
       - apply ptrue; cbn; easy.
-      - specialize (IHT1 w ι G Ty_bool (fun _ => cnd') eq_refl eq_refl eq_refl).
-        specialize (IHT2 w ι G t0      (fun _ => coq') eq_refl eq_refl eq_refl).
-        specialize (IHT3 w ι G t0      (fun _ => alt') eq_refl eq_refl eq_refl).
+      - specialize (IHT1 w ι G0 Ty_bool (fun _ => cnd') eq_refl eq_refl eq_refl).
+        specialize (IHT2 w ι G0 t0      (fun _ => coq') eq_refl eq_refl eq_refl).
+        specialize (IHT3 w ι G0 t0      (fun _ => alt') eq_refl eq_refl eq_refl).
         eapply pif; cbn; eauto; eauto; easy.
       - apply pvar; cbn; try easy.
         now rewrite resolve_inst in H.
-      - specialize (IHT w ι (cons (v, lift vt _) G) (lift t _) (fun _ => e')).
+      - specialize (IHT w ι (cons (v, lift vt _) G0) (lift t _) (fun _ => e')).
         cbn in IHT. rewrite ?inst_lift in IHT.
         specialize (IHT eq_refl eq_refl eq_refl).
         eapply pabsu; cbn; eauto; rewrite ?inst_lift; try easy.
-        change (@inst _ _ (@inst_sem expr) _ ?e ?ι) with (e ι); cbn.
+        change (@inst _ _ (@S.inst_sem expr) _ ?e ?ι) with (e ι); cbn.
         now rewrite inst_lift.
-      - specialize (IHT w ι (cons (v, lift vt _) G) (lift t _) (fun _ => e')).
+      - specialize (IHT w ι (cons (v, lift vt _) G0) (lift t _) (fun _ => e')).
         cbn in IHT. rewrite ?inst_lift in IHT.
         specialize (IHT eq_refl eq_refl eq_refl).
         eapply pabst; cbn; eauto; rewrite ?inst_lift; easy.
-      - specialize (IHT1 w ι G (Ty_func (lift t2 _) t) (fun _ => e1')). cbn in IHT1.
+      - specialize (IHT1 w ι G0 (Ty_func (lift t2 _) t) (fun _ => e1')). cbn in IHT1.
         rewrite ?inst_lift in IHT1. specialize (IHT1 eq_refl eq_refl eq_refl).
-        specialize (IHT2 w ι G (lift t2 _) (fun _ => e2')).
+        specialize (IHT2 w ι G0 (lift t2 _) (fun _ => e2')).
         rewrite ?inst_lift in IHT2. specialize (IHT2 eq_refl eq_refl eq_refl).
         eapply papp; cbn; eauto; rewrite ?inst_lift; easy.
     Abort.

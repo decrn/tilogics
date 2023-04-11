@@ -100,29 +100,29 @@ Fixpoint resolve {X} (var : string) (ctx : list (string * X)) : option X :=
 Reserved Notation "G |-- E ; T ~> EE"
             (at level 50).
 
-Inductive tpb : env -> expr -> ty -> expr -> Prop :=
-  | tpb_false : forall g,
-      g |-- v_false ; ty_bool ~> v_false
-  | tpb_true : forall g,
-      g |-- v_true ; ty_bool ~> v_true
-  | tpb_if : forall g cnd cnd' coq coq' alt alt' t,
-      g |-- cnd ; ty_bool ~> cnd' ->
-      g |-- coq ; t       ~> coq' ->
-      g |-- alt ; t       ~> alt' ->
-      g |-- (e_if cnd coq alt) ; t ~> (e_if cnd' coq' alt')
-  | tpb_var : forall g v vt,
-      resolve v g = Some vt ->
-      g |-- (e_var v) ; vt ~> (e_var v)
-  | tpb_absu : forall v vt g e e' t,
-      ((v, vt) :: g) |-- e ; t ~> e' ->
-      g |-- (e_absu v e) ; (ty_func vt t) ~> (e_abst v vt e')
-  | tpb_abst : forall v vt g e e' t,
-      ((v, vt) :: g) |-- e ; t ~> e' ->
-      g |-- (e_abst v vt e) ; (ty_func vt t) ~> (e_abst v vt e')
-  | tpb_app : forall g e1 t1 e1' e2 t2 e2',
-      g |-- e1 ; (ty_func t2 t1) ~> e1' ->
-      g |-- e2 ; t2 ~> e2' ->
-      g |-- (e_app e1 e2) ; t1 ~> (e_app e1' e2')
+Inductive tpb (G : env) : expr -> ty -> expr -> Prop :=
+  | tpb_false :
+      G |-- v_false ; ty_bool ~> v_false
+  | tpb_true :
+      G |-- v_true ; ty_bool ~> v_true
+  | tpb_if cnd cnd' coq coq' alt alt' t :
+      G |-- cnd ; ty_bool ~> cnd' ->
+      G |-- coq ; t       ~> coq' ->
+      G |-- alt ; t       ~> alt' ->
+      G |-- (e_if cnd coq alt) ; t ~> (e_if cnd' coq' alt')
+  | tpb_var v vt :
+      resolve v G = Some vt ->
+      G |-- (e_var v) ; vt ~> (e_var v)
+  | tpb_absu v vt e e' t :
+      ((v, vt) :: G) |-- e ; t ~> e' ->
+      G |-- (e_absu v e) ; (ty_func vt t) ~> (e_abst v vt e')
+  | tpb_abst v vt e e' t :
+      ((v, vt) :: G) |-- e ; t ~> e' ->
+      G |-- (e_abst v vt e) ; (ty_func vt t) ~> (e_abst v vt e')
+  | tpb_app e1 t1 e1' e2 t2 e2' :
+      G |-- e1 ; (ty_func t2 t1) ~> e1' ->
+      G |-- e2 ; t2 ~> e2' ->
+      G |-- (e_app e1 e2) ; t1 ~> (e_app e1' e2')
 
   where "G |-- E ; T ~> EE" := (tpb G E T EE).
 
@@ -171,31 +171,6 @@ Inductive solvedM (A : Type) : Type :=
 
 Notation Assignment := (@env.Env nat (fun _ => ty)).
 
-Module S.
-  Import World.notations.
-
-  Definition Sem (A : Type) : TYPE :=
-    fun w => Assignment w -> A.
-
-  (* pure  :: a -> f a *)
-  Definition pure {A} (a : A) : Valid (Sem A) := fun _ _ => a.
-  #[global] Arguments pure {A} _ {w} _/.
-
-  Definition fmap {A B} (f : A -> B) : ⊢ʷ Sem A -> Sem B :=
-    fun w a ι => f (a ι).
-
-  (* app :: f (a -> b) -> f a -> f b *)
-  Definition app (A B : Type) : ⊢ʷ (Sem (A -> B)) -> Sem A -> Sem B :=
-    fun w fab fa ass => fab ass (fa ass).
-
-  (* <*> : f a -> f b -> f (a * b) *)
-  Definition spaceship (A B : Type) : ⊢ʷ (Sem A) -> (Sem B) -> (Sem (A * B)) :=
-    fun w fa fb ass => (fa ass, fb ass).
-
-
-End S.
-Export S (Sem).
-
 Class Inst (A : TYPE) (a : Type) : Type :=
   inst : forall {w}, A w -> Assignment w -> a.
 
@@ -235,9 +210,56 @@ Class Inst (A : TYPE) (a : Type) : Type :=
   | (s,T) :: sTs => (s, inst T ass) :: inst_env sTs ass
   end%list.
 
-#[export] Instance inst_sem {A} :
-  Inst (Sem A) A :=
-  fun w x ass => x ass.
+Module S.
+  Import World.notations.
+
+  Definition Sem (A : Type) : TYPE :=
+    fun w => Assignment w -> A.
+
+  (* pure  :: a -> f a *)
+  Definition pure {A} (a : A) : Valid (Sem A) := fun _ _ => a.
+  #[global] Arguments pure {A} _ {w} ι/.
+
+  Definition fmap {A B} (f : A -> B) : ⊢ʷ Sem A -> Sem B :=
+    fun w a ι => f (a ι).
+  #[global] Arguments fmap {A B} _ {w} a ι/.
+
+  (* app :: f (a -> b) -> f a -> f b *)
+  Definition app {A B : Type} : ⊢ʷ (Sem (A -> B)) -> Sem A -> Sem B :=
+    fun w f a ι => f ι (a ι).
+  #[global] Arguments app {A B} [w] f a ι/.
+
+  (* <&> : f a -> f b -> f (a * b) *)
+  Definition spaceship {A B : Type} : ⊢ʷ (Sem A) -> (Sem B) -> (Sem (A * B)) :=
+    fun w a b ι => (a ι, b ι).
+
+  #[export] Instance inst_sem {A} : Inst (Sem A) A :=
+    fun w x ι => x ι.
+  #[global] Arguments inst_sem {A} [w] x ι/.
+
+  #[export] Instance persistent_sem {R} {instR : forall w, Inst (R w) (Assignment w)} {A} :
+    Persistent R (Sem A) := fun w0 t w1 r01 ι1 => t (inst r01 ι1).
+
+  Section PersistLemmas.
+    Context {Θ : ACC} {instΘ : forall w, Inst (Θ w) (Assignment w)}.
+
+    Lemma persist_pure {A} (a : A) [w0 w1] (θ01 : Θ w0 w1) :
+      persist _ (pure a) _ θ01 = pure a.
+    Proof. reflexivity. Qed.
+
+    Lemma persist_fmap {A B} (f : A -> B) [w0] (a : Sem A w0) [w1] (θ01 : Θ w0 w1) :
+      persist _ (fmap f a) _ θ01 = fmap f (persist _ a _ θ01).
+    Proof. reflexivity. Qed.
+
+    Lemma persist_app {A B} [w0] (f : Sem (A -> B) w0) (a : Sem A w0) [w1] (θ01 : Θ w0 w1) :
+      persist _ (app f a) _ θ01 = app (persist _ f _ θ01) (persist _ a _ θ01).
+    Proof. reflexivity. Qed.
+
+  End PersistLemmas.
+
+End S.
+Export (hints) S.
+Export S (Sem).
 
 Class Lk (R : ACC) : Type :=
   lk w1 w2 (r : R w1 w2) x (xIn : ctx.In x w1) : Ty w2.
@@ -253,9 +275,6 @@ Class Reduce (R : ACC) : Type :=
 
 #[export] Instance lk_alloc : Lk Alloc :=
   fun w1 w2 r x xIn => Ty_hole _ x (persist _ xIn _ r).
-
-#[export] Instance persistent_sem {R} {instR : forall w, Inst (R w) (Assignment w)} {A} :
-  Persistent R (Sem A) := fun w0 t w1 r01 ι1 => t (inst r01 ι1).
 
 #[export] Instance Persistent_Ty {R} {lkR : Lk R} : Persistent R Ty :=
   fix per {w} (t : Ty w) {w'} (r : R w w') : Ty w' :=

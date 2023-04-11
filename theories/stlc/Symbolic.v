@@ -181,7 +181,7 @@ Section TypeReconstruction.
         [ θ1 ] '(tf, e1') <- reconstruct e1 Γ ;;
         [ θ2 ] '(t1, e2') <- reconstruct e2 (persist _ Γ _ θ1) ;;
         [ θ3 ] t2         <- @exists_Ty _ ;;
-        [ θ4 ] _          <- assert tf[θ2⊙θ3] (Ty_func _ t1[θ3] t2) ;;
+        [ θ4 ] _          <- assert (Ty_func _ t1[θ3] t2) tf[θ2⊙θ3] ;;
             ret (t2[θ4] , e_app <$> e1'[θ2⊙θ3⊙θ4] <*> e2'[θ3⊙θ4])
     end.
 
@@ -636,6 +636,7 @@ Ltac wsimpl :=
       ?Pred.ext_exists, ?Pred.ext_forall, ?Pred.Acc.wlp_true, ?Pred.eq_pair,
 
       ?Sub.persist_sim_step_alloc_env, ?Sub.persist_sim_step_alloc_ty, ?Sub.persist_sim_step_alloc_sem,
+      ?S.persist_pure, ?S.persist_fmap, ?S.persist_app,
 
       ?ProgramLogic.eqₚ_env_cons, ?ProgramLogic.step_reduce,
       ?ProgramLogic.lift_reduce, ?ProgramLogic.eq_func,
@@ -1144,61 +1145,83 @@ Module Reconstruct.
         WP _ (reconstruct e G0)
           (fun w1 r01 '(t',e') => lift t w1 =ₚ t' /\ₚ S.pure ee =ₚ e')%P.
   Proof.
-    induction T; intros w0 G0; wsimpl; unfold _4, Definitions.T.
+    induction T as [G|G|G e1 e1' e2 e2' e3 e3' t _ IH1 _ IH2 _ IH3|G x t Hres
+      |G x t1 e e' t2 _ IH|G x t1 e e' t2 _ IH|G e1 t2 e1' e2 t1 e2' _ IH1 _ IH2];
+      intros w0 G0; wsimpl; unfold _4, Definitions.T.
     - iIntros "#HeqG". rewrite wp_bind. unfold _4.
-      iPoseProof (IHT1 w0 G0 with "HeqG") as "-#IH".
-      clear IHT1. wsimpl.
-      iRevert "IH". iApply wp_mono. iIntros (w1 r1 (t1 & e1')) "!> (#Heq1 & #Heq2)". wsimpl.
-      iSplit. wsimpl.
+      iPoseProof (IH1 w0 G0 with "HeqG") as "-#IH". clear IH1. iRevert "IH".
+      iApply wp_mono. iIntros (w1 r1 (t1 & e1'')) "!> (#Heq1 & #Heq2)". wsimpl.
+      iSplit. auto.
 
       rewrite wp_bind. unfold _4.
-      iPoseProof (IHT2 w1 G0[r1] with "HeqG") as "-#IH". clear IHT2.
-      iRevert "IH". iApply wp_mono. iIntros (w2 r2 (t2 & e2')). wsimpl.
-      iIntros "!> #Heq3 #Heq4". wsimpl.
+      iPoseProof (IH2 w1 G0[r1] with "HeqG") as "-#IH". clear IH2. iRevert "IH".
+      iApply wp_mono. iIntros (w2 r2 (t2 & e2'')) "!> (#Heq3 & #Heq4)". wsimpl.
 
       rewrite wp_bind. unfold _4.
-      iPoseProof (IHT3 w2 G0 with "HeqG") as "-#IH". clear IHT3.
-      iRevert "IH". iApply wp_mono. iIntros (w3 r3 (t3 & e3')). wsimpl.
-      iIntros "!> #Heq5 #Heq6". wsimpl.
-      repeat iSplit; auto.
-      + admit.
-      + admit.
+      iPoseProof (IH3 w2 G0 with "HeqG") as "-#IH". clear IH3. iRevert "IH".
+      iApply wp_mono. iIntros (w3 r3 (t3 & e3'')) "!> (#Heq5 & #Heq6)". wsimpl.
+
+      iStopProof. constructor. intros ι [_ [(HeqG & Heq1 & Heq2 & Heq3 & Heq4 & Heq5 & Heq6)]].
+      pred_unfold. split. auto. split. auto.
+      cbv [inst S.inst_sem S.pure S.app S.fmap] in *.
+      now subst.
 
     - constructor. intros ι. pred_unfold.
       rewrite inst_lift_env. intros _ ->.
-      rewrite resolve_inst in H.
+      rewrite resolve_inst in Hres.
       destruct resolve.
-      + injection H. clear H. intros <-.
-        cbn. now pred_unfold.
-      + discriminate H.
-    - iIntros "#HeqG".
-      iExists (lift vt _). iIntros "!> #Heq1".
-      rewrite wp_bind. unfold _4. wsimpl.
-      iPoseProof (IHT (w0 ▻ ctx.length w0) ((v, Ty_hole (w0 ▻ ctx.length w0) (ctx.length w0) ctx.in_zero) :: G0)) as "IHT".
-      wsimpl.
-      iPoseProof ("IHT" with "Heq1 HeqG") as "-#IHT'". iRevert "IHT'". iClear "IHT".
-      iApply wp_mono. iIntros (w1 r1 (t1 & e1')) "!> (#Heq2 & #Heq3)". wsimpl.
-      repeat iSplit; auto.
-      admit.
+      + injection Hres. intros <-. cbn. now pred_unfold.
+      + discriminate Hres.
 
-    - admit.
-    - admit.
-  Admitted.
+    - iIntros "#HeqG".
+      iExists (lift t1 _). iIntros "!> #Heq1".
+      rewrite wp_bind. unfold _4. wsimpl.
+      iPoseProof (IH (w0 ▻ ctx.length w0) ((x, Ty_hole (w0 ▻ ctx.length w0) (ctx.length w0) ctx.in_zero) :: G0)) as "IH". clear IH. wsimpl.
+      iPoseProof ("IH" with "Heq1 HeqG") as "-#IH'". iClear "IH". iRevert "IH'".
+      iApply wp_mono. iIntros (w1 r1 (t2' & e1'')) "!> (#Heq2 & #Heq3)". wsimpl.
+      repeat iSplit; auto.
+      iStopProof. constructor. intros ι [_ [(HeqG & Heq1 & Heq2 & Heq3)]].
+      pred_unfold.
+      cbv [inst S.inst_sem S.pure S.app S.fmap] in *.
+      now subst.
+
+    - iIntros "#HeqG".
+      rewrite wp_bind. unfold _4. wsimpl.
+      iPoseProof (IH w0 ((x, lift t1 w0) :: G0)) as "IH". clear IH. wsimpl.
+      iPoseProof ("IH" with "HeqG") as "-#IH'". iClear "IH". iRevert "IH'".
+      iApply wp_mono. iIntros (w1 r1 (t2' & e'')) "!> (#Heq1 & #Heq2)". wsimpl.
+      iSplit. auto.
+      iStopProof. constructor. intros ι [_ [(HeqG & Heq1 & Heq2)]].
+      pred_unfold.
+      cbv [inst S.inst_sem S.pure S.app S.fmap] in *.
+      now subst.
+
+    - iIntros "#HeqG".
+      rewrite wp_bind. unfold _4. wsimpl.
+      iPoseProof (IH1 w0 G0) as "IH". clear IH1. wsimpl.
+      iPoseProof ("IH" with "HeqG") as "-#IH'". iClear "IH". iRevert "IH'".
+      iApply wp_mono. iIntros (w1 r1 (tf & e1'')) "!> (#Heq1 & #Heq2)". wsimpl.
+
+      rewrite wp_bind. unfold _4.
+      iPoseProof (IH2 w1 G0 with "HeqG") as "-#IH". clear IH2. iRevert "IH".
+      iApply wp_mono. iIntros (w2 r2 (t1' & e2'')) "!> (#Heq3 & #Heq4)". wsimpl.
+      iExists (lift t2 w2). unfold _4. rewrite lk_refl. wsimpl.
+
+      iStopProof. constructor. intros ι [_ [(HeqG & Heq1 & Heq2 & Heq3 & Heq4)]].
+      pred_unfold. split; auto.
+      cbv [inst S.inst_sem S.pure S.app S.fmap] in *.
+      now subst.
+  Qed.
 
   Lemma wp_impl {A w} (m : FreeM A w) (P : □⁺(A -> Pred) w) (Q : Pred w) :
     (WP _ m P ->ₚ Q) ⊣⊢ₚ WLP _ m (fun w1 r01 a1 => P w1 r01 a1 ->ₚ Ext Q r01)%P.
   Proof.
-    (* unfold Ext, bientails, implₚ. revert P Q. *)
-    (* induction m; cbn; unfold T, _4, Basics.impl. *)
-    (* - easy. *)
-    (* - intros. intuition. *)
-    (* - split; intuition. now apply IHm. *)
-    (* - intros. specialize (IHm (_4 P step) (Ext Q step)). *)
-    (*   cbn. split. *)
-    (*   + intros HQ t. specialize (IHm (env.snoc ι _ t)). *)
-    (*     apply IHm. intros Hwp. apply HQ. exists t. apply Hwp. *)
-    (*   + intros Hwlp (t & Hwp). specialize (Hwlp t). *)
-    (*     apply IHm in Hwlp; auto. *)
+    induction m; cbn; unfold _4, Basics.impl.
+    - wsimpl.
+    - wsimpl.
+    - wsimpl. now rewrite IHm.
+    - rewrite <- Acc.wp_step, Acc.wp_impl.
+      apply Acc.proper_wlp_bientails. rewrite IHm.
   Admitted.
 
   Theorem correctness e :
