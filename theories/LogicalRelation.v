@@ -172,4 +172,16 @@ Module LR.
   #[global] Arguments ROption {Θ A} R [w0 w1] θ01 _ _ _/.
   #[global] Arguments RBox [Θ] {_ _ A} R [w0 w1] θ01 _ _ _/.
 
+  Lemma eqₚ_subst {Θ} {reflΘ : Refl Θ}
+    {instΘ : forall w, Inst (Θ w) (Assignment w)} {instReflΘ : InstRefl Θ}
+    {persΘTy : Persistent Θ Ty}
+    {w} (s t : Ty w) (Q : Ty w -> Pred w) (RQ : RProper (RImpl RTy (RPred _)) Q) :
+    s =ₚ t ⊢ₚ Q s ->ₚ Q t.
+  Proof.
+    constructor. intros ι Heq.
+    pose proof (fromEntails RQ ι I s t).
+    unfold RTy, RPred in H. pred_unfold.
+    rewrite inst_refl in H. now apply H.
+  Qed.
+
 End LR.
