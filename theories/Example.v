@@ -29,7 +29,7 @@ End WellScoped.
 
 Module WellTyped.
 
-  Inductive expr (Γ : Ctx (string∷ty)) : ty -> Type :=
+  Inductive expr (Γ : Ctx (string*ty)) : ty -> Type :=
     (* values *)
     | v_true    : expr Γ ty_bool
     | v_false   : expr Γ ty_bool
@@ -40,7 +40,7 @@ Module WellTyped.
     | e_plus    : expr Γ ty_nat -> expr Γ ty_nat -> expr Γ ty_nat
     | e_lte     : expr Γ ty_nat -> expr Γ ty_nat -> expr Γ ty_bool
     | e_and     : expr Γ ty_bool -> expr Γ ty_bool -> expr Γ ty_bool
-    | e_let {τ} : forall (x : string) (σ : ty), expr Γ σ -> expr (Γ ▻ x∷σ) τ -> expr Γ τ
-    | e_var     : forall (x : string) (σ : ty), x∷σ ∈ Γ -> expr Γ σ.
+    | e_let {τ} : forall (x : string) (σ : ty), expr Γ σ -> expr (Γ ▻ (x,σ)) τ -> expr Γ τ
+    | e_var     : forall (x : string) (σ : ty), (x,σ) ∈ Γ -> expr Γ σ.
 
 End WellTyped.

@@ -340,6 +340,30 @@ Section WithBinding.
       tabulate (fun x xIn => lookup E (ctx.in_thin bIn xIn)).
     Global Arguments remove' {_} b E.
 
+    Lemma lookup_update_refl {Γ} (E : Env Γ) :
+      forall {b} (bInΓ : b ∈ Γ) (db : D b),
+        lookup (update E bInΓ db) bInΓ = db.
+    Proof.
+      induction E; intros x xIn;
+        destruct (ctx.view xIn); cbn; auto.
+    Qed.
+
+    Lemma lookup_update {eqB : EqDec B} {Γ} (E : Env Γ) :
+      forall (x : B) (xInΓ : x ∈ Γ) (dx : D x) (y : B) (yInΓ : y ∈ Γ),
+        lookup (update E xInΓ dx) yInΓ =
+          match eq_dec (existT x xInΓ) (existT y yInΓ) with
+          | left e => eq_rect x D dx y (f_equal (fun x => projT1 x) e)
+          | right _ => lookup E yInΓ
+          end.
+    Proof.
+      induction E; intros x xIn dx y yIn; destruct (ctx.view xIn), (ctx.view yIn);
+        cbn - [ctx.In_eqdec]; try reflexivity.
+      - rewrite IHE. clear IHE. cbn.  unfold eq_dec.
+        destruct ctx.In_eqdec.
+        + now dependent elimination e.
+        + reflexivity.
+    Qed.
+
     (* Lemma lookup_update {Γ} (E : Env Γ) : *)
     (*   forall {b} (bInΓ : b ∈ Γ) (db : D b), *)
     (*     lookup (update E bInΓ db) bInΓ = db. *)
@@ -590,8 +614,6 @@ Module notations.
   Notation "e .[? k ]" := (@lookup _ _ _ e k _)
     (at level 2, k at level 200, format "e .[?  k ]").
   (* Variant of the above if you don't want to specify the type. *)
-  Notation "e .[?? x ]" := (@lookup _ _ _ e (x∷_) _)
-    (at level 2, x at level 200, only parsing).
 
   Notation "[ ]" := nil : env_scope.
   Notation "[ x ]" := (snoc nil _ x) : env_scope.
@@ -609,10 +631,6 @@ Module notations.
     (snoc .. (snoc (snoc nil _ x) _ y) .. _ z)
     (only parsing) : env_scope.
     (* (format "[ 'env'  '[' x ;  '/' y ;  '/' .. ;  '/' z ']' ]") : env_scope. *)
-  Notation "[ 'nenv' x ; y ; .. ; z ]" :=
-    (snoc .. (snoc (snoc nil (_∷_) x) (_∷_) y) .. (_∷_) z)
-    (only parsing) : env_scope.
-    (* (format "[ 'nenv'  '[' x ;  '/' y ;  '/' .. ;  '/' z ']' ]") : env_scope. *)
 
   (* Sometimes it is necessary to specify both, the element of the context and
      of the environment in cases where the type-checker would otherwise be
@@ -666,92 +684,3 @@ Ltac destroy x :=
 End env.
 Export env (Env).
 Bind Scope env_scope with Env.
-Import env.
-
-Module envrec.
-Section WithBinding.
-
-  Local Set Universe Polymorphism.
-  Context {B : Set}.
-
-  Definition EnvRec (D : B -> Type) : Ctx B -> Type :=
-    fix EnvRec (σs : Ctx B) {struct σs} : Type :=
-      match σs with
-      | []     => unit
-      | σs ▻ σ => EnvRec σs * D σ
-      end%type.
-
-  Section WithD.
-    (* TODO: Make this into Type. *)
-    Context {D : B -> Set}.
-
-    Fixpoint to_env (σs : Ctx B) {struct σs} : EnvRec D σs -> Env D σs :=
-      match σs with
-      | []     => fun _ => nil
-      | σs ▻ σ => fun e => snoc (to_env σs (fst e)) _ (snd e)
-      end.
-
-    Fixpoint of_env (σs : Ctx B) (e : Env D σs) : EnvRec D σs :=
-      match e with
-      | nil        => tt
-      | snoc E σ v => (of_env E, v)
-      end.
-
-    Lemma to_of_env (σs : Ctx B) (e : Env D σs) :
-      to_env σs (of_env e) = e.
-    Proof. induction e; cbn; f_equal; eauto. Qed.
-
-    Lemma of_to_env (σs : Ctx B) (e : EnvRec D σs) :
-      of_env (to_env σs e) = e.
-    Proof. induction σs; destruct e; cbn; now f_equal. Qed.
-
-    Variable eqd : forall b, D b -> D b -> bool.
-    Fixpoint eqb {Γ : Ctx B} : forall (δ1 δ2 : EnvRec D Γ), bool :=
-      match Γ with
-      | []    => fun _ _ => true
-      | _ ▻ b => fun '(E1,d1) '(E2,d2) => eqd d1 d2 &&& eqb E1 E2
-      end.
-
-  End WithD.
-
-End WithBinding.
-End envrec.
-
-Notation EnvRec := envrec.EnvRec.
-Bind Scope env_scope with EnvRec.
-
-Definition NamedEnv {X T : Set} (D : T -> Set) (Γ : NCtx X T) : Set :=
-  Env (fun xt => D (type xt)) Γ.
-Bind Scope env_scope with NamedEnv.
-
-Section Named.
-
-  Context {X T : Set} (D : T -> Set) (Δ : NCtx X T).
-
-  Definition abstract_named (r : Type) : Type :=
-    abstract (fun xt => D (type xt)) Δ r.
-
-  Definition uncurry_named {r : Type} (f : abstract_named r) (δ : NamedEnv D Δ) : r :=
-    uncurry f δ.
-
-  Definition curry_named{r : Type} (f : NamedEnv D Δ -> r) : abstract_named r :=
-    curry f.
-
-  Definition ForallNamed : (NamedEnv D Δ -> Prop) -> Prop :=
-    @Forall (X ∷ T) (fun xt => D (type xt)) Δ.
-
-End Named.
-
-(* Module nenv. *)
-(*   Context {N T : Set}. *)
-
-(*   Section WithD. *)
-(*     Context {D : T -> Set}. *)
-
-(*     Inductive NEnv : NCtx N T -> Set := *)
-(*     | nil                                               : NEnv ε *)
-(*     | snoc {Γ} (E : NEnv Γ) (b : N∷T) (db : D (type b)) : NEnv (Γ ▻ b). *)
-
-(*   End WithD. *)
-
-(* End nenv. *)

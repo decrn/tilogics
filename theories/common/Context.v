@@ -44,29 +44,6 @@ Local Unset Equations Derive Equations.
 Declare Scope ctx_scope.
 Delimit Scope ctx_scope with ctx.
 
-Module Binding.
-
-  Local Set Primitive Projections.
-  Local Set Transparent Obligations.
-
-  Section WithNT.
-    Context (N T : Set).
-
-    Record Binding : Set :=
-      MkB { name :> N; type :> T; }.
-
-    Context {eqN : EqDec N} {eqT : EqDec T}.
-    Derive NoConfusion EqDec for Binding.
-
-  End WithNT.
-
-  Arguments MkB [N T] name type.
-  Arguments name {N T} b.
-  Arguments type {N T} b.
-
-End Binding.
-Export Binding.
-
 Module Import ctx.
 
   (* Type of contexts. This is a list of bindings of type B. This type and
@@ -331,6 +308,58 @@ Module Import ctx.
         f_equal. apply IHxIn.
     Qed.
 
+    Import SigTNotations.
+
+    Notation Ref Γ := (sigT (fun x => In x Γ)).
+
+    Definition ref_zero {Γ x} : Ref (snoc Γ x) :=
+      (@existT B (fun x0 : B => In x0 (@snoc B Γ x)) x (@in_zero x Γ)).
+    Definition ref_succ {Γ x} : Ref Γ -> Ref (snoc Γ x).
+    Proof.
+      intros [y yIn]. exists y. now constructor.
+    Defined.
+
+    Definition ref_zero_neq_succ {Γ x} (r : Ref Γ) :
+      ref_zero <> @ref_succ Γ x r :=
+      match r with
+      | (y;yIn) =>
+         eq_rect
+           ref_zero
+           (fun r =>
+              match r with
+              | (z;in_zero) => True
+              | (z;in_succ _) => False
+              end)
+           I
+           (ref_succ (y; yIn))
+      end.
+
+    Set Equations With UIP.
+
+    Lemma rec_succ_inj {eqB : EqDec B} {Γ z} (r1 r2 : Ref Γ) :
+      @ref_succ Γ z r1 = @ref_succ Γ z r2 -> r1 = r2.
+    Proof.
+      destruct r1 as [x xIn], r2 as [y yIn]; cbn. intros e.
+      now dependent elimination e.
+    Qed.
+
+    #[export] Instance In_eqdec {eqB : EqDec B} : forall Γ, EqDec (Ref Γ) :=
+      fix eqdec Γ' :=
+        match Γ' with
+        | nil       => fun x => match view (projT2 x) with end
+        | snoc Γ b => fun '(x;xIn) '(y;yIn) =>
+            match view xIn , view yIn with
+            | isZero     , isZero     => left eq_refl
+            | isZero     , isSucc yIn => right (ref_zero_neq_succ (_; yIn))
+            | isSucc xIn , isZero     => right (not_eq_sym (ref_zero_neq_succ (_; xIn)))
+            | isSucc xIn , isSucc yIn =>
+                match eqdec Γ (_; xIn) (_; yIn) with
+                | left e => left (f_equal ref_succ e)
+                | right n => right (fun e => (n (rec_succ_inj (_; xIn) (_; yIn) e)))
+                end
+            end
+        end.
+
   End WithBinding.
 
   Section WithAB.
@@ -348,9 +377,6 @@ Module Import ctx.
 
     Open Scope ctx_scope.
 
-    Notation "N ∷ T" := (Binding N T) : type_scope.
-    Notation "x ∷ t" := (MkB x t) : ctx_scope.
-
     Notation "'ε'" := nil (only parsing) : ctx_scope.
     Infix "▻" := snoc : ctx_scope.
     Notation "Γ1 ▻▻ Γ2" := (cat Γ1%ctx Γ2%ctx) : ctx_scope.
@@ -367,97 +393,7 @@ Module Import ctx.
   End notations.
   Import notations.
 
-  Local Notation NCtx N T := (Ctx (Binding N T)).
-
-  Section Resolution.
-
-    Context {Name : Set} {Name_eqdec : EqDec Name} {D : Set}.
-
-    Fixpoint resolve (Γ : NCtx Name D) (x : Name) {struct Γ} : option D :=
-      match Γ with
-      | []      => None
-      | Γ ▻ y∷d => if Name_eqdec x y then Some d else resolve Γ x
-      end.
-
-    Fixpoint resolve_mk_in (Γ : NCtx Name D) (x : Name) {struct Γ} :
-      let m := resolve Γ x in forall (p : IsSome m), x∷fromSome m p ∈ Γ :=
-      match Γ with
-      | [] => fun p => match p with end
-      | Γ ▻ y∷d =>
-        match Name_eqdec x y as s return
-          (forall p, (x∷fromSome (if s then Some d else resolve Γ x) p) ∈ Γ ▻ y∷d)
-        with
-        | left e => fun _ => match e with eq_refl => in_zero end
-        | right _ => fun p => in_succ (resolve_mk_in Γ x p)
-        end
-      end.
-
-    Fixpoint names (Γ : NCtx Name D) : list Name :=
-      match Γ with
-      | []      => List.nil
-      | Γ ▻ y∷_ => cons y (names Γ)
-      end.
-
-  End Resolution.
-
-  Module resolution.
-
-    (* Hook the reflective procedure for name resolution into the typeclass
-       resolution mechanism. *)
-    #[export]
-    Hint Extern 10 (?x∷_ ∈ ?Γ) =>
-      let xInΓ := eval compute in (resolve_mk_in Γ x tt) in
-        exact xInΓ : typeclass_instances.
-
-  End resolution.
-
-  Section FreshName.
-
-    Open Scope string_scope.
-
-    Fixpoint split_at_dot' {R} (x : string) (k : string -> string -> R) {struct x} : R :=
-      match x with
-      | ""           => k "" ""
-      | String "." x => k "" x
-      | String a x   => split_at_dot' x (fun pre => k (String a pre))
-      end.
-
-    Definition split_at_dot (x : string) : (string * string) :=
-      split_at_dot' x pair.
-
-    Definition parse_number (x : string) : N :=
-      match NilEmpty.uint_of_string x with
-      | Some n => N.of_uint n
-      | None   => 0%N
-      end.
-
-    Definition unparse_number (x : N) : string :=
-      NilEmpty.string_of_uint (N.to_uint x).
-
-    Definition max_with_base (base : string) (xs : list string) : N :=
-      List.fold_left
-        (fun o x =>
-           match split_at_dot x with
-             (pre,suf) => if pre =? base
-                          then N.max o (parse_number suf)
-                          else o
-           end)
-        xs 0%N.
-
-    Definition fresh [T : Set] (xs : NCtx string T) (x : option string) : string :=
-      let xs := names xs in
-      let x := match x with Some x => x | None => "x" end in
-      if List.find (String.eqb x) xs
-      then let base := fst (split_at_dot x) in
-           let n    := N.succ (max_with_base base xs) in
-           String.append base (String "."%char (unparse_number n))
-      else x.
-
-  End FreshName.
-
 End ctx.
 Export ctx (Ctx).
 Export (hints) ctx.
-Notation NCtx N T := (Ctx (Binding N T)).
 Bind Scope ctx_scope with Ctx.
-Bind Scope ctx_scope with NCtx.

@@ -36,35 +36,29 @@ From Equations Require Import
   Equations.
 From Em Require Import
   Context
-  Definitions
   Environment
-  LogicalRelation
-  Predicates
   Prelude
-  STLC
-  Substitution
-  Triangular
-  Unification.
+  Stlc.Alloc
+  Stlc.Instantiation
+  Stlc.Persistence
+  Stlc.Predicates
+  Stlc.Spec
+  Stlc.Substitution
+  Stlc.Triangular
+  Stlc.Unification
+  Stlc.Worlds.
 
 Import ctx.notations.
-Import SigTNotations.
 
 Set Implicit Arguments.
-
-#[local] Arguments Ty_hole {Σ i} xIn.
-#[local] Arguments Ty_bool {Σ}.
-#[local] Arguments Ty_func {Σ}.
-#[local] Open Scope indexed_scope.
 
 Reserved Notation "w1 ⊒ w2" (at level 80).
 
 #[local] Notation "□ A" := (Box Tri A) (at level 9, format "□ A", right associativity).
 #[local] Notation "◇ A" := (DiamondT Tri id A) (at level 9, format "◇ A", right associativity).
 #[local] Notation "? A" := (Option A) (at level 9, format "? A", right associativity).
-#[local] Notation "◆ A" := (DiamondT Tri Option A) (at level 9, format "◆ A", right associativity).
-#[local] Notation "A * B" := (Prod A B).
 #[local] Notation "s [ ζ ]" :=
-  (persist _ s _ ζ)
+  (persist s ζ)
     (at level 8, left associativity,
       format "s [ ζ ]").
 
@@ -78,8 +72,8 @@ Module ProgramLogic.
   Definition WP {A} : ⊢ʷ ◆A -> □(A -> Pred) -> Pred :=
     fun w0 d Q =>
       match d with
-      | Some (w1; (r01, a)) => Acc.wp r01 (Q w1 r01 a)
-      | None                => Falseₚ
+      | Some (existT w1 (θ, a)) => Acc.wp θ (Q w1 θ a)
+      | None                    => Falseₚ
       end.
 
   #[global] Arguments WP {A}%indexed_scope [w] _ _%P _.
@@ -125,8 +119,10 @@ Module ProgramLogic.
       now rewrite and_false_r.
   Qed.
 
+  Import Diamond.
+
   Lemma wp_pure {A w0} (a : A w0) (Q : □(A -> Pred) w0) :
-    WP (pure a) Q ⊣⊢ₚ T Q a.
+    WP (pure (M := DiamondT Tri Option) a) Q ⊣⊢ₚ T Q a.
   Proof. unfold WP, pure. cbn. now rewrite Acc.wp_refl. Qed.
 
   Lemma wp_bind {A B w0} (d : ◆A w0) (f : □(A -> ◆B) w0) (Q : □(B -> Pred) w0) :
@@ -140,8 +136,8 @@ Module ProgramLogic.
   Definition WLP {A} : ⊢ʷ ◆A -> □(A -> Pred) -> Pred :=
     fun w0 d Q =>
       match d with
-      | Some (w1; (r01, a)) => Pred.Acc.wlp r01 (Q w1 r01 a)
-      | None                => Trueₚ
+      | Some (existT w1 (r01, a)) => Pred.Acc.wlp r01 (Q w1 r01 a)
+      | None                      => Trueₚ
       end.
   #[global] Arguments WLP {A}%indexed_scope [w] _ _%P _.
   #[global] Instance params_wlp : Params (@WLP) 4 := {}.
@@ -176,7 +172,7 @@ Module ProgramLogic.
     entails R (WLP d P ->ₚ WLP d Q)%P.
   Proof.
     intros pq. destruct d as [(w1 & r01 & a)|]; cbn.
-    - specialize (pq w1 r01 a). rewrite <- Acc.wlp_impl.
+    - specialize (pq w1 r01 a). rewrite <- Acc.wlp_mono.
       now apply Acc.entails_wlp.
     - rewrite impl_true_r. apply true_r.
   Qed.
@@ -193,7 +189,7 @@ Module ProgramLogic.
       now rewrite ?Acc.wlp_trans, ?Acc.wlp_true.
   Qed.
 
-  Lemma wlp_tell1 {w x} (xIn : x ∈ w) (t : Ty (w - x)) (Q : □(Unit -> Pred) w) :
+  Lemma wlp_tell1 {w x} (xIn : x ∈ w) (t : Ṫy (w - x)) (Q : □(Unit -> Pred) w) :
     WLP (tell1 xIn t) Q ⊣⊢ₚ Acc.wlp (thick x t) (Q _ (thick x t) tt).
   Proof. reflexivity. Qed.
 
@@ -205,7 +201,7 @@ Module Correctness.
   Import (hints) Pred.Acc Tri.
   Import Pred Pred.notations ProgramLogic.
 
-  Definition interpM : ⊢ʷ M Unit -> Pred :=
+  Definition interpM : ⊢ʷ ◆Unit -> Pred :=
     fun w m => WP m (fun _ _ _ => Trueₚ).
 
   Definition interpC : ⊢ʷ C -> Pred.
@@ -222,7 +218,7 @@ Module Correctness.
   (* Proof. unfold interp, cfalse. easy. Qed. *)
 
   Opaque bind.
-  Import LR.
+  (* Import LR. *)
 
   Definition ProperRC {w} (c : C w) : Prop :=
     forall w' (r : Tri w w'),
@@ -245,7 +241,7 @@ Module Correctness.
     ProperRC c1 -> ProperRC c2 -> ProperRC (cand c1 c2).
   Proof.
     unfold ProperRC, cand; intros p1 p2 w1 r01.
-    unfold interpM in *. rewrite ?wp_bind. unfold _4.
+    unfold interpM in *. rewrite !wp_bind. unfold _4.
     specialize (p1 w1 r01).
     destruct (c1 w0 refl) as [(w2 & r02 & [])|],
         (c1 w1 r01)  as [(w3 & r13 & [])|];
@@ -274,22 +270,22 @@ Module Correctness.
 
   Definition UnifierSound : ⊢ʷ Unifier -> PROP :=
     fun w0 u =>
-      forall (t1 t2 : Ty w0),
+      forall (t1 t2 : Ṫy w0),
         ⊤ₚ ⊢ₚ WLP (u t1 t2) (Fun _ => Ext (t1 =ₚ t2)).
 
   Definition UnifierComplete : ⊢ʷ Unifier -> PROP :=
     fun w0 u =>
-      forall (t1 t2 : Ty w0),
+      forall (t1 t2 : Ṫy w0),
         t1 =ₚ t2 ⊢ₚ WP (u t1 t2) (fun _ _ _ => ⊤ₚ)%P.
 
   Definition BoxUnifierSound : ⊢ʷ BoxUnifier -> PROP :=
     fun w0 bu =>
-      forall (t1 t2 : Ty w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1),
+      forall (t1 t2 : Ṫy w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1),
         ⊤ₚ ⊢ₚ WLP (bu t1 t2 w1 ζ01) (Fun _ => Ext (Ext (t1 =ₚ t2) ζ01)).
 
   Definition BoxUnifierComplete : ⊢ʷ BoxUnifier -> PROP :=
     fun w0 bu =>
-      forall (t1 t2 : Ty w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1),
+      forall (t1 t2 : Ṫy w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1),
         entails (Ext (t1 =ₚ t2) ζ01) (WP (bu t1 t2 w1 ζ01) (fun _ _ _ => Trueₚ)).
 
   Section BoxedProofs.
@@ -303,8 +299,8 @@ Module Correctness.
       Context (lmgu_sound : forall x (xIn : x ∈ w),
                   BoxUnifierSound (lmgu xIn)).
 
-      Lemma flex_sound_assignment {x} (xIn : x ∈ w) (t : Ty w) :
-        ⊤ₚ ⊢ₚ WLP (flex t xIn) (Fun _ => Ext (Ty_hole xIn =ₚ t)).
+      Lemma flex_sound_assignment {x} (xIn : x ∈ w) (t : Ṫy w) :
+        ⊤ₚ ⊢ₚ WLP (flex t xIn) (Fun _ => Ext (ṫy.var xIn =ₚ t)).
       Proof.
         unfold flex. destruct (varview t) as [y yIn|].
         - destruct (ctx.occurs_check_view xIn yIn).
@@ -316,15 +312,19 @@ Module Correctness.
             rewrite ctx.occurs_check_view_refl, ctx.occurs_check_view_thin.
             rewrite eqₚ_refl. reflexivity.
         - destruct (occurs_check_spec xIn t); subst.
-          + rewrite wlp_tell1, ext_eq, persist_thin_thick.
-            rewrite <- Acc.entails_wlp, ext_true. cbn. unfold thickIn.
+          + rewrite wlp_tell1, ext_eq.
+            rewrite <- !(Sub.persist_sim (Θ := Tri)).
+            rewrite !Sub.of_thick.
+            rewrite Sub.thin_thick_pointful.
+            rewrite <- Acc.entails_wlp, ext_true. cbn.
+            Sub.foldlk. rewrite lk_thick. unfold thickIn.
             rewrite ctx.occurs_check_view_refl. rewrite eqₚ_refl. reflexivity.
           + constructor. constructor.
       Qed.
 
-      Lemma boxflex_sound_assignment {x} (xIn : x ∈ w) (t : Ty w)
+      Lemma boxflex_sound_assignment {x} (xIn : x ∈ w) (t : Ṫy w)
         {w1} (ζ01 : w ⊒⁻ w1) :
-        ⊤ₚ ⊢ₚ WLP (boxflex lmgu t xIn ζ01) (Fun _ => Ext (Ext (Ty_hole xIn =ₚ t) ζ01)).
+        ⊤ₚ ⊢ₚ WLP (boxflex lmgu t xIn ζ01) (Fun _ => Ext (Ext (ṫy.var xIn =ₚ t) ζ01)).
       Proof.
         unfold boxflex, Tri.box_intro_split.
         destruct ζ01 as [|w2 y yIn ty]; folddefs.
@@ -333,11 +333,18 @@ Module Correctness.
           apply proper_wlp_entails.
           intros w2 ζ2 _.
           now rewrite ext_refl.
-        - generalize (lmgu_sound yIn (Ty_hole xIn)[thick y ty] t[thick y ty] ζ01). clear.
-          apply proper_entails_entails; [easy|].
+        - generalize (lmgu_sound yIn (ṫy.var xIn)[thick y ty] t[thick y ty] ζ01). clear.
+          apply proper_entails_entails; [easy|]. cbn - [trans]. Sub.foldlk.
+          rewrite lk_thick.
+          rewrite <- !(Sub.persist_sim (Θ := Tri)).
+          rewrite !Sub.of_thick.
           apply proper_wlp_entails.
           intros w3 ζ3 _.
-          now rewrite ext_trans, ?ext_eq.
+          apply proper_ext_entails; auto.
+          rewrite ext_trans, ?ext_eq. cbn.
+          rewrite <- !(Sub.persist_sim (Θ := Tri)).
+          rewrite !Sub.of_thick.
+          reflexivity.
       Qed.
 
       Lemma wp_ctrue {w0 w1} (r01 : w0 ⊒⁻ w1) (Q : □(Unit -> Pred) w1) :
@@ -391,7 +398,7 @@ Module Correctness.
           apply proper_ext_entails; auto.
           apply proper_ext_entails; auto.
           apply proper_ext_entails; auto.
-          rewrite (peq_ty_noconfusion (Ty_func s1 s2)).
+          rewrite (peq_ty_noconfusion (ṫy.func s1 s2)).
           now apply impl_and_adjoint.
       Qed.
 
@@ -401,21 +408,23 @@ Module Correctness.
       Context (lmgu_complete : forall x (xIn : x ∈ w),
                   BoxUnifierComplete (lmgu xIn)).
 
-      Lemma flex_complete_assignment {x} (xIn : x ∈ w) (t : Ty w) :
-        Ty_hole xIn =ₚ t ⊢ₚ WP (flex t xIn) (fun _ _ _ => ⊤ₚ)%P.
+      Lemma flex_complete_assignment {x} (xIn : x ∈ w) (t : Ṫy w) :
+        ṫy.var xIn =ₚ t ⊢ₚ WP (flex t xIn) (fun _ _ _ => ⊤ₚ)%P.
       Proof.
         unfold flex. destruct (varview t) as [y yIn|].
         - destruct (ctx.occurs_check_view xIn yIn).
           + rewrite wp_pure. unfold T. apply true_r.
-          + unfold WP, tell1. now rewrite Acc.wp_thick, ext_true, and_true_r.
+          + unfold WP, tell1.
+            rewrite Acc.wp_thick, ext_true, and_true_r. cbn. Sub.foldlk.
+            now rewrite lk_thin.
         - destruct (occurs_check_spec xIn t) as [|[HOC|HOC]]; cbn.
           + subst. now rewrite Acc.wp_thick, ext_true, and_true_r.
           + destruct (H _ _ HOC).
           + now apply pno_cycle in HOC.
       Qed.
 
-      Lemma boxflex_complete_assignment {x} (xIn : x ∈ w) (t : Ty w) {w1} (ζ01 : w ⊒⁻ w1) :
-        Ext (Ty_hole xIn =ₚ t) ζ01 ⊢ₚ
+      Lemma boxflex_complete_assignment {x} (xIn : x ∈ w) (t : Ṫy w) {w1} (ζ01 : w ⊒⁻ w1) :
+        Ext (ṫy.var xIn =ₚ t) ζ01 ⊢ₚ
         WP (boxflex lmgu t xIn ζ01) (fun _ _ _ => ⊤ₚ)%P.
       Proof.
         unfold boxflex, Tri.box_intro_split.
@@ -484,27 +493,26 @@ Module Correctness.
 
   Import Pred.
 
-  #[local] Instance instpred_prod_ty : InstPred (Prod Ty Ty) :=
-    fun w '(t1,t2) => eqₚ t1 t2.
+  #[local] Existing Instance instpred_prod_ty.
 
   Definition BoxSolveListSound : ⊢ʷ BoxSolveList -> PROP :=
     fun w0 bsl =>
-      forall (C : List (Prod Ty Ty) w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1),
+      forall (C : List (Ṫy * Ṫy) w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1),
         ⊤ₚ ⊢ₚ WLP (bsl C w1 ζ01) (Fun _ => Ext (Ext (instpred C) ζ01)).
 
   Definition SolveListSound : ⊢ʷ SolveList -> PROP :=
     fun w0 sl =>
-      forall (C : List (Prod Ty Ty) w0),
+      forall (C : List (Ṫy * Ṫy) w0),
         ⊤ₚ ⊢ₚ WLP (sl C) (Fun _ => Ext (instpred C)).
 
   Definition BoxSolveListComplete : ⊢ʷ BoxSolveList -> PROP :=
     fun w0 bsl =>
-      forall (C : List (Prod Ty Ty) w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1),
+      forall (C : List (Ṫy * Ṫy) w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1),
         entails (Ext (instpred C) ζ01) (WP (bsl C w1 ζ01) (fun _ _ _ => Trueₚ)).
 
   Definition SolveListComplete : ⊢ʷ SolveList -> PROP :=
     fun w0 sl =>
-      forall (C : List (Prod Ty Ty) w0),
+      forall (C : List (Ṫy * Ṫy) w0),
         entails (instpred C) (WP (sl C) (fun _ _ _ => Trueₚ)).
 
   Lemma boxsolvelist_sound {w} : BoxSolveListSound (boxsolvelist (w := w)).
@@ -552,128 +560,154 @@ Module Correctness.
     now rewrite ext_refl.
   Qed.
 
-  Definition wp_prenex {A} : ⊢ʷ ?◇⁺(List (Ty * Ty) * A) -> □⁺(A -> Pred) -> Pred :=
-    fun w o Q =>
-      match o with
-      | Some (w'; (r, (C, a))) => Acc.wp r (instpred C /\ₚ Q _ r a)
-      | None => Falseₚ
-      end.
+  Import (hints) Sub.
 
-  Arguments Acc.wp {R _ w0 w1} r01 Q _/.
+  (* Lemma solvelist_correct {w : World} (C : List (Ṫy * Ṫy) w) *)
+  (*   (Q : Box Sub (Unit -> Pred) w) (RQ : ProperPost' Q) : *)
+  (*   @wp_optiondiamond _ _ Unit w (@solvelist w C) Q ⊣⊢ₚ *)
+  (*   instpred C /\ₚ Q w refl tt. *)
+  (* Proof. *)
+  (*   pose proof (solvelist_complete C) as Hcompl. *)
+  (*   pose proof (solvelist_sound C) as Hsound. *)
+  (*   destruct Hcompl as [Hcompl]. *)
+  (*   destruct Hsound as [Hsound]. *)
+  (*   constructor. intros ι. specialize (Hcompl ι). specialize (Hsound ι I). *)
+  (*   destruct solvelist as [(w2 & θ2 & [])|]; cbn in *. *)
+  (*   - split. *)
+  (*     + intros (ι2 & Heq & HQ). subst. constructor. *)
+  (*       now apply Hsound. revert HQ. admit. *)
+  (*     + intros (HC & HQ). specialize (Hcompl HC). *)
+  (*       destruct Hcompl as (ι2 & Heq & _). exists ι2. *)
+  (*       split; auto. revert HQ. admit. *)
+  (* Admitted. *)
 
-  Lemma prenex_correct {A w} (m : FreeM A w) (Q : □⁺(A -> Pred) w) :
-    wp_prenex (prenex m) Q ⊣⊢ₚ STLC.WP m Q.
+  Arguments Acc.wp {Θ w0 w1} θ Q _/.
+
+  Import (hints) Sub.
+
+  Lemma inst_sub_of {Θ : ACC} {w0 w1} (θ : Θ w0 w1) ι :
+    inst (Sub.of θ) ι = inst θ ι.
   Proof.
-    unfold wp_prenex.
-    induction m; cbn.
-    - rewrite Acc.wp_refl. rewrite and_true_l. reflexivity.
-    - reflexivity.
-    - destruct (prenex m) as [(w' & r & C & a)|]; cbn.
-      + change (Acc.wp r (((t[r] =ₚ t0[r]) /\ₚ instpred C) /\ₚ Q w' r a)
-          ⊣⊢ₚ t =ₚ t0 /\ₚ STLC.WP m Q).
-        rewrite <- IHm.
-        rewrite Acc.and_wp_r.
-        apply Acc.proper_wp_bientails.
-        now rewrite ext_eq, and_assoc.
-      + change (Falseₚ ⊣⊢ₚ (t =ₚ t0 /\ₚ STLC.WP m Q)).
-        rewrite <- IHm. now rewrite and_false_r.
-    - destruct (prenex m) as [(w' & r & C & a)|]; cbn.
-      + change (alloc.fresh _ ?x _ ?r) with (step ⊙ r).
-        assert
-          (Acc.wp (step ⊙ r) (instpred C /\ₚ Q w' (alloc.fresh Σ i w' r) a)
-             ⊣⊢ₚ Acc.wp step (STLC.WP m (_4 Q step)))
-          as -> by now rewrite Acc.wp_trans, <- IHm.
-        constructor. intros ι; cbn; split.
-        * intros (ι' & Heq & HQ). destruct env.view as [ι' t]. subst ι'.
-          now exists t.
-        * intros (t & Hwp). apply IHm in Hwp. exists (env.snoc ι _ t). cbn.
-          split. auto. now apply IHm.
-      + constructor. split; [easy|]. intros (t & Hwp). now apply IHm in Hwp.
+    apply env.lookup_extensional. intros α αIn.
+    unfold inst, inst_acc. rewrite ?env.lookup_tabulate. f_equal.
+    unfold Sub.of. cbn. now rewrite env.lookup_tabulate.
   Qed.
 
-  Definition wp_optiondiamond {A} : ⊢ʷ ?◇⁺ A -> □⁺(A -> Pred) -> Pred :=
-    fun w m Q =>
-      match m with
-      | Some (w1; (r01, a)) => Acc.wp r01 (Q w1 r01 a)
-      | None => Falseₚ
-      end.
+  Lemma alloc_nil_is_nil_l {w} (θ : Alloc ctx.nil w) :
+    θ = alloc.nil_l.
+  Proof. Admitted.
 
-  Lemma solvefree_equiv {AT A} {instA : Inst AT A}
-    {persAllocA : Persistent Alloc AT}
-    {persTriA : Persistent Tri.Tri AT}
-    (m : FreeM AT ctx.nil) (Q : □⁺(AT -> Pred) [ctx])
-    (RQ : ProperPost Q) :
-    wp_optiondiamond (solvefree m) Q ⊣⊢ₚ STLC.WP m Q.
+  Lemma solveoptiondiamond_correct {A} {persA : Persistent A} {persLA: PersistLaws A}
+    (m : Diamond alloc.acc_alloc (List (Ṫy * Ṫy) * A) ctx.nil)
+    (Q : Box alloc.acc_alloc (A -> Pred) ctx.nil) (RQ : ProperPost' Q) :
+    wp_optiondiamond (solveoptiondiamond m) Q
+      ⊣⊢ₚ wp_diamond m (fun w θ '(C,a) => instpred C /\ₚ Q w θ a).
   Proof.
-    rewrite <- prenex_correct. unfold solvefree.
-    unfold wp_prenex, wp_optiondiamond.
-    destruct (prenex m) as [(w1 & r1 & C & a)|]; cbn; [|easy].
+    destruct m as (w1 & θ1 & C & a). cbn.
     pose proof (solvelist_complete C) as Hcompl.
     pose proof (solvelist_sound C) as Hsound.
-    destruct solvelist as [(w2 & r2 & [])|]; cbn in *.
-    - apply split_bientails. split.
+    destruct solvelist as [(w2 & θ2 & [])|]; cbn in *.
+    - apply Acc.entails_wlp in Hsound.
+      rewrite ext_true in Hsound.
+      pose proof (alloc_nil_is_nil_l θ1). subst.
+      apply split_bientails. split; apply Acc.entails_wp.
       + destruct Hsound as [Hsound]. constructor.
-        intros ι0 (ι2 & Heq & HQ); pred_unfold; subst. exists (inst r2 ι2).
-        specialize (Hsound (inst r2 ι2) I ι2 eq_refl). hnf in Hsound.
-        unfold andₚ. repeat split.
-        * destruct (env.view (inst r1 (inst r2 ι2))).
-          destruct (env.view (inst alloc.nil_l ι2)).
-          reflexivity.
-        * assumption.
-        * admit.
-          (* epose proof (RQ w1 r1 _ a (inst r2 ι2)) as H1. *)
-          (* epose proof (RQ w2 alloc.nil_l _ (persist _ a _ r2) ι2) as H2. *)
-          (* cbn in H1, H2. *)
-      + destruct Hcompl as [Hcompl]. constructor.
-        intros ι0 (ι1 & Heq1 & HC & HQ).
+        intros ι2 HQ; pred_unfold; subst.
+        exists (inst θ2 ι2). specialize (Hsound ι2 I).
+        unfold andₚ. repeat split; auto. revert HQ.
+        hnf in RQ.
+        pose proof (RQ w2 w1 alloc.nil_l).
+        change (Q w2 alloc.nil_l a[θ2] ι2 -> Ext (Q w1 alloc.nil_l a) θ2 ι2).
+        (* pose proof (fromBientails (RQ w1 w2 env.nil (Sub.of θ2) a) ι2). *)
+        (* symmetry in H. cbn in H. rewrite inst_sub_of in H. *)
+        (* rewrite Sub.persist_sim in H. intuition. *)
+        admit.
+      + destruct Hcompl as [Hcompl]. constructor. intros ι1 (HC & HQ).
         specialize (Hcompl ι1 HC). destruct Hcompl as (ι2 & Heq2 & _).
-        exists ι2. split. subst.
-        * destruct (env.view (inst r1 (inst r2 ι2))).
-          destruct (env.view (inst alloc.nil_l ι2)).
-          reflexivity.
-        * clear - HQ. admit.
+        cbn. exists ι2. split; auto. revert HQ.
+        (* pose proof (fromBientails (RQ w1 w2 env.nil (Sub.of θ2) a) ι2). *)
+        (* cbn in H. rewrite inst_sub_of in H. *)
+        (* rewrite Sub.persist_sim in H. intuition. *)
+        admit.
     - apply split_bientails. split. firstorder.
       destruct Hcompl as [Hcompl]. constructor.
       intros ι (ι1 & Heq & HC & HQ). apply (Hcompl ι1 HC).
   Admitted.
 
+  (* Lemma solve_equiv {A} {persA : Persistent A} *)
+  (*   (m : Diamond Alloc _ ctx.nil) (Q : Box Alloc (A -> Pred) [ctx]) : *)
+  (*   (* (RQ : ProperPost Q) : *) *)
+  (*   wp_optiondiamond (solve m) Q ⊣⊢ₚ wp_diamond m Q. *)
+  (* Proof. *)
+  (*   rewrite <- prenex_correct. unfold solvefree. *)
+  (*   unfold wp_prenex, wp_optiondiamond. *)
+  (*   destruct (prenex m) as [(w1 & r1 & C & a)|]; cbn; [|easy]. *)
+  (*   pose proof (solvelist_complete C) as Hcompl. *)
+  (*   pose proof (solvelist_sound C) as Hsound. *)
+  (*   destruct solvelist as [(w2 & r2 & [])|]; cbn in *. *)
+  (*   - apply split_bientails. split. *)
+  (*     + destruct Hsound as [Hsound]. constructor. *)
+  (*       intros ι0 (ι2 & Heq & HQ); pred_unfold; subst. exists (inst r2 ι2). *)
+  (*       specialize (Hsound (inst r2 ι2) I ι2 eq_refl). hnf in Hsound. *)
+  (*       unfold andₚ. repeat split. *)
+  (*       * destruct (env.view (inst r1 (inst r2 ι2))). *)
+  (*         destruct (env.view (inst alloc.nil_l ι2)). *)
+  (*         reflexivity. *)
+  (*       * assumption. *)
+  (*       * admit. *)
+  (*         (* epose proof (RQ w1 r1 _ a (inst r2 ι2)) as H1. *) *)
+  (*         (* epose proof (RQ w2 alloc.nil_l _ (persist _ a _ r2) ι2) as H2. *) *)
+  (*         (* cbn in H1, H2. *) *)
+  (*     + destruct Hcompl as [Hcompl]. constructor. *)
+  (*       intros ι0 (ι1 & Heq1 & HC & HQ). *)
+  (*       specialize (Hcompl ι1 HC). destruct Hcompl as (ι2 & Heq2 & _). *)
+  (*       exists ι2. split. subst. *)
+  (*       * destruct (env.view (inst r1 (inst r2 ι2))). *)
+  (*         destruct (env.view (inst alloc.nil_l ι2)). *)
+  (*         reflexivity. *)
+  (*       * clear - HQ. admit. *)
+  (*   - apply split_bientails. split. firstorder. *)
+  (*     destruct Hcompl as [Hcompl]. constructor. *)
+  (*     intros ι (ι1 & Heq & HC & HQ). apply (Hcompl ι1 HC). *)
+  (* Admitted. *)
+
 End Correctness.
 
-Module Generalized.
+(* Module Generalized. *)
 
-  Import World.notations.
-  Import (hints) Sub Tri.
-  Import Pred Pred.notations ProgramLogic LR.
+(*   Import World.notations. *)
+(*   Import (hints) Sub Tri. *)
+(*   Import Pred Pred.notations ProgramLogic LR. *)
 
-  Lemma wp_tell {w x} (xIn : x ∈ w) (t : Ty (w - x)) (Q : □(Unit -> Pred) w)
-    (RQ : RProper (RBox (RImpl RUnit (RPred Tri))) Q) :
-    WP (tell1 xIn t) Q ⊣⊢ₚ Ty_hole xIn =ₚ thin xIn t /\ₚ T Q tt.
-  Proof.
-    unfold WP, tell1. rewrite Acc.wp_thick. constructor. intros ι. pred_unfold.
-    rewrite Sub.subst_thin, inst_persist, Sub.inst_thin.
-    apply and_iff_compat_l'. intros Heq.
-    destruct RQ as [RQ].
-    specialize (RQ ι I w (w - x) refl (thick x t) (thick x t) (env.remove _ ι xIn)).
-    cbv [RProper RBox Forall Const implₚ Acc.wlp eqₚ
-      RImpl RUnit Trueₚ RPred iffₚ Ext] in RQ.
-    pred_unfold.
-    cbn in RQ. rewrite <- Heq, env.insert_remove in RQ.
-    now specialize (RQ eq_refl eq_refl tt tt I).
-  Qed.
+(*   Lemma wp_tell {w x} (xIn : x ∈ w) (t : Ty (w - x)) (Q : □(Unit -> Pred) w) *)
+(*     (RQ : RProper (RBox (RImpl RUnit (RPred Tri))) Q) : *)
+(*     WP (tell1 xIn t) Q ⊣⊢ₚ Ty_hole xIn =ₚ thin xIn t /\ₚ T Q tt. *)
+(*   Proof. *)
+(*     unfold WP, tell1. rewrite Acc.wp_thick. constructor. intros ι. pred_unfold. *)
+(*     rewrite Sub.subst_thin, inst_persist, Sub.inst_thin. *)
+(*     apply and_iff_compat_l'. intros Heq. *)
+(*     destruct RQ as [RQ]. *)
+(*     specialize (RQ ι I w (w - x) refl (thick x t) (thick x t) (env.remove _ ι xIn)). *)
+(*     cbv [RProper RBox Forall Const implₚ Acc.wlp eqₚ *)
+(*       RImpl RUnit Trueₚ RPred iffₚ Ext] in RQ. *)
+(*     pred_unfold. *)
+(*     cbn in RQ. rewrite <- Heq, env.insert_remove in RQ. *)
+(*     now specialize (RQ eq_refl eq_refl tt tt I). *)
+(*   Qed. *)
 
-  Lemma flex_correct {w x} (xIn : x ∈ w) (t : Ty w)
-    (Q : □(Unit -> Pred) w) (RQ : RProper (RBox (RImpl RUnit (RPred Tri))) Q) :
-    WP (flex t xIn) Q ⊣⊢ₚ Ty_hole xIn =ₚ t /\ₚ T Q tt.
-  Proof.
-    unfold flex. destruct (varview t) as [y yIn|].
-    - destruct (ctx.occurs_check_view xIn yIn).
-      + now rewrite wp_pure, eqₚ_refl, and_true_l.
-      + now rewrite wp_tell.
-    - destruct (occurs_check_spec xIn t) as [|[HOC|HOC]]; cbn - [tell1].
-      + rewrite wp_tell; now subst.
-      + destruct (H _ _ HOC).
-      + apply pno_cycle in HOC. apply split_bientails. split; [apply false_l|].
-        now rewrite HOC, and_false_l.
-  Qed.
+(*   Lemma flex_correct {w x} (xIn : x ∈ w) (t : Ty w) *)
+(*     (Q : □(Unit -> Pred) w) (RQ : RProper (RBox (RImpl RUnit (RPred Tri))) Q) : *)
+(*     WP (flex t xIn) Q ⊣⊢ₚ Ty_hole xIn =ₚ t /\ₚ T Q tt. *)
+(*   Proof. *)
+(*     unfold flex. destruct (varview t) as [y yIn|]. *)
+(*     - destruct (ctx.occurs_check_view xIn yIn). *)
+(*       + now rewrite wp_pure, eqₚ_refl, and_true_l. *)
+(*       + now rewrite wp_tell. *)
+(*     - destruct (occurs_check_spec xIn t) as [|[HOC|HOC]]; cbn - [tell1]. *)
+(*       + rewrite wp_tell; now subst. *)
+(*       + destruct (H _ _ HOC). *)
+(*       + apply pno_cycle in HOC. apply split_bientails. split; [apply false_l|]. *)
+(*         now rewrite HOC, and_false_l. *)
+(*   Qed. *)
 
-End Generalized.
+(* End Generalized. *)
