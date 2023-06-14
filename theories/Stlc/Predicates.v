@@ -690,7 +690,11 @@ Module Pred.
       Proof. constructor. firstorder. Qed.
 
       Lemma wlp_and {w0 w1} (θ : Θ w0 w1) P Q :
-        wlp θ P /\ₚ wlp θ Q ⊢ₚ wlp θ (P /\ₚ Q).
+        wlp θ P /\ₚ wlp θ Q ⊣⊢ₚ wlp θ (P /\ₚ Q).
+      Proof. constructor. firstorder. Qed.
+
+      Lemma wp_or {w0 w1} (θ : Θ w0 w1) P Q :
+        wp θ P \/ₚ wp θ Q ⊣⊢ₚ wp θ (P \/ₚ Q).
       Proof. constructor. firstorder. Qed.
 
       Lemma wp_mono {w0 w1} (θ : Θ w0 w1) P Q:
