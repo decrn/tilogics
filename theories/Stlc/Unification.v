@@ -242,7 +242,7 @@ Section OccursCheck.
     - unfold occurs_check_in.
       destruct (ctx.occurs_check_view αIn αIn0); constructor.
       + left. reflexivity.
-      + cbn. admit.
+      + cbn - [lk]. now rewrite lk_thin.
     - constructor. reflexivity.
     - repeat option.tactics.mixin; subst; auto; right;
         match goal with
@@ -252,7 +252,7 @@ Section OccursCheck.
             | constructor 2 with t; auto; constructor; constructor
             ]
         end.
-  Admitted.
+  Qed.
 
 End OccursCheck.
 
@@ -309,7 +309,7 @@ Section VarView.
 
 End VarView.
 
-Module Variant1.
+Section Variant1.
 
   Import Tri.notations.
   Import (hints) Tri.
@@ -546,15 +546,18 @@ Module Variant1.
       '(existT w2 (θ2, tt))      <- solvelist cs;;
       Some (existT w2 (alloc.nil_l,persist a θ2)).
 
+  Definition optiondiamond2schematic {A} :
+    Option (Diamond alloc.acc_alloc A) ctx.nil ->
+    option (Schematic A) :=
+      option.map
+        (fun '(existT w (θ,a)) => existT w a).
+
   Definition solve_schematic {A} {pA : Persistent A} :
     Diamond alloc.acc_alloc (List (Ṫy * Ṫy) * A) ctx.nil ->
     option (Schematic A) :=
-    fun '(existT w1 (θ1, (cs, a))) =>
-      '(existT w2 (θ2, tt))      <- solvelist cs;;
-      Some (existT w2 (persist a θ2)).
+    fun od => optiondiamond2schematic (solveoptiondiamond od).
 
 End Variant1.
-Export Variant1.
 
 Module Variant2.
 

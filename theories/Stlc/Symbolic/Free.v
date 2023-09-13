@@ -296,16 +296,19 @@ Section WithPredicates.
 
     #[local] Existing Instance instpred_prod_ty.
 
-    Definition incl_alloc {w0 w1} (θ : Alloc w0 w1) : Θ w0 w1.
-    Proof.
-      induction θ.
-      - apply refl.
-      - apply (trans step IHθ).
-    Defined.
+    Fixpoint incl_alloc {w0 w1} (θ : Alloc w0 w1) : Θ w0 w1 :=
+      match θ with
+      | alloc.refl => refl
+      | alloc.fresh θ' => step ⊙ incl_alloc θ'
+      end.
 
     Definition wp_prenex {A} :
       ⊢ʷ Option (Diamond alloc.acc_alloc (List (Ṫy * Ṫy) * A)) -> Box Θ (A -> Pred) -> Pred :=
       fun w0 o Q => wp_optiondiamond o (fun w1 θ '(C,a) => instpred C /\ₚ Q w1 (incl_alloc θ) a)%P.
+
+    Definition wlp_prenex {A} :
+      ⊢ʷ Option (Diamond alloc.acc_alloc (List (Ṫy * Ṫy) * A)) -> Box Θ (A -> Pred) -> Pred :=
+      fun w0 o Q => wlp_optiondiamond o (fun w1 θ '(C,a) => instpred C ->ₚ Q w1 (incl_alloc θ) a)%P.
 
     Lemma prenex_correct {A w} (m : Free A w) (Q : Box Θ (A -> Pred) w) :
       wp_prenex (prenex m) Q ⊣⊢ₚ WP m Q.
@@ -328,6 +331,29 @@ Section WithPredicates.
           apply Acc.proper_wp_bientails.
           apply proper_and_bientails; auto.
         + rewrite <- IHm. now rewrite Acc.wp_false.
+    Qed.
+
+    Lemma prenex_correct' {A w} (m : Free A w) (Q : Box Θ (A -> Pred) w) :
+      wlp_prenex (prenex m) Q ⊣⊢ₚ WLP m Q.
+    Proof.
+      induction m; cbn - [reduce step].
+      - rewrite Acc.wlp_refl. rewrite impl_true_l. reflexivity.
+      - reflexivity.
+      - rewrite <- IHm. clear IHm. unfold wlp_prenex.
+        rewrite wlp_optiondiamond_bind'.
+        destruct (prenex m) as [(w' & r & C & a)|]; cbn.
+        + rewrite Acc.wlp_frame. apply Acc.proper_wlp_bientails.
+          rewrite <- bi.impl_curry, ext_eq.
+          reflexivity.
+        + rewrite impl_true_r. reflexivity.
+      - rewrite <- IHm. clear IHm. unfold wlp_prenex.
+        rewrite wlp_optiondiamond_bind'.
+        destruct (prenex m) as [(w' & r & C & a)|]; cbn.
+        + change (alloc.fresh ?r) with (step ⊙ r). rewrite Acc.wlp_trans.
+          rewrite (Acc.wlp_step_reduce (Θ := alloc.acc_alloc)).
+          rewrite <- (Acc.wlp_step_reduce (Θ := Θ)).
+          reflexivity.
+        + now rewrite Acc.wlp_true.
     Qed.
 
   End WithAcc.

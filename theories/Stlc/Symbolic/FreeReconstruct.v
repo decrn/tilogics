@@ -58,14 +58,14 @@ Set Implicit Arguments.
     (at level 8, left associativity,
       format "s [ ζ ]").
 
-Section Reconstruct.
+Section Generate.
   Import MonadNotations.
   Import World.notations.
 
   Notation "f <$> a" := (@Sem.fmap _ _ f _ a) (at level 61, left associativity).
   Notation "f <*> a" := (@Sem.app _ _ _ f a) (at level 61, left associativity).
 
-  Definition reconstruct : Exp -> ⊢ʷ Ėnv -> Free (Ṫy * Sem Exp) :=
+  Definition generate : Exp -> ⊢ʷ Ėnv -> Free (Ṫy * Sem Exp) :=
     fix gen e {w} Γ :=
       match e with
       | exp.var x =>
@@ -97,10 +97,20 @@ Section Reconstruct.
           Ret (t2[θ4], exp.app <$> e1'[θ2⊙θ3⊙θ4] <*> e2'[θ3⊙θ4])
       end.
 
-  Definition reconstruct_schematic (e : Exp) : option (Schematic (Ṫy * Sem Exp)) :=
-    option.bind (prenex (reconstruct e ∅)) solve_schematic.
+End Generate.
 
-  Definition reconstruct_grounded (e : Exp) : option (Ty * Exp) :=
+Section Reconstruct.
+
+  Definition reconstruct_optiondiamond (e : Exp) :
+    Option (Diamond alloc.acc_alloc (Ṫy * Sem Exp)) ctx.nil :=
+    option.bind (prenex (generate e ∅)) solveoptiondiamond.
+
+  Definition reconstruct_schematic (e : Exp) :
+    option (Schematic (Ṫy * Sem Exp)) :=
+    optiondiamond2schematic (reconstruct_optiondiamond e).
+
+  Definition reconstruct_grounded (e : Exp) :
+    option (Ty * Exp) :=
     option.map
       (fun s : Schematic _ =>
          let (w, te) := s in
@@ -115,10 +125,10 @@ Definition persist_sim_step_alloc_sem {A} := Sub.persist_sim_step (Θ := alloc.a
 
 Ltac wsimpl :=
   repeat
-    (rewrite ?persist_refl, ?persist_trans, ?persist_liftEnv, ?persist_liftTy,
+    (rewrite ?persist_refl, ?persist_trans, ?persist_lift,
       ?inst_lift, ?inst_reduce, ?inst_persist,
-      ?inst_step_snoc, ?inst_lift_env, ?lk_trans, ?trans_refl_l, ?trans_refl_r,
-      ?persist_insert, ?liftEnv_insert,
+      ?inst_step_snoc, ?lk_trans, ?trans_refl_l, ?trans_refl_r,
+      ?persist_insert, ?lift_insert,
 
       ?Pred.ext_refl, ?Pred.ext_tpb, ?Pred.ext_and, ?Pred.ext_eq,
       ?Pred.eqₚ_refl, ?Pred.impl_true_l, ?Pred.and_true_r, ?Pred.and_true_l,
@@ -168,9 +178,9 @@ Section Correctness.
   #[local] Arguments step : simpl never.
   (* #[local] Arguments Free.choose : simpl never. *)
 
-  Lemma soundness e :
+  Lemma generate_sound e :
     forall (w : World) (G : Ėnv w),
-      ⊢ WLP (Θ := alloc.acc_alloc) (reconstruct e G) (fun w1 θ '(t,ee) =>
+      ⊢ WLP (Θ := alloc.acc_alloc) (generate e G) (fun w1 θ '(t,ee) =>
                                    G[θ] |--ₚ e; t ~> ee).
   Proof.
     induction e; cbn; intros w G; unfold T, _4; wsimpl.
@@ -220,10 +230,10 @@ Section Correctness.
       econstructor; eauto.
   Qed.
 
-  Lemma completeness_aux {G e t ee} (T : G |-- e ∷ t ~> ee) :
+  Lemma generate_complete_aux {G e t ee} (T : G |-- e ∷ t ~> ee) :
     forall w0 (G0 : Ėnv w0),
-      ⊢ liftEnv G _ =ₚ G0 →
-      WP (Θ := alloc.acc_alloc) (reconstruct e G0)
+      ⊢ lift G _ =ₚ G0 →
+      WP (Θ := alloc.acc_alloc) (generate e G0)
           (fun w1 r01 '(t',e') => lift t w1 =ₚ t' /\ₚ Sem.pure ee =ₚ e')%P.
   Proof.
     induction T as [G x t Hres|G|G|G e1 e1' e2 e2' e3 e3' t _ IH1 _ IH2 _ IH3
@@ -292,178 +302,171 @@ Section Correctness.
       iExists (lift t2 w2). unfold _4. rewrite lk_refl. wsimpl.
 
       iStopProof. constructor. intros ι [_ [(HeqG & Heq1 & Heq2 & Heq3 & Heq4)]].
-      pred_unfold. split; auto. cbv [inst Sem.inst_sem Sem.pure Sem.app Sem.fmap] in *. now subst.
+      pred_unfold. split; auto. cbv [inst Sem.inst_sem Sem.pure Sem.app Sem.fmap] in *.
+      now subst.
   Qed.
 
-  Theorem generator_correctness e :
+  Theorem generate_correct e :
     forall w (G : Ėnv w) Q (RQ : ProperPost Q),
-      WP (Θ := alloc.acc_alloc) (reconstruct e G) Q ⊣⊢ₚ
+      WP (Θ := alloc.acc_alloc) (generate e G) Q ⊣⊢ₚ
       ∃ₚ t : Ṫy w, ∃ₚ ee : Sem Exp w, TPB G e t ee /\ₚ T Q (t,ee).
   Proof.
     intros w G Q RQ. unfold T. apply split_bientails. split.
     - iStartProof. rewrite wand_is_impl.
-      rewrite wp_impl. iPoseProof (@soundness e w G) as "-#Hsound". iRevert "Hsound".
+      rewrite wp_impl. iPoseProof (@generate_sound e w G) as "-#Hsound". iRevert "Hsound".
       iApply (@wlp_mono alloc.acc_alloc). iIntros (w1 θ1 [t e']) "!> HT HQ". wsimpl.
       iStopProof. constructor. intros ι [HT HQ]. pred_unfold.
       exists (lift (inst t ι) _).
       exists (fun _ => inst e' ι). wsimpl. pred_unfold.
       split. apply HT. revert HQ. apply RQ. wsimpl.
     - constructor. intros ι (t & e' & HT & HQ).
-      pose proof (fromEntails (completeness_aux HT G) ι (MkEmp _)).
+      pose proof (fromEntails (generate_complete_aux HT G) ι (MkEmp _)).
       pred_unfold. specialize (H eq_refl). revert H.
       apply wp_mono. intros w1 θ [?t ?e'] ι1 <- []. pred_unfold.
       revert HQ. apply RQ. wsimpl. f_equal; auto.
   Qed.
 
+  Theorem generate_correct' e :
+    forall w (G : Ėnv w) Q (RQ : ProperPost Q),
+      WLP (Θ := alloc.acc_alloc) (generate e G) Q ⊣⊢ₚ
+      ∀ₚ t : Ṫy w, ∀ₚ ee : Sem Exp w, TPB G e t ee ->ₚ T Q (t,ee).
+  Proof.
+    intros w G Q RQ. unfold T. apply split_bientails. split.
+    - constructor. intros ι HWLP t ee HT.
+      pose proof (fromEntails (generate_complete_aux HT G) ι (MkEmp _)) as Hcompl.
+      pred_unfold. specialize (Hcompl eq_refl). revert Hcompl.
+      apply wp_impl. revert HWLP. apply wlp_mono.
+      intros w1 θ1 [?t ?e'] ι1 <- HQ []. pred_unfold.
+      revert HQ. apply RQ. wsimpl. f_equal; auto.
+    - iStartProof. rewrite wand_is_impl. iIntros "HQ".
+      iPoseProof (@generate_sound e w G) as "-#Hsound". iRevert "Hsound".
+      iApply (@wlp_mono alloc.acc_alloc). iIntros (w1 θ1 [t e']) "!> HT". wsimpl.
+      iStopProof. constructor. intros ι [HQ HT]. pred_unfold.
+      specialize (HQ (lift (inst t ι) _)).
+      specialize (HQ (fun _ => inst e' ι)). pred_unfold.
+      specialize (HQ HT).
+      revert HQ. apply RQ. wsimpl.
+  Qed.
+
   Definition wp_schematic {A} (m : Schematic A) (Q : ⊢ʷ A -> Pred) : Prop :=
     match m with existT w a => exists ι : Assignment w, Q w a ι end.
 
-  Theorem reconstruct_schematic_correct e w t e':
-    reconstruct_schematic e = Some (existT w (t,e')) <->
-      forall ι : Assignment w, ∅ |-- e ∷ inst t ι ~> inst e' ι.
+  Definition wp_optionschematic {A} (m : option (Schematic A)) (Q : ⊢ʷ A -> Pred) : Prop :=
+    option.wp (fun s => wp_schematic s Q) m.
+
+  Lemma exist_subst {A y} P :
+    (exists x : A, y = x /\ P x) <-> P y.
+  Proof. firstorder. now subst. Qed.
+
+  Lemma incl_alloc_alloc {w} (θ : alloc.acc_alloc ctx.nil w) :
+    incl_alloc θ = θ.
+  Proof. induction θ; cbn; now f_equal. Qed.
+
+  Import (hints) Triangular.Tri.
+  Import (hints) Acc.
+
+  Theorem prenex_generate_correct (e : Exp) (w : World)
+    (P : Box alloc.acc_alloc (Ṫy * Sem Exp -> Pred) w) (PP : ProperPost P) :
+    wp_prenex (prenex (generate e ∅)) P ⊣⊢ₚ
+      ∃ₚ t : Ṫy w, ∃ₚ ee : Sem Exp w, ∅ |--ₚ e; t ~> ee /\ₚ T P (t,ee).
+  Proof. now rewrite prenex_correct generate_correct. Qed.
+
+  Theorem prenex_generate_sound (e : Exp) (w0 : World) G0 :
+    ⊢ wlp_prenex
+      (prenex (generate e G0))
+      (fun w1 (θ : alloc.acc_alloc w0 w1) '(t1,e1) =>
+         G0[θ] |--ₚ e; t1 ~> e1).
   Proof.
-    pose (fun (w : World) (θ : alloc.acc_alloc ctx.nil w) (te : Prod Ṫy (Sem Exp) w) =>
-            ∅ |--ₚ e; fst te ~> snd te) as Q.
-    assert (ProperPost Q) as RQ.
-    { subst Q. clear. intros w θ1 [t0 e0'] [t1 e1']. wsimpl.
-      constructor. intros ι [Heq1 Heq2]. pred_unfold.
-      now rewrite !inst_empty. }
-    pose proof (@generator_correctness e ctx.nil empty Q RQ).
-    pose proof (prenex_correct (Θ := alloc.acc_alloc) (@reconstruct e ctx.nil ∅)).
-    rewrite <- H0 in H. clear H0. unfold reconstruct_schematic.
-    clear RQ. subst Q. unfold T in H.
-    unfold wp_prenex, wp_optiondiamond, wp_diamond in H.
-    destruct (prenex (reconstruct e ∅)) as [(w1 & θ1 & C & t1 & e1')|]; cbn.
-    - rewrite <- option.bind_eq_some.
-      admit.
-    - destruct H as [H]. specialize (H env.nil). destruct H as [_ H]. cbn in H.
-      split.
-      + intros. discriminate.
-      + intros HT. exfalso. apply H. clear H. pred_unfold.
-        specialize (HT (grounding _)).
-        exists (persist t (Sub.lift (grounding _))).
-        exists (persist e' (Sub.lift (grounding _))). wsimpl.
-        rewrite Sub.inst_lift. rewrite inst_empty. split; auto.
-  Admitted.
+    rewrite prenex_correct' generate_correct'.
+    - unfold T. wsimpl.
+    - intros w1 θ1 [t0 e0] [t1 e1]. wsimpl. constructor. intros ι1 Heq.
+      pred_unfold. destruct Heq as [Heq1 Heq2]. now subst.
+  Qed.
+
+  Theorem prenex_generate_complete (e : Exp) (w0 : World) G0 t0 e0 :
+    ⊢ G0 |--ₚ e; t0 ~> e0 ->ₚ
+      wp_prenex
+      (prenex (generate e G0))
+      (fun w1 (θ1 : alloc.acc_alloc w0 w1) '(t1,e1) =>
+         t0[θ1] =ₚ t1 /\ₚ e0[θ1] =ₚ e1).
+  Proof.
+    rewrite prenex_correct generate_correct.
+    - unfold T. wsimpl. constructor. intros ι0 _ HT0.
+      exists t0. exists e0. pred_unfold. auto.
+    - intros w1 θ1 [t1 e1] [t2 e2]. wsimpl. constructor. intros ι1 Heq.
+      pred_unfold. destruct Heq. now subst.
+  Qed.
+
+  Theorem reconstruct_schematic_sound e wunc t e':
+    reconstruct_schematic e = Some (existT wunc (t,e')) ->
+    forall ι : Assignment wunc, ∅ |-- e ∷ inst t ι ~> inst e' ι.
+  Proof.
+    unfold reconstruct_schematic, reconstruct_optiondiamond, optiondiamond2schematic.
+    pose proof (@prenex_generate_sound e ctx.nil empty) as Hprenex.
+    destruct (prenex (generate e ∅)) as [(wall & θ1 & C1 & t1 & e1)|];
+      cbn in Hprenex |- *; [|discriminate].
+    pose proof (@Correctness.solvelist_sound wall C1) as Hsolve.
+    destruct (solvelist C1) as [(wunc' & θ2 & [])|]; cbn in *; [|discriminate].
+    intros Heq. depelim Heq.
+    apply Acc.entails_wlp in Hprenex.
+    apply Acc.entails_wlp in Hsolve.
+    intros ι.
+    destruct Hsolve as [Hsolve].
+    specialize (Hsolve ι I).
+    destruct Hprenex as [Hprenex].
+    specialize (Hprenex (inst θ2 ι) (MkEmp _) Hsolve).
+    pred_unfold.
+    now rewrite inst_empty in Hprenex.
+  Qed.
+
+  Theorem reconstruct_schematic_complete (e : Exp) (t : Ty) (e' : Exp) :
+    ∅ |-- e ∷ t ~> e' ->
+    match reconstruct_schematic e with
+    | Some (existT w1 (t1,e1)) =>
+        exists ι : Assignment w1,
+          inst t1 ι = t /\ inst e1 ι = e'
+    | None => False
+    end.
+  Proof.
+    intros H. rewrite <- option.wp_match.
+    unfold reconstruct_schematic, reconstruct_optiondiamond, optiondiamond2schematic, solveoptiondiamond.
+    rewrite option.wp_map option.wp_bind.
+    rewrite option.wp_match.
+    pose proof (@prenex_generate_complete e ctx.nil empty (lift t _) (lift e' _)) as Hcompl.
+    destruct Hcompl as [Hcompl]. pred_unfold.
+    specialize (Hcompl env.nil (MkEmp _)).
+    rewrite inst_empty !inst_lift in Hcompl.
+    specialize (Hcompl H).
+    destruct (prenex (generate e ∅)) as [(w1 & θ1 & C1 & t1 & e1)|]; cbn in *; auto.
+    destruct Hcompl as (ι1 & _ & HC & Heqt & Heqe). pred_unfold. subst.
+    rewrite option.wp_bind.
+    pose proof (@Correctness.solvelist_complete w1 C1) as Hsolv.
+    destruct Hsolv as [Hsolv]. specialize (Hsolv ι1 HC).
+    rewrite option.wp_match.
+    destruct (solvelist C1) as [(w2 & θ2 & [])|]; cbn in *; auto.
+    destruct Hsolv as (ι2 & Heqι & _). subst.
+    rewrite option.wp_match. exists ι2.
+    now rewrite !inst_persist.
+  Qed.
+
+  Definition tpb_algo (e : Exp) (t : Ty) (ee : Exp) : Prop :=
+    match reconstruct_schematic e with
+    | Some (existT w (t', ee')) =>
+        exists ι : Assignment w, inst t' ι = t /\ inst ee' ι = ee
+    | None => False
+    end.
+
+  Lemma correctness (e : Exp) (t : Ty) (ee : Exp) :
+    tpb empty e t ee <-> tpb_algo e t ee.
+  Proof.
+    split; intros HT.
+    - apply (reconstruct_schematic_complete HT).
+    - pose proof (reconstruct_schematic_sound e) as Hsnd. unfold tpb_algo in HT.
+      destruct (reconstruct_schematic e) as [(wunc & t' & e')|].
+      + destruct HT as (ι & Heq1 & Heq2). subst. apply (Hsnd _ _ _ eq_refl ι).
+      + easy.
+  Qed.
+
+  Print Assumptions correctness.
 
 End Correctness.
-
-
-  (* (* Lemma completeness e : forall (w0 : World) (G : Env w0) {t ee}, *) *)
-  (* (*   (TPB G e t ee) *) *)
-  (* (*   ⊢ₚ *) *)
-  (* (*   WP w0 (reconstruct e G) *) *)
-  (* (*       (fun w1 r01 '(t', ee') => (<{ ee ~ r01 }> =ₚ ee' /\ₚ <{ t ~ r01 }> =ₚ t')%P). *) *)
-  (* (* Proof. *) *)
-  (* (*   intros. revert w0 G e t ee. apply TPB_ind; cbn. *) *)
-  (* (*   - intro w. *) *)
-  (* (*     apply forall_r. intros _. *) *)
-  (* (*     apply forall_r. intros t. *) *)
-  (* (*     apply forall_r. intros ee ι. *) *)
-  (* (*     unfold T. cbn. intros _ Ht Hee. *) *)
-  (* (*     now rewrite inst_persist_ty, inst_refl. *) *)
-  (* (*   - intro w. *) *)
-  (* (*     apply forall_r. intros _. *) *)
-  (* (*     apply forall_r. intros t. *) *)
-  (* (*     apply forall_r. intros ee ι. *) *)
-  (* (*     unfold T. cbn. intros _ Ht Hee. *) *)
-  (* (*     now rewrite inst_persist_ty, inst_refl. *) *)
-  (* (*   - intro w1. *) *)
-  (* (*     do 9 (apply forall_r; intros ?). *) *)
-  (* (*     do 7 (rewrite <- impl_and_adjoint). *) *)
-  (* (*     assert (MASSAGE: forall w (A B C D E F G : Pred w), *) *)
-  (* (* bientails (andₚ (andₚ (andₚ (andₚ (andₚ (andₚ A B) C) D) E) F) G) *) *)
-  (* (*           (andₚ (andₚ (andₚ (andₚ (andₚ (andₚ A B) C) G) E) F) D)) by admit. *) *)
-  (* (*     rewrite MASSAGE. clear MASSAGE. *) *)
-  (* (*     rewrite wp_bind. apply impl_and_adjoint. apply wp_monotonic'. *) *)
-  (* (*     intros w2 r12 [t1 ee1]. cbn -[step]. unfold Definitions.T, _4. *) *)
-  (* (*     rewrite wp_bind. *) *)
-  (* (*     rewrite <- impl_and_adjoint. *) *)
-  (* (*     rewrite (eqₚ_sym t1). *) *)
-  (* (*     assert (MASSAGE: forall w (A B C D : Pred w), *) *)
-  (* (*                entails (andₚ A (andₚ B C)) (andₚ C D) <-> entails (andₚ A (andₚ B ⊤ₚ)) D) by admit. *) *)
-  (* (*     rewrite (MASSAGE _ _ (eqₚ (persist w1 x4 w2 r12) ee1) (eqₚ (Ty_bool w2) t1) _). *) *)
-  (* (*     rewrite and_true_r. *) *)
-  (* (*     admit. *) *)
-  (* (*   - intros w G s t e' ι. cbn. *) *)
-  (* (*     intros _ Heqo Hvar. destruct (resolve s G) eqn:?; cbn; inversion Heqo. *) *)
-  (* (*     unfold T. firstorder. now rewrite refl_persist. *) *)
-  (* (*   - admit. *) *)
-  (* (*   - admit. *) *)
-  (* (*   - admit. *) *)
-  (* (* Admitted. *) *)
-
-  (* Lemma soundness' e : forall (w0 : World) (G : Env w0), *)
-  (*   Trueₚ *)
-  (*   ⊢ₚ *)
-  (*   WLP w0 (reconstruct e G) *)
-  (*       (fun w1 r01 '(t, ee) => TPB <{G ~ r01}> e t ee). *)
-  (* Proof. *)
-  (*   (* induction e; cbn; intros; subst; unfold T. *) *)
-  (*   (* - constructor; constructor. *) *)
-  (*   (* - constructor; constructor. *) *)
-  (*   (* - rewrite wlp_bind. rewrite IHe1. *) *)
-  (*   (*   rewrite <- and_true_l. apply impl_and_adjoint. apply wlp_monotonic'. *) *)
-  (*   (*   intros. rewrite ext_true. *) *)
-  (*   (*   destruct a. rewrite <- impl_and_adjoint. *) *)
-  (*   (*   cbn. rewrite <- impl_and_adjoint. unfold T. rewrite wlp_bind. *) *)
-  (*   (*   specialize (IHe2 w1 <{ G ~ r ⊙ refl }>). rewrite IHe2. *) *)
-  (*   (*   (* probably doable with some kind of tactic, perhaps change or replace X with Y is easier? *) *) *)
-  (*   (*   assert (MASSAGE: forall w (X Y Z : Pred w), bientails (andₚ (andₚ X Y) Z) (andₚ (andₚ Y Z) X)). *) *)
-  (*   (*   { intros. now rewrite (and_assoc X _), (and_comm _ X). } *) *)
-  (*   (*   rewrite MASSAGE. clear MASSAGE. *) *)
-  (*   (*   apply impl_and_adjoint. apply wlp_monotonic'. *) *)
-  (*   (*   intros. destruct a. rewrite wlp_bind. *) *)
-  (*   (*   rewrite <- impl_and_adjoint. rewrite <- and_true_r. *) *)
-  (*   (*   rewrite IHe3. *) *)
-  (*   (*   apply impl_and_adjoint. apply wlp_monotonic'. *) *)
-  (*   (*   intros. destruct a. cbn. unfold T, _4. clear. *) *)
-  (*   (*   rewrite trans_refl_r, trans_refl_r. *) *)
-  (*   (*   constructor. *) *)
-  (*   (*   intro. unfold Ext. unfold andₚ, implₚ, TPB. intros. *) *)
-  (*   (*   destruct H as [[]]. *) *)
-  (*   (*   constructor. *) *)
-  (*   (*   + rewrite inst_persist_env, ?inst_trans. *) *)
-  (*   (*     rewrite inst_persist_env, H2 in H. cbn in H. *) *)
-  (*   (*     rewrite persist_trans. *) *)
-  (*   (*     exact H. *) *)
-  (*   (*   + rewrite inst_persist_env, inst_trans, inst_trans, inst_persist_ty. *) *)
-  (*   (*     rewrite inst_persist_env, inst_persist_env in H3. *) *)
-  (*   (*     apply H3. *) *)
-  (*   (*   + rewrite inst_persist_env, inst_trans, inst_trans. *) *)
-  (*   (*     rewrite inst_persist_env, inst_persist_env, inst_trans, <- H1 in H0. *) *)
-  (*   (*     apply H0. *) *)
-  (*   (* - destruct (resolve s G) eqn:?; cbn; try easy. *) *)
-  (*   (*   unfold T. rewrite refl_persist. constructor. constructor. *) *)
-  (*   (*   now rewrite resolve_inst, Heqo. *) *)
-  (*   (* - rewrite <- Acc.entails_wlp. rewrite ext_true. rewrite IHe. *) *)
-  (*   (*   rewrite <- and_true_l. *) *)
-  (*   (*   apply impl_and_adjoint. unfold T, _4. rewrite wlp_bind. *) *)
-  (*   (*   apply wlp_monotonic'. *) *)
-  (*   (*   intros. rewrite ext_true. *) *)
-  (*   (*   destruct a. cbn -[step]. unfold T, _4. *) *)
-  (*   (*   rewrite trans_refl_r, trans_refl_r. *) *)
-  (*   (*   constructor. intro. cbn -[step]. *) *)
-  (*   (*   unfold Ext, andₚ, implₚ, TPB. intros. cbn -[step] in *. *) *)
-  (*   (*   constructor. rewrite ?inst_persist_env in *. exact H0. *) *)
-  (*   (* - rewrite wlp_bind. specialize (IHe w0 ((s, lift t w0) :: G)). rewrite IHe. *) *)
-  (*   (*   rewrite <- and_true_l. *) *)
-  (*   (*   apply impl_and_adjoint. *) *)
-  (*   (*   apply wlp_monotonic'. *) *)
-  (*   (*   intros. rewrite ext_true. destruct a. rewrite <- impl_and_adjoint. *) *)
-  (*   (*   rewrite and_true_l. cbn in *. unfold T, _4. *) *)
-  (*   (*   constructor. intros ι He. cbn in *. rewrite ?inst_persist_env, ?inst_persist_ty, ?trans_refl_r, ?inst_lift in *. now constructor. *) *)
-  (*   (* - rewrite <- Acc.entails_wlp, ext_true, IHe2, <- and_true_l. *) *)
-  (*   (*   apply impl_and_adjoint. unfold T, _4. rewrite wlp_bind. apply wlp_monotonic'. *) *)
-  (*   (*   intros w1 r [t2 e2']. *) *)
-  (*   (*   rewrite ext_true, wlp_bind, <- impl_and_adjoint, and_comm, IHe1. *) *)
-  (*   (*   apply impl_and_adjoint. apply wlp_monotonic'. *) *)
-  (*   (*   intros w2 r12 [t1 e1']. cbn -[step]. unfold T, _4. *) *)
-  (*   (*   rewrite ?trans_refl_r. *) *)
-  (*   (*   constructor. *) *)
-  (*   (*   intros ι He2 He1 Ht1. *) *)
-  (*   (*   cbn -[step] in *. *) *)
-  (*   (*   rewrite ?inst_persist_ty, ?inst_persist_env, ?inst_trans, ?assoc_persist in *. *) *)
-  (*   (*   rewrite Ht1 in He1. econstructor. *) *)
-  (*   (*   exact He1. exact He2. *) *)
-  (* Admitted. *)

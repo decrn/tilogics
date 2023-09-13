@@ -514,7 +514,7 @@ Module JustTyping.
       intros c P Q PQ. induction c; cbn.
       - apply PQ.
       - reflexivity.
-      - apply Morphisms_Prop.and_impl_morphism; intuition.
+      - apply Morphisms_Prop.and_impl_morphism; [reflexivity|now apply IHc].
       - apply Morphisms_Prop.ex_impl_morphism.
         intros t. now apply H.
       - apply IHc. intros. now apply H.

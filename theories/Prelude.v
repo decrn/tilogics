@@ -125,6 +125,10 @@ Module option.
     - destruct o as [a|]; [ now exists a | discriminate ].
   Qed.
 
+  Lemma map_bind {A B C} (f : B -> C) (g : A -> option B) (o : option A) :
+    map f (bind o g) = bind o (fun a => map f (g a)).
+  Proof. now destruct o. Qed.
+
   (* Not lazy in (a : option A). Avoid! *)
   Definition ap {A B} (f : option (A -> B)) (a : option A) : option B :=
     match f with
@@ -256,7 +260,7 @@ Module option.
     (fS : forall a, S1 a <-> S2 a) (fN: N1 <-> N2) :
     forall (o : option A),
       spec S1 N1 o <-> spec S2 N2 o.
-  Proof. split; apply spec_monotonic; intuition. Qed.
+  Proof. split; apply spec_monotonic; firstorder. Qed.
 
   Lemma wp_map {A B S} (f : A -> B) (o : option A) :
     wp S (map f o) <-> wp (fun a => S (f a)) o.
@@ -281,7 +285,7 @@ Module option.
 
   Lemma wp_proper {A} (S1 S2 : A -> Prop) (fS : forall a, S1 a <-> S2 a)  :
     forall (o : option A), wp S1 o <-> wp S2 o.
-  Proof. split; apply wp_monotonic; intuition. Qed.
+  Proof. split; apply wp_monotonic; firstorder. Qed.
 
   Lemma wlp_map {A B S} (f : A -> B) (o : option A) :
     wlp S (map f o) <-> wlp (fun a => S (f a)) o.
@@ -306,7 +310,7 @@ Module option.
 
   Lemma wlp_proper {A} (S1 S2 : A -> Prop) (fS : forall a, S1 a <-> S2 a)  :
     forall (o : option A), wlp S1 o <-> wlp S2 o.
-  Proof. split; apply wlp_monotonic; intuition. Qed.
+  Proof. split; apply wlp_monotonic; firstorder. Qed.
 
   Module Import notations.
 

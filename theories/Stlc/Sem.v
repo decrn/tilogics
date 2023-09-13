@@ -62,6 +62,9 @@ Module Sem.
     fun w x ι => x ι.
   #[global] Arguments inst_sem {A} [w] x ι/.
 
+  #[export] Instance lift_sem {A} : Lift (Sem A) A :=
+    pure.
+
   #[export] Instance persistent_sem {A} : Persistent (Sem A) :=
     fun Θ w0 t w1 θ ι => t (inst θ ι).
 
@@ -78,6 +81,9 @@ Module Sem.
       change (inst (ṫy.var αIn) (inst θ1 ι) = inst (ṫy.var αIn) (inst θ2 ι)).
       rewrite <- ?inst_persist. f_equal. cbn. apply H.
   Qed.
+
+  #[export] Instance inst_persist_sem {A} : InstPersist (Sem A) A.
+  Proof. easy. Qed.
 
   Section PersistLemmas.
     Context {Θ : ACC}.

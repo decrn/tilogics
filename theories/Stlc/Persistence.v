@@ -118,6 +118,15 @@ Proof.
   - intros. destruct a; cbn; f_equal. now apply persist_simulation.
 Qed.
 
+#[export] Instance persistlaws_prod {A B} `{PersistLaws A, PersistLaws B} :
+  PersistLaws (Prod A B).
+Proof.
+  constructor.
+  - intros. destruct a; cbn; f_equal; apply persist_refl.
+  - intros. destruct a; cbn; f_equal; apply persist_trans.
+  - intros. destruct a; cbn; f_equal; now apply persist_simulation.
+Qed.
+
 #[export] Instance persistlaws_env : PersistLaws Ėnv.
 Proof.
   constructor.
@@ -156,15 +165,17 @@ Proof.
   now rewrite lookup_fmap.
 Qed.
 
+Lemma persist_empty {Θ : ACC}
+  {w0 w1} (θ : Θ w0 w1) :
+  persist (empty (A := Ėnv w0)) θ = empty.
+Proof.
+  apply (fmap_empty (M := gmap string)).
+Qed.
+
 Lemma persist_insert {Θ : ACC}
   {w0 w1} (θ : Θ w0 w1) (G : Ėnv w0) (x : string) (t : Ṫy w0) :
   persist (insert x t G) θ = insert x (persist t θ) (persist G θ).
 Proof. unfold persist, persist_env, Ėnv. now rewrite fmap_insert. Qed.
-
-Lemma step_reduce {Θ1 Θ2 : ACC} {T} `{Persistent T, Step Θ1, Reduce Θ2}
-  {w α s} (t : T w) :
-  persist (persist t (step (Θ := Θ1))) (reduce (Θ := Θ2) α s) = t.
-Proof. Admitted.
 
 Lemma lk_reduce_zero {Θ} {reduceΘ : Reduce Θ} :
   forall {w x} (t : Ṫy w),
@@ -176,6 +187,11 @@ Lemma lk_reduce_succ {Θ} {reduceΘ : Reduce Θ}
   lk (reduce (Θ := Θ) x t) (ctx.in_succ yIn) = ṫy.var yIn.
 Proof. (* exact (env.lookup_tabulate (@ṫy.var w) yIn). *) Admitted.
 
+Lemma lk_step {Θ} {stepΘ : Step Θ} :
+  forall w α (αIn : α ∈ w) β,
+    lk (step (α := β)) αIn = ṫy.var (ctx.in_succ αIn).
+Proof. Admitted.
+
 Lemma lk_thin {Θ} {thinΘ : Thin Θ} :
   forall w α (αIn : α ∈ w) β (βIn : β ∈ w - α),
     lk (thin α) βIn = ṫy.var (ctx.in_thin αIn βIn).
@@ -184,4 +200,9 @@ Proof. Admitted.
 Lemma lk_thick {Θ} {thickΘ : Thick Θ} :
   forall w α (αIn : α ∈ w) (t : Ṫy (w - α)) β (βIn : β ∈ w),
     lk (thick α t) βIn = thickIn αIn t βIn.
+Proof. Admitted.
+
+Lemma step_reduce {Θ1 Θ2 : ACC} {T} `{Persistent T, Step Θ1, Reduce Θ2}
+  {w α s} (t : T w) :
+  persist (persist t (step (Θ := Θ1))) (reduce (Θ := Θ2) α s) = t.
 Proof. Admitted.
