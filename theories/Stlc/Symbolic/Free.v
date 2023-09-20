@@ -358,6 +358,10 @@ Section WithPredicates.
 
   End WithAcc.
 
+  Lemma incl_alloc_alloc {w0 w1} (θ : alloc.acc_alloc w0 w1) :
+    incl_alloc θ = θ.
+  Proof. induction θ; cbn; now f_equal. Qed.
+
   Definition wp_schematic {A} (m : Schematic A) (Q : ⊢ʷ A -> Pred) : Prop :=
     match m with existT w a => exists ι : Assignment w, Q w a ι end.
 

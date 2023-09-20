@@ -126,6 +126,10 @@ Section InstLift.
     apply map_fmap_ext. intros x t Hlk. apply inst_lift.
   Qed.
 
+  #[export] Instance inst_lift_prod {AT A BT B}
+    `{InstLift AT A, InstLift BT B} : InstLift (Prod AT BT) (A * B).
+  Proof. intros w [a b] ι. cbn. f_equal; apply inst_lift. Qed.
+
 End InstLift.
 
 Section InstPersist.
@@ -147,6 +151,10 @@ Section InstPersist.
     rewrite <- map_fmap_compose. apply map_fmap_ext.
     intros x t Hlk. apply inst_persist.
   Qed.
+
+  #[export] Instance inst_persist_prod {AT A BT B}
+    `{InstPersist AT A, InstPersist BT B} : InstPersist (Prod AT BT) (A * B).
+  Proof. intros Θ w0 w1 θ [a b] ι. cbn. f_equal; apply inst_persist. Qed.
 
 End InstPersist.
 

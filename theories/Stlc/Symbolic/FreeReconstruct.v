@@ -137,13 +137,13 @@ Ltac wsimpl :=
       ?Pred.eq_func,
 
       ?persist_sim_step_alloc_env, ?persist_sim_step_alloc_ty, ?persist_sim_step_alloc_sem,
-      ?Sem.persist_pure, ?Sem.persist_fmap, ?Sem.persist_app,
+      ?Sem.inst_pure, ?Sem.inst_fmap, ?Sem.inst_app, ?Sem.persist_pure, ?Sem.persist_fmap, ?Sem.persist_app,
 
       (* ?ProgramLogic.eqₚ_env_cons, *)
       ?step_reduce,
       (* ?ProgramLogic.equiv_true, *)
       ?lk_reduce_zero,
-      ?lk_reduce_succ;
+      ?lk_reduce_succ in *;
      cbn - [lk trans step thick Sub.up1]; auto);
   repeat setoid_rewrite Pred.ext_exists;
   repeat setoid_rewrite Pred.ext_forall;
@@ -261,9 +261,7 @@ Section Correctness.
       iApply (@wp_mono alloc.acc_alloc). iIntros (w3 r3 (t3 & e3'')) "!> (#Heq5 & #Heq6)". wsimpl.
 
       iStopProof. constructor. intros ι [_ [(HeqG & Heq1 & Heq2 & Heq3 & Heq4 & Heq5 & Heq6)]].
-      pred_unfold. split. auto. split. auto. split. auto.
-      cbv [inst Sem.inst_sem Sem.pure Sem.app Sem.fmap] in *.
-      now subst.
+      pred_unfold. wsimpl. now subst.
 
     - iIntros "#HeqG". rewrite Acc.wp_step_reduce. iExists (lift t1 _). iIntros "!> #Heq1".
       rewrite wp_bind. unfold _4. wsimpl.
@@ -274,7 +272,7 @@ Section Correctness.
       iIntros (w1 r1 (t2' & e1'')) "!> (#Heq2 & #Heq3)"; wsimpl.
       repeat iSplit; auto.
       iStopProof. constructor. intros ι [_ [(HeqG & Heq1 & Heq2 & Heq3)]].
-      pred_unfold. cbv [inst Sem.inst_sem Sem.pure Sem.app Sem.fmap] in *. now subst.
+      pred_unfold. wsimpl. now subst.
 
     - iIntros "#HeqG".
       rewrite wp_bind. unfold _4.
@@ -285,7 +283,7 @@ Section Correctness.
       iIntros (w1 r1 (t2' & e'')) "!> (#Heq1 & #Heq2)"; wsimpl.
       iSplit; auto.
       iStopProof. constructor. intros ι [_ [(HeqG & Heq1 & Heq2)]].
-      pred_unfold. cbv [inst Sem.inst_sem Sem.pure Sem.app Sem.fmap] in *. now subst.
+      pred_unfold. wsimpl. now subst.
 
     - iIntros "#HeqG".
       rewrite wp_bind. unfold _4. wsimpl.
@@ -302,8 +300,23 @@ Section Correctness.
       iExists (lift t2 w2). unfold _4. rewrite lk_refl. wsimpl.
 
       iStopProof. constructor. intros ι [_ [(HeqG & Heq1 & Heq2 & Heq3 & Heq4)]].
-      pred_unfold. split; auto. cbv [inst Sem.inst_sem Sem.pure Sem.app Sem.fmap] in *.
-      now subst.
+      pred_unfold. wsimpl. now subst.
+  Qed.
+
+  Lemma generate_complete (e : Exp) (w0 : World) G0 t0 e0 :
+    ⊢ G0 |--ₚ e; t0 ~> e0 -∗
+      WP (Θ := alloc.acc_alloc)
+        (generate e G0)
+        (fun w1 (θ1 : alloc.acc_alloc w0 w1) '(t1,e1) =>
+           t0[θ1] =ₚ t1 /\ₚ e0[θ1] =ₚ e1).
+  Proof.
+    rewrite wand_is_impl.
+    constructor. intros ι _ HT.
+    destruct (@generate_complete_aux _ _ _ _ HT w0 G0) as [Hcompl].
+    specialize (Hcompl ι (MkEmp _)). pred_unfold.
+    specialize (Hcompl eq_refl). revert Hcompl.
+    apply wp_mono. intros w1 θ1 [t1 e1].
+    wsimpl. intros ι1 <-. pred_unfold. wsimpl.
   Qed.
 
   Theorem generate_correct e :
@@ -312,17 +325,19 @@ Section Correctness.
       ∃ₚ t : Ṫy w, ∃ₚ ee : Sem Exp w, TPB G e t ee /\ₚ T Q (t,ee).
   Proof.
     intros w G Q RQ. unfold T. apply split_bientails. split.
-    - iStartProof. rewrite wand_is_impl.
-      rewrite wp_impl. iPoseProof (@generate_sound e w G) as "-#Hsound". iRevert "Hsound".
+    - iStartProof. rewrite wand_is_impl wp_impl.
+      iPoseProof (@generate_sound e w G) as "-#Hsound". iRevert "Hsound".
       iApply (@wlp_mono alloc.acc_alloc). iIntros (w1 θ1 [t e']) "!> HT HQ". wsimpl.
       iStopProof. constructor. intros ι [HT HQ]. pred_unfold.
       exists (lift (inst t ι) _).
       exists (fun _ => inst e' ι). wsimpl. pred_unfold.
       split. apply HT. revert HQ. apply RQ. wsimpl.
-    - constructor. intros ι (t & e' & HT & HQ).
-      pose proof (fromEntails (generate_complete_aux HT G) ι (MkEmp _)).
-      pred_unfold. specialize (H eq_refl). revert H.
-      apply wp_mono. intros w1 θ [?t ?e'] ι1 <- []. pred_unfold.
+    - iStartProof. iIntros "(%t & %ee & HT & HQ)".
+      iPoseProof (generate_complete with "HT") as "-#Hcompl".
+      iRevert "Hcompl".
+      iApply (@wp_mono alloc.acc_alloc).
+      iIntros (w1 θ1 [t1 e1]) "!> [Heqt Heqe]".
+      iStopProof. constructor. intros ι (HQ & Heqt & Heqe). pred_unfold.
       revert HQ. apply RQ. wsimpl. f_equal; auto.
   Qed.
 
@@ -347,20 +362,6 @@ Section Correctness.
       specialize (HQ HT).
       revert HQ. apply RQ. wsimpl.
   Qed.
-
-  Definition wp_schematic {A} (m : Schematic A) (Q : ⊢ʷ A -> Pred) : Prop :=
-    match m with existT w a => exists ι : Assignment w, Q w a ι end.
-
-  Definition wp_optionschematic {A} (m : option (Schematic A)) (Q : ⊢ʷ A -> Pred) : Prop :=
-    option.wp (fun s => wp_schematic s Q) m.
-
-  Lemma exist_subst {A y} P :
-    (exists x : A, y = x /\ P x) <-> P y.
-  Proof. firstorder. now subst. Qed.
-
-  Lemma incl_alloc_alloc {w} (θ : alloc.acc_alloc ctx.nil w) :
-    incl_alloc θ = θ.
-  Proof. induction θ; cbn; now f_equal. Qed.
 
   Import (hints) Triangular.Tri.
   Import (hints) Acc.

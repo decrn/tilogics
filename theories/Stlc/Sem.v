@@ -82,8 +82,27 @@ Module Sem.
       rewrite <- ?inst_persist. f_equal. cbn. apply H.
   Qed.
 
+  #[export] Instance inst_lift_sem {A} : InstLift (Sem A) A.
+  Proof. easy. Qed.
+
   #[export] Instance inst_persist_sem {A} : InstPersist (Sem A) A.
   Proof. easy. Qed.
+
+  Section InstLemmas.
+
+    Lemma inst_pure {A w} {ι : Assignment w} (a : A) :
+      inst (pure a) ι = a.
+    Proof. reflexivity. Qed.
+
+    Lemma inst_fmap {A B} (f : A -> B) [w0] (a : Sem A w0) (ι : Assignment w0) :
+      inst (fmap f a) ι = f (inst a ι).
+    Proof. reflexivity. Qed.
+
+    Lemma inst_app {A B} [w0] (f : Sem (A -> B) w0) (a : Sem A w0) (ι : Assignment w0) :
+      inst (app f a) ι = (inst f ι) (inst a ι).
+    Proof. reflexivity. Qed.
+
+  End InstLemmas.
 
   Section PersistLemmas.
     Context {Θ : ACC}.
