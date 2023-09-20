@@ -1,0 +1,30 @@
+# This file was generated from `meta.yml`, please do not edit manually.
+# Follow the instructions on https://github.com/coq-community/templates to regenerate.
+
+opam-version: "2.0"
+maintainer: "steven.keuchel@gmail.com"
+version: "dev"
+
+homepage: "https://github.com/decrn/em"
+dev-repo: "git+https://github.com/decrn/em.git"
+bug-reports: "https://github.com/decrn/em/issues"
+
+
+synopsis: ""
+description: """
+"""
+
+build: [make "-j%{jobs}%"]
+install: [make "install"]
+depends: [
+  "coq" 
+  "coq-iris" {>= "4.0.0"}
+]
+
+tags: [
+  "logpath:"
+]
+authors: [
+  "Steven Keuchel <steven.keuchel@gmail.com>"
+  "Denis Carnier <decrn@users.noreply.github.com>"
+]

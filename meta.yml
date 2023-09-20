@@ -1,0 +1,23 @@
+# Using https://github.com/coq-community/templates
+
+authors:
+- name: "Steven Keuchel"
+  email: "steven.keuchel@gmail.com"
+- name: "Denis Carnier"
+  email: "decrn@users.noreply.github.com"
+
+opam-file-maintainer: "steven.keuchel@gmail.com"
+organization: decrn
+shortname: em
+
+action: true
+opam_name: coq-decrn-em
+branch: main
+tested_coq_opam_versions:
+- version: '8.16'
+- version: '8.17'
+
+dependencies:
+- opam:
+    name: coq-iris
+    version: '{>= "4.0.0"}'
