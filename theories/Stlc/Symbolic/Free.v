@@ -296,19 +296,9 @@ Section WithPredicates.
 
     #[local] Existing Instance instpred_prod_ty.
 
-    Fixpoint incl_alloc {w0 w1} (θ : Alloc w0 w1) : Θ w0 w1 :=
-      match θ with
-      | alloc.refl => refl
-      | alloc.fresh θ' => step ⊙ incl_alloc θ'
-      end.
-
     Definition wp_prenex {A} :
       ⊢ʷ Option (Diamond alloc.acc_alloc (List (Ṫy * Ṫy) * A)) -> Box Θ (A -> Pred) -> Pred :=
-      fun w0 o Q => wp_optiondiamond o (fun w1 θ '(C,a) => instpred C /\ₚ Q w1 (incl_alloc θ) a)%P.
-
-    Definition wlp_prenex {A} :
-      ⊢ʷ Option (Diamond alloc.acc_alloc (List (Ṫy * Ṫy) * A)) -> Box Θ (A -> Pred) -> Pred :=
-      fun w0 o Q => wlp_optiondiamond o (fun w1 θ '(C,a) => instpred C ->ₚ Q w1 (incl_alloc θ) a)%P.
+      fun w0 o Q => wp_optiondiamond o (fun w1 θ '(C,a) => instpred C /\ₚ Q w1 (alloc.incl θ) a)%P.
 
     Lemma prenex_correct {A w} (m : Free A w) (Q : Box Θ (A -> Pred) w) :
       wp_prenex (prenex m) Q ⊣⊢ₚ WP m Q.
@@ -333,76 +323,6 @@ Section WithPredicates.
         + rewrite <- IHm. now rewrite Acc.wp_false.
     Qed.
 
-    Lemma prenex_correct' {A w} (m : Free A w) (Q : Box Θ (A -> Pred) w) :
-      wlp_prenex (prenex m) Q ⊣⊢ₚ WLP m Q.
-    Proof.
-      induction m; cbn - [reduce step].
-      - rewrite Acc.wlp_refl. rewrite impl_true_l. reflexivity.
-      - reflexivity.
-      - rewrite <- IHm. clear IHm. unfold wlp_prenex.
-        rewrite wlp_optiondiamond_bind'.
-        destruct (prenex m) as [(w' & r & C & a)|]; cbn.
-        + rewrite Acc.wlp_frame. apply Acc.proper_wlp_bientails.
-          rewrite <- bi.impl_curry, ext_eq.
-          reflexivity.
-        + rewrite impl_true_r. reflexivity.
-      - rewrite <- IHm. clear IHm. unfold wlp_prenex.
-        rewrite wlp_optiondiamond_bind'.
-        destruct (prenex m) as [(w' & r & C & a)|]; cbn.
-        + change (alloc.fresh ?r) with (step ⊙ r). rewrite Acc.wlp_trans.
-          rewrite (Acc.wlp_step_reduce (Θ := alloc.acc_alloc)).
-          rewrite <- (Acc.wlp_step_reduce (Θ := Θ)).
-          reflexivity.
-        + now rewrite Acc.wlp_true.
-    Qed.
-
   End WithAcc.
-
-  Lemma incl_alloc_alloc {w0 w1} (θ : alloc.acc_alloc w0 w1) :
-    incl_alloc θ = θ.
-  Proof. induction θ; cbn; now f_equal. Qed.
-
-  Definition wp_schematic {A} (m : Schematic A) (Q : ⊢ʷ A -> Pred) : Prop :=
-    match m with existT w a => exists ι : Assignment w, Q w a ι end.
-
-  Definition solvefree {A} {persA : Persistence.Persistent A} (m : Free A ctx.nil) :
-    option (Schematic A) := option.bind (prenex m) solve_schematic.
-
-  (* Lemma solve_equiv {A} {persA : Persistent A} *)
-  (*   (m : Diamond Alloc _ ctx.nil) (Q : Box Alloc (A -> Pred) [ctx]) : *)
-  (*   (* (RQ : ProperPost Q) : *) *)
-  (*   wp_optiondiamond (solve m) Q ⊣⊢ₚ wp_diamond m Q. *)
-  (* Proof. *)
-  (*   rewrite <- prenex_correct. unfold solvefree. *)
-  (*   unfold wp_prenex, wp_optiondiamond. *)
-  (*   destruct (prenex m) as [(w1 & r1 & C & a)|]; cbn; [|easy]. *)
-  (*   pose proof (solvelist_complete C) as Hcompl. *)
-  (*   pose proof (solvelist_sound C) as Hsound. *)
-  (*   destruct solvelist as [(w2 & r2 & [])|]; cbn in *. *)
-  (*   - apply split_bientails. split. *)
-  (*     + destruct Hsound as [Hsound]. constructor. *)
-  (*       intros ι0 (ι2 & Heq & HQ); pred_unfold; subst. exists (inst r2 ι2). *)
-  (*       specialize (Hsound (inst r2 ι2) I ι2 eq_refl). hnf in Hsound. *)
-  (*       unfold andₚ. repeat split. *)
-  (*       * destruct (env.view (inst r1 (inst r2 ι2))). *)
-  (*         destruct (env.view (inst alloc.nil_l ι2)). *)
-  (*         reflexivity. *)
-  (*       * assumption. *)
-  (*       * admit. *)
-  (*         (* epose proof (RQ w1 r1 _ a (inst r2 ι2)) as H1. *) *)
-  (*         (* epose proof (RQ w2 alloc.nil_l _ (persist _ a _ r2) ι2) as H2. *) *)
-  (*         (* cbn in H1, H2. *) *)
-  (*     + destruct Hcompl as [Hcompl]. constructor. *)
-  (*       intros ι0 (ι1 & Heq1 & HC & HQ). *)
-  (*       specialize (Hcompl ι1 HC). destruct Hcompl as (ι2 & Heq2 & _). *)
-  (*       exists ι2. split. subst. *)
-  (*       * destruct (env.view (inst r1 (inst r2 ι2))). *)
-  (*         destruct (env.view (inst alloc.nil_l ι2)). *)
-  (*         reflexivity. *)
-  (*       * clear - HQ. admit. *)
-  (*   - apply split_bientails. split. firstorder. *)
-  (*     destruct Hcompl as [Hcompl]. constructor. *)
-  (*     intros ι (ι1 & Heq & HC & HQ). apply (Hcompl ι1 HC). *)
-  (* Admitted. *)
 
 End WithPredicates.

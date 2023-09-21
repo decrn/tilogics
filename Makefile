@@ -1,3 +1,6 @@
+# Always run with nproc jobs by default. Can be overridden by the user.
+MAKEFLAGS := --jobs=$(shell nproc)
+
 all: Makefile.coq
 	@+$(MAKE) -f Makefile.coq all
 

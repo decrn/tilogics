@@ -1,8 +1,6 @@
 -Q theories Em
-theories/aelet/AELetMonadic.v
 theories/common/Context.v
 theories/common/Environment.v
-theories/Example.v
 theories/Prelude.v
 theories/LetPoly.v
 theories/Stlc/Alloc.v

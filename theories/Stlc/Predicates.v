@@ -508,57 +508,6 @@ Module Pred.
 
   End Lemmas.
 
-  Definition ProperPost {Θ} {reflΘ : Refl Θ}
-    {AT A} {persA : Persistence.Persistent AT} {instT : Inst AT A}
-    {w} (Q : Box Θ (Impl AT Pred) w) : Prop :=
-    forall w1 (θ : Θ w w1) (te0 : AT w) (te1 : AT w1),
-      (te1 =ₚ (persist te0 θ)) ⊢ₚ (Ext (Q w refl te0) θ <->ₚ Q w1 θ te1).
-
-  Definition ProperPost' {Θ} {reflΘ : Refl Θ} {transΘ : Trans Θ}
-    {A} {persA : Persistence.Persistent A}
-    {w0} (Q : Box Θ (Impl A Pred) w0) : Prop :=
-    forall w1 w2 (θ1 : Θ w0 w1) (θ2 : Θ w1 w2) (a : A _),
-      Ext (Q w1 θ1 a) θ2 ⊣⊢ₚ Q w2 (trans θ1 θ2) (persist a θ2).
-
-  Lemma properpost_impl {Θ} {reflΘ : Refl Θ} {transΘ : Trans Θ}
-    {lkTransΘ : LkTrans Θ}
-    {AT A} {persA : Persistence.Persistent AT} {instA : Inst AT A}
-    {liftA : Lift AT A} {instLiftA : InstLift AT A}
-    {instPersA : InstPersist AT A}
-    {w0} (Q : Box Θ (Impl AT Pred) w0) :
-    ProperPost Q -> ProperPost' Q.
-  Proof.
-    intros PP.
-    unfold ProperPost in PP.
-    unfold ProperPost'.
-    intros w1 w2 θ1 θ2 a.
-    constructor. intros ι2. cbn.
-
-    pose proof (PP w2 (trans θ1 θ2)) as PP2.
-    specialize (PP2 (lift (inst a (inst θ2 ι2)) w0)).
-    specialize (PP2 (persist a θ2)).
-    rewrite ext_trans in PP2.
-
-    destruct PP2 as [PP2].
-    specialize (PP2 ι2). cbn in PP2.
-    rewrite !inst_persist in PP2.
-    rewrite inst_trans in PP2.
-    rewrite inst_lift in PP2.
-    specialize (PP2 eq_refl).
-
-    pose proof (PP w1 θ1) as PP1.
-    specialize (PP1 (lift (inst a (inst θ2 ι2)) w0)).
-    specialize (PP1 a).
-    destruct PP1 as [PP1].
-    specialize (PP1 (inst θ2 ι2)). cbn in PP1.
-    rewrite inst_persist in PP1.
-    rewrite inst_lift in PP1.
-    specialize (PP1 eq_refl).
-
-    firstorder.
-
-  Qed.
-
   Section InstPred.
     Import World.notations.
     (* A type class for things that can be interpreted as a predicate. *)
@@ -1130,19 +1079,6 @@ Module Pred.
     (f : A w1 -> Option (Diamond Θ B) w2) (Q : Box Θ (B -> Pred) w2) :
     wlp_optiondiamond (option.bind o f) Q ⊣⊢ₚ wlp_option o (fun a => wlp_optiondiamond (f a) Q).
   Proof. constructor; intros ι. now destruct o. Qed.
-
-  (* Lemma wp_optiondiamond_bind {Θ : ACC} {A B w1 w2} (o : Option (Diamond Θ A) w1) *)
-  (*   (f : Diamond Θ A w1 -> Option (Diamond Θ B) w2) (Q : Box Θ (B -> Pred) w2) : Prop. *)
-  (*   refine (wp_optiondiamond (option.bind o f) Q ⊣⊢ₚ wp_optiondiamond o _). *)
-
-  (*   @wp_optiondiamond alloc.acc_alloc (Ṫy * Sem Exp) [ctx] *)
-  (*   (@option.bind (Diamond Triangular.Tri.Tri Unit w1) (Diamond alloc.acc_alloc (Ṫy * Sem Exp) [ctx]) *)
-  (*      (@solvelist w1 C) *)
-  (*      (λ '(existT w2 (θ2, ())), *)
-  (*         @Some (Diamond alloc.acc_alloc (Ṫy * Sem Exp) [ctx]) *)
-  (*           (@existT World (λ w0 : World, (Alloc [ctx] w0 * (Ṫy * Sem Exp)%W w0)%type) w2 *)
-  (*              (@alloc.nil_l w2, (t1[θ2], e1'[θ2]))))) P *)
-
 
 End Pred.
 Export Pred (Pred).

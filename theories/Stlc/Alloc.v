@@ -94,6 +94,17 @@ Module alloc.
     induction θ1; cbn; [easy|]. now rewrite IHθ1.
   Qed.
 
+  Definition incl {Θ} {reflΘ : Refl Θ} {transΘ : Trans Θ} {stepΘ : Step Θ} :=
+    fix incl {w0 w1} (θ : Alloc w0 w1) : Θ w0 w1 :=
+      match θ with
+      | alloc.refl => Worlds.refl
+      | alloc.fresh θ' => Worlds.trans step (incl θ')
+      end.
+
+  Lemma incl_alloc {w0 w1} (θ : alloc.acc_alloc w0 w1) :
+      incl θ = θ.
+  Proof. induction θ; cbn; now f_equal. Qed.
+
 End alloc.
 Export alloc (Alloc).
 Export (hints) alloc.
