@@ -27,7 +27,8 @@
 (******************************************************************************)
 
 From Coq Require Import
-  Logic.FunctionalExtensionality.
+  Logic.FunctionalExtensionality
+  Strings.String.
 From Em Require Import
   Environment
   Stlc.Instantiation
@@ -35,8 +36,9 @@ From Em Require Import
   Stlc.Persistence
   Stlc.Worlds.
 
+Import World.notations.
+
 Module Sem.
-  Import World.notations.
 
   Definition Sem (A : Type) : TYPE :=
     fun w => Assignment w -> A.
@@ -126,6 +128,59 @@ Module Sem.
   Definition decode_env : ⊢ʷ Ėnv -> Sem Env := fun w G => inst G.
   #[global] Arguments decode_env [w] _.
 
+  Module notations.
+
+    Notation "f <$> a" := (@Sem.fmap _ _ f _ a) (at level 61, left associativity).
+    Notation "f <*> a" := (@Sem.app _ _ _ f a) (at level 61, left associativity).
+
+  End notations.
+
 End Sem.
 Export (hints) Sem.
 Export Sem (Sem).
+
+Notation Ėxp := (Sem Exp).
+Module ėxp.
+  Import Sem Sem.notations.
+
+  Set Implicit Arguments.
+  Set Maximal Implicit Insertion.
+
+  Definition var : ⊢ʷ Const string -> Ėxp :=
+    fun _ x => Sem.pure (exp.var x).
+  Definition true : ⊢ʷ Ėxp :=
+    fun _ => Sem.pure exp.true.
+  Definition false : ⊢ʷ Ėxp :=
+    fun _ => Sem.pure exp.false.
+  Definition ifte : ⊢ʷ Ėxp -> Ėxp -> Ėxp -> Ėxp :=
+    fun _ e1 e2 e3 => exp.ifte <$> e1 <*> e2 <*> e3.
+  Definition absu : ⊢ʷ Const string -> Ėxp -> Ėxp :=
+    fun _ x e => exp.absu x <$> e.
+  Definition abst : ⊢ʷ Const string -> Ṫy -> Ėxp -> Ėxp :=
+    fun _ x t e => exp.abst x <$> decode_ty t <*> e.
+  Definition app : ⊢ʷ Ėxp -> Ėxp -> Ėxp :=
+    fun _ e1 e2 => exp.app <$> e1 <*> e2.
+
+  Section InstLemmas.
+    Context {w} (ι : Assignment w).
+    Lemma inst_var x : inst (var x) ι = exp.var x.
+    Proof. reflexivity. Qed.
+    Lemma inst_true : inst true ι = exp.true.
+    Proof. reflexivity. Qed.
+    Lemma inst_false : inst false ι = exp.false.
+    Proof. reflexivity. Qed.
+    Lemma inst_ifte e1 e2 e3 :
+      inst (ifte e1 e2 e3) ι = exp.ifte (inst e1 ι) (inst e2 ι) (inst e3 ι).
+    Proof. reflexivity. Qed.
+    Lemma inst_absu x e :
+      inst (absu x e) ι = exp.absu x (inst e ι).
+    Proof. reflexivity. Qed.
+    Lemma inst_abst x t e :
+      inst (abst x t e) ι = exp.abst x (inst t ι) (inst e ι).
+    Proof. reflexivity. Qed.
+    Lemma inst_app e1 e2 :
+      inst (app e1 e2) ι = exp.app (inst e1 ι) (inst e2 ι).
+    Proof. reflexivity. Qed.
+  End InstLemmas.
+
+End ėxp.

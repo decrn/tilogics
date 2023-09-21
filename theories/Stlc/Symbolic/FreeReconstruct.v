@@ -62,39 +62,36 @@ Section Generate.
   Import MonadNotations.
   Import World.notations.
 
-  Notation "f <$> a" := (@Sem.fmap _ _ f _ a) (at level 61, left associativity).
-  Notation "f <*> a" := (@Sem.app _ _ _ f a) (at level 61, left associativity).
-
   Definition generate : Exp -> ⊢ʷ Ėnv -> Free (Ṫy * Sem Exp) :=
     fix gen e {w} Γ :=
       match e with
       | exp.var x =>
           match lookup x Γ with
-          | Some t => Ret (t , Sem.pure (exp.var x))
+          | Some t => Ret (t , ėxp.var x)
           | None   => Fail
           end
-      | exp.true  => Ret (ṫy.bool, Sem.pure exp.true)
-      | exp.false => Ret (ṫy.bool, Sem.pure exp.false)
+      | exp.true  => Ret (ṫy.bool, ėxp.true)
+      | exp.false => Ret (ṫy.bool, ėxp.false)
       | exp.ifte e1 e2 e3 =>
           [ θ1 ] '(t1,e1') <- gen e1 Γ ;;
           [ θ2 ] '(t2,e2') <- gen e2 Γ[θ1] ;;
           [ θ3 ] '(t3,e3') <- gen e3 Γ[θ1⊙θ2] ;;
           [ θ4 ] _         <- assert ṫy.bool t1[θ2⊙θ3] ;;
           [ θ5 ] _         <- assert t2[θ3⊙θ4] t3[θ4] ;;
-          Ret (t3[θ4⊙θ5], exp.ifte <$> e1'[θ2⊙θ3⊙θ4⊙θ5] <*> e2'[θ3⊙θ4⊙θ5] <*> e3'[θ4⊙θ5])
+          Ret (t3[θ4⊙θ5], ėxp.ifte e1'[θ2⊙θ3⊙θ4⊙θ5] e2'[θ3⊙θ4⊙θ5] e3'[θ4⊙θ5])
       | exp.absu x e =>
           [ θ1 ] t1       <- choose ;;
           [ θ2 ] '(t2,e') <- gen e (Γ[θ1] ,, x∷t1) ;;
-          Ret (ṫy.func t1[θ2] t2, exp.abst x <$> Sem.decode_ty t1[θ2] <*> e')
+          Ret (ṫy.func t1[θ2] t2, ėxp.abst x t1[θ2] e')
       | exp.abst x t1 e =>
           [ θ1 ] '(t2,e') <- gen e (Γ ,, x∷lift t1 _) ;;
-          Ret (ṫy.func (lift t1 _) t2, exp.abst x t1 <$> e')
+          Ret (ṫy.func (lift t1 _) t2, ėxp.abst x (lift t1 _) e')
       | exp.app e1 e2 =>
           [ θ1 ] '(tf, e1') <- gen e1 Γ ;;
           [ θ2 ] '(t1, e2') <- gen e2 Γ[θ1] ;;
           [ θ3 ] t2 <- choose ;;
           [ θ4 ] _  <- assert tf[θ2⊙θ3] (ṫy.func t1[θ3] t2) ;;
-          Ret (t2[θ4], exp.app <$> e1'[θ2⊙θ3⊙θ4] <*> e2'[θ3⊙θ4])
+          Ret (t2[θ4], ėxp.app e1'[θ2⊙θ3⊙θ4] e2'[θ3⊙θ4])
       end.
 
 End Generate.
@@ -137,6 +134,7 @@ Ltac wsimpl :=
       ?Pred.eq_func,
 
       ?persist_sim_step_alloc_env, ?persist_sim_step_alloc_ty, ?persist_sim_step_alloc_sem,
+      ?ėxp.inst_var, ?ėxp.inst_true, ?ėxp.inst_false, ?ėxp.inst_ifte, ?ėxp.inst_absu, ?ėxp.inst_abst, ?ėxp.inst_app,
       ?Sem.inst_pure, ?Sem.inst_fmap, ?Sem.inst_app, ?Sem.persist_pure, ?Sem.persist_fmap, ?Sem.persist_app,
 
       (* ?ProgramLogic.eqₚ_env_cons, *)
@@ -217,7 +215,7 @@ Section Correctness.
       iPoseProof (IHe _ (G ,, x∷lift t w)) as "-#IH". iRevert "IH". clear IHe.
       iApply (@wlp_mono alloc.acc_alloc). iIntros (w1 θ1 (t1 & e1')) "!> HT". cbn.
       rewrite persist_insert. wsimpl.
-      iStopProof. constructor. intros ι HT1. pred_unfold.
+      iStopProof. constructor. intros ι HT1. pred_unfold. wsimpl.
       rewrite inst_insert inst_lift in HT1. now constructor.
     - rewrite wlp_bind. unfold _4.
       iPoseProof (IHe1 w G) as "-#IH". iRevert "IH". clear IHe1.
@@ -226,7 +224,7 @@ Section Correctness.
       iPoseProof (IHe2 w1 G[r1]) as "-#IH". iRevert "IH". clear IHe2.
       iApply (@wlp_mono alloc.acc_alloc). iIntros (w2 r2 (t2 & e2')) "!> HT2". cbn.
       unfold _4. rewrite Acc.wlp_step_reduce. iIntros (t1). wsimpl.
-      iStopProof. constructor. intros ι (HT1 & HT2). pred_unfold.
+      iStopProof. constructor. intros ι (HT1 & HT2). pred_unfold. wsimpl.
       econstructor; eauto.
   Qed.
 
