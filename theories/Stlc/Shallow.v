@@ -141,10 +141,19 @@ Section Elaborate.
 
   Context {tclM : TypeCheckLogic M}.
 
-  Lemma elab_sound (Γ : Env) (e : Exp) :
-    wlp (elab Γ e) (fun '(t,e') => Γ |-- e ∷ t ~> e').
+  Definition tpb_algorithmic (Γ : Env) (e : Exp) (t : Ty) (ee : Exp) : Prop :=
+    wp (elab Γ e) (fun '(t',ee') => t = t' /\ ee = ee').
+  Notation "Γ |--ₐ e ∷ t ~> e'" := (tpb_algorithmic Γ e t e') (at level 80).
+
+  Lemma elab_sound (Γ : Env) (e : Exp) t ee :
+    (Γ |--ₐ e ∷ t ~> ee) -> (Γ |-- e ∷ t ~> ee).
   Proof.
-    revert Γ. induction e; cbn; intros Γ;
+    enough (wlp (elab Γ e) (fun '(t',ee') => Γ |-- e ∷ t' ~> ee')).
+    { unfold tpb_algorithmic. apply wp_impl_wlp. revert H.
+      apply wlp_mono. intros [t1 e1] HT [Heq1 Heq2]. now subst.
+    }
+    revert Γ. clear t ee.
+    induction e; cbn; intros Γ;
       repeat
         (rewrite ?wlp_ret, ?wlp_bind, ?wlp_fail, ?wlp_assert, ?wlp_choose;
          try
@@ -179,22 +188,16 @@ Section Elaborate.
        intros; eauto).
 
   Lemma elab_complete (Γ : Env) (e ee : Exp) (t : Ty) :
-    Γ |-- e ∷ t ~> ee ->
-    wp (elab Γ e) (fun '(t',ee') => t = t' /\ ee = ee').
+    Γ |-- e ∷ t ~> ee -> Γ |--ₐ e ∷ t ~> ee.
   Proof.
+    unfold tpb_algorithmic.
     induction 1; cbn; solve_complete;
       try (eexists; solve_complete; fail).
   Qed.
 
-  Lemma elab_correct Γ e Q :
-    wp (elab Γ e) Q <-> exists t ee, Γ |-- e ∷ t ~> ee /\ Q (t,ee).
-  Proof.
-    split.
-    - apply wp_impl_wlp. specialize (elab_sound Γ e). apply wlp_mono.
-      intros [t ee] HT HQ. now exists t, ee.
-    - intros (t & ee & HT & HQ). apply elab_complete in HT. revert HT.
-      apply wp_mono. intros [t' ee']. intuition congruence.
-  Qed.
+  Lemma elab_correct Γ e t ee :
+    Γ |-- e ∷ t ~> ee <-> Γ |--ₐ e ∷ t ~> ee.
+  Proof. split; auto using elab_complete, elab_sound. Qed.
 
 End Elaborate.
 
