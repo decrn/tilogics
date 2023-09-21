@@ -90,6 +90,9 @@ Module Sem.
   #[export] Instance inst_persist_sem {A} : InstPersist (Sem A) A.
   Proof. easy. Qed.
 
+  #[export] Instance persist_lift_sem {A} : PersistLift (Sem A) A.
+  Proof. easy. Qed.
+
   Section InstLemmas.
 
     Lemma inst_pure {A w} {ι : Assignment w} (a : A) :

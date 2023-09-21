@@ -1100,6 +1100,11 @@ Module Pred.
       | None => Falseₚ
       end.
 
+  Lemma wp_option_bind {A B w1 w2 w3} (o : Option A w1)
+    (f : A w1 -> Option B w2) (Q : B w2 -> Pred w3) :
+    wp_option (option.bind o f) Q ⊣⊢ₚ wp_option o (fun a => wp_option (f a) Q).
+  Proof. constructor; intros ι. now destruct o. Qed.
+
   Definition wlp_option {A w1 w2} :
     Option A w1 -> (A w1 -> Pred w2) -> Pred w2 :=
     fun o Q =>

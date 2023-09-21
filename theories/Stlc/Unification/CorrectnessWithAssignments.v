@@ -513,8 +513,8 @@ Module Correctness.
 
   Definition SolveListCorrect : ⊢ʷ SolveList -> PROP :=
     fun w0 sl =>
-      forall (C : List (Ṫy * Ṫy) w0) Q (RQ : ProperPost' Q),
-        WP (sl C) Q ⊣⊢ₚ instpred C /\ₚ T Q tt.
+      forall (C : List (Ṫy * Ṫy) w0),
+        WP (sl C) (fun w θ _ => Trueₚ) ⊣⊢ₚ instpred C.
 
   Lemma boxsolvelist_sound {w} : BoxSolveListSound (boxsolvelist (w := w)).
   Proof.
@@ -563,166 +563,14 @@ Module Correctness.
 
   Lemma solvelist_correct {w} : SolveListCorrect (solvelist (w := w)).
   Proof.
-    intros C Q RQ.
+    intros C.
     pose proof (solvelist_complete C) as Hcompl.
     pose proof (solvelist_sound C) as Hsound.
     destruct Hcompl as [Hcompl].
     destruct Hsound as [Hsound].
     constructor. intros ι. specialize (Hcompl ι). specialize (Hsound ι I).
-    destruct solvelist as [(w2 & θ2 & [])|]; cbn in *.
-    - specialize (RQ w w2 refl θ2 tt).
-      rewrite trans_refl_l in RQ.
-      destruct RQ as [RQ].
-      unfold Ext in RQ.
-      unfold T.
-      split.
-      + intros (ι2 & Heq & HQ). subst. constructor.
-        now apply Hsound. revert HQ.
-        specialize (RQ ι2). apply RQ.
-      + intros (HC & HQ). specialize (Hcompl HC).
-        destruct Hcompl as (ι2 & Heq & _).  exists ι2.
-        specialize (RQ ι2).
-        split; auto. subst. revert HQ. apply RQ.
-     - firstorder.
+    destruct solvelist as [(w2 & θ2 & [])|];
+      cbn in *; firstorder; subst; auto.
   Qed.
-
-  Import (hints) Sub.
-
-  Arguments Acc.wp {Θ w0 w1} θ Q _/.
-
-  Import (hints) Sub.
-
-  Lemma inst_sub_of {Θ : ACC} {w0 w1} (θ : Θ w0 w1) ι :
-    inst (Sub.of θ) ι = inst θ ι.
-  Proof.
-    apply env.lookup_extensional. intros α αIn.
-    unfold inst, inst_acc. rewrite ?env.lookup_tabulate. f_equal.
-    unfold Sub.of. cbn. now rewrite env.lookup_tabulate.
-  Qed.
-
-  Lemma alloc_nil_is_nil_l {w} (θ : Alloc ctx.nil w) :
-    θ = alloc.nil_l.
-  Proof. Admitted.
-
-  Lemma solveoptiondiamond_correct {A} {persA : Persistent A} {persLA: PersistLaws A}
-    (m : Diamond alloc.acc_alloc (List (Ṫy * Ṫy) * A) ctx.nil)
-    (Q : Box alloc.acc_alloc (A -> Pred) ctx.nil) (RQ : ProperPost' Q) :
-    wp_optiondiamond (solveoptiondiamond m) Q
-      ⊣⊢ₚ wp_diamond m (fun w θ '(C,a) => instpred C /\ₚ Q w θ a).
-  Proof.
-    destruct m as (w1 & θ1 & C & a). cbn.
-    pose proof (solvelist_complete C) as Hcompl.
-    pose proof (solvelist_sound C) as Hsound.
-    destruct solvelist as [(w2 & θ2 & [])|]; cbn in *.
-    - apply Acc.entails_wlp in Hsound.
-      rewrite ext_true in Hsound.
-      pose proof (alloc_nil_is_nil_l θ1). subst.
-      apply split_bientails. split; apply Acc.entails_wp.
-      + destruct Hsound as [Hsound]. constructor.
-        intros ι2 HQ; pred_unfold; subst.
-        exists (inst θ2 ι2). specialize (Hsound ι2 I).
-        unfold andₚ. repeat split; auto. revert HQ.
-        hnf in RQ.
-        pose proof (RQ w2 w1 alloc.nil_l).
-        change (Q w2 alloc.nil_l a[θ2] ι2 -> Ext (Q w1 alloc.nil_l a) θ2 ι2).
-        (* pose proof (fromBientails (RQ w1 w2 env.nil (Sub.of θ2) a) ι2). *)
-        (* symmetry in H. cbn in H. rewrite inst_sub_of in H. *)
-        (* rewrite Sub.persist_sim in H. intuition. *)
-        admit.
-      + destruct Hcompl as [Hcompl]. constructor. intros ι1 (HC & HQ).
-        specialize (Hcompl ι1 HC). destruct Hcompl as (ι2 & Heq2 & _).
-        cbn. exists ι2. split; auto. revert HQ.
-        (* pose proof (fromBientails (RQ w1 w2 env.nil (Sub.of θ2) a) ι2). *)
-        (* cbn in H. rewrite inst_sub_of in H. *)
-        (* rewrite Sub.persist_sim in H. intuition. *)
-        admit.
-    - apply split_bientails. split. firstorder.
-      destruct Hcompl as [Hcompl]. constructor.
-      intros ι (ι1 & Heq & HC & HQ). apply (Hcompl ι1 HC).
-  Admitted.
-
-  Lemma solveoptiondiamond_correct' {A} {persA : Persistent A} {persLA: PersistLaws A}
-    (m : Diamond alloc.acc_alloc (List (Ṫy * Ṫy) * A) ctx.nil)
-    (Q : Box alloc.acc_alloc (A -> Pred) ctx.nil) (RQ : ProperPost' Q) :
-    wlp_optiondiamond (solveoptiondiamond m) Q
-      ⊣⊢ₚ wlp_diamond m (fun w θ '(C,a) => instpred C ->ₚ Q w θ a).
-  Proof. Admitted.
-
-
-  (* Lemma solve_equiv {A} {persA : Persistent A} *)
-  (*   (m : Diamond Alloc _ ctx.nil) (Q : Box Alloc (A -> Pred) [ctx]) : *)
-  (*   (* (RQ : ProperPost Q) : *) *)
-  (*   wp_optiondiamond (solve m) Q ⊣⊢ₚ wp_diamond m Q. *)
-  (* Proof. *)
-  (*   rewrite <- prenex_correct. unfold solvefree. *)
-  (*   unfold wp_prenex, wp_optiondiamond. *)
-  (*   destruct (prenex m) as [(w1 & r1 & C & a)|]; cbn; [|easy]. *)
-  (*   pose proof (solvelist_complete C) as Hcompl. *)
-  (*   pose proof (solvelist_sound C) as Hsound. *)
-  (*   destruct solvelist as [(w2 & r2 & [])|]; cbn in *. *)
-  (*   - apply split_bientails. split. *)
-  (*     + destruct Hsound as [Hsound]. constructor. *)
-  (*       intros ι0 (ι2 & Heq & HQ); pred_unfold; subst. exists (inst r2 ι2). *)
-  (*       specialize (Hsound (inst r2 ι2) I ι2 eq_refl). hnf in Hsound. *)
-  (*       unfold andₚ. repeat split. *)
-  (*       * destruct (env.view (inst r1 (inst r2 ι2))). *)
-  (*         destruct (env.view (inst alloc.nil_l ι2)). *)
-  (*         reflexivity. *)
-  (*       * assumption. *)
-  (*       * admit. *)
-  (*         (* epose proof (RQ w1 r1 _ a (inst r2 ι2)) as H1. *) *)
-  (*         (* epose proof (RQ w2 alloc.nil_l _ (persist _ a _ r2) ι2) as H2. *) *)
-  (*         (* cbn in H1, H2. *) *)
-  (*     + destruct Hcompl as [Hcompl]. constructor. *)
-  (*       intros ι0 (ι1 & Heq1 & HC & HQ). *)
-  (*       specialize (Hcompl ι1 HC). destruct Hcompl as (ι2 & Heq2 & _). *)
-  (*       exists ι2. split. subst. *)
-  (*       * destruct (env.view (inst r1 (inst r2 ι2))). *)
-  (*         destruct (env.view (inst alloc.nil_l ι2)). *)
-  (*         reflexivity. *)
-  (*       * clear - HQ. admit. *)
-  (*   - apply split_bientails. split. firstorder. *)
-  (*     destruct Hcompl as [Hcompl]. constructor. *)
-  (*     intros ι (ι1 & Heq & HC & HQ). apply (Hcompl ι1 HC). *)
-  (* Admitted. *)
 
 End Correctness.
-
-(* Module Generalized. *)
-
-(*   Import World.notations. *)
-(*   Import (hints) Sub Tri. *)
-(*   Import Pred Pred.notations ProgramLogic LR. *)
-
-(*   Lemma wp_tell {w x} (xIn : x ∈ w) (t : Ty (w - x)) (Q : □(Unit -> Pred) w) *)
-(*     (RQ : RProper (RBox (RImpl RUnit (RPred Tri))) Q) : *)
-(*     WP (tell1 xIn t) Q ⊣⊢ₚ Ty_hole xIn =ₚ thin xIn t /\ₚ T Q tt. *)
-(*   Proof. *)
-(*     unfold WP, tell1. rewrite Acc.wp_thick. constructor. intros ι. pred_unfold. *)
-(*     rewrite Sub.subst_thin, inst_persist, Sub.inst_thin. *)
-(*     apply and_iff_compat_l'. intros Heq. *)
-(*     destruct RQ as [RQ]. *)
-(*     specialize (RQ ι I w (w - x) refl (thick x t) (thick x t) (env.remove _ ι xIn)). *)
-(*     cbv [RProper RBox Forall Const implₚ Acc.wlp eqₚ *)
-(*       RImpl RUnit Trueₚ RPred iffₚ Ext] in RQ. *)
-(*     pred_unfold. *)
-(*     cbn in RQ. rewrite <- Heq, env.insert_remove in RQ. *)
-(*     now specialize (RQ eq_refl eq_refl tt tt I). *)
-(*   Qed. *)
-
-(*   Lemma flex_correct {w x} (xIn : x ∈ w) (t : Ty w) *)
-(*     (Q : □(Unit -> Pred) w) (RQ : RProper (RBox (RImpl RUnit (RPred Tri))) Q) : *)
-(*     WP (flex t xIn) Q ⊣⊢ₚ Ty_hole xIn =ₚ t /\ₚ T Q tt. *)
-(*   Proof. *)
-(*     unfold flex. destruct (varview t) as [y yIn|]. *)
-(*     - destruct (ctx.occurs_check_view xIn yIn). *)
-(*       + now rewrite wp_pure, eqₚ_refl, and_true_l. *)
-(*       + now rewrite wp_tell. *)
-(*     - destruct (occurs_check_spec xIn t) as [|[HOC|HOC]]; cbn - [tell1]. *)
-(*       + rewrite wp_tell; now subst. *)
-(*       + destruct (H _ _ HOC). *)
-(*       + apply pno_cycle in HOC. apply split_bientails. split; [apply false_l|]. *)
-(*         now rewrite HOC, and_false_l. *)
-(*   Qed. *)
-
-(* End Generalized. *)
