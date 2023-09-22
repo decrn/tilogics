@@ -62,164 +62,27 @@ Reserved Notation "w1 ⊒ w2" (at level 80).
     (at level 8, left associativity,
       format "s [ ζ ]").
 
-Module ProgramLogic.
-
-  Import World.notations.
-  Import (hints) Tri.
-  Import Pred.
-  Import Pred.notations.
-
-  Definition WP {A} : ⊢ʷ ◆A -> □(A -> Pred) -> Pred :=
-    wp_optiondiamond.
-
-  #[global] Arguments WP {A}%indexed_scope [w] _ _%P _.
-  #[global] Instance params_wp : Params (@WP) 4 := {}.
-
-  #[export] Instance proper_wp_bientails {A w} :
-    Proper
-      (pointwise_relation _
-         (forall_relation
-            (fun _ => pointwise_relation _
-                        (pointwise_relation _ bientails)) ==> bientails))
-      (@WP A w).
-  Proof.
-    intros d p q pq. destruct d as [(w1 & r01 & a)|]; cbn; [|easy].
-    apply Acc.proper_wp_bientails. apply pq.
-  Qed.
-
-  #[export] Instance proper_wp_entails {A w} :
-    Proper
-      (pointwise_relation _
-         (forall_relation
-            (fun _ => pointwise_relation _
-                        (pointwise_relation _ entails)) ==> entails))
-      (@WP A w).
-  Proof.
-    intros d p q pq. destruct d as [(w1 & r01 & a)|]; cbn; [|easy].
-    apply Acc.proper_wp_entails. apply pq.
-  Qed.
-
-  Lemma wp_monotonic' {A w} (d : ◆A w) (R : Pred w) (P Q : □(A -> Pred) w) :
-    (forall w1 (r : w ⊒⁻ w1) (a : A w1),
-        persist R r ⊢ₚ P w1 r a ->ₚ Q w1 r a) ->
-    R ⊢ₚ WP d P ->ₚ WP d Q.
-  Proof.
-    intros pq. destruct d as [(w1 & r01 & a)|]; cbn.
-    - specialize (pq w1 r01 a).
-      apply impl_and_adjoint.
-      rewrite Acc.and_wp_r.
-      apply Acc.proper_wp_entails.
-      apply impl_and_adjoint.
-      apply pq.
-    - apply impl_and_adjoint.
-      now rewrite and_false_r.
-  Qed.
-
-  Import Diamond.
-
-  Lemma wp_pure {A w0} (a : A w0) (Q : □(A -> Pred) w0) :
-    WP (pure (M := DiamondT Tri Option) a) Q ⊣⊢ₚ T Q a.
-  Proof. unfold WP, pure. cbn. now rewrite Acc.wp_refl. Qed.
-
-  Lemma wp_bind {A B w0} (d : ◆A w0) (f : □(A -> ◆B) w0) (Q : □(B -> Pred) w0) :
-    WP (bind d f) Q ⊣⊢ₚ WP d (fun w1 ζ1 a1 => WP (f w1 ζ1 a1) (_4 Q ζ1)).
-  Proof.
-    destruct d as [(w1 & r01 & a)|]; cbn; [|reflexivity].
-    destruct (f w1 r01 a) as [(w2 & r12 & b2)|]; cbn;
-      now rewrite ?Acc.wp_trans, ?Acc.wp_false.
-  Qed.
-
-  Definition WLP {A} : ⊢ʷ ◆A -> □(A -> Pred) -> Pred :=
-    fun w0 d Q =>
-      match d with
-      | Some (existT w1 (r01, a)) => Pred.Acc.wlp r01 (Q w1 r01 a)
-      | None                      => Trueₚ
-      end.
-  #[global] Arguments WLP {A}%indexed_scope [w] _ _%P _.
-  #[global] Instance params_wlp : Params (@WLP) 4 := {}.
-
-  #[export] Instance proper_wlp_bientails {A w} :
-    Proper
-      (pointwise_relation _
-         (forall_relation
-            (fun _ => pointwise_relation _
-                        (pointwise_relation _ bientails)) ==> bientails))
-      (@WLP A w).
-  Proof.
-    intros d p q pq. destruct d as [(w1 & r01 & a)|]; cbn; [|easy].
-    apply Acc.proper_wlp_bientails. apply pq.
-  Qed.
-
-  #[export] Instance proper_wlp_entails {A w} :
-    Proper
-      (pointwise_relation _
-         (forall_relation
-            (fun _ => pointwise_relation _
-                        (pointwise_relation _ entails)) ==> entails))
-      (@WLP A w).
-  Proof.
-    intros d p q pq. destruct d as [(w1 & r01 & a)|]; cbn; [|easy].
-    apply Acc.proper_wlp_entails. apply pq.
-  Qed.
-
-  Lemma wlp_monotonic' {A w} (d : ◆A w) (R : Pred w) (P Q : □(A -> Pred) w) :
-    (forall w1 (r : w ⊒⁻ w1) (a : A w1),
-        entails (persist R r) (P w1 r a ->ₚ Q w1 r a)%P) ->
-    entails R (WLP d P ->ₚ WLP d Q)%P.
-  Proof.
-    intros pq. destruct d as [(w1 & r01 & a)|]; cbn.
-    - specialize (pq w1 r01 a). rewrite <- Acc.wlp_mono.
-      now apply Acc.entails_wlp.
-    - rewrite impl_true_r. apply true_r.
-  Qed.
-
-  Lemma wlp_pure {A w} (a : A w) (Q : □(A -> Pred) w) :
-    WLP (pure a) Q ⊣⊢ₚ T Q a.
-  Proof. unfold WLP, pure. cbn. now rewrite Acc.wlp_refl. Qed.
-
-  Lemma wlp_bind {A B w0} (d : ◆A w0) (f : □(A -> ◆B) w0) (Q : □(B -> Pred) w0) :
-    WLP (bind d f) Q ⊣⊢ₚ WLP d (fun w1 ζ1 a1 => WLP (f w1 ζ1 a1) (_4 Q ζ1)).
-  Proof.
-    destruct d as [(w1 & r01 & a)|]; cbn; [|reflexivity].
-    destruct (f w1 r01 a) as [(w2 & r12 & b2)|]; cbn;
-      now rewrite ?Acc.wlp_trans, ?Acc.wlp_true.
-  Qed.
-
-  Lemma wlp_tell1 {w x} (xIn : x ∈ w) (t : Ṫy (w - x)) (Q : □(Unit -> Pred) w) :
-    WLP (tell1 xIn t) Q ⊣⊢ₚ Acc.wlp (thick x t) (Q _ (thick x t) tt).
-  Proof. reflexivity. Qed.
-
-End ProgramLogic.
-
 Module Correctness.
 
   Import World.notations.
   Import (hints) Pred.Acc Tri.
-  Import Pred Pred.notations ProgramLogic.
-
-  Definition interpM : ⊢ʷ ◆Unit -> Pred :=
-    fun w m => WP m (fun _ _ _ => Trueₚ).
-
-  Definition interpC : ⊢ʷ C -> Pred.
-  Proof.
-    intros w m.
-    unfold C in m.
-    refine (WP (m w refl) (fun _ _ _ => Trueₚ)).
-  Defined.
-
-  (* Lemma ctrue_correct {w : World} : BiEntails (w := w) (interp ctrue) PTrue. *)
-  (* Proof. unfold interp, ctrue. now rewrite wp_pure. Qed. *)
-
-  (* Lemma cfalse_correct {w : World} : BiEntails (w := w) (interp cfalse) PFalse. *)
-  (* Proof. unfold interp, cfalse. easy. Qed. *)
+  Import Pred Pred.notations.
 
   Opaque bind.
-  (* Import LR. *)
+
+  Lemma wlp_optiondiamond_tell1 {w x} (xIn : x ∈ w) (t : Ṫy (w - x))
+    (Q : □(Unit -> Pred) w) :
+    wlp_optiondiamond (tell1 xIn t) Q ⊣⊢ₚ
+    Acc.wlp (thick x t) (Q _ (thick x t) tt).
+  Proof. reflexivity. Qed.
+
+  Definition interpC : ⊢ʷ C -> Pred :=
+    fun w m => instpred (m w refl).
 
   Definition ProperRC {w} (c : C w) : Prop :=
     forall w' (r : Tri w w'),
-      Acc.wp r (WP (c w' r) (fun _ _ _ => Trueₚ)) ⊣⊢ₚ
-      Acc.wp r Trueₚ /\ₚ WP (c w refl) (fun _ _ _ => Trueₚ).
+      Acc.wp r (instpred (c w' r)) ⊣⊢ₚ
+      Acc.wp r Trueₚ /\ₚ instpred (c w refl).
 
   Lemma proper_ctrue {w0} : @ProperRC w0 ctrue.
   Proof.
@@ -236,8 +99,8 @@ Module Correctness.
   Lemma proper_cand {w0} (c1 c2 : C w0) :
     ProperRC c1 -> ProperRC c2 -> ProperRC (cand c1 c2).
   Proof.
-    unfold ProperRC, cand; intros p1 p2 w1 r01.
-    unfold interpM in *. rewrite !wp_bind. unfold _4.
+    unfold ProperRC, instpred, instpred_optiondiamond, cand; intros p1 p2 w1 r01.
+    rewrite !wp_optiondiamond_bind. unfold _4.
     specialize (p1 w1 r01).
     destruct (c1 w0 refl) as [(w2 & r02 & [])|],
         (c1 w1 r01)  as [(w3 & r13 & [])|];
@@ -255,7 +118,8 @@ Module Correctness.
   Lemma cand_correct {w} {c1 c2 : C w} {p2 : ProperRC c2} :
     interpC (cand c1 c2) ⊣⊢ₚ interpC c1 /\ₚ interpC c2.
   Proof.
-    unfold interpC, cand. rewrite wp_bind.
+    unfold interpC, instpred, instpred_optiondiamond, cand.
+    rewrite wp_optiondiamond_bind.
     destruct (c1 w refl) as [(w1 & r01 & [])|];
       cbn; [|now rewrite and_false_l].
     unfold _4.
@@ -267,22 +131,22 @@ Module Correctness.
   Definition UnifierSound : ⊢ʷ Unifier -> PROP :=
     fun w0 u =>
       forall (t1 t2 : Ṫy w0),
-        ⊤ₚ ⊢ₚ WLP (u t1 t2) (Fun _ => persist (t1 =ₚ t2)).
+        ⊤ₚ ⊢ₚ wlp_optiondiamond (u t1 t2) (Fun _ => persist (t1 =ₚ t2)).
 
   Definition UnifierComplete : ⊢ʷ Unifier -> PROP :=
     fun w0 u =>
       forall (t1 t2 : Ṫy w0),
-        t1 =ₚ t2 ⊢ₚ WP (u t1 t2) (fun _ _ _ => ⊤ₚ)%P.
+        t1 =ₚ t2 ⊢ₚ wp_optiondiamond (u t1 t2) (fun _ _ _ => ⊤ₚ)%P.
 
   Definition BoxUnifierSound : ⊢ʷ BoxUnifier -> PROP :=
     fun w0 bu =>
       forall (t1 t2 : Ṫy w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1),
-        ⊤ₚ ⊢ₚ WLP (bu t1 t2 w1 ζ01) (Fun _ => persist (persist (t1 =ₚ t2) ζ01)).
+        ⊤ₚ ⊢ₚ wlp_optiondiamond (bu t1 t2 w1 ζ01) (Fun _ => persist (persist (t1 =ₚ t2) ζ01)).
 
   Definition BoxUnifierComplete : ⊢ʷ BoxUnifier -> PROP :=
     fun w0 bu =>
       forall (t1 t2 : Ṫy w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1),
-        entails (persist (t1 =ₚ t2)%P ζ01) (WP (bu t1 t2 w1 ζ01) (fun _ _ _ => Trueₚ)).
+        entails (persist (t1 =ₚ t2)%P ζ01) (wp_optiondiamond (bu t1 t2 w1 ζ01) (fun _ _ _ => Trueₚ)).
 
   Definition BoxUnifierCorrect : ⊢ʷ BoxUnifier -> PROP :=
     fun w0 bu =>
@@ -300,19 +164,19 @@ Module Correctness.
                   BoxUnifierSound (lmgu xIn)).
 
       Lemma flex_sound_assignment {x} (xIn : x ∈ w) (t : Ṫy w) :
-        ⊤ₚ ⊢ₚ WLP (flex t xIn) (Fun _ => persist (ṫy.var xIn =ₚ t)).
+        ⊤ₚ ⊢ₚ wlp_optiondiamond (flex t xIn) (Fun _ => persist (ṫy.var xIn =ₚ t)).
       Proof.
         unfold flex. destruct (varview t) as [y yIn|].
         - destruct (ctx.occurs_check_view xIn yIn).
-          + rewrite wlp_pure. unfold T.
+          + rewrite wlp_optiondiamond_pure. unfold T.
             rewrite persist_pred_refl, eqₚ_refl.
             reflexivity.
-          + rewrite wlp_tell1. rewrite <- Acc.entails_wlp.
+          + rewrite wlp_optiondiamond_tell1. rewrite <- Acc.entails_wlp.
             rewrite persist_true, persist_eq. cbn. unfold thickIn.
             rewrite ctx.occurs_check_view_refl, ctx.occurs_check_view_thin.
             rewrite eqₚ_refl. reflexivity.
         - destruct (occurs_check_spec xIn t); subst.
-          + rewrite wlp_tell1, persist_eq.
+          + rewrite wlp_optiondiamond_tell1, persist_eq.
             rewrite <- !(Sub.persist_sim (Θ := Tri)).
             rewrite !Sub.of_thick.
             rewrite Sub.thin_thick_pointful.
@@ -324,13 +188,13 @@ Module Correctness.
 
       Lemma boxflex_sound_assignment {x} (xIn : x ∈ w) (t : Ṫy w)
         {w1} (ζ01 : w ⊒⁻ w1) :
-        ⊤ₚ ⊢ₚ WLP (boxflex lmgu t xIn ζ01) (Fun _ => persist (persist (ṫy.var xIn =ₚ t) ζ01)).
+        ⊤ₚ ⊢ₚ wlp_optiondiamond (boxflex lmgu t xIn ζ01) (Fun _ => persist (persist (ṫy.var xIn =ₚ t) ζ01)).
       Proof.
         unfold boxflex, Tri.box_intro_split.
         destruct ζ01 as [|w2 y yIn ty]; folddefs.
         - generalize (flex_sound_assignment xIn t).
           apply proper_entails_entails; [easy|].
-          apply proper_wlp_entails.
+          apply proper_wlp_optiondiamond_entails.
           intros w2 ζ2 _.
           now rewrite persist_pred_refl.
         - generalize (lmgu_sound yIn (ṫy.var xIn)[thick y ty] t[thick y ty] ζ01). clear.
@@ -338,7 +202,7 @@ Module Correctness.
           rewrite lk_thick.
           rewrite <- !(Sub.persist_sim (T:= Ṫy) (Θ := Tri)).
           rewrite !Sub.of_thick.
-          apply proper_wlp_entails.
+          apply proper_wlp_optiondiamond_entails.
           intros w3 ζ3 _.
           apply proper_persist_entails; auto.
           rewrite persist_pred_trans, !persist_eq. cbn.
@@ -348,30 +212,30 @@ Module Correctness.
       Qed.
 
       Lemma wp_ctrue {w0 w1} (r01 : w0 ⊒⁻ w1) (Q : □(Unit -> Pred) w1) :
-        WP (ctrue r01) Q ⊣⊢ₚ T Q tt.
-      Proof. unfold ctrue. now rewrite wp_pure. Qed.
+        wp_optiondiamond (ctrue r01) Q ⊣⊢ₚ T Q tt.
+      Proof. unfold ctrue. now rewrite wp_optiondiamond_pure. Qed.
 
       Lemma wp_cfalse {w0 w1} (r01 : w0 ⊒⁻ w1) (Q : □(Unit -> Pred) w1) :
-        WP (cfalse r01) Q ⊣⊢ₚ Falseₚ.
+        wp_optiondiamond (cfalse r01) Q ⊣⊢ₚ Falseₚ.
       Proof. reflexivity. Qed.
 
       Lemma wp_cand {w0 w1} (r01 : w0 ⊒⁻ w1) m1 m2 (Q : □(Unit -> Pred) w1) :
-        WP (cand m1 m2 r01) Q ⊣⊢ₚ
-        WP (m1 w1 r01) (fun w2 r12 _ => WP (_4 m2 r01 r12) (_4 Q r12)).
-      Proof. unfold cand. now rewrite wp_bind. Qed.
+        wp_optiondiamond (cand m1 m2 r01) Q ⊣⊢ₚ
+        wp_optiondiamond (m1 w1 r01) (fun w2 r12 _ => wp_optiondiamond (_4 m2 r01 r12) (_4 Q r12)).
+      Proof. unfold cand. now rewrite wp_optiondiamond_bind. Qed.
 
       Lemma wlp_ctrue {w0 w1} (r01 : w0 ⊒⁻ w1) (Q : □(Unit -> Pred) w1) :
-        WLP (ctrue r01) Q ⊣⊢ₚ T Q tt.
-      Proof. unfold ctrue. now rewrite wlp_pure. Qed.
+        wlp_optiondiamond (ctrue r01) Q ⊣⊢ₚ T Q tt.
+      Proof. unfold ctrue. now rewrite wlp_optiondiamond_pure. Qed.
 
       Lemma wlp_cfalse {w0 w1} (r01 : w0 ⊒⁻ w1) (Q : □(Unit -> Pred) w1) :
-        WLP (cfalse r01) Q ⊣⊢ₚ Trueₚ.
+        wlp_optiondiamond (cfalse r01) Q ⊣⊢ₚ Trueₚ.
       Proof. reflexivity. Qed.
 
       Lemma wlp_cand {w0 w1} (r01 : w0 ⊒⁻ w1) m1 m2 (Q : □(Unit -> Pred) w1) :
-        WLP (cand m1 m2 r01) Q ⊣⊢ₚ
-        WLP (m1 w1 r01) (fun w2 r12 _ => WLP (_4 m2 r01 r12) (_4 Q r12)).
-      Proof. unfold cand. now rewrite wlp_bind. Qed.
+        wlp_optiondiamond (cand m1 m2 r01) Q ⊣⊢ₚ
+        wlp_optiondiamond (m1 w1 r01) (fun w2 r12 _ => wlp_optiondiamond (_4 m2 r01 r12) (_4 Q r12)).
+      Proof. unfold cand. now rewrite wlp_optiondiamond_bind. Qed.
 
       Lemma boxmgu_sound_assignment : BoxUnifierSound (boxmgu lmgu).
       Proof.
@@ -380,7 +244,7 @@ Module Correctness.
         - intros. apply boxflex_sound_assignment.
         - intros. generalize (boxflex_sound_assignment xIn t ζ01).
           apply proper_entails_entails; [easy|].
-          apply proper_wlp_entails.
+          apply proper_wlp_optiondiamond_entails.
           intros w2 r12 _. now rewrite eqₚ_sym.
         - intros *. now rewrite wlp_ctrue.
         - intros *. now rewrite wlp_cfalse.
@@ -388,11 +252,11 @@ Module Correctness.
         - intros * IH1 IH2 *. rewrite wlp_cand.
           specialize (IH1 _ ζ01). revert IH1.
           apply proper_entails_entails; [easy|].
-          apply proper_wlp_entails.
+          apply proper_wlp_optiondiamond_entails.
           intros w2 ζ12 _. unfold _4.
           specialize (IH2 _ (ζ01 ⊙ ζ12)).
           rewrite <- and_true_r, IH2. apply impl_and_adjoint.
-          apply wlp_monotonic'.
+          apply wlp_optiondiamond_monotonic'.
           intros ? ? _.
           rewrite !persist_pred_trans, <- !persist_impl.
           apply proper_persist_entails; auto.
@@ -409,12 +273,12 @@ Module Correctness.
                   BoxUnifierComplete (lmgu xIn)).
 
       Lemma flex_complete_assignment {x} (xIn : x ∈ w) (t : Ṫy w) :
-        ṫy.var xIn =ₚ t ⊢ₚ WP (flex t xIn) (fun _ _ _ => ⊤ₚ)%P.
+        ṫy.var xIn =ₚ t ⊢ₚ wp_optiondiamond (flex t xIn) (fun _ _ _ => ⊤ₚ)%P.
       Proof.
         unfold flex. destruct (varview t) as [y yIn|].
         - destruct (ctx.occurs_check_view xIn yIn).
-          + rewrite wp_pure. unfold T. apply true_r.
-          + unfold WP, tell1. cbn.
+          + rewrite wp_optiondiamond_pure. unfold T. apply true_r.
+          + unfold tell1. cbn.
             rewrite Acc.wp_thick, persist_true, and_true_r. cbn. Sub.foldlk.
             now rewrite lk_thin.
         - destruct (occurs_check_spec xIn t) as [|[HOC|HOC]]; cbn.
@@ -425,7 +289,7 @@ Module Correctness.
 
       Lemma boxflex_complete_assignment {x} (xIn : x ∈ w) (t : Ṫy w) {w1} (ζ01 : w ⊒⁻ w1) :
         persist (ṫy.var xIn =ₚ t)%P ζ01 ⊢ₚ
-        WP (boxflex lmgu t xIn ζ01) (fun _ _ _ => ⊤ₚ)%P.
+        wp_optiondiamond (boxflex lmgu t xIn ζ01) (fun _ _ _ => ⊤ₚ)%P.
       Proof.
         unfold boxflex, Tri.box_intro_split.
         destruct ζ01 as [|w2 y yIn ty]; folddefs.
@@ -452,11 +316,11 @@ Module Correctness.
           apply impl_and_adjoint.
           rewrite and_comm.
           apply impl_and_adjoint.
-          apply wp_monotonic'. intros.
+          apply wp_optiondiamond_monotonic'. intros.
           rewrite impl_true_l. unfold _4.
           rewrite <- persist_pred_trans.
           apply (pApply (IH2 _ _)).
-          now apply proper_wp_entails.
+          now apply proper_wp_optiondiamond_entails.
       Qed.
 
     End Completeness.
@@ -480,7 +344,7 @@ Module Correctness.
     unfold UnifierSound, mgu. intros t1 t2.
     specialize (bmgu_sound t1 t2 refl).
     apply proper_entails_entails; [easy|].
-    apply proper_wlp_entails.
+    apply proper_wlp_optiondiamond_entails.
     intros w' r _. now rewrite persist_pred_refl.
   Qed.
 
@@ -498,27 +362,27 @@ Module Correctness.
   Definition BoxSolveListSound : ⊢ʷ BoxSolveList -> PROP :=
     fun w0 bsl =>
       forall (C : List (Ṫy * Ṫy) w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1),
-        ⊤ₚ ⊢ₚ WLP (bsl C w1 ζ01) (Fun _ => persist (persist (instpred C) ζ01)).
+        ⊤ₚ ⊢ₚ wlp_optiondiamond (bsl C w1 ζ01) (Fun _ => persist (persist (instpred C) ζ01)).
 
   Definition SolveListSound : ⊢ʷ SolveList -> PROP :=
     fun w0 sl =>
       forall (C : List (Ṫy * Ṫy) w0),
-        ⊤ₚ ⊢ₚ WLP (sl C) (Fun _ => persist (instpred C)).
+        ⊤ₚ ⊢ₚ wlp_optiondiamond (sl C) (Fun _ => persist (instpred C)).
 
   Definition BoxSolveListComplete : ⊢ʷ BoxSolveList -> PROP :=
     fun w0 bsl =>
       forall (C : List (Ṫy * Ṫy) w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1),
-        entails (persist (instpred C) ζ01) (WP (bsl C w1 ζ01) (fun _ _ _ => Trueₚ)).
+        entails (persist (instpred C) ζ01) (wp_optiondiamond (bsl C w1 ζ01) (fun _ _ _ => Trueₚ)).
 
   Definition SolveListComplete : ⊢ʷ SolveList -> PROP :=
     fun w0 sl =>
       forall (C : List (Ṫy * Ṫy) w0),
-        entails (instpred C) (WP (sl C) (fun _ _ _ => Trueₚ)).
+        entails (instpred C) (wp_optiondiamond (sl C) (fun _ _ _ => Trueₚ)).
 
   Definition SolveListCorrect : ⊢ʷ SolveList -> PROP :=
     fun w0 sl =>
       forall (C : List (Ṫy * Ṫy) w0),
-        WP (sl C) (fun w θ _ => Trueₚ) ⊣⊢ₚ instpred C.
+        wp_optiondiamond (sl C) (fun w θ _ => Trueₚ) ⊣⊢ₚ instpred C.
 
   Lemma boxsolvelist_sound {w} : BoxSolveListSound (boxsolvelist (w := w)).
   Proof.
@@ -526,9 +390,9 @@ Module Correctness.
     - now rewrite wlp_ctrue.
     - rewrite wlp_cand. generalize (bmgu_sound t1 t2 ζ01).
       apply proper_entails_entails; [easy|].
-      apply proper_wlp_entails. intros w2 r2 _.
+      apply proper_wlp_optiondiamond_entails. intros w2 r2 _.
       rewrite <- and_true_r, (IHC _ (ζ01 ⊙⁻ r2)).
-      apply impl_and_adjoint, wlp_monotonic'.
+      apply impl_and_adjoint, wlp_optiondiamond_monotonic'.
       unfold _4. intros w3 r3 _.
       rewrite !persist_pred_trans, <- !persist_impl.
       apply proper_persist_entails; auto.
@@ -542,7 +406,7 @@ Module Correctness.
     unfold SolveListSound, solvelist. intros C.
     generalize (boxsolvelist_sound C refl).
     apply proper_entails_entails; [easy|].
-    apply proper_wlp_entails.
+    apply proper_wlp_optiondiamond_entails.
     intros w' r _. now rewrite persist_pred_refl.
   Qed.
 
@@ -553,7 +417,7 @@ Module Correctness.
     - rewrite wp_cand. rewrite persist_and.
       rewrite (@bmgu_complete _ t1 t2 _ ζ01).
       rewrite and_comm. apply impl_and_adjoint.
-      apply wp_monotonic'. intros.
+      apply wp_optiondiamond_monotonic'. intros.
       rewrite impl_true_l, <- persist_pred_trans.
       apply IHC.
   Qed.

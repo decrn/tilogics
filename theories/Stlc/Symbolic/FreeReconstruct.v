@@ -354,7 +354,6 @@ Section Correctness.
     intros (w & θ & C & [t' ee']). cbn.
     rewrite wp_optiondiamond_bind'.
     rewrite <- Correctness.solvelist_correct.
-    unfold ProgramLogic.WP.
     unfold wp_optiondiamond.
     destruct (solvelist C) as [(w2 & θ2 & [])|]; cbn.
     - rewrite Acc.and_wp_l. wsimpl. clear.

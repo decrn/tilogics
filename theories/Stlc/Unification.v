@@ -70,19 +70,6 @@ Ltac folddefs :=
         change_no_check (Tri.cons x t r) with (thick x t ⊙⁻ r)
     end.
 
-(* Section MoveMe. *)
-
-(*   Import (hints) Tri. *)
-
-(*   Lemma persist_thin_thick {w x} (xIn : x ∈ w) (s t : Ṫy (w - x)) : *)
-(*     persist (thin xIn t) (thick (Θ := Tri) x s) = t. *)
-(*   Proof. *)
-(*     induction t; cbn - [thick]; try rewrite Tri.persist_fix; f_equal; auto. *)
-(*     cbn. unfold thickIn. now rewrite ctx.occurs_check_view_thin. *)
-(*   Qed. *)
-
-(* End MoveMe. *)
-
 Module BoveCapretta.
 
   Set Case Analysis Schemes.
@@ -151,11 +138,6 @@ Section Operations.
   (* Import LR. *)
   Import (hints) Diamond.
 
-  (* Definition RM {A} (R : LR.RELATION Tri A) := LR.ROption (LR.RDiamond R). *)
-
-  #[export] Instance pure_optiondiamond : Pure OptionDiamond :=
-    fun A w a => Some (pure a).
-
   Definition fail {A} : ⊢ʷ ◆A :=
     fun w => None.
 
@@ -163,51 +145,11 @@ Section Operations.
     @option.map (Diamond Tri A w1) (Diamond Tri A w0)
       (fun '(existT w2 (ζ2 , a)) => existT w2 (ζ1 ⊙⁻ ζ2, a)).
 
-  (* Lemma proper_pure {A} {RA : RELATION Tri A} : *)
-  (*   RValid (RImpl RA (RM RA)) pure. *)
-  (* Proof. *)
-  (*   intros w0 w1 r01. cbv [RValid pure]. *)
-  (*   apply forall_r. intros a0. *)
-  (*   apply forall_r. intros a1. *)
-  (*   apply impl_and_adjoint. rewrite and_true_l. *)
-  (*   apply exists_r. exists r01. *)
-  (*   rewrite Acc.wp_refl, ?trans_refl_l, trans_refl_r. *)
-  (*   now rewrite eqₚ_refl, and_true_l. *)
-  (* Qed. *)
-
-  (* Lemma proper_fail {A} {RA : RELATION Tri A} : *)
-  (*   RValid (RM RA) fail. *)
-  (* Proof. easy. Qed. *)
-  (* #[global] Arguments fail {A w}. *)
-
   Definition η1 {A} {w x} {xIn : x ∈ w} (t : Ṫy (w - x)) (a : A (w - x)) : ◆A w :=
     sooner2diamondtm (existT x (existT xIn (t, a))).
 
   Definition tell1 {w x} (xIn : x ∈ w) (t : Ṫy (w - x)) : ◆Unit w :=
     Some (existT (w - x) (thick (Θ := Tri) x t, tt)).
-
-  #[export] Instance bind_optiondiamond : Bind Tri OptionDiamond :=
-    fun A B w a0 f =>
-      option.bind a0 (fun '(existT w1 (ζ1, a1)) => acc ζ1 (f w1 ζ1 a1)).
-
-  (* Lemma proper_bind {A B} {RA : RELATION Tri A} {RB : RELATION Tri B} : *)
-  (*   RValid (RImpl (RM RA) (RImpl (RBox (RImpl RA (RM RB))) (RM RB))) bind. *)
-  (* Proof. *)
-  (* Admitted. *)
-  (* (* Proof. *) *)
-  (* (*   intros w0 w1 r01. cbv [RValid bind]. *) *)
-  (* (*   apply forall_r. intros m0. *) *)
-  (* (*   apply forall_r. intros m1. *) *)
-  (* (*   apply impl_and_adjoint. rewrite and_true_l. *) *)
-  (* (*   apply forall_r. intros f0. *) *)
-  (* (*   apply forall_r. intros f1. *) *)
-  (* (*   apply impl_and_adjoint. unfold RM at 3. *) *)
-  (* (*   unfold ROption. *) *)
-
-  (* (*   Search option.bind. *) *)
-  (* (*   rewrite Acc.wp_refl, ?trans_refl_l, trans_refl_r. *) *)
-  (* (*   now rewrite eqₚ_refl, and_true_l. *) *)
-  (* (* Qed. *) *)
 
 End Operations.
 
@@ -275,7 +217,7 @@ Local Notation "s [ ζ ]" :=
 
 Section Mult.
   Import option.notations.
-  Import (hints) Tri.
+  Import (hints) Diamond Tri.
   Import Tri.notations.
 
   Definition μ {A} : Hom ◆◆A ◆A :=
@@ -314,7 +256,7 @@ End VarView.
 Section Variant1.
 
   Import Tri.notations.
-  Import (hints) Tri.
+  Import (hints) Diamond Tri.
   Import Pred Pred.notations.
 
   Definition C := Box Tri (OptionDiamond Unit).
@@ -327,128 +269,6 @@ Section Variant1.
   Definition cand : ⊢ʷ C -> C -> C :=
     fun w0 c1 c2 w1 r01 =>
       bind (c1 w1 r01) (fun w2 r12 _ => _4 c2 r01 r12).
-
-  (* Lemma proper_ctrue : LR.RValid RC ctrue. *)
-  (* Proof. *)
-  (*   unfold LR.RValid, RC, LR.RBox, ctrue. intros w0 w1 r01. *)
-  (*   apply forall_r. intros w2. *)
-  (*   apply forall_r. intros w3. *)
-  (*   apply forall_r. intros r02. *)
-  (*   apply forall_r. intros r13. *)
-  (*   apply forall_r. intros r23. *)
-  (*   apply Acc.entails_wlp. rewrite ext_true. *)
-  (*   apply impl_and_adjoint. rewrite and_true_l. cbn. *)
-  (*   eapply exists_r. exists r23. *)
-  (*   rewrite Acc.wp_refl, trans_refl_r, ?trans_refl_l. *)
-  (*   rewrite eqₚ_refl, and_true_l. apply true_r. *)
-  (* Qed. *)
-
-  (* Lemma proper_cfalse : LR.RValid RC cfalse. *)
-  (* Proof. *)
-  (*   unfold LR.RValid, LR.RBox, cfalse. intros w0 w1 r01. *)
-  (*   apply forall_r. intros w2. *)
-  (*   apply forall_r. intros w3. *)
-  (*   apply forall_r. intros r02. *)
-  (*   apply forall_r. intros r13. *)
-  (*   apply forall_r. intros r23. *)
-  (*   apply Acc.entails_wlp, impl_and_adjoint, true_r. *)
-  (* Qed. *)
-
-  (* Lemma ext_rbox {A} {RA : LR.RELATION Tri A} {w0 w1 w2} *)
-  (*   {r01 : w0 ⊒⁻ w1} {r12 : w1 ⊒⁻ w2} (a0 : □⁻A w0) (a1 : □⁻A w1) : *)
-  (*   Ext (LR.RBox RA r01 a0 a1) r12 ⊣⊢ₚ LR.RBox RA (r01 ⊙⁻ r12) a0 (_4 a1 r12). *)
-  (* Proof. *)
-  (*   unfold LR.RBox. *)
-  (*   rewrite ext_forall. apply proper_bientails_forall. intros w3. *)
-  (*   rewrite ext_forall. apply proper_bientails_forall. intros w4. *)
-  (*   rewrite ext_forall. apply proper_bientails_forall. intros r03. *)
-  (*   rewrite ext_forall. *)
-  (*   setoid_rewrite ext_forall. *)
-  (*   apply split_bientails; split. *)
-  (*   - apply forall_r. intros r24. *)
-  (*     apply forall_r. intros r34. *)
-  (*     constructor. intros ι2 HQ ι4 <- Heq; pred_unfold. cbn in *. *)
-  (*     apply HQ; now rewrite ?inst_trans in *. *)
-  (*   - apply forall_r. intros r14. *)
-  (*     apply forall_r. intros r34. *)
-  (*     constructor. cbn. *)
-  (*     intros ι2 HQ ι4 Heq1 Heq2. *)
-  (* Abort. *)
-
-  (* Lemma proper_bind' {A B} {RA : LR.RELATION _ A} {RB : LR.RELATION _ B} *)
-  (*   {w0 w1} (r01 : w0 ⊒⁻ w1) (P : Pred w1) *)
-  (*   (m1 : ◆A w1) *)
-  (*   (m0 : ◆A w0) *)
-  (*   (Q0 : □⁻(A -> ◆B) w0) *)
-  (*   (Q1 : □⁻(A -> ◆B) w1) : *)
-  (*   entails P (RM RA r01 m0 m1) -> *)
-  (*   entails P (LR.RBox (LR.RImpl RA (RM RB)) r01 Q0 Q1) -> *)
-  (*   entails P (RM RB r01 (bind m0 Q0) (bind m1 Q1)). *)
-  (* Proof. *)
-  (*   intros rm rq. *)
-  (*   pose proof (@proper_bind A B RA RB w0 w1 r01). *)
-  (*   unfold LR.RImpl at 1 in H. *)
-  (*   rewrite forall_r in H. specialize (H m0). *)
-  (*   rewrite forall_r in H. specialize (H m1). *)
-  (*   apply impl_and_adjoint in H. rewrite and_true_l in H. *)
-  (*   unfold LR.RImpl at 1 in H. *)
-  (*   rewrite forall_r in H. specialize (H Q0). *)
-  (*   rewrite forall_r in H. specialize (H Q1). *)
-  (*   apply impl_and_adjoint in H. *)
-  (*   rewrite <- H. *)
-  (*   now apply and_right. *)
-  (* Qed. *)
-
-  (* Lemma proper_cand : LR.RValid (LR.RImpl RC (LR.RImpl RC RC)) cand. *)
-  (* Proof. *)
-  (*   intros w0 w1 r01. *)
-  (*   apply forall_r. intros c11. *)
-  (*   apply forall_r. intros c12. *)
-  (*   apply impl_and_adjoint. rewrite and_true_l. *)
-  (*   apply forall_r. intros c21. *)
-  (*   apply forall_r. intros c22. *)
-  (*   apply impl_and_adjoint. *)
-  (*   unfold RC at 3, LR.RBox. *)
-  (*   apply forall_r. intros w2. *)
-  (*   apply forall_r. intros w3. *)
-  (*   apply forall_r. intros r02. *)
-  (*   apply forall_r. intros r13. *)
-  (*   apply forall_r. intros r23. *)
-  (*   apply Acc.entails_wlp. cbn. *)
-  (*   rewrite <- impl_and_adjoint. *)
-  (*   unfold cand. *)
-  (*   eapply proper_bind'; eauto using LR.RUnit. *)
-  (*   Unshelve. 3: apply LR.RUnit. *)
-  (*   - rewrite ext_and. constructor. cbn. *)
-  (*     intros ι3 [[H1 H2] Heq]. *)
-  (*     exact (H1 _ _ r02 r13 r23 ι3 eq_refl Heq). *)
-  (*   - unfold LR.RBox. *)
-  (*     apply forall_r. intros w4. *)
-  (*     apply forall_r. intros w5. *)
-  (*     apply forall_r. intros r24. *)
-  (*     apply forall_r. intros r35. *)
-  (*     apply forall_r. intros r45. *)
-  (*     apply Acc.entails_wlp. *)
-  (*     rewrite <- impl_and_adjoint. *)
-  (*     unfold LR.RImpl. *)
-  (*     apply forall_r. intros ru4. *)
-  (*     apply forall_r. intros ru5. *)
-  (*     rewrite <- impl_and_adjoint. *)
-  (*     unfold LR.RUnit at 1. *)
-  (*     rewrite and_true_r. *)
-  (*     unfold RM, RC. *)
-  (*     rewrite <- ?ext_and. *)
-  (*     rewrite <- ?ext_trans. *)
-  (*     unfold _4. *)
-  (*     constructor. repeat (pred_unfold; cbn). *)
-  (*     intros ι5; intros [[[] ?] ?]. *)
-  (*     specialize (H0 _ _ (r02 ⊙⁻ r24) (r13 ⊙⁻ r35) r45 ι5). *)
-  (*     rewrite ?inst_trans in *. *)
-  (*     rewrite H1, H2 in H0. *)
-  (*     specialize (H0 eq_refl eq_refl). *)
-  (*     destruct (c21 w4 (r02 ⊙⁻ r24)) as *)
-  (*       [(w6 & r46 & [])|], (c22 w5 (r13 ⊙⁻ r35)) as [(w7 & r57 & [])|]; try easy. *)
-  (* Qed. *)
 
   #[global] Arguments cfalse {w} [w1] _.
   #[global] Arguments ctrue {w} [w1] _.

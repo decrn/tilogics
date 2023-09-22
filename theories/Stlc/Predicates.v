@@ -753,6 +753,7 @@ Module Pred.
 
   Section Transformers.
     Import World.notations.
+    Import (hints) Diamond.
 
     Definition wp_diamond {Θ : ACC} {A} :
       ⊢ʷ Diamond Θ A -> Box Θ (A -> Pred) -> Pred :=
@@ -796,14 +797,131 @@ Module Pred.
       ⊢ʷ DiamondT Θ Option A -> Box Θ (A -> Pred) -> Pred :=
       fun w m Q => wlp_option m (fun d => wlp_diamond d Q).
 
+    #[global] Arguments wp_optiondiamond {Θ} {A}%indexed_scope [w] _ _%P _.
+    #[global] Instance params_wp_optiondiamond : Params (@wp_optiondiamond) 5 := {}.
+
+    #[global] Arguments wlp_optiondiamond {Θ} {A}%indexed_scope [w] _ _%P _.
+    #[global] Instance params_wlp_optiondiamond : Params (@wlp_optiondiamond) 5 := {}.
+
+    #[export] Instance proper_wp_optiondiamond_bientails {Θ A w} :
+      Proper
+        (pointwise_relation _
+           (forall_relation
+              (fun _ => pointwise_relation _
+                          (pointwise_relation _ bientails)) ==> bientails))
+        (@wp_optiondiamond Θ A w).
+    Proof.
+      intros d p q pq. destruct d as [(w1 & r01 & a)|]; cbn; [|easy].
+      apply Acc.proper_wp_bientails. apply pq.
+    Qed.
+
+    #[export] Instance proper_wp_optiondiamond_entails {Θ A w} :
+      Proper
+        (pointwise_relation _
+           (forall_relation
+              (fun _ => pointwise_relation _
+                          (pointwise_relation _ entails)) ==> entails))
+        (@wp_optiondiamond Θ A w).
+    Proof.
+      intros d p q pq. destruct d as [(w1 & r01 & a)|]; cbn; [|easy].
+      apply Acc.proper_wp_entails. apply pq.
+    Qed.
+
+    #[export] Instance proper_wlp_optiondiamond_bientails {Θ A w} :
+      Proper
+        (pointwise_relation _
+           (forall_relation
+              (fun _ => pointwise_relation _
+                          (pointwise_relation _ bientails)) ==> bientails))
+        (@wlp_optiondiamond Θ A w).
+    Proof.
+      intros d p q pq. destruct d as [(w1 & θ1 & a)|]; cbn; [|easy].
+      apply Acc.proper_wlp_bientails. apply pq.
+    Qed.
+
+    #[export] Instance proper_wlp_optiondiamond_entails {Θ A w} :
+      Proper
+        (pointwise_relation _
+           (forall_relation
+              (fun _ => pointwise_relation _
+                          (pointwise_relation _ entails)) ==> entails))
+        (@wlp_optiondiamond Θ A w).
+    Proof.
+      intros d p q pq. destruct d as [(w1 & θ1 & a)|]; cbn; [|easy].
+      apply Acc.proper_wlp_entails. apply pq.
+    Qed.
+
+    Lemma wp_optiondiamond_monotonic' {Θ A w} (d : DiamondT Θ Option A w)
+      (R : Pred w) (P Q : Box Θ (A -> Pred) w) :
+      (forall w1 (r : Θ w w1) (a : A w1),
+          persist R r ⊢ₚ P w1 r a ->ₚ Q w1 r a) ->
+      R ⊢ₚ wp_optiondiamond d P ->ₚ wp_optiondiamond d Q.
+    Proof.
+      intros pq. destruct d as [(w1 & r01 & a)|]; cbn.
+      - specialize (pq w1 r01 a).
+        apply impl_and_adjoint.
+        rewrite Acc.and_wp_r.
+        apply Acc.proper_wp_entails.
+        apply impl_and_adjoint.
+        apply pq.
+      - apply impl_and_adjoint.
+        now rewrite and_false_r.
+    Qed.
+
+    Lemma wp_optiondiamond_pure {Θ} {reflΘ : Refl Θ} {lkreflΘ : LkRefl Θ}
+      {A w0} (a : A w0) (Q : Box Θ (A -> Pred) w0) :
+      wp_optiondiamond (pure (M := DiamondT Θ Option) a) Q ⊣⊢ₚ T Q a.
+    Proof. cbn. now rewrite Acc.wp_refl. Qed.
+
+    Lemma wp_optiondiamond_bind {Θ} {transΘ : Trans Θ} {lkTransΘ : LkTrans Θ}
+      {A B w0} (d : DiamondT Θ Option A w0) (f : Box Θ (A -> DiamondT Θ Option B) w0)
+      (Q : Box Θ (B -> Pred) w0) :
+      wp_optiondiamond (bind d f) Q ⊣⊢ₚ
+      wp_optiondiamond d (fun w1 ζ1 a1 => wp_optiondiamond (f w1 ζ1 a1) (_4 Q ζ1)).
+    Proof.
+      destruct d as [(w1 & r01 & a)|]; cbn; [|reflexivity].
+      destruct (f w1 r01 a) as [(w2 & r12 & b2)|]; cbn;
+        now rewrite ?Acc.wp_trans, ?Acc.wp_false.
+    Qed.
+
+    Lemma wlp_optiondiamond_monotonic' {Θ A w} (d : DiamondT Θ Option A w)
+        (R : Pred w) (P Q : Box Θ (A -> Pred) w) :
+        (forall w1 (r : Θ w w1) (a : A w1),
+            persist R r ⊢ₚ P w1 r a ->ₚ Q w1 r a) ->
+        R ⊢ₚ wlp_optiondiamond d P ->ₚ wlp_optiondiamond d Q.
+    Proof.
+      intros pq. destruct d as [(w1 & r01 & a)|]; cbn.
+      - specialize (pq w1 r01 a). rewrite <- Acc.wlp_mono.
+        now apply Acc.entails_wlp.
+      - rewrite impl_true_r. apply true_r.
+    Qed.
+
+    Lemma wlp_optiondiamond_pure {Θ} {reflΘ : Refl Θ} {lkreflΘ : LkRefl Θ}
+      {A w0} (a : A w0) (Q : Box Θ (A -> Pred) w0) :
+      wlp_optiondiamond (pure (M := DiamondT Θ Option) a) Q ⊣⊢ₚ T Q a.
+    Proof. cbn. now rewrite Acc.wlp_refl. Qed.
+
+    Lemma wlp_optiondiamond_bind {Θ} {transΘ : Trans Θ} {lkTransΘ : LkTrans Θ}
+      {A B w0} (d : DiamondT Θ Option A w0) (f : Box Θ (A -> DiamondT Θ Option B) w0)
+      (Q : Box Θ (B -> Pred) w0) :
+      wlp_optiondiamond (bind d f) Q ⊣⊢ₚ
+      wlp_optiondiamond d (fun w1 ζ1 a1 => wlp_optiondiamond (f w1 ζ1 a1) (_4 Q ζ1)).
+    Proof.
+      destruct d as [(w1 & r01 & a)|]; cbn; [|reflexivity].
+      destruct (f w1 r01 a) as [(w2 & r12 & b2)|]; cbn;
+        now rewrite ?Acc.wlp_trans, ?Acc.wlp_true.
+    Qed.
+
     Lemma wp_optiondiamond_bind' {Θ : ACC} {A B w1 w2} (o : Option A w1)
       (f : A w1 -> Option (Diamond Θ B) w2) (Q : Box Θ (B -> Pred) w2) :
-      wp_optiondiamond (option.bind o f) Q ⊣⊢ₚ wp_option o (fun a => wp_optiondiamond (f a) Q).
+      wp_optiondiamond (option.bind o f) Q ⊣⊢ₚ
+      wp_option o (fun a => wp_optiondiamond (f a) Q).
     Proof. constructor; intros ι. now destruct o. Qed.
 
     Lemma wlp_optiondiamond_bind' {Θ : ACC} {A B w1 w2} (o : Option A w1)
       (f : A w1 -> Option (Diamond Θ B) w2) (Q : Box Θ (B -> Pred) w2) :
-      wlp_optiondiamond (option.bind o f) Q ⊣⊢ₚ wlp_option o (fun a => wlp_optiondiamond (f a) Q).
+      wlp_optiondiamond (option.bind o f) Q ⊣⊢ₚ
+      wlp_option o (fun a => wlp_optiondiamond (f a) Q).
     Proof. constructor; intros ι. now destruct o. Qed.
 
   End Transformers.
@@ -830,9 +948,12 @@ Module Pred.
       fun w '(t1,t2) => eqₚ t1 t2.
     #[export] Instance instpred_unit : InstPred Unit :=
       fun w 'tt => Trueₚ.
-    #[export] Instance instpred_diamond {Θ A} `{ipA : InstPred A} :
+    #[local] Instance instpred_diamond {Θ A} `{ipA : InstPred A} :
       InstPred (Diamond Θ A) :=
       fun w m => wp_diamond m (fun _ _ a => instpred a).
+    #[export] Instance instpred_optiondiamond {Θ A} `{ipA : InstPred A} :
+      InstPred (DiamondT Θ Option A) :=
+      fun w m => wp_optiondiamond m (fun _ _ a => instpred a).
 
   End InstPred.
 
