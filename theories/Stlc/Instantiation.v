@@ -191,16 +191,6 @@ Proof.
   now rewrite ?env.lookup_tabulate, lk_trans, inst_persist.
 Qed.
 
-Lemma inst_reduce {Θ} {reduceΘ : Reduce Θ} {w α t} (ι : Assignment w) :
-  inst (reduce α t) ι = env.snoc ι α (inst t ι).
-Proof.
-  apply env.lookup_extensional. intros β βIn. unfold inst, inst_acc.
-  rewrite env.lookup_tabulate. cbn.
-  destruct ctx.view; cbn.
-  - now rewrite lk_reduce_zero.
-  - now rewrite lk_reduce_succ.
-Qed.
-
 Lemma inst_step_snoc {Θ} {stepΘ : Step Θ} {w x} (ι : Assignment w) (t : Ty) :
   inst (step (Θ := Θ)) (env.snoc ι x t) = ι.
 Proof.

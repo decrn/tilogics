@@ -128,10 +128,6 @@ Class Step (Θ : ACC) : Type :=
   step w α : Θ w (w ▻ α).
 #[global] Arguments step {Θ _ w α}.
 
-Class Reduce (Θ : ACC) : Type :=
-  reduce w α (t : Ṫy w) : Θ (w ▻ α) w.
-#[global] Arguments reduce {Θ _ w} α t.
-
 Class Thin (Θ : ACC) : Type :=
   thin w α {αIn : α ∈ w} : Θ (w - α) w.
 #[global] Arguments thin {Θ _ w} α {αIn}.

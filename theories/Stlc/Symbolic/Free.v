@@ -305,7 +305,7 @@ Section WithPredicates.
     Lemma prenex_correct {A w} (m : Free A w) (Q : Box Θ (A -> Pred) w) :
       wp_prenex (prenex m) Q ⊣⊢ₚ WP m Q.
     Proof.
-      induction m; cbn - [reduce step].
+      induction m; cbn - [step].
       - rewrite Acc.wp_refl. rewrite and_true_l. reflexivity.
       - reflexivity.
       - destruct (prenex m) as [(w' & r & C & a)|]; cbn.
@@ -314,14 +314,8 @@ Section WithPredicates.
           apply Acc.proper_wp_bientails.
           now rewrite persist_eq and_assoc.
         + rewrite <- IHm. now rewrite and_false_r.
-      - destruct (prenex m) as [(w' & r & C & a)|]; cbn - [reduce step].
-        + change (alloc.fresh ?r) with (step ⊙ r). rewrite Acc.wp_trans.
-          rewrite (Acc.wp_step_reduce (Θ := alloc.acc_alloc)).
-          rewrite <- (Acc.wp_step_reduce (Θ := Θ)).
-          apply Acc.proper_wp_bientails.
-          rewrite <- IHm. cbn - [reduce step Sub.of].
-          apply Acc.proper_wp_bientails.
-          apply proper_and_bientails; auto.
+      - destruct (prenex m) as [(w' & r & C & a)|]; cbn - [step] in *.
+        + rewrite Acc.wp_trans. apply Acc.proper_wp_step. now rewrite <- IHm.
         + rewrite <- IHm. now rewrite Acc.wp_false.
     Qed.
 

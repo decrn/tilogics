@@ -123,7 +123,7 @@ Definition persist_sim_step_alloc_sem {A} := Sub.persist_sim_step (Θ := alloc.a
 Ltac wsimpl :=
   repeat
     (rewrite ?persist_refl, ?persist_trans, ?persist_lift,
-      ?inst_lift, ?inst_reduce, ?inst_persist,
+      ?inst_lift, ?inst_persist,
       ?inst_step_snoc, ?lk_trans, ?trans_refl_l, ?trans_refl_r,
       ?persist_insert, ?lift_insert,
 
@@ -133,15 +133,12 @@ Ltac wsimpl :=
       ?Pred.persist_exists, ?Pred.persist_forall, ?Pred.Acc.wlp_true, ?Pred.eq_pair,
       ?Pred.eq_func,
 
+      (* ?ProgramLogic.eqₚ_env_cons, *)
+      (* ?ProgramLogic.equiv_true, *)
+
       ?persist_sim_step_alloc_env, ?persist_sim_step_alloc_ty, ?persist_sim_step_alloc_sem,
       ?ėxp.inst_var, ?ėxp.inst_true, ?ėxp.inst_false, ?ėxp.inst_ifte, ?ėxp.inst_absu, ?ėxp.inst_abst, ?ėxp.inst_app,
-      ?Sem.inst_pure, ?Sem.inst_fmap, ?Sem.inst_app, ?Sem.persist_pure, ?Sem.persist_fmap, ?Sem.persist_app,
-
-      (* ?ProgramLogic.eqₚ_env_cons, *)
-      ?step_reduce,
-      (* ?ProgramLogic.equiv_true, *)
-      ?lk_reduce_zero,
-      ?lk_reduce_succ in *;
+      ?Sem.inst_pure, ?Sem.inst_fmap, ?Sem.inst_app, ?Sem.persist_pure, ?Sem.persist_fmap, ?Sem.persist_app in *;
      cbn - [lk trans step thick Sub.up1]; auto);
   repeat setoid_rewrite Pred.persist_exists;
   repeat setoid_rewrite Pred.persist_forall;
@@ -227,8 +224,8 @@ Section Correctness.
       iApply (@wlp_mono alloc.acc_alloc). iIntros (w1 r1 (t12 & e1')) "!> HT1".
       rewrite wlp_bind. unfold _4.
       iPoseProof (IHe2 w1 G[r1]) as "-#IH". iRevert "IH". clear IHe2.
-      iApply (@wlp_mono alloc.acc_alloc). iIntros (w2 r2 (t2 & e2')) "!> HT2". cbn.
-      unfold _4. rewrite Acc.wlp_step_reduce. iIntros (t1). wsimpl.
+      iApply (@wlp_mono alloc.acc_alloc). iIntros (w2 r2 (t2 & e2')) "!> HT2 !>". cbn.
+      unfold _4. wsimpl.
       iStopProof. constructor. intros ι (HT1 & HT2). pred_unfold. wsimpl.
       econstructor; eauto.
   Qed.
@@ -236,10 +233,9 @@ Section Correctness.
   Lemma generate_sound (e : Exp) (w0 : World) (G0 : Ėnv w0) t0 e0 :
     TPB_algo G0 e t0 e0 ⊢ₚ G0 |--ₚ e; t0 ~> e0.
   Proof.
-    iIntros "HWP". iRevert "HWP". rewrite wand_is_impl.
-    rewrite wp_impl. iPoseProof (@generate_sound_aux e w0 G0) as "-#Hsound".
-    iRevert "Hsound". iApply (@wlp_mono alloc.acc_alloc).
-    iIntros (w1 θ1 [t e']) "!> HT". wsimpl.
+    iStartProof. rewrite wand_is_impl. rewrite wp_impl.
+    iPoseProof (@generate_sound_aux e w0 G0) as "-#Hsound". iRevert "Hsound".
+    iApply (@wlp_mono alloc.acc_alloc). iIntros (w1 θ1 [t e']) "!> HT". wsimpl.
     iStopProof. constructor. intros ι HT Heq1 Heq2. now pred_unfold.
   Qed.
 
@@ -276,7 +272,7 @@ Section Correctness.
       iStopProof. constructor. intros ι [_ [(HeqG & Heq1 & Heq2 & Heq3 & Heq4 & Heq5 & Heq6)]].
       pred_unfold. wsimpl. now subst.
 
-    - iIntros "#HeqG". rewrite Acc.wp_step_reduce. iExists (lift t1 _). iIntros "!> #Heq1".
+    - iIntros "#HeqG". rewrite Acc.intro_wp_step. iExists (lift t1 _). iIntros "!> #Heq1".
       rewrite wp_bind. unfold _4. wsimpl.
       iPoseProof (IH _ (G0 ,, x∷ṫy.var ctx.in_zero)) as "IH". clear IH. wsimpl.
       rewrite <- eqₚ_insert. wsimpl.
@@ -309,8 +305,8 @@ Section Correctness.
       iPoseProof (IH2 w1 G0 with "HeqG") as "-#IH"; clear IH2. iRevert "IH".
       iApply (@wp_mono alloc.acc_alloc).
       iIntros (w2 r2 (t1' & e2'')) "!> (#Heq3 & #Heq4)"; wsimpl.
-      rewrite Acc.wp_step_reduce.
-      iExists (lift t2 w2). unfold _4. rewrite lk_refl. wsimpl.
+      rewrite Acc.intro_wp_step. iExists (lift t2 w2). unfold _4. rewrite lk_refl. wsimpl.
+      iIntros "!>". wsimpl.
 
       iStopProof. constructor. intros ι [_ [(HeqG & Heq1 & Heq2 & Heq3 & Heq4)]].
       pred_unfold. wsimpl. now subst.

@@ -69,8 +69,6 @@ Module Sub.
     fun w α αIn => env.tabulate (fun β βIn => ṫy.var (ctx.in_thin αIn βIn)).
   #[export] Instance step_sub : Step Sub :=
     fun w x => thin _ (αIn := ctx.in_zero).
-  #[export] Instance reduce_sub : Reduce Sub :=
-    fun w α t => env.snoc refl _ t.
 
   Definition up1 {w0 w1} (r01 : Sub w0 w1) {n} : Sub (w0 ▻ n) (w1 ▻ n) :=
     env.snoc (env.map (fun _ (t : Ṫy _) => persist t step) r01) n (ṫy.var ctx.in_zero).
@@ -273,16 +271,6 @@ Module Sub.
   Proof.
     apply env.lookup_extensional. intros β βIn. unfold of. cbn.
     rewrite !env.lookup_tabulate. now rewrite lk_step.
-  Qed.
-
-  Lemma of_reduce {Θ} {reduceΘ : Reduce Θ} w α t :
-    of (@reduce Θ reduceΘ w α t) = reduce (Θ := Sub) α t.
-  Proof.
-    apply env.lookup_extensional. intros β βIn. unfold of.
-    rewrite env.lookup_tabulate. cbn.
-    destruct ctx.view.
-    - now rewrite lk_reduce_zero.
-    - rewrite lk_reduce_succ. symmetry. apply (lk_refl (Θ := Sub)).
   Qed.
 
   Lemma of_thick {Θ} {thickΘ : Thick Θ} w α αIn t :

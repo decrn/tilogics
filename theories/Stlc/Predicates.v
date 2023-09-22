@@ -50,7 +50,6 @@ From Em Require Import
 
 #[local] Set Implicit Arguments.
 #[local] Arguments step : simpl never.
-#[local] Arguments reduce : simpl never.
 #[local] Arguments thick : simpl never.
 
 Module Pred.
@@ -488,18 +487,6 @@ Module Pred.
         persist (∃ₚ a : A, Q a) θ ⊣⊢ₚ (∃ₚ a : A, persist (Q a) θ).
       Proof. obligation. Qed.
 
-      Import (hints) Sub.
-      Lemma persist_reduce  {w α} (t : Ṫy w) P Q :
-        (persist P (step (Θ := Sub)) ⊢ₚ
-           ṫy.var ctx.in_zero =ₚ persist t (step (Θ := Sub)) ->ₚ Q) ->
-        P ⊢ₚ persist Q (reduce (Θ := Sub) α t).
-      Proof.
-        rewrite ?entails_in. unfold persist, persist_pred. intros H ι HP.
-        pred_unfold. rewrite inst_reduce.
-        specialize (H (env.snoc ι α (inst t ι))).
-        rewrite inst_persist inst_step_snoc in H. now apply H.
-      Qed.
-
       Lemma persist_tpb {w0 w1} (θ : Θ w0 w1) G (e : Exp) (t : Ṫy w0) (ee : Ėxp w0) :
         persist (G |--ₚ e; t ~> ee) θ ⊣⊢ₚ
         persist G θ |--ₚ e; persist t θ ~> persist ee θ.
@@ -604,19 +591,6 @@ Module Pred.
         repeat change_no_check (@inst (Alloc ?w0) _ _ ?w1 ?θ1 ?ι1) with
           (@inst (acc alloc.acc_alloc w0) _ _ w1 θ1 ι1).
 
-      Lemma wp_step_reduce {stepθ : Step Θ} {w} {x} (Q : Pred (ctx.snoc w x)):
-        wp (w0:=w) step Q ⊣⊢ₚ (∃ₚ t : Ṫy w, persist Q (reduce x t)).
-      Proof.
-        constructor. intros ι; pred_unfold; cbn - [inst reduce step].
-        split.
-        - intros (ι' & <- & HQ). destruct (env.view ι') as [ι t].
-          rewrite inst_step_snoc. exists (lift t _). clean_inst.
-          now rewrite inst_reduce, inst_lift.
-        - cbn - [inst reduce step]. intros (t & HQ).
-          exists (env.snoc ι _ (inst t ι)). rewrite inst_step_snoc. clean_inst.
-          now rewrite inst_reduce in HQ.
-      Qed.
-
       Lemma and_wp_l {w0 w1} (θ : Θ w0 w1) P Q :
         wp θ P /\ₚ Q ⊣⊢ₚ wp θ (P /\ₚ persist Q θ).
       Proof.
@@ -628,21 +602,6 @@ Module Pred.
       Lemma and_wp_r {w0 w1} (θ : Θ w0 w1) P Q :
         P /\ₚ wp θ Q ⊣⊢ₚ wp θ (persist P θ /\ₚ Q).
       Proof. now rewrite and_comm, and_wp_l, and_comm. Qed.
-
-      Lemma wp_reduce {reduceΘ : Reduce Θ}
-        {w α} (t : Ṫy w) (Q : Pred w) :
-        wp (reduce α t) Q ⊣⊢ₚ
-          ṫy.var ctx.in_zero =ₚ (persist t (step (Θ := alloc.acc_alloc))) /\ₚ
-          persist Q (step (Θ := alloc.acc_alloc)).
-      Proof.
-        constructor. intros ι; pred_unfold; cbn - [inst].
-        split.
-        - intros (ι1 & Heq & HQ). subst. clean_inst.
-          now rewrite inst_reduce, inst_step_snoc.
-        - destruct (env.view ι) as [ι t']. cbn - [inst]. rewrite inst_step_snoc.
-          intros [Heq HQ]. subst.
-          exists ι. split; auto. now rewrite inst_reduce.
-      Qed.
 
       Lemma wp_thick {thickΘ : Thick Θ}
         {w α} (αIn : ctx.In α w) (t : Ṫy (ctx.remove αIn)) (Q : Pred (ctx.remove αIn)) :
@@ -712,12 +671,6 @@ Module Pred.
           exists ι1. split; auto.
       Qed.
 
-      Lemma wlp_reduce {reduceΘ : Reduce Θ} {w α} (t : Ṫy w) (Q : Pred w) :
-        wlp (reduce α t) Q ⊣⊢ₚ
-          ṫy.var ctx.in_zero =ₚ (persist t (step (Θ := alloc.acc_alloc))) ->ₚ persist Q (step (Θ := alloc.acc_alloc)).
-      Proof.
-      Admitted.
-
       (* Lemma wlp_thick {thickR : Thick Θ} *)
       (*   {w x} (xIn : ctx.In x w) (t : Ty (ctx.remove xIn)) (Q : Pred (ctx.remove xIn)) : *)
       (*   wlp (thick x t) Q ⊣⊢ₚ Ty_hole xIn =ₚ thin xIn t ->ₚ persist Q (Sub.thin xIn). *)
@@ -750,17 +703,6 @@ Module Pred.
           now rewrite inst_lift in HQ.
       Qed.
 
-      Lemma wlp_step_reduce {stepR : Step Θ} {w} {x} (Q : Pred (ctx.snoc w x)):
-        wlp (w0:=w) step Q ⊣⊢ₚ (∀ₚ t : Ṫy w, persist Q (reduce x t)).
-      Proof.
-        constructor. intros ι; pred_unfold; cbn - [inst reduce step].
-        split.
-        - intros HQ t. apply HQ. now rewrite inst_reduce, inst_step_snoc.
-        - intros HQ ι' <-. destruct (env.view ι') as [ι t].
-          specialize (HQ (lift t _)).
-          now rewrite inst_step_snoc, inst_reduce, inst_lift in HQ.
-      Qed.
-
       Lemma wp_impl {w0 w1} (θ1 : Θ w0 w1) (P : Pred _) (Q : Pred _) :
         (wp θ1 P ->ₚ Q) ⊣⊢ₚ wlp θ1 (P ->ₚ persist Q θ1).
       Proof.
@@ -787,31 +729,41 @@ Module Pred.
     (* #[global] Opaque wp. *)
     (* #[global] Opaque wlp. *)
 
-    Lemma persist_wp_step {w0 w1 : World} (x : nat) (P : Pred (ctx.snoc w0 x)) (θ : Sub w0 w1) :
-      persist (wp (step (Θ := alloc.acc_alloc)) P) θ ⊣⊢ₚ
-        wp (step (Θ := alloc.acc_alloc)) (persist P (Sub.up1 θ)).
+    Lemma proper_wp_step {Θ1 Θ2 : ACC} {stepΘ1 : Step Θ1} {stepΘ2 : Step Θ2} {w α} :
+      forall P Q : Pred (ctx.snoc w α),
+        P ⊣⊢ₚ Q -> wp (step (Θ := Θ1)) P ⊣⊢ₚ wp (step (Θ := Θ2)) Q.
     Proof.
-      rewrite !wp_step_reduce. rewrite persist_exists. constructor.
-      intros ι; cbn - [thick Sub.up1].
-      split; intros [t HP].
-      - pred_unfold. exists (persist t θ). cbn - [inst reduce step] in *.
-        rewrite inst_reduce in HP. rewrite inst_reduce, inst_persist. revert HP.
-        generalize (inst t (inst θ ι)). clear. intros t HP.
-        assert (inst (Sub.up1 θ) (env.snoc ι x t) = env.snoc (inst θ ι) x t).
-        { cbn. f_equal. apply env.lookup_extensional. intros α αIn.
-          rewrite env.lookup_tabulate, env.lookup_map, inst_persist.
-          rewrite inst_step_snoc. unfold inst at 2, inst_acc.
-          now rewrite env.lookup_tabulate. }
-        now rewrite H.
-      - pred_unfold. exists (lift (inst t ι) _). cbn - [inst step thick] in *.
-        rewrite inst_reduce in HP. rewrite inst_reduce, inst_lift. revert HP.
-        generalize (inst t ι). clear. intros t HP.
-        assert (env.snoc (inst θ ι) x t = inst (Sub.up1 θ) (env.snoc ι x t)).
-        { cbn. f_equal. apply env.lookup_extensional. intros α αIn.
-          rewrite env.lookup_tabulate, env.lookup_map, inst_persist.
-          rewrite inst_step_snoc. unfold inst at 1, inst_acc.
-          now rewrite env.lookup_tabulate. }
-        now rewrite H.
+      intros P Q [PQ]. constructor. intros ι. cbn. apply base.exist_proper.
+      intros ι2. now rewrite !inst_step, PQ.
+    Qed.
+
+    Lemma wp_incl {Θ} {reflΘ : Refl Θ} {transΘ : Trans Θ} {stepΘ : Step Θ}
+      {lkReflΘ : LkRefl Θ} {lkTransΘ : LkTrans Θ}
+      {w1 w2} (θ : alloc.acc_alloc w1 w2) :
+      forall Q, wp θ Q ⊣⊢ₚ wp (alloc.incl (Θ := Θ) θ) Q.
+    Proof.
+      intros Q. induction θ; cbn.
+      - change alloc.refl with (refl (Θ := alloc.acc_alloc) (w := w)).
+        now rewrite !wp_refl.
+      - change (alloc.fresh ?r) with (step (Θ := alloc.acc_alloc) ⊙ r).
+        rewrite !wp_trans. apply proper_wp_step, IHθ.
+    Qed.
+
+    Lemma intro_wp_step {Θ} {stepΘ : Step Θ} {w α} (Q : Pred (ctx.snoc w α)) :
+      wp (step (Θ := Θ)) Q ⊣⊢ₚ (∃ₚ t : Ṫy _, wlp step (persist t step =ₚ ṫy.var ctx.in_zero ->ₚ Q)).
+    Proof.
+      constructor. intros ι. pred_unfold. unfold wlp, wp, implₚ, eqₚ. cbn.
+      split.
+      - intros (ι' & Heq & HQ). subst. destruct (env.view ι').
+        exists (lift v _). intros ι' Heq1 Heq2.
+        rewrite inst_step_snoc in Heq1. subst.
+        rewrite inst_persist, inst_lift in Heq2. subst.
+        destruct (env.view ι'). rewrite inst_step_snoc in HQ.
+        now cbn in HQ.
+      - intros (t & H). exists (env.snoc ι α (inst t ι)).
+        rewrite inst_step_snoc. split; [easy|]. apply H.
+        + now rewrite inst_step_snoc.
+        + now rewrite inst_persist, inst_step_snoc.
     Qed.
 
   End Acc.
@@ -966,40 +918,6 @@ Module Pred.
       Proof. firstorder. Qed.
 
     End PersistModality.
-
-    Section PersistReduceModality.
-
-      Context {Θ : ACC} {reduceΘ : Reduce Θ} [w : World] (α : nat) (t : Ṫy w).
-
-      Class IntoPersistReduce (P : Pred w) (Q : Pred (ctx.snoc w α)) :=
-        into_persist_reduce : P ⊢ persist Q (reduce (Θ := Θ) α t).
-
-      #[export] Instance into_persist_reduce_default (P : Pred w) :
-        IntoPersistReduce P (persist P (step (Θ := Sub))).
-      Proof.
-        constructor. pred_unfold. intros ι HP.
-        now rewrite inst_reduce inst_step_snoc.
-      Qed.
-
-      Definition modality_persist_reduce_mixin :
-        modality_mixin (fun P => persist P (reduce (Θ := Θ) α t))
-          (MIEnvTransform IntoPersistReduce)
-          (MIEnvTransform IntoPersistReduce).
-      Proof. firstorder. Qed.
-
-      Definition modality_persist_reduce : modality bi_pred bi_pred :=
-        Modality _ (modality_persist_reduce_mixin).
-
-      #[export] Instance from_modal_persist_reduce P :
-        FromModal True modality_persist_reduce
-          (persist P (reduce (Θ := Θ) α t)) (persist P (reduce (Θ := Θ) α t))
-          (persist t (step (Θ := Sub)) =ₚ ṫy.var ctx.in_zero ->ₚ P).
-      Proof.
-        intros _. cbn. constructor. pred_unfold. intros ι.
-        rewrite inst_persist inst_reduce inst_step_snoc. cbn. intuition.
-      Qed.
-
-    End PersistReduceModality.
 
     Section AccModality.
 
