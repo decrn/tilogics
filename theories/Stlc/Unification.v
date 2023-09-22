@@ -300,11 +300,12 @@ Section VarView.
   Inductive VarView {w} : Ṫy w -> Type :=
   | is_var {x} (xIn : x ∈ w) : VarView (ṫy.var xIn)
   | not_var {t} (H: forall x (xIn : x ∈ w), t <> ṫy.var xIn) : VarView t.
+  #[global] Arguments not_var {w t} &.
 
   Definition varview {w} (t : Ṫy w) : VarView t :=
     match t with
     | ṫy.var xIn => is_var xIn
-    | _ => ltac:(constructor 2; discriminate)
+    | _         => not_var (fun _ _ => noConfusion_inv)
     end.
 
 End VarView.

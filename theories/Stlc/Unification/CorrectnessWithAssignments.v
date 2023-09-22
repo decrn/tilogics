@@ -284,6 +284,10 @@ Module Correctness.
       forall (t1 t2 : Ṫy w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1),
         entails (persist (t1 =ₚ t2)%P ζ01) (WP (bu t1 t2 w1 ζ01) (fun _ _ _ => Trueₚ)).
 
+  Definition BoxUnifierCorrect : ⊢ʷ BoxUnifier -> PROP :=
+    fun w0 bu =>
+      forall (t1 t2 : Ṫy w0), interpC (bu t1 t2) ⊣⊢ₚ t1 =ₚ t2.
+
   Section BoxedProofs.
 
     Import Tri.notations.

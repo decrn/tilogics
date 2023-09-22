@@ -496,27 +496,6 @@ Module Pred.
 
   End Lemmas.
 
-  Section InstPred.
-    Import World.notations.
-    (* A type class for things that can be interpreted as a predicate. *)
-    Class InstPred (A : TYPE) :=
-      instpred : ⊢ʷ A -> Pred.
-
-    #[export] Instance instpred_option {A} `{ipA : InstPred A} :
-      InstPred (Option A) :=
-      fun w o => match o with Some p => instpred p | None => Falseₚ end.
-    #[export] Instance instpred_list {A} `{ipA : InstPred A} :
-      InstPred (List A) :=
-      fun w =>
-        fix ip xs {struct xs} :=
-        match xs with
-        | nil       => Trueₚ
-        | cons y ys => andₚ (instpred y) (ip ys)
-        end.
-    #[local] Instance instpred_prod_ty : InstPred (Ṫy * Ṫy) :=
-      fun w '(t1,t2) => eqₚ t1 t2.
-  End InstPred.
-
   Module Acc.
     Import World.notations.
     Import (hints) Sub.
@@ -716,6 +695,10 @@ Module Pred.
         persist (wlp θ P) θ ⊢ₚ P.
       Proof. constructor. intros ι H. now apply H. Qed.
 
+      Lemma persist_wp {w0 w1} {θ : Θ w0 w1} (P : Pred w1) :
+        P ⊢ₚ persist (wp θ P) θ.
+      Proof. constructor. intros ι H. hnf. exists ι. auto. Qed.
+
       Lemma wlp_frame {w0 w1} (θ : Θ w0 w1) (P : Pred _) (Q : Pred _) :
         P ->ₚ wlp θ Q ⊣⊢ₚ wlp θ (persist P θ ->ₚ Q).
       Proof.
@@ -768,6 +751,86 @@ Module Pred.
 
   End Acc.
 
+  Section Transformers.
+    Import World.notations.
+
+    Definition wp_diamond {Θ : ACC} {A} :
+      ⊢ʷ Diamond Θ A -> Box Θ (A -> Pred) -> Pred :=
+      fun w '(existT w1 (θ, a)) Q => Acc.wp θ (Q w1 θ a).
+
+    Definition wlp_diamond {Θ : ACC} {A} :
+      ⊢ʷ Diamond Θ A -> Box Θ (A -> Pred) -> Pred :=
+      fun w '(existT w1 (θ, a)) Q => Acc.wlp θ (Q w1 θ a).
+
+    Definition wp_option {A w1 w2} :
+      Option A w1 -> (A w1 -> Pred w2) -> Pred w2 :=
+      fun o Q =>
+        match o with
+        | Some a => Q a
+        | None => Falseₚ
+        end.
+
+    Lemma wp_option_bind {A B w1 w2 w3} (o : Option A w1)
+      (f : A w1 -> Option B w2) (Q : B w2 -> Pred w3) :
+      wp_option (option.bind o f) Q ⊣⊢ₚ wp_option o (fun a => wp_option (f a) Q).
+    Proof. constructor; intros ι. now destruct o. Qed.
+
+    Definition wlp_option {A w1 w2} :
+      Option A w1 -> (A w1 -> Pred w2) -> Pred w2 :=
+      fun o Q =>
+        match o with
+        | Some a => Q a
+        | None => Trueₚ
+        end.
+
+    Definition wp_optiondiamond {Θ : ACC} {A} :
+      ⊢ʷ DiamondT Θ Option A -> Box Θ (A -> Pred) -> Pred :=
+      fun w m Q => wp_option m (fun d => wp_diamond d Q).
+
+    Definition wlp_optiondiamond {Θ : ACC} {A} :
+      ⊢ʷ DiamondT Θ Option A -> Box Θ (A -> Pred) -> Pred :=
+      fun w m Q => wlp_option m (fun d => wlp_diamond d Q).
+
+    Lemma wp_optiondiamond_bind' {Θ : ACC} {A B w1 w2} (o : Option A w1)
+      (f : A w1 -> Option (Diamond Θ B) w2) (Q : Box Θ (B -> Pred) w2) :
+      wp_optiondiamond (option.bind o f) Q ⊣⊢ₚ wp_option o (fun a => wp_optiondiamond (f a) Q).
+    Proof. constructor; intros ι. now destruct o. Qed.
+
+    Lemma wlp_optiondiamond_bind' {Θ : ACC} {A B w1 w2} (o : Option A w1)
+      (f : A w1 -> Option (Diamond Θ B) w2) (Q : Box Θ (B -> Pred) w2) :
+      wlp_optiondiamond (option.bind o f) Q ⊣⊢ₚ wlp_option o (fun a => wlp_optiondiamond (f a) Q).
+    Proof. constructor; intros ι. now destruct o. Qed.
+
+  End Transformers.
+
+  Section InstPred.
+    Import World.notations.
+    (* A type class for things that can be interpreted as a predicate. *)
+    Class InstPred (A : TYPE) :=
+      instpred : ⊢ʷ A -> Pred.
+    #[global] Arguments instpred {_ _ _}.
+
+    #[export] Instance instpred_option {A} `{ipA : InstPred A} :
+      InstPred (Option A) :=
+      fun w o => wp_option o instpred.
+    #[export] Instance instpred_list {A} `{ipA : InstPred A} :
+      InstPred (List A) :=
+      fun w =>
+        fix ip xs {struct xs} :=
+        match xs with
+        | nil       => Trueₚ
+        | cons y ys => andₚ (instpred y) (ip ys)
+        end.
+    #[local] Instance instpred_prod_ty : InstPred (Ṫy * Ṫy) :=
+      fun w '(t1,t2) => eqₚ t1 t2.
+    #[export] Instance instpred_unit : InstPred Unit :=
+      fun w 'tt => Trueₚ.
+    #[export] Instance instpred_diamond {Θ A} `{ipA : InstPred A} :
+      InstPred (Diamond Θ A) :=
+      fun w m => wp_diamond m (fun _ _ a => instpred a).
+
+  End InstPred.
+
   Lemma pno_cycle {w} (t1 t2 : Ṫy w) (Hsub : ṫy.Ṫy_subterm t1 t2) :
     t1 =ₚ t2 ⊢ₚ ⊥ₚ.
   Proof.
@@ -775,7 +838,6 @@ Module Pred.
     apply (inst_subterm ι) in Hsub. cbn in Hsub.
     rewrite <- Heq in Hsub. now apply ty.no_cycle in Hsub.
   Qed.
-
 
   (* A predicate-based induction scheme for the typing relation. *)
   Section InductionScheme.
@@ -950,54 +1012,6 @@ Module Pred.
 
   End Modalities.
 
-  Import World.notations.
-
-  Definition wp_diamond {Θ : ACC} {A} :
-    ⊢ʷ Diamond Θ A -> Box Θ (A -> Pred) -> Pred :=
-    fun w '(existT w1 (θ, a)) Q => Acc.wp θ (Q w1 θ a).
-
-  Definition wlp_diamond {Θ : ACC} {A} :
-    ⊢ʷ Diamond Θ A -> Box Θ (A -> Pred) -> Pred :=
-    fun w '(existT w1 (θ, a)) Q => Acc.wlp θ (Q w1 θ a).
-
-  Definition wp_option {A w1 w2} :
-    Option A w1 -> (A w1 -> Pred w2) -> Pred w2 :=
-    fun o Q =>
-      match o with
-      | Some a => Q a
-      | None => Falseₚ
-      end.
-
-  Lemma wp_option_bind {A B w1 w2 w3} (o : Option A w1)
-    (f : A w1 -> Option B w2) (Q : B w2 -> Pred w3) :
-    wp_option (option.bind o f) Q ⊣⊢ₚ wp_option o (fun a => wp_option (f a) Q).
-  Proof. constructor; intros ι. now destruct o. Qed.
-
-  Definition wlp_option {A w1 w2} :
-    Option A w1 -> (A w1 -> Pred w2) -> Pred w2 :=
-    fun o Q =>
-      match o with
-      | Some a => Q a
-      | None => Trueₚ
-      end.
-
-  Definition wp_optiondiamond {Θ : ACC} {A} :
-    ⊢ʷ DiamondT Θ Option A -> Box Θ (A -> Pred) -> Pred :=
-    fun w m Q => wp_option m (fun d => wp_diamond d Q).
-
-  Definition wlp_optiondiamond {Θ : ACC} {A} :
-    ⊢ʷ DiamondT Θ Option A -> Box Θ (A -> Pred) -> Pred :=
-    fun w m Q => wlp_option m (fun d => wlp_diamond d Q).
-
-  Lemma wp_optiondiamond_bind' {Θ : ACC} {A B w1 w2} (o : Option A w1)
-    (f : A w1 -> Option (Diamond Θ B) w2) (Q : Box Θ (B -> Pred) w2) :
-    wp_optiondiamond (option.bind o f) Q ⊣⊢ₚ wp_option o (fun a => wp_optiondiamond (f a) Q).
-  Proof. constructor; intros ι. now destruct o. Qed.
-
-  Lemma wlp_optiondiamond_bind' {Θ : ACC} {A B w1 w2} (o : Option A w1)
-    (f : A w1 -> Option (Diamond Θ B) w2) (Q : Box Θ (B -> Pred) w2) :
-    wlp_optiondiamond (option.bind o f) Q ⊣⊢ₚ wlp_option o (fun a => wlp_optiondiamond (f a) Q).
-  Proof. constructor; intros ι. now destruct o. Qed.
 
 End Pred.
 Export Pred (Pred).
