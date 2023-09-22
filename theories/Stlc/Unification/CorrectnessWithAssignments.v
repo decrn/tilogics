@@ -101,7 +101,7 @@ Module ProgramLogic.
 
   Lemma wp_monotonic' {A w} (d : ◆A w) (R : Pred w) (P Q : □(A -> Pred) w) :
     (forall w1 (r : w ⊒⁻ w1) (a : A w1),
-        Ext R r ⊢ₚ P w1 r a ->ₚ Q w1 r a) ->
+        persist R r ⊢ₚ P w1 r a ->ₚ Q w1 r a) ->
     R ⊢ₚ WP d P ->ₚ WP d Q.
   Proof.
     intros pq. destruct d as [(w1 & r01 & a)|]; cbn.
@@ -164,7 +164,7 @@ Module ProgramLogic.
 
   Lemma wlp_monotonic' {A w} (d : ◆A w) (R : Pred w) (P Q : □(A -> Pred) w) :
     (forall w1 (r : w ⊒⁻ w1) (a : A w1),
-        entails (Ext R r) (P w1 r a ->ₚ Q w1 r a)%P) ->
+        entails (persist R r) (P w1 r a ->ₚ Q w1 r a)%P) ->
     entails R (WLP d P ->ₚ WLP d Q)%P.
   Proof.
     intros pq. destruct d as [(w1 & r01 & a)|]; cbn.
@@ -267,7 +267,7 @@ Module Correctness.
   Definition UnifierSound : ⊢ʷ Unifier -> PROP :=
     fun w0 u =>
       forall (t1 t2 : Ṫy w0),
-        ⊤ₚ ⊢ₚ WLP (u t1 t2) (Fun _ => Ext (t1 =ₚ t2)).
+        ⊤ₚ ⊢ₚ WLP (u t1 t2) (Fun _ => persist (t1 =ₚ t2)).
 
   Definition UnifierComplete : ⊢ʷ Unifier -> PROP :=
     fun w0 u =>
@@ -277,12 +277,12 @@ Module Correctness.
   Definition BoxUnifierSound : ⊢ʷ BoxUnifier -> PROP :=
     fun w0 bu =>
       forall (t1 t2 : Ṫy w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1),
-        ⊤ₚ ⊢ₚ WLP (bu t1 t2 w1 ζ01) (Fun _ => Ext (Ext (t1 =ₚ t2) ζ01)).
+        ⊤ₚ ⊢ₚ WLP (bu t1 t2 w1 ζ01) (Fun _ => persist (persist (t1 =ₚ t2) ζ01)).
 
   Definition BoxUnifierComplete : ⊢ʷ BoxUnifier -> PROP :=
     fun w0 bu =>
       forall (t1 t2 : Ṫy w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1),
-        entails (Ext (t1 =ₚ t2) ζ01) (WP (bu t1 t2 w1 ζ01) (fun _ _ _ => Trueₚ)).
+        entails (persist (t1 =ₚ t2)%P ζ01) (WP (bu t1 t2 w1 ζ01) (fun _ _ _ => Trueₚ)).
 
   Section BoxedProofs.
 
@@ -296,23 +296,23 @@ Module Correctness.
                   BoxUnifierSound (lmgu xIn)).
 
       Lemma flex_sound_assignment {x} (xIn : x ∈ w) (t : Ṫy w) :
-        ⊤ₚ ⊢ₚ WLP (flex t xIn) (Fun _ => Ext (ṫy.var xIn =ₚ t)).
+        ⊤ₚ ⊢ₚ WLP (flex t xIn) (Fun _ => persist (ṫy.var xIn =ₚ t)).
       Proof.
         unfold flex. destruct (varview t) as [y yIn|].
         - destruct (ctx.occurs_check_view xIn yIn).
           + rewrite wlp_pure. unfold T.
-            rewrite ext_refl, eqₚ_refl.
+            rewrite persist_pred_refl, eqₚ_refl.
             reflexivity.
           + rewrite wlp_tell1. rewrite <- Acc.entails_wlp.
-            rewrite ext_true, ext_eq. cbn. unfold thickIn.
+            rewrite persist_true, persist_eq. cbn. unfold thickIn.
             rewrite ctx.occurs_check_view_refl, ctx.occurs_check_view_thin.
             rewrite eqₚ_refl. reflexivity.
         - destruct (occurs_check_spec xIn t); subst.
-          + rewrite wlp_tell1, ext_eq.
+          + rewrite wlp_tell1, persist_eq.
             rewrite <- !(Sub.persist_sim (Θ := Tri)).
             rewrite !Sub.of_thick.
             rewrite Sub.thin_thick_pointful.
-            rewrite <- Acc.entails_wlp, ext_true. cbn.
+            rewrite <- Acc.entails_wlp, persist_true. cbn.
             Sub.foldlk. rewrite lk_thick. unfold thickIn.
             rewrite ctx.occurs_check_view_refl. rewrite eqₚ_refl. reflexivity.
           + constructor. constructor.
@@ -320,7 +320,7 @@ Module Correctness.
 
       Lemma boxflex_sound_assignment {x} (xIn : x ∈ w) (t : Ṫy w)
         {w1} (ζ01 : w ⊒⁻ w1) :
-        ⊤ₚ ⊢ₚ WLP (boxflex lmgu t xIn ζ01) (Fun _ => Ext (Ext (ṫy.var xIn =ₚ t) ζ01)).
+        ⊤ₚ ⊢ₚ WLP (boxflex lmgu t xIn ζ01) (Fun _ => persist (persist (ṫy.var xIn =ₚ t) ζ01)).
       Proof.
         unfold boxflex, Tri.box_intro_split.
         destruct ζ01 as [|w2 y yIn ty]; folddefs.
@@ -328,16 +328,16 @@ Module Correctness.
           apply proper_entails_entails; [easy|].
           apply proper_wlp_entails.
           intros w2 ζ2 _.
-          now rewrite ext_refl.
+          now rewrite persist_pred_refl.
         - generalize (lmgu_sound yIn (ṫy.var xIn)[thick y ty] t[thick y ty] ζ01). clear.
           apply proper_entails_entails; [easy|]. cbn - [trans]. Sub.foldlk.
           rewrite lk_thick.
-          rewrite <- !(Sub.persist_sim (Θ := Tri)).
+          rewrite <- !(Sub.persist_sim (T:= Ṫy) (Θ := Tri)).
           rewrite !Sub.of_thick.
           apply proper_wlp_entails.
           intros w3 ζ3 _.
-          apply proper_ext_entails; auto.
-          rewrite ext_trans, ?ext_eq. cbn.
+          apply proper_persist_entails; auto.
+          rewrite persist_pred_trans, !persist_eq. cbn.
           rewrite <- !(Sub.persist_sim (Θ := Tri)).
           rewrite !Sub.of_thick.
           reflexivity.
@@ -390,10 +390,10 @@ Module Correctness.
           rewrite <- and_true_r, IH2. apply impl_and_adjoint.
           apply wlp_monotonic'.
           intros ? ? _.
-          rewrite ?trans_refl_r, ?ext_trans, <- ?ext_impl.
-          apply proper_ext_entails; auto.
-          apply proper_ext_entails; auto.
-          apply proper_ext_entails; auto.
+          rewrite !persist_pred_trans, <- !persist_impl.
+          apply proper_persist_entails; auto.
+          apply proper_persist_entails; auto.
+          apply proper_persist_entails; auto.
           rewrite (peq_ty_noconfusion (ṫy.func s1 s2)).
           now apply impl_and_adjoint.
       Qed.
@@ -411,23 +411,23 @@ Module Correctness.
         - destruct (ctx.occurs_check_view xIn yIn).
           + rewrite wp_pure. unfold T. apply true_r.
           + unfold WP, tell1. cbn.
-            rewrite Acc.wp_thick, ext_true, and_true_r. cbn. Sub.foldlk.
+            rewrite Acc.wp_thick, persist_true, and_true_r. cbn. Sub.foldlk.
             now rewrite lk_thin.
         - destruct (occurs_check_spec xIn t) as [|[HOC|HOC]]; cbn.
-          + subst. now rewrite Acc.wp_thick, ext_true, and_true_r.
+          + subst. now rewrite Acc.wp_thick, persist_true, and_true_r.
           + destruct (H _ _ HOC).
           + now apply pno_cycle in HOC.
       Qed.
 
       Lemma boxflex_complete_assignment {x} (xIn : x ∈ w) (t : Ṫy w) {w1} (ζ01 : w ⊒⁻ w1) :
-        Ext (ṫy.var xIn =ₚ t) ζ01 ⊢ₚ
+        persist (ṫy.var xIn =ₚ t)%P ζ01 ⊢ₚ
         WP (boxflex lmgu t xIn ζ01) (fun _ _ _ => ⊤ₚ)%P.
       Proof.
         unfold boxflex, Tri.box_intro_split.
         destruct ζ01 as [|w2 y yIn ty]; folddefs.
-        - rewrite ext_refl. apply flex_complete_assignment.
+        - rewrite persist_pred_refl. apply flex_complete_assignment.
         - change (Tri.cons ?x ?t ?r) with (thick x t ⊙ r).
-          rewrite ext_trans, ext_eq.
+          rewrite persist_pred_trans, persist_eq.
           now apply (lmgu_complete yIn).
       Qed.
 
@@ -438,11 +438,11 @@ Module Correctness.
         - intros. apply boxflex_complete_assignment.
         - intros. rewrite eqₚ_sym. apply boxflex_complete_assignment.
         - intros *. rewrite wp_ctrue. apply true_r.
-        - intros. now rewrite peq_ty_noconfusion, ext_false.
-        - intros. now rewrite peq_ty_noconfusion, ext_false.
+        - intros. now rewrite peq_ty_noconfusion, persist_false.
+        - intros. now rewrite peq_ty_noconfusion, persist_false.
         - intros * IH1 IH2 *.
           rewrite wp_cand, peq_ty_noconfusion.
-          rewrite ext_and.
+          rewrite persist_and.
           apply impl_and_adjoint.
           apply (pApply (IH1 w1 ζ01)). clear IH1.
           apply impl_and_adjoint.
@@ -450,7 +450,7 @@ Module Correctness.
           apply impl_and_adjoint.
           apply wp_monotonic'. intros.
           rewrite impl_true_l. unfold _4.
-          rewrite <- ext_trans.
+          rewrite <- persist_pred_trans.
           apply (pApply (IH2 _ _)).
           now apply proper_wp_entails.
       Qed.
@@ -477,14 +477,14 @@ Module Correctness.
     specialize (bmgu_sound t1 t2 refl).
     apply proper_entails_entails; [easy|].
     apply proper_wlp_entails.
-    intros w' r _. now rewrite ext_refl.
+    intros w' r _. now rewrite persist_pred_refl.
   Qed.
 
   Definition mgu_complete w : UnifierComplete (@mgu w).
   Proof.
     unfold UnifierComplete, mgu. intros t1 t2.
     specialize (@bmgu_complete _ t1 t2 _ refl).
-    now rewrite ext_refl.
+    now rewrite persist_pred_refl.
   Qed.
 
   Import Pred.
@@ -494,17 +494,17 @@ Module Correctness.
   Definition BoxSolveListSound : ⊢ʷ BoxSolveList -> PROP :=
     fun w0 bsl =>
       forall (C : List (Ṫy * Ṫy) w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1),
-        ⊤ₚ ⊢ₚ WLP (bsl C w1 ζ01) (Fun _ => Ext (Ext (instpred C) ζ01)).
+        ⊤ₚ ⊢ₚ WLP (bsl C w1 ζ01) (Fun _ => persist (persist (instpred C) ζ01)).
 
   Definition SolveListSound : ⊢ʷ SolveList -> PROP :=
     fun w0 sl =>
       forall (C : List (Ṫy * Ṫy) w0),
-        ⊤ₚ ⊢ₚ WLP (sl C) (Fun _ => Ext (instpred C)).
+        ⊤ₚ ⊢ₚ WLP (sl C) (Fun _ => persist (instpred C)).
 
   Definition BoxSolveListComplete : ⊢ʷ BoxSolveList -> PROP :=
     fun w0 bsl =>
       forall (C : List (Ṫy * Ṫy) w0) (w1 : World) (ζ01 : w0 ⊒⁻ w1),
-        entails (Ext (instpred C) ζ01) (WP (bsl C w1 ζ01) (fun _ _ _ => Trueₚ)).
+        entails (persist (instpred C) ζ01) (WP (bsl C w1 ζ01) (fun _ _ _ => Trueₚ)).
 
   Definition SolveListComplete : ⊢ʷ SolveList -> PROP :=
     fun w0 sl =>
@@ -526,10 +526,10 @@ Module Correctness.
       rewrite <- and_true_r, (IHC _ (ζ01 ⊙⁻ r2)).
       apply impl_and_adjoint, wlp_monotonic'.
       unfold _4. intros w3 r3 _.
-      rewrite ?trans_refl_r, ?ext_trans, <- ?ext_impl.
-      apply proper_ext_entails; auto.
-      apply proper_ext_entails; auto.
-      apply proper_ext_entails; auto.
+      rewrite !persist_pred_trans, <- !persist_impl.
+      apply proper_persist_entails; auto.
+      apply proper_persist_entails; auto.
+      apply proper_persist_entails; auto.
       now apply impl_and_adjoint.
   Qed.
 
@@ -539,18 +539,18 @@ Module Correctness.
     generalize (boxsolvelist_sound C refl).
     apply proper_entails_entails; [easy|].
     apply proper_wlp_entails.
-    intros w' r _. now rewrite ext_refl.
+    intros w' r _. now rewrite persist_pred_refl.
   Qed.
 
   Lemma boxsolvelist_complete {w} : BoxSolveListComplete (boxsolvelist (w := w)).
   Proof.
     intros C. induction C as [|[t1 t2]]; cbn; intros.
     - rewrite Acc.wp_refl. easy.
-    - rewrite wp_cand. rewrite ext_and.
+    - rewrite wp_cand. rewrite persist_and.
       rewrite (@bmgu_complete _ t1 t2 _ ζ01).
       rewrite and_comm. apply impl_and_adjoint.
       apply wp_monotonic'. intros.
-      rewrite impl_true_l, <- ext_trans.
+      rewrite impl_true_l, <- persist_pred_trans.
       apply IHC.
   Qed.
 
@@ -558,7 +558,7 @@ Module Correctness.
   Proof.
     unfold SolveListComplete, solvelist. intros C.
     apply (pApply_r (@boxsolvelist_complete _ C _ refl)).
-    now rewrite ext_refl.
+    now rewrite persist_pred_refl.
   Qed.
 
   Lemma solvelist_correct {w} : SolveListCorrect (solvelist (w := w)).
@@ -571,6 +571,7 @@ Module Correctness.
     constructor. intros ι. specialize (Hcompl ι). specialize (Hsound ι I).
     destruct solvelist as [(w2 & θ2 & [])|];
       cbn in *; firstorder; subst; auto.
+    now apply Hsound.
   Qed.
 
 End Correctness.

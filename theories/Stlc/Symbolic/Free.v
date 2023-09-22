@@ -152,16 +152,17 @@ Section WithPredicates.
         now iApply IHm.
       - rewrite wand_is_impl. iApply Acc.wp_mono. iModIntro.
         rewrite <- wand_is_impl. iApply IHm.
-        iIntros (w1 θ1 a1) "!>". rewrite <- ext_trans.
+        iIntros (w1 θ1 a1) "!>".
+        rewrite <- persist_pred_trans.
         unfold _4.
-        rewrite ?ext_forall.
+        rewrite persist_forall.
         iSpecialize ("PQ" $! w1).
-        rewrite ?ext_forall.
+        rewrite persist_forall.
         iSpecialize ("PQ" $! (step ⊙ θ1)).
-        rewrite ?ext_forall.
+        rewrite persist_forall.
         iSpecialize ("PQ" $! a1).
         Unshelve. all: eauto.
-        now rewrite Acc.ext_wlp.
+        now rewrite Acc.persist_wlp.
     Qed.
 
     Lemma wlp_mono {A w0} (m : Free A w0) (P Q : Box Θ (A -> Pred) w0) :
@@ -177,16 +178,17 @@ Section WithPredicates.
         now iApply IHm.
       - rewrite wand_is_impl. iApply Acc.wlp_mono. iModIntro.
         rewrite <- wand_is_impl. iApply IHm.
-        iIntros (w1 θ1 a1) "!>". rewrite <- ext_trans.
+        iIntros (w1 θ1 a1) "!>".
+        rewrite <- persist_pred_trans.
         unfold _4.
-        rewrite ?ext_forall.
+        rewrite persist_forall.
         iSpecialize ("PQ" $! w1).
-        rewrite ?ext_forall.
+        rewrite persist_forall.
         iSpecialize ("PQ" $! (step ⊙ θ1)).
-        rewrite ?ext_forall.
+        rewrite persist_forall.
         iSpecialize ("PQ" $! a1).
         Unshelve. all: eauto.
-        now rewrite Acc.ext_wlp.
+        now rewrite Acc.persist_wlp.
     Qed.
 
     #[export] Instance proper_wp_entails {A : TYPE} {w : World} (m : Free A w):
@@ -239,18 +241,18 @@ Section WithPredicates.
 
     Lemma wp_monotonic' {A w0} (m : Free A w0) (R : Pred w0) (P Q : Box Θ (A -> Pred) w0) :
       (forall w1 (θ : Θ w0 w1) (a : A w1),
-          Ext R θ ⊢ₚ P w1 θ a ->ₚ Q w1 θ a) ->
+          persist R θ ⊢ₚ P w1 θ a ->ₚ Q w1 θ a) ->
       R ⊢ₚ WP m P ->ₚ WP m Q.
     Proof. Admitted.
 
     Lemma wlp_monotonic' {A w0} (m : Free A w0) (R : Pred w0) (P Q : Box Θ (A -> Pred) w0) :
       (forall w1 (θ : Θ w0 w1) (a : A w1),
-          Ext R θ ⊢ₚ P w1 θ a ->ₚ Q w1 θ a) ->
+          persist R θ ⊢ₚ P w1 θ a ->ₚ Q w1 θ a) ->
       R ⊢ₚ WLP m P ->ₚ WLP m Q.
     Proof. Admitted.
 
     Lemma wp_frame2 {A w} (m : Free A w) (P : Box Θ (A -> Pred) w) (Q : Pred w) :
-      WP m P /\ₚ Q ⊣⊢ₚ WP m (fun _ θ a => P _ θ a /\ₚ Ext Q θ)%P.
+      WP m P /\ₚ Q ⊣⊢ₚ WP m (fun _ θ a => P _ θ a /\ₚ persist Q θ)%P.
     Proof. Admitted.
 
     Lemma wp_bind {refltransθ : ReflTrans Θ}
@@ -284,14 +286,14 @@ Section WithPredicates.
     Qed.
 
     Lemma wp_impl {A w} (m : Free A w) (P : Box Θ (A -> Pred) w) (Q : Pred w) :
-      (WP m P ->ₚ Q) ⊣⊢ₚ WLP m (fun w1 r01 a1 => P w1 r01 a1 ->ₚ Ext Q r01)%P.
+      (WP m P ->ₚ Q) ⊣⊢ₚ WLP m (fun w1 r01 a1 => P w1 r01 a1 ->ₚ persist Q r01)%P.
     Proof.
       induction m; cbn; unfold _4, Basics.impl.
-      - now rewrite ext_refl.
+      - now rewrite persist_pred_refl.
       - apply impl_false_l.
       - rewrite impl_and. now rewrite IHm.
       - rewrite Acc.wp_impl. apply Acc.proper_wlp_bientails. rewrite IHm. clear IHm.
-        apply proper_wlp_bientails. iIntros (w1 θ1 a1). now rewrite ext_trans.
+        apply proper_wlp_bientails. iIntros (w1 θ1 a1). now rewrite persist_pred_trans.
     Qed.
 
     #[local] Existing Instance instpred_prod_ty.
@@ -310,7 +312,7 @@ Section WithPredicates.
         + rewrite <- IHm.
           rewrite Acc.and_wp_r.
           apply Acc.proper_wp_bientails.
-          now rewrite ext_eq and_assoc.
+          now rewrite persist_eq and_assoc.
         + rewrite <- IHm. now rewrite and_false_r.
       - destruct (prenex m) as [(w' & r & C & a)|]; cbn - [reduce step].
         + change (alloc.fresh ?r) with (step ⊙ r). rewrite Acc.wp_trans.

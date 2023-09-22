@@ -127,10 +127,10 @@ Ltac wsimpl :=
       ?inst_step_snoc, ?lk_trans, ?trans_refl_l, ?trans_refl_r,
       ?persist_insert, ?lift_insert,
 
-      ?Pred.ext_refl, ?Pred.ext_tpb, ?Pred.ext_and, ?Pred.ext_eq,
+      ?Pred.persist_tpb, ?Pred.persist_and, ?Pred.persist_eq,
       ?Pred.eqₚ_refl, ?Pred.impl_true_l, ?Pred.and_true_r, ?Pred.and_true_l,
-      ?Pred.impl_true_r, ?Pred.impl_false_l, ?Pred.ext_impl, ?Pred.impl_and,
-      ?Pred.ext_exists, ?Pred.ext_forall, ?Pred.Acc.wlp_true, ?Pred.eq_pair,
+      ?Pred.impl_true_r, ?Pred.impl_false_l, ?Pred.persist_impl, ?Pred.impl_and,
+      ?Pred.persist_exists, ?Pred.persist_forall, ?Pred.Acc.wlp_true, ?Pred.eq_pair,
       ?Pred.eq_func,
 
       ?persist_sim_step_alloc_env, ?persist_sim_step_alloc_ty, ?persist_sim_step_alloc_sem,
@@ -143,8 +143,8 @@ Ltac wsimpl :=
       ?lk_reduce_zero,
       ?lk_reduce_succ in *;
      cbn - [lk trans step thick Sub.up1]; auto);
-  repeat setoid_rewrite Pred.ext_exists;
-  repeat setoid_rewrite Pred.ext_forall;
+  repeat setoid_rewrite Pred.persist_exists;
+  repeat setoid_rewrite Pred.persist_forall;
   repeat
     match goal with
     | |- context[@persist ?A ?I ?Θ ?w0 ?x ?w1 ?θ] =>
