@@ -775,6 +775,11 @@ Module Pred.
       wp_option (option.bind o f) Q ⊣⊢ₚ wp_option o (fun a => wp_option (f a) Q).
     Proof. constructor; intros ι. now destruct o. Qed.
 
+    Lemma wp_option_map {A B : TYPE} {w1 w2 w3} (o : Option A w1)
+      (f : A w1 -> B w2) (Q : B w2 -> Pred w3) :
+      wp_option (option.map f o) Q ⊣⊢ₚ wp_option o (fun a => Q (f a)).
+    Proof. constructor; intros ι. now destruct o. Qed.
+
     Definition wlp_option {A w1 w2} :
       Option A w1 -> (A w1 -> Pred w2) -> Pred w2 :=
       fun o Q =>

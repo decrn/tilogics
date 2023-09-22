@@ -160,7 +160,8 @@ Section Operations.
     fun w => None.
 
   Definition acc {A} {w0 w1} (ζ1 : w0 ⊒⁻ w1) : ◆A w1 -> ◆A w0 :=
-    option.map (fun '(existT w2 (ζ2 , a)) => existT w2 (ζ1 ⊙⁻ ζ2, a)).
+    @option.map (Diamond Tri A w1) (Diamond Tri A w0)
+      (fun '(existT w2 (ζ2 , a)) => existT w2 (ζ1 ⊙⁻ ζ2, a)).
 
   (* Lemma proper_pure {A} {RA : RELATION Tri A} : *)
   (*   RValid (RImpl RA (RM RA)) pure. *)
