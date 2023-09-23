@@ -253,7 +253,7 @@ Section VarView.
 
 End VarView.
 
-Section Variant1.
+Section Implementation.
 
   Import Tri.notations.
   Import (hints) Diamond Tri.
@@ -273,20 +273,10 @@ Section Variant1.
   #[global] Arguments cfalse {w} [w1] _.
   #[global] Arguments ctrue {w} [w1] _.
 
-  Definition Flex : TYPE :=
-    Ṫy -> ∀ x, ctx.In x -> ◆Unit.
-  Definition Unifier : TYPE :=
-    Ṫy -> Ṫy -> ◆Unit.
-  Definition SolveList : TYPE :=
-    List (Prod Ṫy Ṫy) -> ◆Unit.
-  Definition BoxFlex : TYPE :=
-    Ṫy -> ∀ x, ctx.In x -> C.
   Definition BoxUnifier : TYPE :=
     Ṫy -> Ṫy -> C.
-  Definition BoxSolveList : TYPE :=
-    List (Prod Ṫy Ṫy) -> C.
 
-  Definition flex : ⊢ʷ Flex :=
+  Definition flex : ⊢ʷ Ṫy -> ∀ x, ctx.In x -> ◆Unit :=
     fun w t x xIn =>
       match varview t with
       | is_var yIn =>
@@ -346,17 +336,17 @@ Section Variant1.
   Definition bmgu : ⊢ʷ BoxUnifier :=
     fun w s t => Löb boxmgu _ s t.
 
-  Definition mgu : ⊢ʷ Unifier :=
+  Definition mgu : ⊢ʷ Ṫy -> Ṫy -> ◆Unit :=
     fun w s t => T (@bmgu w s t).
 
-  Definition boxsolvelist : ⊢ʷ BoxSolveList :=
+  Definition boxsolvelist : ⊢ʷ List (Prod Ṫy Ṫy) -> C :=
     fix solve {w} cs {struct cs} :=
       match cs with
       | List.nil             => ctrue
       | List.cons (t1,t2) cs => cand (bmgu t1 t2) (solve cs)
       end.
 
-  Definition solvelist : ⊢ʷ SolveList :=
+  Definition solvelist : ⊢ʷ List (Prod Ṫy Ṫy) -> ◆Unit :=
     fun w cs => boxsolvelist cs Tri.refl.
 
   Import option.notations.
@@ -379,4 +369,130 @@ Section Variant1.
     option (Schematic A) :=
     fun od => optiondiamond2schematic (solveoptiondiamond od).
 
-End Variant1.
+End Implementation.
+
+Section Correctness.
+
+  Import World.notations.
+  Import Pred Pred.notations.
+  Import (hints) Pred.Acc Tri.
+
+  #[local] Notation "s [ ζ ]" :=
+    (persist s ζ)
+      (at level 8, left associativity,
+        format "s [ ζ ]").
+
+  Lemma instpred_ctrue {w0 w1} (θ1 : Tri w0 w1) :
+    instpred (ctrue θ1) ⊣⊢ₚ Trueₚ.
+  Proof. cbn. now rewrite Acc.wp_refl. Qed.
+
+  Lemma instpred_cfalse {w0 w1} (θ1 : Tri w0 w1) :
+    instpred (cfalse θ1) ⊣⊢ₚ Falseₚ.
+  Proof. reflexivity. Qed.
+
+  Lemma instpred_cand_intro {w0} (c1 c2 : C w0) P Q :
+    (forall w1 (θ1 : Tri w0 w1), instpred (c1 w1 θ1) ⊣⊢ₚ P[θ1]) ->
+    (forall w1 (θ1 : Tri w0 w1), instpred (c2 w1 θ1) ⊣⊢ₚ Q[θ1]) ->
+    (forall w1 (θ1 : Tri w0 w1), instpred (cand c1 c2 θ1) ⊣⊢ₚ (P /\ₚ Q)[θ1]).
+  Proof.
+    unfold instpred, instpred_optiondiamond, cand. intros H1 H2 w1 θ1.
+    rewrite wp_optiondiamond_bind. unfold _4. rewrite persist_and, <- H1.
+    rewrite wp_optiondiamond_and.
+    apply proper_wp_optiondiamond_bientails.
+    intros w2 θ2 []. cbn. rewrite and_true_l.
+    change (instpred (c2 w2 (θ1 ⊙⁻ θ2)) ⊣⊢ₚ Q[θ1][θ2]).
+    rewrite <- persist_pred_trans. apply H2.
+  Qed.
+
+  Definition BoxUnifierCorrect : ⊢ʷ BoxUnifier -> PROP :=
+    fun w0 bu =>
+      forall (t1 t2 : Ṫy w0) w1 (θ1 : w0 ⊒⁻ w1),
+        instpred (bu t1 t2 w1 θ1) ⊣⊢ₚ (t1 =ₚ t2)[θ1].
+
+  Section Correctness.
+
+    Import Tri.notations.
+    Import (hints) Pred.Acc.
+
+    Context [w] (lmgu : ▷BoxUnifier w).
+    Context (lmgu_correct : forall x (xIn : x ∈ w),
+                BoxUnifierCorrect (lmgu xIn)).
+
+    Lemma flex_correct {α} (αIn : α ∈ w) (t : Ṫy w) :
+      instpred (flex t αIn) ⊣⊢ₚ ṫy.var αIn =ₚ t.
+    Proof.
+      unfold flex. destruct varview; cbn.
+      - destruct ctx.occurs_check_view; cbn.
+        + now rewrite Acc.wp_refl, eqₚ_refl.
+        + rewrite Acc.wp_thick. rewrite persist_true.
+          rewrite and_true_r. cbn - [lk].
+          now rewrite lk_thin.
+      - destruct (occurs_check_spec αIn t) as [|[HOC|HOC]]; cbn.
+        + subst. unfold tell1. cbn.
+          rewrite Acc.wp_thick. rewrite persist_true.
+          now rewrite and_true_r.
+        + subst. now contradiction (H α αIn).
+        + apply pno_cycle in HOC.
+          apply split_bientails. now split.
+    Qed.
+
+    Lemma boxflex_correct {α} (αIn : α ∈ w) (t : Ṫy w) w1 (θ1 : w ⊒⁻ w1) :
+      instpred (boxflex lmgu t αIn θ1) ⊣⊢ₚ (ṫy.var αIn =ₚ t)[θ1].
+    Proof.
+      destruct θ1; cbn - [persist].
+      - change Tri.refl with (refl (Θ := Tri) (w:=w)).
+        rewrite persist_pred_refl. apply flex_correct.
+      - rewrite lmgu_correct.
+        change (Tri.cons ?x ?t ?r) with (thick x t ⊙⁻ r).
+        now rewrite !persist_eq, !persist_trans.
+    Qed.
+
+    Lemma boxmgu_correct : BoxUnifierCorrect (boxmgu lmgu).
+    Proof.
+      intros t1 t2.
+      pattern (boxmgu lmgu t1 t2). apply boxmgu_elim; clear t1 t2.
+      - intros α αIn t w1 θ1. now rewrite boxflex_correct.
+      - intros α αIn t w1 θ1. now rewrite boxflex_correct.
+      - intros. now rewrite instpred_ctrue, eqₚ_refl.
+      - intros. now rewrite instpred_cfalse, peq_ty_noconfusion.
+      - intros. now rewrite instpred_cfalse, peq_ty_noconfusion.
+      - intros s1 s2 t1 t2 IH1 IH2 w1 θ1.
+        rewrite peq_ty_noconfusion. now apply instpred_cand_intro.
+    Qed.
+
+  End Correctness.
+
+  Lemma bmgu_correct w : BoxUnifierCorrect (@bmgu w).
+  Proof.
+    pattern (@bmgu w). revert w. apply Löb_elim.
+    intros w IH. now apply boxmgu_correct.
+  Qed.
+
+  Definition mgu_correct w (t1 t2 : Ṫy w) :
+    instpred (mgu t1 t2) ⊣⊢ₚ t1 =ₚ t2.
+  Proof. unfold mgu, T. now rewrite bmgu_correct, persist_pred_refl. Qed.
+
+  #[local] Existing Instance instpred_prod_ty.
+
+  Lemma boxsolvelist_correct {w0} (C : List (Ṫy * Ṫy) w0) :
+    forall w1 (θ1 : w0 ⊒⁻ w1),
+      instpred (boxsolvelist C θ1) ⊣⊢ₚ (instpred C)[θ1].
+  Proof.
+    induction C as [|[t1 t2]]; cbn - [ctrue cand]; intros.
+    - now rewrite instpred_ctrue.
+    - apply instpred_cand_intro; auto.
+      intros. apply bmgu_correct.
+  Qed.
+
+  Lemma solvelist_correct {w} (C : List (Ṫy * Ṫy) w) :
+    instpred (solvelist C) ⊣⊢ₚ instpred C.
+  Proof.
+    unfold solvelist, T.
+    change Tri.refl with (refl (w:=w)).
+    rewrite boxsolvelist_correct.
+    now rewrite persist_pred_refl.
+  Qed.
+
+  Print Assumptions solvelist_correct.
+
+End Correctness.

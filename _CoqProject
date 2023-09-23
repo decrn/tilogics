@@ -16,5 +16,4 @@ theories/Stlc/Symbolic/FreeReconstruct.v
 theories/Stlc/Symbolic/FreeSynthesis.v
 theories/Stlc/Triangular.v
 theories/Stlc/Unification.v
-theories/Stlc/Unification/CorrectnessWithAssignments.v
 theories/Stlc/Worlds.v

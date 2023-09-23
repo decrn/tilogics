@@ -45,7 +45,6 @@ From Em Require Import
   Stlc.Substitution
   Stlc.Symbolic.Free
   Stlc.Unification
-  Stlc.Unification.CorrectnessWithAssignments
   Stlc.Worlds.
 
 Import ctx.notations.
@@ -353,7 +352,7 @@ Section Correctness.
     apply proper_wp_option_bientails.
     intros (w & θ & C & [t' ee']). cbn.
     rewrite wp_optiondiamond_bind'.
-    rewrite <- Correctness.solvelist_correct.
+    rewrite <- solvelist_correct.
     unfold wp_optiondiamond.
     destruct (solvelist C) as [(w2 & θ2 & [])|]; cbn.
     - rewrite Acc.and_wp_l. wsimpl. clear.

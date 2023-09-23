@@ -108,6 +108,9 @@ Qed.
 #[export] Instance persistent_option {A} {pRA : Persistent A} :
   Persistent (Option A) :=
   fun Θ w1 oa w2 r => option.map (fun a => persist a r) oa.
+#[export] Instance persistent_list {A} {pRA : Persistent A} :
+  Persistent (List A) :=
+  fun Θ w1 la w2 r => List.map (fun a => persist a r) la.
 
 #[export] Instance persistlaws_option {A} `{persLawsA : PersistLaws A} :
   PersistLaws (Option A).

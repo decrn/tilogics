@@ -851,6 +851,16 @@ Module Pred.
       apply Acc.proper_wlp_entails. apply pq.
     Qed.
 
+    Lemma wp_optiondiamond_and {Θ A w} (d : DiamondT Θ Option A w)
+      (P : Box Θ (A -> Pred) w) (Q : Pred w) :
+       wp_optiondiamond d P /\ₚ Q
+       ⊣⊢ₚ wp_optiondiamond d (fun w1 θ1 a1 => P w1 θ1 a1 /\ₚ persist Q θ1).
+    Proof.
+      destruct d as [(w1 & θ1 & a1)|]; cbn.
+      - now rewrite Acc.and_wp_l.
+      - now rewrite and_false_l.
+    Qed.
+
     Lemma wp_optiondiamond_monotonic' {Θ A w} (d : DiamondT Θ Option A w)
       (R : Pred w) (P Q : Box Θ (A -> Pred) w) :
       (forall w1 (r : Θ w w1) (a : A w1),
