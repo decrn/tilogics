@@ -27,10 +27,7 @@
 (******************************************************************************)
 
 From Coq Require Import
-  Arith.PeanoNat
-  Classes.Morphisms
-  Classes.Morphisms_Prop
-  Relations.Relation_Definitions.
+  Arith.PeanoNat.
 From Equations Require Import
   Equations.
 From Em Require Import
@@ -40,7 +37,6 @@ From Em Require Import
   Stlc.Instantiation
   Stlc.Predicates
   Stlc.Persistence
-  Stlc.Spec
   Stlc.Substitution
   Stlc.Triangular
   Stlc.Worlds.
@@ -50,20 +46,16 @@ Import World.notations.
 
 Set Implicit Arguments.
 
-Reserved Notation "w1 ⊒ w2" (at level 80).
-
 Notation OptionDiamond := (DiamondT Tri Option).
 
-#[local] Notation "◇ A" := (DiamondT Tri id A) (at level 9, format "◇ A", right associativity).
-#[local] Notation "? A" := (Option A) (at level 9, format "? A", right associativity).
-Notation "◆ A" := (OptionDiamond A) (at level 9, format "◆ A", right associativity).
-
+#[local] Notation "s [ ζ ]" :=
+  (persist s ζ)
+    (at level 8, left associativity,
+      format "s [ ζ ]").
 
 Ltac folddefs :=
   repeat
     match goal with
-    | H: context[@Tri.refl ?w] |- _ =>
-        change_no_check (@Tri.refl w) with (@refl Tri _ w) in H
     | |- context[@Tri.refl ?w] =>
         change_no_check (@Tri.refl w) with (@refl Tri _ w)
     | |- context[Tri.cons ?x ?t ?r] =>
@@ -115,40 +107,14 @@ Section Operations.
   Import Tri.notations.
   Import (hints) Tri.
   Import Pred Pred.notations.
-
-  Definition box2later {A} : ⊢ʷ □⁻A -> ▶A.
-    intros w a x xIn t. apply a. econstructor.
-    apply t. constructor.
-  Defined.
-
-  Definition sooner2diamond {A} : ⊢ʷ ◀A -> ◇A :=
-    fun w a =>
-      match a with
-        existT x (existT xIn (t , a)) =>
-        existT (w - x) (pair (thick (Θ := Tri) x t) a)
-      end.
-
-  Definition sooner2diamondtm {A} : ⊢ʷ ◀A -> ◆A.
-    intros w a. destruct a as [σ [σIn [t a]]].
-    constructor.
-    econstructor. split; try eassumption.
-    econstructor 2. auto. constructor 1.
-  Defined.
-
-  (* Import LR. *)
   Import (hints) Diamond.
 
-  Definition fail {A} : ⊢ʷ ◆A :=
+  Definition fail {A} : ⊢ʷ OptionDiamond A :=
     fun w => None.
+  #[global] Arguments fail {A w}.
 
-  Definition acc {A} {w0 w1} (ζ1 : w0 ⊒⁻ w1) : ◆A w1 -> ◆A w0 :=
-    @option.map (Diamond Tri A w1) (Diamond Tri A w0)
-      (fun '(existT w2 (ζ2 , a)) => existT w2 (ζ1 ⊙⁻ ζ2, a)).
-
-  Definition η1 {A} {w x} {xIn : x ∈ w} (t : Ṫy (w - x)) (a : A (w - x)) : ◆A w :=
-    sooner2diamondtm (existT x (existT xIn (t, a))).
-
-  Definition tell1 {w x} (xIn : x ∈ w) (t : Ṫy (w - x)) : ◆Unit w :=
+  Definition singleton {w x} (xIn : x ∈ w) (t : Ṫy (w - x)) :
+    OptionDiamond Unit w :=
     Some (existT (w - x) (thick (Θ := Tri) x t, tt)).
 
 End Operations.
@@ -157,7 +123,7 @@ Section OccursCheck.
   Import option.notations.
   Import Tri.notations.
   Import World.notations.
-  Import Sub.
+  Import (hints) Sub.
 
   Definition occurs_check_in : ⊢ʷ ∀ x, ctx.In x -> ▷(Option (ctx.In x)) :=
     fun w x xIn y yIn =>
@@ -199,45 +165,6 @@ Section OccursCheck.
 
 End OccursCheck.
 
-Definition Hom (A B : TYPE) := ⊢ʷ A -> B.
-
-Definition fmap {A B} (f : Hom A B) : Hom ◆A ◆B.
-Proof.
-  intros w0 [[w1 [ζ1 a1]]|].
-  - constructor 1. exists w1. split. auto. apply f. auto.
-  - constructor 2.
-Defined.
-(* Notation "f <$> a" := (fmap f a) (at level 20). *)
-
-Local Notation "s [ ζ ]" :=
-  (persist _ s _ ζ)
-    (at level 8, left associativity,
-      format "s [ ζ ]").
-(* Local Coercion Sub.triangular : Tri.Tri >-> Sub.Sub. *)
-
-Section Mult.
-  Import option.notations.
-  Import (hints) Diamond Tri.
-  Import Tri.notations.
-
-  Definition μ {A} : Hom ◆◆A ◆A :=
-    fun w0 a0 => '(existT w1 (ζ1 , a1)) <- a0;; acc ζ1 a1.
-
-  Definition ebind {A B} : Hom A ◆B -> Hom ◆A ◆B :=
-    fun f w0 a0 => '(existT w1 (ζ1, a1)) <- a0 ;; acc ζ1 (f w1 a1).
-
-  (* see Kobayashi, S. (1997). Monad as modality. *)
-  Definition strength {A B} : Hom (□⁻A * ◆B) (◆(□⁻A * B)) :=
-    fun w0 '(a0,b0) => bind b0 (fun w1 ζ1 b1 => pure (_4 a0 ζ1, b1)).
-
-End Mult.
-
-#[local] Notation "⟨ ζ ⟩ x <- ma ;; mb" :=
-  (bind ma (fun _ ζ x => mb))
-    (at level 80, x at next level,
-      ma at next level, mb at level 200,
-      right associativity).
-
 Section VarView.
 
   Inductive VarView {w} : Ṫy w -> Type :=
@@ -276,18 +203,18 @@ Section Implementation.
   Definition BoxUnifier : TYPE :=
     Ṫy -> Ṫy -> C.
 
-  Definition flex : ⊢ʷ Ṫy -> ∀ x, ctx.In x -> ◆Unit :=
-    fun w t x xIn =>
+  Definition flex : ⊢ʷ Ṫy -> ∀ α, ctx.In α -> OptionDiamond Unit :=
+    fun w t α αIn =>
       match varview t with
-      | is_var yIn =>
-          match ctx.occurs_check_view xIn yIn with
+      | is_var βIn =>
+          match ctx.occurs_check_view αIn βIn with
           | ctx.Same _      => pure tt
-          | ctx.Diff _ yIn' => tell1 xIn (ṫy.var yIn')
+          | ctx.Diff _ βIn' => singleton αIn (ṫy.var βIn')
           end
       | not_var _ =>
-          match occurs_check t xIn with
-          | Some t' => tell1 xIn t'
-          | None    => None
+          match occurs_check t αIn with
+          | Some t' => singleton αIn t'
+          | None    => fail
           end
       end.
 
@@ -336,7 +263,7 @@ Section Implementation.
   Definition bmgu : ⊢ʷ BoxUnifier :=
     fun w s t => Löb boxmgu _ s t.
 
-  Definition mgu : ⊢ʷ Ṫy -> Ṫy -> ◆Unit :=
+  Definition mgu : ⊢ʷ Ṫy -> Ṫy -> OptionDiamond Unit :=
     fun w s t => T (@bmgu w s t).
 
   Definition boxsolvelist : ⊢ʷ List (Prod Ṫy Ṫy) -> C :=
@@ -346,8 +273,8 @@ Section Implementation.
       | List.cons (t1,t2) cs => cand (bmgu t1 t2) (solve cs)
       end.
 
-  Definition solvelist : ⊢ʷ List (Prod Ṫy Ṫy) -> ◆Unit :=
-    fun w cs => boxsolvelist cs Tri.refl.
+  Definition solvelist : ⊢ʷ List (Prod Ṫy Ṫy) -> OptionDiamond Unit :=
+    fun w cs => boxsolvelist cs refl.
 
   Import option.notations.
 
@@ -364,11 +291,6 @@ Section Implementation.
       option.map
         (fun '(existT w (θ,a)) => existT w a).
 
-  Definition solve_schematic {A} {pA : Persistent A} :
-    Diamond alloc.acc_alloc (List (Ṫy * Ṫy) * A) ctx.nil ->
-    option (Schematic A) :=
-    fun od => optiondiamond2schematic (solveoptiondiamond od).
-
 End Implementation.
 
 Section Correctness.
@@ -376,11 +298,6 @@ Section Correctness.
   Import World.notations.
   Import Pred Pred.notations.
   Import (hints) Pred.Acc Tri.
-
-  #[local] Notation "s [ ζ ]" :=
-    (persist s ζ)
-      (at level 8, left associativity,
-        format "s [ ζ ]").
 
   Lemma instpred_ctrue {w0 w1} (θ1 : Tri w0 w1) :
     instpred (ctrue θ1) ⊣⊢ₚ Trueₚ.
@@ -396,12 +313,9 @@ Section Correctness.
     (forall w1 (θ1 : Tri w0 w1), instpred (cand c1 c2 θ1) ⊣⊢ₚ (P /\ₚ Q)[θ1]).
   Proof.
     unfold instpred, instpred_optiondiamond, cand. intros H1 H2 w1 θ1.
-    rewrite wp_optiondiamond_bind. unfold _4. rewrite persist_and, <- H1.
-    rewrite wp_optiondiamond_and.
-    apply proper_wp_optiondiamond_bientails.
-    intros w2 θ2 []. cbn. rewrite and_true_l.
-    change (instpred (c2 w2 (θ1 ⊙⁻ θ2)) ⊣⊢ₚ Q[θ1][θ2]).
-    rewrite <- persist_pred_trans. apply H2.
+    rewrite wp_optiondiamond_bind, persist_and, <- H1, wp_optiondiamond_and.
+    unfold _4. apply proper_wp_optiondiamond_bientails. intros w2 θ2 [].
+    cbn. rewrite and_true_l, <- persist_pred_trans. apply H2.
   Qed.
 
   Definition BoxUnifierCorrect : ⊢ʷ BoxUnifier -> PROP :=
@@ -409,7 +323,7 @@ Section Correctness.
       forall (t1 t2 : Ṫy w0) w1 (θ1 : w0 ⊒⁻ w1),
         instpred (bu t1 t2 w1 θ1) ⊣⊢ₚ (t1 =ₚ t2)[θ1].
 
-  Section Correctness.
+  Section InnerRecursion.
 
     Import Tri.notations.
     Import (hints) Pred.Acc.
@@ -424,33 +338,25 @@ Section Correctness.
       unfold flex. destruct varview; cbn.
       - destruct ctx.occurs_check_view; cbn.
         + now rewrite Acc.wp_refl, eqₚ_refl.
-        + rewrite Acc.wp_thick. rewrite persist_true.
-          rewrite and_true_r. cbn - [lk].
-          now rewrite lk_thin.
+        + rewrite Acc.wp_thick, persist_true, and_true_r.
+          cbn - [lk]. now rewrite lk_thin.
       - destruct (occurs_check_spec αIn t) as [|[HOC|HOC]]; cbn.
-        + subst. unfold tell1. cbn.
-          rewrite Acc.wp_thick. rewrite persist_true.
-          now rewrite and_true_r.
+        + subst. now rewrite Acc.wp_thick, persist_true, and_true_r.
         + subst. now contradiction (H α αIn).
-        + apply pno_cycle in HOC.
-          apply split_bientails. now split.
+        + apply pno_cycle in HOC. apply split_bientails. now split.
     Qed.
 
     Lemma boxflex_correct {α} (αIn : α ∈ w) (t : Ṫy w) w1 (θ1 : w ⊒⁻ w1) :
       instpred (boxflex lmgu t αIn θ1) ⊣⊢ₚ (ṫy.var αIn =ₚ t)[θ1].
     Proof.
-      destruct θ1; cbn - [persist].
-      - change Tri.refl with (refl (Θ := Tri) (w:=w)).
-        rewrite persist_pred_refl. apply flex_correct.
-      - rewrite lmgu_correct.
-        change (Tri.cons ?x ?t ?r) with (thick x t ⊙⁻ r).
-        now rewrite !persist_eq, !persist_trans.
+      destruct θ1; cbn - [persist]; folddefs.
+      - now rewrite flex_correct, persist_pred_refl.
+      - now rewrite lmgu_correct, !persist_eq, !persist_trans.
     Qed.
 
     Lemma boxmgu_correct : BoxUnifierCorrect (boxmgu lmgu).
     Proof.
-      intros t1 t2.
-      pattern (boxmgu lmgu t1 t2). apply boxmgu_elim; clear t1 t2.
+      intros t1 t2. pattern (boxmgu lmgu t1 t2). apply boxmgu_elim; clear t1 t2.
       - intros α αIn t w1 θ1. now rewrite boxflex_correct.
       - intros α αIn t w1 θ1. now rewrite boxflex_correct.
       - intros. now rewrite instpred_ctrue, eqₚ_refl.
@@ -460,7 +366,7 @@ Section Correctness.
         rewrite peq_ty_noconfusion. now apply instpred_cand_intro.
     Qed.
 
-  End Correctness.
+  End InnerRecursion.
 
   Lemma bmgu_correct w : BoxUnifierCorrect (@bmgu w).
   Proof.
@@ -480,19 +386,14 @@ Section Correctness.
   Proof.
     induction C as [|[t1 t2]]; cbn - [ctrue cand]; intros.
     - now rewrite instpred_ctrue.
-    - apply instpred_cand_intro; auto.
-      intros. apply bmgu_correct.
+    - apply instpred_cand_intro; auto. intros. apply bmgu_correct.
   Qed.
 
   Lemma solvelist_correct {w} (C : List (Ṫy * Ṫy) w) :
     instpred (solvelist C) ⊣⊢ₚ instpred C.
   Proof.
     unfold solvelist, T.
-    change Tri.refl with (refl (w:=w)).
-    rewrite boxsolvelist_correct.
-    now rewrite persist_pred_refl.
+    now rewrite boxsolvelist_correct, persist_pred_refl.
   Qed.
-
-  Print Assumptions solvelist_correct.
 
 End Correctness.
