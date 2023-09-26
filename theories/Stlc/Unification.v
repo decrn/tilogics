@@ -41,8 +41,8 @@ From Em Require Import
   Stlc.Triangular
   Stlc.Worlds.
 
-Import ctx.notations.
-Import World.notations.
+Import Pred ctx.notations Tri.notations World.notations Pred.notations.
+Import (hints) Diamond Tri.
 
 Set Implicit Arguments.
 
@@ -62,52 +62,18 @@ Ltac folddefs :=
         change_no_check (Tri.cons x t r) with (thick x t ⊙⁻ r)
     end.
 
-Module BoveCapretta.
-
-  Set Case Analysis Schemes.
-  Inductive dom (w : World) : Type :=
-  | domstep : (forall x (xIn : x ∈ w), dom (w - x)) -> dom w.
-
-  #[local] Obligation Tactic := auto using Nat.eq_le_incl, ctx.length_remove.
-  Equations indom {w : World} : dom w by wf (ctx.length w) :=
-  indom := domstep (fun _ _ => indom).
-  #[global] Arguments indom w : clear implicits.
-
-  Definition dom_inv w (d : dom w) :
-    (forall x (xIn : x ∈ w), dom (w - x)) :=
-    match d with domstep x => x end.
-
-End BoveCapretta.
-
 Section Löb.
-
-  Import Tri.notations.
 
   Context (A : TYPE) (step : ⊢ʷ ▷A -> A).
 
   #[local] Obligation Tactic := auto using Nat.eq_le_incl, ctx.length_remove.
-  Equations Löbaux {w : World} : A w by wf (ctx.length w) :=
-  Löbaux := step (fun _ _ => Löbaux).
-  Local Arguments Löbaux : clear implicits.
-
-  Transparent Löbaux.
-  Definition Löb : ⊢ʷ A := Löbaux.
-
-  Context (P : forall w : World, A w -> Type).
-  Context (pstep : forall w,
-        (forall x (xIn : x ∈ w), P (Löb (w - x))) ->
-        P (step (fun x xIn => Löb (w - x)))).
-
-  Definition Löb_elim : forall w, P (Löb w) :=
-    Löbaux_elim P pstep.
+  Equations Löb {w : World} : A w by wf (ctx.length w) :=
+  Löb := step (fun _ _ => Löb).
+  #[global] Arguments Löb : clear implicits.
 
 End Löb.
 
 Section Operations.
-  Import Tri.notations.
-  Import (hints) Tri.
-  Import Pred Pred.notations.
-  Import (hints) Diamond.
 
   Definition fail {A} : ⊢ʷ OptionDiamond A :=
     fun w => None.
@@ -121,8 +87,6 @@ End Operations.
 
 Section OccursCheck.
   Import option.notations.
-  Import Tri.notations.
-  Import World.notations.
   Import (hints) Sub.
 
   Definition occurs_check_in : ⊢ʷ ∀ x, ctx.In x -> ▷(Option (ctx.In x)) :=
@@ -143,7 +107,7 @@ Section OccursCheck.
 
   Lemma occurs_check_spec {w α} (αIn : α ∈ w) (t : Ṫy w) :
     option.spec
-      (fun t' => t = persist t' (thin α))
+      (fun t' => t = t'[thin α])
       (t = ṫy.var αIn \/ ṫy.Ṫy_subterm (ṫy.var αIn) t)
       (occurs_check t αIn).
   Proof.
@@ -182,12 +146,7 @@ End VarView.
 
 Section Implementation.
 
-  Import Tri.notations.
-  Import (hints) Diamond Tri.
-  Import Pred Pred.notations.
-
   Definition C := Box Tri (OptionDiamond Unit).
-  (* Definition RC := LR.RBox (RM LR.RUnit). *)
 
   Definition ctrue : ⊢ʷ C :=
     fun w0 w1 r01 => pure tt.
@@ -196,7 +155,6 @@ Section Implementation.
   Definition cand : ⊢ʷ C -> C -> C :=
     fun w0 c1 c2 w1 r01 =>
       bind (c1 w1 r01) (fun w2 r12 _ => _4 c2 r01 r12).
-
   #[global] Arguments cfalse {w} [w1] _.
   #[global] Arguments ctrue {w} [w1] _.
 
@@ -295,10 +253,6 @@ End Implementation.
 
 Section Correctness.
 
-  Import World.notations.
-  Import Pred Pred.notations.
-  Import (hints) Pred.Acc Tri.
-
   Lemma instpred_ctrue {w0 w1} (θ1 : Tri w0 w1) :
     instpred (ctrue θ1) ⊣⊢ₚ Trueₚ.
   Proof. cbn. now rewrite Acc.wp_refl. Qed.
@@ -323,28 +277,25 @@ Section Correctness.
       forall (t1 t2 : Ṫy w0) w1 (θ1 : w0 ⊒⁻ w1),
         instpred (bu t1 t2 w1 θ1) ⊣⊢ₚ (t1 =ₚ t2)[θ1].
 
-  Section InnerRecursion.
+  Lemma flex_correct {w α} (αIn : α ∈ w) (t : Ṫy w) :
+    instpred (flex t αIn) ⊣⊢ₚ ṫy.var αIn =ₚ t.
+  Proof.
+    unfold flex. destruct varview; cbn.
+    - destruct ctx.occurs_check_view; cbn.
+      + now rewrite Acc.wp_refl, eqₚ_refl.
+      + rewrite Acc.wp_thick, persist_true, and_true_r.
+        cbn - [lk]. now rewrite lk_thin.
+    - destruct (occurs_check_spec αIn t) as [|[HOC|HOC]]; cbn.
+      + subst. now rewrite Acc.wp_thick, persist_true, and_true_r.
+      + subst. now contradiction (H α αIn).
+      + apply pno_cycle in HOC. apply split_bientails. now split.
+  Qed.
 
-    Import Tri.notations.
-    Import (hints) Pred.Acc.
+  Section InnerRecursion.
 
     Context [w] (lmgu : ▷BoxUnifier w).
     Context (lmgu_correct : forall x (xIn : x ∈ w),
                 BoxUnifierCorrect (lmgu xIn)).
-
-    Lemma flex_correct {α} (αIn : α ∈ w) (t : Ṫy w) :
-      instpred (flex t αIn) ⊣⊢ₚ ṫy.var αIn =ₚ t.
-    Proof.
-      unfold flex. destruct varview; cbn.
-      - destruct ctx.occurs_check_view; cbn.
-        + now rewrite Acc.wp_refl, eqₚ_refl.
-        + rewrite Acc.wp_thick, persist_true, and_true_r.
-          cbn - [lk]. now rewrite lk_thin.
-      - destruct (occurs_check_spec αIn t) as [|[HOC|HOC]]; cbn.
-        + subst. now rewrite Acc.wp_thick, persist_true, and_true_r.
-        + subst. now contradiction (H α αIn).
-        + apply pno_cycle in HOC. apply split_bientails. now split.
-    Qed.
 
     Lemma boxflex_correct {α} (αIn : α ∈ w) (t : Ṫy w) w1 (θ1 : w ⊒⁻ w1) :
       instpred (boxflex lmgu t αIn θ1) ⊣⊢ₚ (ṫy.var αIn =ₚ t)[θ1].
@@ -397,3 +348,20 @@ Section Correctness.
   Qed.
 
 End Correctness.
+
+Module BoveCapretta.
+
+  Definition bmgu_aux : ⊢ʷ ctx.remove_acc -> BoxUnifier :=
+    fix bmgu {w} d {struct d} : BoxUnifier w :=
+      boxmgu (fun α αIn => bmgu (ctx.remove_acc_inv d αIn)).
+
+  Definition bmgu : ⊢ʷ BoxUnifier :=
+    fun w => bmgu_aux (ctx.remove_acc_all w).
+
+  Lemma bmgu_aux_correct w d : BoxUnifierCorrect (@bmgu_aux w d).
+  Proof. induction d. cbn. now apply boxmgu_correct. Qed.
+
+  Lemma bmgu_correct w : BoxUnifierCorrect (@bmgu w).
+  Proof. apply bmgu_aux_correct. Qed.
+
+End BoveCapretta.
