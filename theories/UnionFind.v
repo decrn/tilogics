@@ -39,22 +39,21 @@ From iris Require
   bi.interface.
 
 From Em Require Import
-  Definitions
   Environment
   Context
-  Predicates
   Prelude
-  STLC
-  Triangular.
+  Stlc.Instantiation
+  Stlc.Persistence
+  Stlc.Predicates
+  Stlc.Spec
+  Stlc.Triangular
+  Stlc.Worlds.
 
 Import ctx.notations.
 Import World.notations.
 
 Set Implicit Arguments.
 
-#[local] Arguments Ty_hole {Σ i} xIn.
-#[local] Arguments Ty_bool {Σ}.
-#[local] Arguments Ty_func {Σ}.
 #[local] Open Scope indexed_scope.
 
 Ltac folddefs :=
@@ -68,16 +67,16 @@ Ltac folddefs :=
         change_no_check (Tri.cons x t r) with (thick x t ⊙⁻ r)
     end.
 
+Definition Ref : TYPE :=
+  fun w => { x & x ∈ w }.
+
 Module DS.
 
-  Definition Ref : TYPE :=
-    fun w => { x & x ∈ w }.
-
-  #[export] Instance persistent_ref : Persistent Alloc Ref.
-  Proof.
-    intros w0 [x xIn] w1 r.
-    refine (existT x (persist _ xIn _ r)).
-  Defined.
+  (* #[export] Instance persistent_ref : Persistent Ref. *)
+  (* Proof. *)
+  (*   intros Θ w0 [x xIn] w1 r. *)
+  (*   refine (existT x (persist _ xIn _ r)). *)
+  (* Defined. *)
 
   Set Equations With UIP.
 
@@ -91,6 +90,10 @@ Module DS.
 
   Definition IsRepr {w} (fnd : Ref w -> Ref w) (x : Ref w) : Prop :=
     fnd x = x.
+
+  Lemma proof_irrelevance_isrepr {w} (fnd : Ref w -> Ref w) (x : Ref w) :
+    forall p q : IsRepr fnd x, p = q.
+  Proof. intros p q. apply uip. Qed.
 
   Definition FindWf {w} (fnd : Ref w -> Ref w) : Prop :=
     forall x, IsRepr fnd (fnd x).
@@ -136,7 +139,7 @@ Module DS.
   Proof.
     unfold FindWf, mergeFind, IsRepr. intros z neq e.
     destruct (eq_dec ry (fnd z)). destruct (neq e). auto.
-  Qed.
+  Defined.
 
   Definition mergeCont {A w} (fnd : Ref w -> Ref w)
     (cnt : forall r, IsRepr fnd r -> A w) (rx ry : Ref w) (a : A w) :
@@ -146,6 +149,7 @@ Module DS.
       | left _  => a
       | right n => cnt z (mergeFind_wf_inverse n z_wf)
       end.
+  #[global] Arguments mergeCont {A w} fnd cnt rx ry a [z] _.
 
   (* Variant MergeResult (A B : TYPE) (w : World) : Type := *)
   (* | merge_none *)
@@ -259,14 +263,8 @@ Module DS.
 
   Lemma sym {A w} (d : DS A w) (x y : Ref w) :
     equiv d x y = true ->
-    equiv d x y = true.
-  Proof. unfold equiv. now destruct eq_dec. Qed.
-
-  Lemma trans {A w} (d : DS A w) (x y z : Ref w) :
-    equiv d x y = true ->
-    equiv d y z = true ->
-    equiv d x z = true.
-  Proof. unfold equiv. destruct eq_dec; [rewrite e|]; easy. Qed.
+    equiv d y x = true.
+  Proof. unfold equiv. do 2 destruct eq_dec; congruence. Qed.
 
   (* Lemma equiv_union {A w} (f : A w -> A w -> A w) *)
   (*   (d : DS A w) (x y : Ref w) : *)
@@ -290,14 +288,53 @@ Module DS.
   (*     now rewrite eq_dec_refl. *)
   (* Qed. *)
 
+End DS.
+
+Section ShallowConstraints.
+  Import World.notations.
+
+  Inductive TyF (w : World) : Type :=
+  | TyF_bool
+  | TyF_func (x y : Ref w).
+  #[global] Arguments TyF_bool {w}.
+  #[global] Arguments TyF_func {w} x y.
+
+  Definition inj : ⊢ʷ TyF -> Ṫy :=
+    fun w t =>
+      match t with
+      | TyF_bool     => ṫy.bool
+      | TyF_func x y => ṫy.func (ṫy.var (projT2 x)) (ṫy.var (projT2 y))
+      end.
+
+  Variant ShallowConstraint (w : World) : Type :=
+    | FlexFlex (x y : Ref w)
+    | FlexRigid (x : Ref w) (t : TyF w).
+
+End ShallowConstraints.
+
+Import DS.
+Section Solve.
+
   Import (notations) iris.bi.interface.
   Import Pred Pred.notations Pred.proofmode.
 
-  Definition compatible : ⊢ʷ DS (Option TyF) -> Pred :=
-    fun w d =>
-      (∀ (x : Ref w) t,
-          ⌜get d x = Some t⌝ →
-          Ty_hole (projT2 x) =ₚ STLC.inj w t)%P%I.
+  #[export] Instance inst_ref : Inst Ref Ty :=
+    fun w x ι => env.lookup ι (projT2 x).
+
+  #[export] Instance inst_tyf : Inst TyF Ty :=
+    fun w t => inst (inj t).
+
+  Definition compatible_find : ⊢ʷ (Ref -> Ref) -> Pred :=
+    fun w fnd => (∀ (x : Ref w), x =ₚ fnd x)%P%I.
+
+  Definition compatible_cont {w} (fnd : Ref w -> Ref w)
+    (cnt : forall x, IsRepr fnd x -> Option TyF w) : Pred w :=
+    (∀ (x : Ref w) (rx : IsRepr fnd x) t,
+        ⌜cnt x rx = Some t⌝ ->ₚ
+        ṫy.var (projT2 x) =ₚ inj t)%P%I.
+
+  #[export] Instance instpred_ds : InstPred (DS (Option TyF)) :=
+    fun w d => andₚ (compatible_find (find d)) (compatible_cont (cont d)).
 
   Definition StateT (S : TYPE) (M : TYPE -> TYPE) (A : TYPE) : TYPE :=
     S -> M (Prod A S).
@@ -309,15 +346,15 @@ Module DS.
 
   Definition M := StateT (DS (Option TyF)) Option.
 
-  Definition pure {A} : ⊢ʷ A -> M A.
-  Admitted.
+  Definition pure {A} : ⊢ʷ A -> M A :=
+    fun w a s => Some (a, s).
 
-  Definition fail {A} : ⊢ʷ M A.
-  Admitted.
+  Definition fail {A} : ⊢ʷ M A :=
+    fun w s => None.
   #[global] Arguments fail {A w}.
 
-  Definition bind {A B} : ⊢ʷ M A -> (A -> M B) -> M B.
-  Admitted.
+  Definition bind {A B} : ⊢ʷ M A -> (A -> M B) -> M B :=
+    fun w m f s => option.bind (m s) (fun '(a,s') => f a s').
 
   (* Variant ShallowConstraint (w : World) : Type := *)
   (* | FlexFlex (x y : Ref w) *)
@@ -328,7 +365,7 @@ Module DS.
 
   #[export] Instance instpred_cflex : InstPred CFlex.
   Proof.
-    intros w [x y]. apply (Pred.eqₚ (Ty_hole (projT2 x)) (Ty_hole (projT2 y))).
+    intros w [x y]. apply (Pred.eqₚ x y).
   Defined.
 
   Definition mergeCell :
@@ -339,8 +376,8 @@ Module DS.
           match t1 , t2 with
           | TyF_bool         , TyF_bool => Some (ot1, [])
           | TyF_func r11 r12 , TyF_func r21 r22 =>
-              let c1 := cflex (existT _ r11) (existT _ r21) in
-              let c2 := cflex (existT _ r12) (existT _ r22) in
+              let c1 := cflex r11 r21 in
+              let c2 := cflex r12 r22 in
               Some (ot1, [c1;c2])
           | _                , _ => None
           end
@@ -349,6 +386,38 @@ Module DS.
       | None   , None   => Some (None, [])
       end%list.
 
+  Definition sim {w} (x y : Option TyF w) : Pred w :=
+    match x , y with
+    | Some x , Some y => inj x =ₚ inj y
+    | _      , _      => Trueₚ
+    end.
+
+  Lemma mergeCell_spec {w} (t1 t2 : Option TyF w) :
+    option.spec
+      (fun '(t,cs) => sim t1 t2 ⊣⊢ₚ sim t1 t /\ₚ sim t2 t /\ₚ instpred cs)
+      (sim t1 t2 ⊢ₚ Falseₚ)
+      (mergeCell t1 t2).
+  Proof.
+    destruct t1 as [t1|], t2 as [t2|]; cbn.
+    - destruct t1, t2; constructor; cbn.
+      + now rewrite eqₚ_refl, !and_true_l.
+      + now rewrite peq_ty_noconfusion.
+      + now rewrite peq_ty_noconfusion.
+      + rewrite !eq_func. constructor; intros ι.
+        pred_unfold. unfold Trueₚ. intuition.
+    - constructor. easy.
+    - constructor. easy.
+    - constructor. easy.
+  Qed.
+
+  Definition merge {w} (d : DS (Option TyF) w)
+    {rx ry : Ref w} (rx_wf : IsRepr (find d) rx)
+    (ry_wf : IsRepr (find d) ry) (v : Option TyF w) : DS (Option TyF) w :=
+    {| find    := mergeFind (find d) rx ry;
+       find_wf := mergeFind_wf (find_wf d) rx_wf ry_wf;
+       cont    := mergeCont (find d) (cont d) rx ry v
+    |}.
+
   Section OpenRecursion.
 
     Context {w} (d : DS (Option TyF) w)
@@ -356,15 +425,12 @@ Module DS.
           MR lessthan (fun d => measure (find d)) d' d ->
           List CFlex w -> Option (DS (Option TyF)) w).
 
-    Definition merge (cs' : List CFlex w) {rx ry : Ref w} (n : rx <> ry)
+    Definition mergeRepr (cs' : List CFlex w) {rx ry : Ref w} (n : rx <> ry)
       (rx_wf : IsRepr (find d) rx) (ry_wf : IsRepr (find d) ry) :=
       match mergeCell (cont d rx rx_wf) (cont d ry ry_wf) with
       | Some (ot, cs'') =>
           orec
-            {| find    := mergeFind (find d) rx ry;
-               find_wf := mergeFind_wf (find_wf d) rx_wf ry_wf;
-               cont    := mergeCont (cont d) ot
-            |}
+            (merge d rx_wf ry_wf ot)
             (mergeFind_lt rx_wf ry_wf n)
             (app cs'' cs')
       | None => None
@@ -382,24 +448,77 @@ Module DS.
           | right n =>
               let rx_wf := find_wf d x in
               let ry_wf := find_wf d y in
-              merge cs' n rx_wf ry_wf
+              mergeRepr cs' n rx_wf ry_wf
           end
       end.
-
-    Locate MR.
   End OpenRecursion.
 
   Definition solve {w} : forall (d : DS (Option TyF) w) (cs : List CFlex w),
       Option (DS (Option TyF)) w :=
     Fix (measure_wf lessthan_wellfounded (fun d => measure (find d))) _ osolve.
 
+  Definition Acc_dep_ind (A : Type) (R : A → A → Prop) (P : ∀ x : A, Acc R x → Prop)
+    (f : ∀ (x : A) (a : ∀ y : A, R y x → Acc R y)
+           (IH : ∀ (y : A) (r : R y x), P y (a y r)), P x (Acc_intro x a)) :=
+    fix F (x : A) (a : Acc R x) {struct a} : P x a :=
+      match a as a0 return (P x a0) with
+        Acc_intro _ a0 => f x a0 (λ (y : A) (y0 : R y x), F y (a0 y y0))
+      end.
+
+  Lemma compatible_mergefind {w} (fnd : Ref w -> Ref w) (x y : Ref w) :
+    (⊢ x =ₚ y ->ₚ
+       compatible_find fnd ->ₚ
+       compatible_find (mergeFind fnd x y))%P%I.
+  Proof.
+    unfold compatible_find; constructor. intros ι _ Heq Hfind. pred_unfold.
+    intros z. rewrite (Hfind z). clear Hfind. unfold mergeFind.
+    destruct eq_dec; subst; auto.
+  Qed.
+
+  Lemma compatible_mergecont {w} (x y : Ref w) (t : Option TyF w)
+    (r : Ref w → Ref w) (rx : IsRepr r x) (ry : IsRepr r y)
+    (o : ∀ x0 : Ref w, IsRepr r x0 → Option TyF w) :
+    (⊢ x =ₚ y ->ₚ compatible_find r ->ₚ compatible_cont o ->ₚ compatible_cont (mergeCont r o x y t))%P%I.
+  Proof.
+    constructor. intros ι _ Heq Hfind Hcont. pred_unfold.
+    intros z rz ot. pred_unfold. unfold mergeCont.
+    destruct eq_dec. intros Heqt. subst. unfold inst, inst_ref in Heq.
+  Admitted.
+
+  Import iris.proofmode.tactics.
+
+  Lemma merge_correct {w} (d : DS (Option TyF) w)
+    (x y : Ref w)
+    (rx : IsRepr (DS.find d) x)
+    (ry : IsRepr (DS.find d) y)
+    (t : Option TyF w) :
+    x =ₚ y ⊢ₚ instpred d ->ₚ instpred (Solve.merge d rx ry t).
+  Proof.
+    unfold merge, instpred, instpred_ds in *. cbn.
+    iIntros "#Heq [#Hfind #Hcont]". iSplit.
+    - now iApply compatible_mergefind.
+    - iApply compatible_mergecont; auto.
+  Qed.
+
   Lemma solve_sound {w} (d : DS (Option TyF) w) :
     forall (cs : List CFlex w),
-      (⊢ compatible d →
-       match solve d cs with
-       | Some d' => compatible d' ∧ instpred cs
-       | None    => True
-       end)%P%I.
-  Proof. Abort.
+      instpred (solve d cs) ⊢ₚ instpred d ->ₚ instpred cs.
+  Proof.
+    unfold solve, Fix.
+    generalize (measure_wf lessthan_wellfounded (fun d => measure (DS.find d)) d) as a.
+    induction a as [d a IH] using Acc_dep_ind.
+    induction cs; cbn.
+    - easy.
+    - destruct a0. destruct eq_dec; cbn.
+      + rewrite IHcs. constructor. intros ι. pred_unfold. clear - e.
+        intros Hcs Hd. specialize (Hcs Hd). split; auto.
+        destruct Hd as [Hwf _]. unfold compatible_find in Hwf. pred_unfold.
+        now rewrite (Hwf x) (Hwf y) e.
+      + clear IHcs. unfold mergeRepr.
+        match goal with
+          |- context[mergeCell ?t1 ?t2] =>
+            destruct (mergeCell_spec t1 t2) as [[t cs'']|]
+        end; cbn; [|easy]. rewrite IH. clear IH.
+  Admitted.
 
-End DS.
+End Solve.

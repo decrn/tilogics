@@ -17,3 +17,4 @@ theories/Stlc/Symbolic/FreeSynthesis.v
 theories/Stlc/Triangular.v
 theories/Stlc/Unification.v
 theories/Stlc/Worlds.v
+theories/UnionFind.v
