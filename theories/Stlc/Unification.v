@@ -42,7 +42,7 @@ From Em Require Import
   Stlc.Worlds.
 
 Import Pred ctx.notations Tri.notations World.notations Pred.notations.
-Import (hints) Diamond Tri.
+Import (hints) Diamond Sub Tri.
 
 Set Implicit Arguments.
 

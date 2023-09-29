@@ -87,12 +87,14 @@ Module alloc.
   Proof. induction w; [constructor|now apply snoc_r]. Defined.
 
   #[export] Instance lkrefl : LkRefl Alloc.
-  Proof. now intros w α αIn. Qed.
+  Proof. easy. Qed.
   #[export] Instance lktrans : LkTrans Alloc.
   Proof.
     intros w0 w1 w2 θ1 θ2 α αIn. DepElim.hnf_eq. f_equal.
     induction θ1; cbn; [easy|]. now rewrite IHθ1.
   Qed.
+  #[export] Instance lkstep : LkStep Alloc.
+  Proof. easy. Qed.
 
   Definition incl {Θ} {reflΘ : Refl Θ} {transΘ : Trans Θ} {stepΘ : Step Θ} :=
     fix incl {w0 w1} (θ : Alloc w0 w1) : Θ w0 w1 :=

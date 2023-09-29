@@ -412,9 +412,6 @@ Module Pred.
       Lemma eqₚ_trans {w} (s t u : T w) : s =ₚ t /\ₚ t =ₚ u ⊢ₚ s =ₚ u.
       Proof. obligation. Qed.
 
-      Lemma eqₚ_subst {w} (s t : T w) Q : s =ₚ t ⊢ₚ Q s ->ₚ Q t.
-      Proof. Admitted.
-
     End Eq.
     #[global] Arguments eqₚ_trans {T A _ w} s t u.
 
@@ -549,21 +546,6 @@ Module Pred.
         wp θ ⊥ₚ ⊣⊢ₚ ⊥ₚ.
       Proof. constructor. firstorder. Qed.
 
-      (* Lemma wp_step_thick {stepθ : Step Θ} {w} {x} (Q : Pred (ctx.snoc w x)): *)
-      (*   wp (w0:=w) step Q ⊣⊢ₚ (∃ₚ t : Ṫy w, persist Q (thick (αIn := ctx.in_zero) x t)). *)
-      (* Proof. *)
-      (*   constructor. intros ι; pred_unfold; cbn - [inst thick]. *)
-      (*   split. *)
-      (*   - intros (ι' & <- & HQ). destruct (env.view ι') as [ι t]. *)
-      (*     rewrite inst_step_snoc. exists (lift t _). *)
-      (*     rewrite (inst_thick ctx.in_zero (lift t w) ι). *)
-      (*     now rewrite inst_lift. *)
-      (*   - cbn - [inst thick]. intros (t & HQ). *)
-      (*     exists (env.snoc ι _ (inst t ι)). *)
-      (*     rewrite inst_step_snoc. *)
-      (*     now rewrite (inst_thick ctx.in_zero t ι) in HQ. *)
-      (* Qed. *)
-
       Ltac clean_inst :=
         repeat change_no_check (@inst (Sub ?w0) _ _ ?w1 ?θ1 ?ι1) with
           (@inst (acc Sub w0) _ _ w1 θ1 ι1) in *;
@@ -582,7 +564,7 @@ Module Pred.
         P /\ₚ wp θ Q ⊣⊢ₚ wp θ (persist P θ /\ₚ Q).
       Proof. now rewrite and_comm, and_wp_l, and_comm. Qed.
 
-      Lemma wp_thick {thickΘ : Thick Θ}
+      Lemma wp_thick {thickΘ : Thick Θ} {lkThickΘ : LkThick Θ}
         {w α} (αIn : ctx.In α w) (t : Ṫy (ctx.remove αIn)) (Q : Pred (ctx.remove αIn)) :
         wp (thick α t) Q ⊣⊢ₚ ṫy.var αIn =ₚ persist t (thin (Θ := Sub) α) /\ₚ persist Q (thin (Θ := Sub) α).
       Proof.
@@ -650,38 +632,6 @@ Module Pred.
           exists ι1. split; auto.
       Qed.
 
-      (* Lemma wlp_thick {thickR : Thick Θ} *)
-      (*   {w x} (xIn : ctx.In x w) (t : Ty (ctx.remove xIn)) (Q : Pred (ctx.remove xIn)) : *)
-      (*   wlp (thick x t) Q ⊣⊢ₚ Ty_hole xIn =ₚ thin xIn t ->ₚ persist Q (Sub.thin xIn). *)
-      (* Proof. *)
-      (*   constructor. intros ι; pred_unfold; cbn. *)
-      (*   rewrite Sub.subst_thin, inst_persist, Sub.inst_thin. *)
-      (*   split; intros HQ. *)
-      (*   - specialize (HQ (env.remove x ι xIn)). intros Heq. *)
-      (*     rewrite inst_thick in HQ. *)
-      (*     rewrite <- Heq in HQ. *)
-      (*     rewrite env.insert_remove in HQ. auto. *)
-      (*   - intros ι1 Heq. subst. *)
-      (*     rewrite inst_thick, env.remove_insert, env.lookup_insert in HQ. *)
-      (*     now apply HQ. *)
-      (* Qed. *)
-
-      Lemma wlp_step_thick {stepR : Step Θ} {w} {α} (Q : Pred (ctx.snoc w α)):
-        wlp (w0:=w) step Q ⊣⊢ₚ (∀ₚ t : Ṫy w, persist Q (thick (αIn := ctx.in_zero) α t)).
-      Proof.
-        constructor. intros ι; pred_unfold; cbn - [inst thick].
-        split.
-        - intros HQ t. apply HQ.
-          rewrite (inst_thick ctx.in_zero t ι). cbn.
-          now rewrite inst_step_snoc.
-        - cbn - [inst thick]. intros HQ ι' <-.
-          destruct (env.view ι') as [ι t].
-          specialize (HQ (lift t _)).
-          rewrite inst_step_snoc in HQ.
-          rewrite (inst_thick ctx.in_zero (lift t w) ι) in HQ.
-          now rewrite inst_lift in HQ.
-      Qed.
-
       Lemma wp_impl {w0 w1} (θ1 : Θ w0 w1) (P : Pred _) (Q : Pred _) :
         (wp θ1 P ->ₚ Q) ⊣⊢ₚ wlp θ1 (P ->ₚ persist Q θ1).
       Proof.
@@ -712,7 +662,9 @@ Module Pred.
     (* #[global] Opaque wp. *)
     (* #[global] Opaque wlp. *)
 
-    Lemma proper_wp_step {Θ1 Θ2 : ACC} {stepΘ1 : Step Θ1} {stepΘ2 : Step Θ2} {w α} :
+    Lemma proper_wp_step {Θ1 Θ2 : ACC} {stepΘ1 : Step Θ1} {stepΘ2 : Step Θ2}
+      {lkStepΘ1 : LkStep Θ1} {lkStepΘ2 : LkStep Θ2}
+      {w α} :
       forall P Q : Pred (ctx.snoc w α),
         P ⊣⊢ₚ Q -> wp (step (Θ := Θ1)) P ⊣⊢ₚ wp (step (Θ := Θ2)) Q.
     Proof.
@@ -721,7 +673,7 @@ Module Pred.
     Qed.
 
     Lemma wp_incl {Θ} {reflΘ : Refl Θ} {transΘ : Trans Θ} {stepΘ : Step Θ}
-      {lkReflΘ : LkRefl Θ} {lkTransΘ : LkTrans Θ}
+      {lkReflΘ : LkRefl Θ} {lkTransΘ : LkTrans Θ} {lkStep : LkStep Θ}
       {w1 w2} (θ : alloc.acc_alloc w1 w2) :
       forall Q, wp θ Q ⊣⊢ₚ wp (alloc.incl (Θ := Θ) θ) Q.
     Proof.
@@ -732,8 +684,10 @@ Module Pred.
         rewrite !wp_trans. apply proper_wp_step, IHθ.
     Qed.
 
-    Lemma intro_wp_step {Θ} {stepΘ : Step Θ} {w α} (Q : Pred (ctx.snoc w α)) :
-      wp (step (Θ := Θ)) Q ⊣⊢ₚ (∃ₚ t : Ṫy _, wlp step (persist t step =ₚ ṫy.var ctx.in_zero ->ₚ Q)).
+    Lemma intro_wp_step {Θ} {stepΘ : Step Θ} {lkStepΘ : LkStep Θ}
+      {w α} (Q : Pred (ctx.snoc w α)) :
+      wp (step (Θ := Θ)) Q ⊣⊢ₚ
+      ∃ₚ t : Ṫy _, wlp step (persist t step =ₚ ṫy.var ctx.in_zero ->ₚ Q).
     Proof.
       constructor. intros ι. pred_unfold. unfold wlp, wp, implₚ, eqₚ. cbn.
       split.

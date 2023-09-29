@@ -88,13 +88,17 @@ Module Sub.
     induction θ1; destruct (ctx.view αIn); cbn; now foldlk.
   Qed.
 
-  (* Lemma lk_thin [w α β] (αIn : α ∈ w) (βIn : β ∈ w - α) : *)
-  (*   lk (thin α) βIn = ṫy.var (ctx.in_thin αIn βIn). *)
-  (* Proof. (* unfold lk, lk_sub, thin. now rewrite env.lookup_tabulate. *) Admitted. *)
+  #[export] Instance lk_thin_sub : LkThin Sub.
+  Proof.
+    intros w0 α αIn β βIn. unfold lk, thin, thin_sub; cbn.
+    now rewrite env.lookup_tabulate.
+  Qed.
 
-  (* Lemma lk_thick [w x y] (xIn : x ∈ w) (t : Ṫy _) (yIn : y ∈ w) : *)
-  (*   lk (thick x t) yIn = thickIn xIn t yIn. *)
-  (* Proof. unfold lk, lk_sub, thick, thick_sub. now rewrite env.lookup_tabulate. Qed. *)
+  #[export] Instance lk_thick_sub : LkThick Sub.
+  Proof.
+    intros w0 α αIn t β βIn. unfold lk, thick, thick_sub; cbn.
+    now rewrite env.lookup_tabulate.
+  Qed.
 
   Lemma lk_up1_zero {w0 w1 x} (θ : Sub w0 w1) :
     lk (up1 θ (n := x)) ctx.in_zero = ṫy.var ctx.in_zero.
@@ -162,14 +166,15 @@ Module Sub.
     - econstructor 2; eauto.
   Qed.
 
-  Lemma of_step {Θ} {stepΘ : Step Θ} w α :
+  Lemma of_step {Θ} {stepΘ : Step Θ} {lkStepΘ : LkStep Θ} w α :
     of (@step Θ stepΘ w α) = step (Θ := Sub).
   Proof.
     apply env.lookup_extensional. intros β βIn. unfold of. cbn.
     rewrite !env.lookup_tabulate. now rewrite lk_step.
   Qed.
 
-  Lemma of_thick {Θ} {thickΘ : Thick Θ} w α αIn t :
+  Lemma of_thick {Θ} {thickΘ : Thick Θ} {lkThickΘ : LkThick Θ}
+    w α αIn t :
     of (@thick Θ thickΘ w α αIn t) = thick (Θ := Sub) α t.
   Proof.
     apply env.lookup_extensional. intros β βIn. unfold of, thick at 2, thick_sub.
@@ -192,7 +197,7 @@ Module Sub.
     forall t, persist t (of θ) = persist t θ.
   Proof. intros. apply persist_simulation. intros. now rewrite lk_of. Qed.
 
-  Lemma persist_sim_step {Θ} {stepΘ : Step Θ}
+  Lemma persist_sim_step {Θ} {stepΘ : Step Θ} {lkStepΘ : LkStep Θ}
     [T] {persT : Persistent T} {persLT : PersistLaws T}
     w α (t : T w) :
     persist t (step (Θ := Θ)) = persist t (step (Θ := Sub) (α := α)).

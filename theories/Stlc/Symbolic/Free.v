@@ -114,7 +114,8 @@ Section WithPredicates.
   Section WithAcc.
 
     Context {Θ} {reflΘ : Refl Θ} {lkreflΘ : LkRefl Θ}
-      {transΘ : Trans Θ} {lktransΘ : LkTrans Θ} {stepΘ : Step Θ}.
+      {transΘ : Trans Θ} {lktransΘ : LkTrans Θ}
+      {stepΘ : Step Θ} {lkstepΘ : LkStep Θ}.
 
     Definition WP {A} : ⊢ʷ Free A -> Box Θ (A -> Pred) -> Pred :=
       fix WP (w : World) (m : Free A w) (POST : Box Θ (A -> Pred) w) {struct m} :=
@@ -238,22 +239,6 @@ Section WithPredicates.
       apply split_bientails; split; apply proper_wlp_entails; intros w1 θ1 a1;
       specialize (PQ w1 θ1 a1); now apply split_bientails in PQ.
     Qed.
-
-    Lemma wp_monotonic' {A w0} (m : Free A w0) (R : Pred w0) (P Q : Box Θ (A -> Pred) w0) :
-      (forall w1 (θ : Θ w0 w1) (a : A w1),
-          persist R θ ⊢ₚ P w1 θ a ->ₚ Q w1 θ a) ->
-      R ⊢ₚ WP m P ->ₚ WP m Q.
-    Proof. Admitted.
-
-    Lemma wlp_monotonic' {A w0} (m : Free A w0) (R : Pred w0) (P Q : Box Θ (A -> Pred) w0) :
-      (forall w1 (θ : Θ w0 w1) (a : A w1),
-          persist R θ ⊢ₚ P w1 θ a ->ₚ Q w1 θ a) ->
-      R ⊢ₚ WLP m P ->ₚ WLP m Q.
-    Proof. Admitted.
-
-    Lemma wp_frame2 {A w} (m : Free A w) (P : Box Θ (A -> Pred) w) (Q : Pred w) :
-      WP m P /\ₚ Q ⊣⊢ₚ WP m (fun _ θ a => P _ θ a /\ₚ persist Q θ)%P.
-    Proof. Admitted.
 
     Lemma wp_bind {refltransθ : ReflTrans Θ}
       {A B w0} (m : Free A w0) (f : Box Θ (A -> Free B) w0) :

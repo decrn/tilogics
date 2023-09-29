@@ -180,17 +180,17 @@ Lemma persist_insert {Θ : ACC}
   persist (insert x t G) θ = insert x (persist t θ) (persist G θ).
 Proof. unfold persist, persist_env, Ėnv. now rewrite fmap_insert. Qed.
 
-Lemma lk_step {Θ} {stepΘ : Step Θ} :
-  forall w α (αIn : α ∈ w) β,
+Class LkStep (Θ : ACC) (stepΘ : Step Θ) : Prop :=
+  lk_step w α (αIn : α ∈ w) β :
     lk (step (α := β)) αIn = ṫy.var (ctx.in_succ αIn).
-Proof. Admitted.
+#[global] Arguments LkStep Θ {_}.
 
-Lemma lk_thin {Θ} {thinΘ : Thin Θ} :
-  forall w α (αIn : α ∈ w) β (βIn : β ∈ w - α),
+Class LkThin (Θ : ACC) (thinΘ : Thin Θ) : Prop :=
+  lk_thin w α (αIn : α ∈ w) β (βIn : β ∈ w - α) :
     lk (thin α) βIn = ṫy.var (ctx.in_thin αIn βIn).
-Proof. Admitted.
+#[global] Arguments LkThin Θ {_}.
 
-Lemma lk_thick {Θ} {thickΘ : Thick Θ} :
-  forall w α (αIn : α ∈ w) (t : Ṫy (w - α)) β (βIn : β ∈ w),
+Class LkThick (Θ : ACC) (thickΘ : Thick Θ) : Prop :=
+  lk_thick w α (αIn : α ∈ w) (t : Ṫy (w - α)) β (βIn : β ∈ w) :
     lk (thick α t) βIn = thickIn αIn t βIn.
-Proof. Admitted.
+#[global] Arguments LkThick Θ {_}.

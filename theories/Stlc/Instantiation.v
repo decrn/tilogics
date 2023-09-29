@@ -191,18 +191,20 @@ Proof.
   now rewrite ?env.lookup_tabulate, lk_trans, inst_persist.
 Qed.
 
-Lemma inst_step_snoc {Θ} {stepΘ : Step Θ} {w x} (ι : Assignment w) (t : Ty) :
+Lemma inst_step_snoc {Θ} {stepΘ : Step Θ} {lkStepΘ : LkStep Θ}
+  {w x} (ι : Assignment w) (t : Ty) :
   inst (step (Θ := Θ)) (env.snoc ι x t) = ι.
 Proof.
   apply env.lookup_extensional. intros α αIn. unfold inst, inst_acc.
   rewrite env.lookup_tabulate. rewrite lk_step. reflexivity.
 Qed.
 
-Lemma inst_step {Θ} {stepΘ : Step Θ} {w x} (ι : Assignment (w ▻ x)) :
+Lemma inst_step {Θ} {stepΘ : Step Θ} {lkStepΘ : LkStep Θ}
+  {w x} (ι : Assignment (w ▻ x)) :
   inst (step (Θ := Θ)) ι = let (ι',_) := env.view ι in ι'.
 Proof. destruct env.view. apply inst_step_snoc. Qed.
 
-Lemma inst_thin {Θ} {thinΘ : Thin Θ}
+Lemma inst_thin {Θ} {thinΘ : Thin Θ} {lkthinΘ : LkThin Θ}
   {w} (ι : Assignment w) {α} (αIn : α ∈ w) :
   inst (thin α) ι = env.remove α ι αIn.
 Proof.
@@ -211,7 +213,7 @@ Proof.
   now rewrite env.lookup_thin.
 Qed.
 
-Lemma inst_thick {Θ} {thickΘ : Thick Θ} :
+Lemma inst_thick {Θ} {thickΘ : Thick Θ} {lkthickΘ : LkThick Θ} :
   forall {w} {x} (xIn : x ∈ w) (t : Ṫy (w - x)) (ι : Assignment (w - x)),
     inst (thick (Θ := Θ) x t) ι = env.insert xIn ι (inst t ι).
 Proof.
