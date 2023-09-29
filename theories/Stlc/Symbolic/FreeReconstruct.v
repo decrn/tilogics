@@ -117,12 +117,12 @@ End Reconstruct.
 
 Definition persist_sim_step_alloc_env := Sub.persist_sim_step (Θ := alloc.acc_alloc) (T := Ėnv).
 Definition persist_sim_step_alloc_ty := Sub.persist_sim_step (Θ := alloc.acc_alloc) (T := Ṫy).
-Definition persist_sim_step_alloc_sem {A} := Sub.persist_sim_step (Θ := alloc.acc_alloc) (T := Sem A).
+(* Definition persist_sim_step_alloc_sem {A} := Sub.persist_sim_step (Θ := alloc.acc_alloc) (T := Sem A). *)
 
 Ltac wsimpl :=
   repeat
     (rewrite ?persist_refl, ?persist_trans, ?persist_lift,
-      ?inst_lift, ?inst_persist,
+      ?inst_lift, ?inst_persist, ?inst_refl, ?inst_trans,
       ?inst_step_snoc, ?lk_trans, ?trans_refl_l, ?trans_refl_r,
       ?persist_insert, ?lift_insert,
 
@@ -135,7 +135,7 @@ Ltac wsimpl :=
       (* ?ProgramLogic.eqₚ_env_cons, *)
       (* ?ProgramLogic.equiv_true, *)
 
-      ?persist_sim_step_alloc_env, ?persist_sim_step_alloc_ty, ?persist_sim_step_alloc_sem,
+      ?persist_sim_step_alloc_env, ?persist_sim_step_alloc_ty, (* ?persist_sim_step_alloc_sem, *)
       ?ėxp.inst_var, ?ėxp.inst_true, ?ėxp.inst_false, ?ėxp.inst_ifte, ?ėxp.inst_absu, ?ėxp.inst_abst, ?ėxp.inst_app,
       ?Sem.inst_pure, ?Sem.inst_fmap, ?Sem.inst_app, ?Sem.persist_pure, ?Sem.persist_fmap, ?Sem.persist_app in *;
      cbn - [lk trans step thick Sub.up1]; auto);
@@ -202,7 +202,7 @@ Section Correctness.
       iApply (@wlp_mono alloc.acc_alloc). iIntros (w3 θ3 (t3 & e3')) "!> HT3". cbn.
       iIntros "Heq1 Heq2". wsimpl.
       iStopProof. constructor. intros ι (HT1 & HT2 & HT3 & Heq1 & Heq2).
-      pred_unfold. constructor; auto.
+      pred_unfold. wsimpl. constructor; auto.
 
     - iIntros "!>".
       rewrite wlp_bind. unfold _4. cbn - [step].

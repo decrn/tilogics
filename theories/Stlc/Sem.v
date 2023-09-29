@@ -27,7 +27,7 @@
 (******************************************************************************)
 
 From Coq Require Import
-  Logic.FunctionalExtensionality
+  (* Logic.FunctionalExtensionality *)
   Strings.String.
 From Em Require Import
   Environment
@@ -70,19 +70,19 @@ Module Sem.
   #[export] Instance persistent_sem {A} : Persistent (Sem A) :=
     fun Θ w0 t w1 θ ι => t (inst θ ι).
 
-  #[export] Instance persistlaws_sem {A} : PersistLaws (Sem A).
-  Proof.
-    constructor.
-    - intros. cbv [persist persistent_sem].
-      extensionality ι. now rewrite inst_refl.
-    - intros. cbv [persist persistent_sem].
-      extensionality ι. now rewrite inst_trans.
-    - intros. cbv [persist persistent_sem].
-      extensionality ι. f_equal.
-      apply env.lookup_extensional. intros α αIn.
-      change (inst (ṫy.var αIn) (inst θ1 ι) = inst (ṫy.var αIn) (inst θ2 ι)).
-      rewrite <- ?inst_persist. f_equal. cbn. apply H.
-  Qed.
+  (* #[export] Instance persistlaws_sem {A} : PersistLaws (Sem A). *)
+  (* Proof. *)
+  (*   constructor. *)
+  (*   - intros. cbv [persist persistent_sem]. *)
+  (*     extensionality ι. now rewrite inst_refl. *)
+  (*   - intros. cbv [persist persistent_sem]. *)
+  (*     extensionality ι. now rewrite inst_trans. *)
+  (*   - intros. cbv [persist persistent_sem]. *)
+  (*     extensionality ι. f_equal. *)
+  (*     apply env.lookup_extensional. intros α αIn. *)
+  (*     change (inst (ṫy.var αIn) (inst θ1 ι) = inst (ṫy.var αIn) (inst θ2 ι)). *)
+  (*     rewrite <- ?inst_persist. f_equal. cbn. apply H. *)
+  (* Qed. *)
 
   #[export] Instance inst_lift_sem {A} : InstLift (Sem A) A.
   Proof. easy. Qed.

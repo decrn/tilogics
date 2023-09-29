@@ -62,17 +62,6 @@ Ltac folddefs :=
         change_no_check (Tri.cons x t r) with (thick x t ⊙⁻ r)
     end.
 
-Section Löb.
-
-  Context (A : TYPE) (step : ⊢ʷ ▷A -> A).
-
-  #[local] Obligation Tactic := auto using Nat.eq_le_incl, ctx.length_remove.
-  Equations Löb {w : World} : A w by wf (ctx.length w) :=
-  Löb := step (fun _ _ => Löb).
-  #[global] Arguments Löb : clear implicits.
-
-End Löb.
-
 Section Operations.
 
   Definition fail {A} : ⊢ʷ OptionDiamond A :=
@@ -218,8 +207,12 @@ Section Implementation.
 
   End MguO.
 
+  Definition bmgu_aux : ⊢ʷ ctx.remove_acc -> BoxUnifier :=
+    fix bmgu {w} d {struct d} : BoxUnifier w :=
+      boxmgu (fun α αIn => bmgu (ctx.remove_acc_inv d αIn)).
+
   Definition bmgu : ⊢ʷ BoxUnifier :=
-    fun w s t => Löb boxmgu _ s t.
+    fun w => bmgu_aux (ctx.remove_acc_all w).
 
   Definition mgu : ⊢ʷ Ṫy -> Ṫy -> OptionDiamond Unit :=
     fun w s t => T (@bmgu w s t).
@@ -319,11 +312,15 @@ Section Correctness.
 
   End InnerRecursion.
 
-  Lemma bmgu_correct w : BoxUnifierCorrect (@bmgu w).
-  Proof.
-    pattern (@bmgu w). revert w. apply Löb_elim.
-    intros w IH. now apply boxmgu_correct.
-  Qed.
+  Section OuterRecursion.
+
+    Lemma bmgu_aux_correct w d : BoxUnifierCorrect (@bmgu_aux w d).
+    Proof. induction d. cbn. now apply boxmgu_correct. Qed.
+
+    Lemma bmgu_correct w : BoxUnifierCorrect (@bmgu w).
+    Proof. apply bmgu_aux_correct. Qed.
+
+  End OuterRecursion.
 
   Definition mgu_correct w (t1 t2 : Ṫy w) :
     instpred (mgu t1 t2) ⊣⊢ₚ t1 =ₚ t2.
@@ -349,19 +346,26 @@ Section Correctness.
 
 End Correctness.
 
-Module BoveCapretta.
+Module Löb.
 
-  Definition bmgu_aux : ⊢ʷ ctx.remove_acc -> BoxUnifier :=
-    fix bmgu {w} d {struct d} : BoxUnifier w :=
-      boxmgu (fun α αIn => bmgu (ctx.remove_acc_inv d αIn)).
+  Section Recursor.
+
+    Context (A : TYPE) (step : ⊢ʷ ▷A -> A).
+
+    #[local] Obligation Tactic := auto using Nat.eq_le_incl, ctx.length_remove.
+    Equations Löb {w : World} : A w by wf (ctx.length w) :=
+    Löb := step (fun _ _ => Löb).
+    #[global] Arguments Löb : clear implicits.
+
+  End Recursor.
 
   Definition bmgu : ⊢ʷ BoxUnifier :=
-    fun w => bmgu_aux (ctx.remove_acc_all w).
-
-  Lemma bmgu_aux_correct w d : BoxUnifierCorrect (@bmgu_aux w d).
-  Proof. induction d. cbn. now apply boxmgu_correct. Qed.
+    fun w s t => Löb boxmgu _ s t.
 
   Lemma bmgu_correct w : BoxUnifierCorrect (@bmgu w).
-  Proof. apply bmgu_aux_correct. Qed.
+  Proof.
+    pattern (@bmgu w). revert w. apply Löb_elim.
+    intros w IH. now apply boxmgu_correct.
+  Qed.
 
-End BoveCapretta.
+End Löb.
