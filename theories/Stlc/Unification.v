@@ -115,7 +115,7 @@ Section OccursCheck.
     - unfold occurs_check_in.
       destruct (ctx.occurs_check_view αIn αIn0); constructor.
       + left. reflexivity.
-      + cbn - [lk]. now rewrite lk_thin.
+      + cbn. now rewrite lk_thin.
     - constructor. reflexivity.
     - repeat option.tactics.mixin; subst; auto; right;
         match goal with
@@ -284,7 +284,7 @@ Section Correctness.
     - destruct ctx.occurs_check_view; cbn.
       + now rewrite Acc.wp_refl, eqₚ_refl.
       + rewrite Acc.wp_thick, persist_true, and_true_r.
-        cbn - [lk]. now rewrite lk_thin.
+        cbn. now rewrite lk_thin.
     - destruct (occurs_check_spec αIn t) as [|[HOC|HOC]]; cbn.
       + subst. now rewrite Acc.wp_thick, persist_true, and_true_r.
       + subst. now contradiction (H α αIn).
@@ -300,7 +300,7 @@ Section Correctness.
     Lemma boxflex_correct {α} (αIn : α ∈ w) (t : Ṫy w) w1 (θ1 : w ⊒⁻ w1) :
       instpred (boxflex lmgu t αIn θ1) ⊣⊢ₚ (ṫy.var αIn =ₚ t)[θ1].
     Proof.
-      destruct θ1; cbn - [persist]; folddefs.
+      destruct θ1; cbn; folddefs.
       - now rewrite flex_correct, persist_pred_refl.
       - now rewrite lmgu_correct, !persist_eq, !persist_trans.
     Qed.

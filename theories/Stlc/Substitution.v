@@ -42,7 +42,7 @@ Import World.notations.
 
 #[local] Set Implicit Arguments.
 
-Reserved Notation "w1 ⊒ˢ w2" (at level 80).
+Reserved Notation "w1 ⊑ˢ w2" (at level 80).
 
 Module Sub.
 
@@ -51,7 +51,7 @@ Module Sub.
        lk w0 w1 θ α αIn := env.lookup θ αIn
     |}.
 
-  #[local] Notation "w0 ⊒ˢ w1" := (acc Sub w0 w1).
+  #[local] Notation "w0 ⊑ˢ w1" := (acc Sub w0 w1).
   #[local] Notation "□ˢ A" := (Box Sub A) (at level 9, format "□ˢ A", right associativity).
   #[local] Notation subst t θ := (persist t θ) (only parsing).
 
@@ -152,111 +152,7 @@ Module Sub.
 
   Lemma lk_of {Θ : ACC} [w0 w1] (θ : Θ w0 w1) α (αIn : α ∈ w0) :
     lk (of θ) αIn = lk θ αIn.
-  Proof. cbn. unfold of. now rewrite env.lookup_tabulate. Qed.
-
-  (* Section Triangular. *)
-  (*   Import (hints) Tri. *)
-
-  (*   Fixpoint triangular {w1 w2} (ζ : w1 ⊒⁻ w2) : w1 ⊒ˢ w2 := *)
-  (*     match ζ with *)
-  (*     | Tri.refl       => refl *)
-  (*     | Tri.cons x t ζ => trans (thick _ t) (triangular ζ) *)
-  (*     end. *)
-
-  (*   Lemma triangular_trans {w0 w1 w2} (ζ01 : w0 ⊒⁻ w1) (ζ12 : w1 ⊒⁻ w2) : *)
-  (*     triangular (trans ζ01 ζ12) = *)
-  (*       trans (triangular ζ01) (triangular ζ12). *)
-  (*   Proof. *)
-  (*     induction ζ01; cbn. *)
-  (*     - now rewrite trans_refl_l. *)
-  (*     - now rewrite trans_assoc, IHζ01. *)
-  (*   Qed. *)
-
-  (*   Lemma persist_triangular {w0 w1} (t : Ty w0) (r : Tri w0 w1) : *)
-  (*     persist _ t _ (triangular r) = persist _ t _ r. *)
-  (*   Proof. Admitted. *)
-
-  (* End Triangular. *)
-
-  Definition geq {w0 w1} (ζ1 : w0 ⊒ˢ w1) [w2] (ζ2 : w0 ⊒ˢ w2) : Prop :=
-    exists ζ12 : w1 ⊒ˢ w2, ζ2 = ζ1 ⊙ ζ12.
-  Notation "ζ1 ≽ ζ2" := (geq ζ1 ζ2) (at level 80).
-
-  Lemma geq_refl {w1 w2} (ζ : w1 ⊒ˢ w2) : ζ ≽ ζ.
-  Proof. exists refl. symmetry. apply trans_refl_r. Qed.
-
-  Lemma geq_trans {w0 w1 w2 w3} (ζ1 : w0 ⊒ˢ w1) (ζ2 : w0 ⊒ˢ w2) (ζ3 : w0 ⊒ˢ w3) :
-    ζ1 ≽ ζ2 -> ζ2 ≽ ζ3 -> ζ1 ≽ ζ3.
-  Proof.
-    intros [ζ12 H12] [ζ23 H23]. rewrite H23, H12.
-    exists (ζ12 ⊙ ζ23). apply trans_assoc.
-  Qed.
-
-  Lemma geq_precom {w0 w1 w2 w3} (ζ1 : w0 ⊒ˢ w1) (ζ2 : w1 ⊒ˢ w2) (ζ3 : w1 ⊒ˢ w3) :
-    ζ2 ≽ ζ3 -> ζ1 ⊙ ζ2 ≽ ζ1 ⊙ ζ3.
-  Proof. intros [ζ23 ->]. exists ζ23. symmetry. apply trans_assoc. Qed.
-
-  Lemma geq_max {w1 w2} (ζ : w1 ⊒ˢ w2) : refl ≽ ζ.
-  Proof. exists ζ. symmetry. apply trans_refl_l. Qed.
-
-  Lemma geq_extend {w0 w1 w2} (ζ1 : w0 ⊒ˢ w1) (ζ2 : w1 ⊒ˢ w2) : ζ1 ≽ ζ1 ⊙ ζ2.
-  Proof. now exists ζ2. Qed.
-
-  (* Fixpoint geqb {w0 w1} (ζ1 : w0 ⊒⁻ w1) [w2] (ζ2 : w0 ⊒ˢ w2) {struct ζ1} : bool := *)
-  (*   match ζ1 with *)
-  (*   | Tri.refl => true *)
-  (*   | Tri.cons x t ζ1 => *)
-  (*       let ζ2' := thin _ ⊙ ζ2 in *)
-  (*       if Ty_eqdec (subst (Ty_hole _) ζ2) (subst t ζ2') *)
-  (*       then geqb ζ1 ζ2' *)
-  (*       else false *)
-  (*   end. *)
-  (* Infix "≽?" := geqb (at level 80). *)
-
-  (* Lemma geqb_spec {w0 w1} (ζ1 : w0 ⊒⁻ w1) : *)
-  (*   forall [w2] (ζ2 : w0 ⊒ˢ w2), *)
-  (*     Bool.reflect (triangular ζ1 ≽ ζ2) (ζ1 ≽? ζ2). *)
-  (* Proof. *)
-  (*   induction ζ1; cbn [geqb triangular]; intros w2 ζ2. *)
-  (*   - constructor. apply geq_max. *)
-  (*   - unfold trans at 1. cbn - [Ty_eqdec]. destruct Ty_eqdec. *)
-  (*     + destruct (IHζ1 _ (thin xIn ⊙ ζ2)); constructor; clear IHζ1. *)
-  (*       * destruct g as [ζ2']. exists ζ2'. *)
-  (*         rewrite trans_assoc. rewrite <- H. clear - e. *)
-  (*         apply env.lookup_extensional. intros y yIn. foldlk. *)
-  (*         rewrite lk_trans. *)
-  (*         rewrite lk_thick. unfold thickIn. *)
-  (*         destruct (ctx.occurs_check_view xIn yIn). apply e. *)
-  (*         cbn. now rewrite lk_trans, lk_thin. *)
-  (*       * intros [ζ2' ->]. apply n. clear n. exists ζ2'. *)
-  (*         rewrite <- ?trans_assoc. *)
-  (*         rewrite comp_thin_thick. *)
-  (*         rewrite trans_refl_l. *)
-  (*         reflexivity. *)
-  (*     + constructor. intros [ζ2' ->]. apply n. clear n. *)
-  (*       rewrite <- ?trans_assoc. *)
-  (*       rewrite comp_thin_thick. *)
-  (*       rewrite trans_refl_l. *)
-  (*       cbn. rewrite ?lk_trans, lk_thick. *)
-  (*       unfold thickIn. rewrite ctx.occurs_check_view_refl. *)
-  (*       now rewrite persist_trans. *)
-  (* Qed. *)
-
-  (* #[export] Instance inst_thick_sub : InstThick Sub. *)
-  (* Proof. *)
-  (*   intros w x xIn s ι. apply env.lookup_extensional. intros y yIn. *)
-  (*   rewrite env.insert_insert'. *)
-  (*   unfold inst at 1, InstSub, thick, thick_sub, env.insert'. *)
-  (*   rewrite env.lookup_map, !env.lookup_tabulate. *)
-  (*   unfold thickIn. now destruct ctx.occurs_check_view. *)
-  (* Qed. *)
-
-  (* #[export] Instance inst_refl_sub : InstRefl Sub. *)
-  (* Proof. *)
-  (*   intros w ι. unfold refl, inst, refl_sub, InstSub. *)
-  (*   apply env.lookup_extensional. intros. *)
-  (*   now rewrite env.lookup_map, env.lookup_tabulate. *)
-  (* Qed. *)
+  Proof. unfold of, lk at 1; cbn. now rewrite env.lookup_tabulate. Qed.
 
   Lemma Ty_subterm_subst {w1 w2} (s t : Ṫy w1) (θ : Sub w1 w2) :
     ṫy.Ṫy_subterm s t -> ṫy.Ṫy_subterm (persist s θ) (persist t θ).
@@ -302,24 +198,6 @@ Module Sub.
     persist t (step (Θ := Θ)) = persist t (step (Θ := Sub) (α := α)).
   Proof. now rewrite <- persist_sim, of_step. Qed.
 
-  Definition lift {w0 w1} : Assignment w0 -> Sub w0 w1.
-  Proof. apply env.map. intros _ t. apply (lift t _). Defined.
-
-  Lemma inst_lift {w0 w1} (ι0 : Assignment w0) (ι1 : Assignment w1) :
-    inst (lift ι0) ι1 = ι0.
-  Proof.
-    apply env.lookup_extensional. intros α αIn.
-    unfold inst, inst_acc, lift.
-    rewrite env.lookup_tabulate. cbn.
-    rewrite env.lookup_map.
-    now rewrite inst_lift.
-  Qed.
-
 End Sub.
 Export Sub (Sub).
-Infix "⊒ˢ" := Sub.Sub.
-Infix "≽ˢ" := Sub.geq (at level 80).
-(* Infix "≽?" := Sub.geqb (at level 80). *)
-
-(* Infix "≽⁻" := Tri.geq (at level 80). *)
-(* Infix "≽?" := Sub.geqb (at level 80). *)
+Notation "w0 ⊑ˢ w1" := (acc Sub w0 w1).

@@ -105,7 +105,7 @@ Structure ACC : Type :=
       #[canonical=no] lk {w0 w1} (θ : acc w0 w1) α (αIn : α ∈ w0) : Ṫy w1;
     }.
 #[global] Arguments acc Θ (_ _)%ctx_scope : rename, simpl never.
-#[global] Arguments lk {Θ w0 w1} θ {α} αIn : rename.
+#[global] Arguments lk {Θ} [w0 w1] !θ [α] αIn : rename.
 
 Class Refl (Θ : ACC) : Type :=
   refl w : Θ w w.

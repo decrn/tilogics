@@ -321,7 +321,7 @@ Module Tri.
 
   #[export] Instance lktrans_tri : LkTrans Tri.
   Proof.
-    intros w0 w1 w2 θ1 θ2 α αIn. cbn.
+    intros w0 w1 w2 θ1 θ2 α αIn. unfold lk; cbn.
     generalize (ṫy.var αIn). clear. intros t.
     now rewrite persist_outer_trans, persist_outer_persist.
   Qed.
