@@ -72,7 +72,7 @@ Module alloc.
     constructor.
     - easy.
     - intros ? ? r; induction r; cbn; [|rewrite IHr]; easy.
-    - induction r1; cbn; congruence.
+    - induction r1; cbn; firstorder; now rewrite IHr1.
   Qed.
 
   Lemma snoc_r {w1 w2} (r : Alloc w1 w2) :

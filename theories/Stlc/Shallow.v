@@ -306,126 +306,126 @@ Module FromWitness.
 
 End FromWitness.
 
-Module Unused.
-  Import Prelude.option.
+(* Module Unused. *)
+(*   Import Prelude.option. *)
 
-  Lemma unused_wp_match {A B} (m : option B) S N Q :
-    @wp A
-      match m with
-      | Some x => S x
-      | None => N
-      end Q <-> match m with
-                | Some x => @wp A (S x) Q
-                | None   => @wp A N Q
-                end.
-  Proof. now destruct m. Qed.
+(*   Lemma unused_wp_match {A B} (m : option B) S N Q : *)
+(*     @wp A *)
+(*       match m with *)
+(*       | Some x => S x *)
+(*       | None => N *)
+(*       end Q <-> match m with *)
+(*                 | Some x => @wp A (S x) Q *)
+(*                 | None   => @wp A N Q *)
+(*                 end. *)
+(*   Proof. now destruct m. Qed. *)
 
-  Lemma unused_typing_inversion {Γ e t ee} :
-    Γ |-- e ∷ t ~> ee <->
-    match e with
-    | exp.true          =>
-        t = ty.bool /\
-        ee = exp.true
-    | exp.false         =>
-        t = ty.bool /\
-        ee = exp.false
-    | exp.ifte e1 e2 e3 =>
-        exists e1' e2' e3',
-        exp.ifte e1' e2' e3' = ee /\
-        Γ |-- e1 ∷ ty.bool ~> e1' /\
-        Γ |-- e2 ∷ t ~> e2' /\
-        Γ |-- e3 ∷ t ~> e3'
-    | exp.var x =>
-        exp.var x = ee /\
-        lookup x Γ = Some t
-    | exp.absu x e1 =>
-        exists e1' t1 t2,
-        ty.func t1 t2 = t /\
-        exp.abst x t1 e1' = ee /\
-        Γ ,, x∷t1 |-- e1 ∷ t2 ~> e1'
-    | exp.abst x t1 e1 =>
-        exists e1' t2,
-        ty.func t1 t2 = t /\
-        exp.abst x t1 e1' = ee /\
-        Γ ,, x∷t1 |-- e1 ∷ t2 ~> e1'
-    | exp.app e1 e2 =>
-        exists e1' e2' t1,
-        exp.app e1' e2' = ee /\
-        Γ |-- e1 ∷ ty.func t1 t ~> e1' /\
-        Γ |-- e2 ∷ t1 ~> e2'
-    end.
-  Proof.
-    split; intros HT.
-    - destruct HT; firstorder.
-    - destruct e; destruct_conjs; subst; try econstructor; eauto.
-  Qed.
+(*   Lemma unused_typing_inversion {Γ e t ee} : *)
+(*     Γ |-- e ∷ t ~> ee <-> *)
+(*     match e with *)
+(*     | exp.true          => *)
+(*         t = ty.bool /\ *)
+(*         ee = exp.true *)
+(*     | exp.false         => *)
+(*         t = ty.bool /\ *)
+(*         ee = exp.false *)
+(*     | exp.ifte e1 e2 e3 => *)
+(*         exists e1' e2' e3', *)
+(*         exp.ifte e1' e2' e3' = ee /\ *)
+(*         Γ |-- e1 ∷ ty.bool ~> e1' /\ *)
+(*         Γ |-- e2 ∷ t ~> e2' /\ *)
+(*         Γ |-- e3 ∷ t ~> e3' *)
+(*     | exp.var x => *)
+(*         exp.var x = ee /\ *)
+(*         lookup x Γ = Some t *)
+(*     | exp.absu x e1 => *)
+(*         exists e1' t1 t2, *)
+(*         ty.func t1 t2 = t /\ *)
+(*         exp.abst x t1 e1' = ee /\ *)
+(*         Γ ,, x∷t1 |-- e1 ∷ t2 ~> e1' *)
+(*     | exp.abst x t1 e1 => *)
+(*         exists e1' t2, *)
+(*         ty.func t1 t2 = t /\ *)
+(*         exp.abst x t1 e1' = ee /\ *)
+(*         Γ ,, x∷t1 |-- e1 ∷ t2 ~> e1' *)
+(*     | exp.app e1 e2 => *)
+(*         exists e1' e2' t1, *)
+(*         exp.app e1' e2' = ee /\ *)
+(*         Γ |-- e1 ∷ ty.func t1 t ~> e1' /\ *)
+(*         Γ |-- e2 ∷ t1 ~> e2' *)
+(*     end. *)
+(*   Proof. *)
+(*     split; intros HT. *)
+(*     - destruct HT; firstorder. admit. *)
+(*     - destruct e; destruct_conjs; subst; try econstructor; eauto. *)
+(*   Qed. *)
 
-End Unused.
+(* End Unused. *)
 
-Module Old.
-  Fixpoint gensem (G : Env) (e : Exp) (t : Ty) : Prop :=
-    match e with
-    | exp.true  => t = ty.bool
-    | exp.false => t = ty.bool
-    | exp.ifte cnd coq alt =>
-        gensem G cnd ty.bool /\
-        gensem G coq t    /\
-        gensem G alt t
-    | exp.var var =>
-        match (lookup var G) with
-        | None => False
-        | Some t' => t = t'
-        end
-    | exp.app e1 e2 =>
-        exists t2,
-        gensem G e1 (ty.func t2 t) /\
-        gensem G e2 t2
-    | exp.absu var e =>
-        exists t_e t_var,
-        gensem (G ,, var ∷ t_var) e t_e /\
-        t = (ty.func t_var t_e)
-    | exp.abst var t_var e =>
-        exists t_e,
-        gensem (G ,, var ∷ t_var) e t_e /\
-        t = (ty.func t_var t_e)
-    end.
+(* Module Old. *)
+(*   Fixpoint gensem (G : Env) (e : Exp) (t : Ty) : Prop := *)
+(*     match e with *)
+(*     | exp.true  => t = ty.bool *)
+(*     | exp.false => t = ty.bool *)
+(*     | exp.ifte cnd coq alt => *)
+(*         gensem G cnd ty.bool /\ *)
+(*         gensem G coq t    /\ *)
+(*         gensem G alt t *)
+(*     | exp.var var => *)
+(*         match (lookup var G) with *)
+(*         | None => False *)
+(*         | Some t' => t = t' *)
+(*         end *)
+(*     | exp.app e1 e2 => *)
+(*         exists t2, *)
+(*         gensem G e1 (ty.func t2 t) /\ *)
+(*         gensem G e2 t2 *)
+(*     | exp.absu var e => *)
+(*         exists t_e t_var, *)
+(*         gensem (G ,, var ∷ t_var) e t_e /\ *)
+(*         t = (ty.func t_var t_e) *)
+(*     | exp.abst var t_var e => *)
+(*         exists t_e, *)
+(*         gensem (G ,, var ∷ t_var) e t_e /\ *)
+(*         t = (ty.func t_var t_e) *)
+(*     end. *)
 
-  Lemma gensem_correct (e : Exp) (G : Env) (t : Ty) :
-    gensem G e t <-> exists e', G |-- e ∷ t ~> e'.
-  Proof.
-    split.
-    - revert G t. induction e; cbn; intros; destruct_conjs; subst;
-        repeat
-          match goal with
-          | [IH: forall G t, gensem G ?e t -> _, H: gensem _ ?e _ |- _] =>
-              specialize (IH _ _ H); destruct_conjs
-          end.
-      + destruct lookup eqn:?; [|easy].
-        subst. econstructor. econstructor. auto.
-      + eexists. econstructor.
-      + eexists. econstructor.
-      + eexists. econstructor; eauto.
-      + eexists. econstructor; eauto.
-      + eexists. econstructor; eauto.
-      + eexists. econstructor; eauto.
-    - intros [e' T]. induction T; cbn; auto; try (firstorder; fail).
-      rewrite H; auto.
-  Qed.
+(*   Lemma gensem_correct (e : Exp) (G : Env) (t : Ty) : *)
+(*     gensem G e t <-> exists e', G |-- e ∷ t ~> e'. *)
+(*   Proof. *)
+(*     split. *)
+(*     - revert G t. induction e; cbn; intros; destruct_conjs; subst; *)
+(*         repeat *)
+(*           match goal with *)
+(*           | [IH: forall G t, gensem G ?e t -> _, H: gensem _ ?e _ |- _] => *)
+(*               specialize (IH _ _ H); destruct_conjs *)
+(*           end. *)
+(*       + destruct lookup eqn:?; [|easy]. *)
+(*         subst. econstructor. econstructor. auto. *)
+(*       + eexists. econstructor. *)
+(*       + eexists. econstructor. *)
+(*       + eexists. econstructor; eauto. *)
+(*       + eexists. econstructor; eauto. *)
+(*       + eexists. econstructor; eauto. *)
+(*       + eexists. econstructor; eauto. *)
+(*     - intros [e' T]. induction T; cbn; auto; try (firstorder; fail). *)
+(*       rewrite H; auto. *)
+(*   Qed. *)
 
-  Example ex_gensem1 :
-    gensem empty (exp.app (exp.absu "x" (exp.var "x")) exp.false) ty.bool.
-  Proof.
-    compute. repeat eexists.
-  Qed.
+(*   Example ex_gensem1 : *)
+(*     gensem empty (exp.app (exp.absu "x" (exp.var "x")) exp.false) ty.bool. *)
+(*   Proof. *)
+(*     compute. repeat eexists. *)
+(*   Qed. *)
 
-  Example ex_gensem2 :
-  gensem empty (exp.app (exp.absu "x" (exp.true)) (exp.absu "x" (exp.var "x"))) ty.bool.
-  Proof.
-    compute. repeat eexists.
-    Unshelve. apply ty.bool.
-  Qed.
+(*   Example ex_gensem2 : *)
+(*   gensem empty (exp.app (exp.absu "x" (exp.true)) (exp.absu "x" (exp.var "x"))) ty.bool. *)
+(*   Proof. *)
+(*     compute. repeat eexists. *)
+(*     Unshelve. apply ty.bool. *)
+(*   Qed. *)
 
-End Old.
+(* End Old. *)
 
 Module Prenex.
 
