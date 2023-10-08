@@ -61,7 +61,7 @@ Section Generate.
   Import MonadNotations.
   Import World.notations.
 
-  Definition generate : Exp -> ⊢ʷ Ėnv -> Free (Ṫy * Sem Exp) :=
+  Definition generate : Exp -> ⊢ʷ Ėnv -> Free (Ṫy * Ėxp) :=
     fix gen e {w} Γ :=
       match e with
       | exp.var x =>
@@ -172,7 +172,8 @@ Section Correctness.
   #[local] Arguments step : simpl never.
   (* #[local] Arguments Free.choose : simpl never. *)
 
-  Definition TPB_algo {w0} (G0 : Ėnv w0) (e : Exp) (t0 : Ṫy w0) (e0 : Sem Exp w0) : Pred w0 :=
+  Definition TPB_algo : ⊢ʷ Ėnv -> Const Exp -> Ṫy -> Ėxp -> Pred :=
+    fun w0 G0 e t0 e0 =>
     WP (Θ := alloc.acc_alloc)
       (generate e G0)
       (fun w1 (θ1 : alloc.acc_alloc w0 w1) '(t1,e1) =>

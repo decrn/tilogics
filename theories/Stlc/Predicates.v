@@ -52,6 +52,11 @@ From Em Require Import
 #[local] Arguments step : simpl never.
 #[local] Arguments thick : simpl never.
 
+#[local] Notation "Q [ ζ ]" :=
+  (_4 Q ζ)
+    (at level 8, left associativity,
+      format "Q [ ζ ]") : box_scope.
+
 Module Pred.
   #[local] Notation Ėxp := (Sem Exp).
 
@@ -403,6 +408,9 @@ Module Pred.
 
       Context {T A} {instTA : Inst T A}.
 
+      Lemma eqₚ_intro {w} (t : T w) : ⊢ (t =ₚ t)%P.
+      Proof. obligation. Qed.
+
       Lemma eqₚ_refl {w} (t : T w) : t =ₚ t ⊣⊢ₚ ⊤ₚ.
       Proof. obligation. Qed.
 
@@ -751,7 +759,7 @@ Module Pred.
       ⊢ʷ DiamondT Θ Option A -> Box Θ (A -> Pred) -> Pred :=
       fun w m Q => wlp_option m (fun d => wlp_diamond d Q).
 
-    #[global] Arguments wp_optiondiamond {Θ} {A}%indexed_scope [w] _ _%P _.
+    #[global] Arguments wp_optiondiamond {Θ} {A}%indexed_scope [w] _ _%B _.
     #[global] Instance params_wp_optiondiamond : Params (@wp_optiondiamond) 5 := {}.
 
     #[global] Arguments wlp_optiondiamond {Θ} {A}%indexed_scope [w] _ _%P _.
@@ -841,7 +849,7 @@ Module Pred.
       {A B w0} (d : DiamondT Θ Option A w0) (f : Box Θ (A -> DiamondT Θ Option B) w0)
       (Q : Box Θ (B -> Pred) w0) :
       wp_optiondiamond (bind d f) Q ⊣⊢ₚ
-      wp_optiondiamond d (fun w1 ζ1 a1 => wp_optiondiamond (f w1 ζ1 a1) (_4 Q ζ1)).
+      wp_optiondiamond d (fun w1 ζ1 a1 => wp_optiondiamond (f w1 ζ1 a1) Q[ζ1]).
     Proof.
       destruct d as [(w1 & r01 & a)|]; cbn; [|reflexivity].
       destruct (f w1 r01 a) as [(w2 & r12 & b2)|]; cbn;

@@ -158,6 +158,10 @@ Definition Sum (A B : TYPE) : TYPE := fun w => sum (A w) (B w).
 Definition Box (Θ : ACC) (A : TYPE) : TYPE :=
   fun w0 => forall w1, Θ w0 w1 -> A w1.
 
+Declare Scope box_scope.
+Bind    Scope box_scope with Box.
+Delimit Scope box_scope with B.
+
 #[local] Notation "⊢ʷ A" :=
   (Valid A)
     (at level 200, right associativity).
@@ -262,11 +266,6 @@ Definition T {Θ} {reflΘ : Refl Θ} {A} : ⊢ʷ Box Θ A -> A :=
 Definition _4 {Θ} {transΘ : Trans Θ} {A} : ⊢ʷ Box Θ A -> Box Θ (Box Θ A) :=
   fun w0 a w1 r1 w2 r2 => a w2 (trans r1 r2).
 #[global] Arguments _4 {Θ _ A} [_] _ [_] _ [_] _ : simpl never.
-
-Definition K {Θ A B} :
-  ⊢ʷ Box Θ (A -> B) -> (Box Θ A -> Box Θ B) :=
-  fun w0 f a w1 ω01 =>
-    f w1 ω01 (a w1 ω01).
 
 Definition thickIn [w x] (xIn : x ∈ w) (s : Ṫy (w - x)) :
   forall y, y ∈ w -> Ṫy (w - x) :=
