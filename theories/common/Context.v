@@ -26,444 +26,136 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Coq Require Import
-     Bool.Bool
-     Arith.PeanoNat
-     NArith.BinNat
-     Numbers.DecimalString
-     Strings.Ascii
-     Strings.String.
-
 From Equations Require Import Equations.
-From Em Require Import
-     Prelude.
+From Em Require Import Prelude.
 
-Local Set Implicit Arguments.
-Local Unset Equations Derive Equations.
+#[local] Unset Equations Derive Equations.
+#[local] Set Transparent Obligations.
 
-Declare Scope ctx_scope.
-Delimit Scope ctx_scope with ctx.
+Declare Scope world_scope.
+Delimit Scope world_scope with world.
 
-Module Import ctx.
+Module Import world.
 
   (* Type of contexts. This is a list of bindings of type B. This type and
      subsequent types use the common notation of snoc lists. *)
-  #[universes(template)]
-  Inductive Ctx (B : Type) : Type :=
+  Inductive World : Type :=
   | nil
-  | snoc (Γ : Ctx B) (b : B).
+  | snoc (w : World) (α : nat).
+  Derive NoConfusion EqDec for World.
 
-  Section TransparentObligations.
-    Local Set Transparent Obligations.
-    Derive NoConfusion for Ctx.
-  End TransparentObligations.
-
-  Arguments nil {_}.
-  Arguments snoc {_} _%ctx _%ctx.
-
-  Section WithBinding.
-    Context {B : Set}.
-
-    #[export] Instance eq_dec_ctx (eqB : EqDec B) : EqDec (Ctx B) :=
-      fix eq_dec_ctx (Γ Δ : Ctx B) {struct Γ} : dec_eq Γ Δ :=
-        match Γ , Δ with
-        | nil      , nil      => left eq_refl
-        | snoc Γ b , snoc Δ c => f_equal2_dec snoc noConfusion_inv
-                                   (eq_dec_ctx Γ Δ) (eq_dec b c)
-        | _        , _        => right noConfusion_inv
-        end.
-
-    Fixpoint lookup (Γ : Ctx B) (n : nat) : option B :=
-      match Γ , n with
-      | snoc _ b , O   => Some b
-      | snoc Γ _ , S n => lookup Γ n
-      | _        , _   => None
-      end.
-
-    (* Concatenation of two contexts. *)
-    Fixpoint cat (Γ1 Γ2 : Ctx B) {struct Γ2} : Ctx B :=
-      match Γ2 with
-      | nil       => Γ1
-      | snoc Γ2 τ => snoc (cat Γ1 Γ2) τ
-      end.
-
-    (* This is a predicate that that encodes that the de Bruijn index n points
-       to the binding b in Γ. *)
-    Fixpoint nth_is (Γ : Ctx B) (n : nat) (b : B) {struct Γ} : Prop :=
-      match Γ , n with
-      | snoc _ x , O   => x = b
-      | snoc Γ _ , S n => nth_is Γ n b
-      | _        , _   => False
-      end.
-
-    Definition proof_irrelevance_het_nth_is {b1 b2 : B} :
-      forall {Γ n} (p1 : nth_is Γ n b1) (p2 : nth_is Γ n b2),
-        existT _ p1 = existT _ p2 :=
-       fix pi Γ n {struct Γ} :=
-         match Γ with
-         | nil => fun p q => match q with end
-         | snoc Γ b =>
-           match n with
-           | O   => fun p q => match p , q with
-                                 eq_refl , eq_refl => eq_refl
-                               end
-           | S n => pi Γ n
-           end
-         end.
-
-    Definition nth_is_right_exact {Γ : Ctx B} (n : nat) (b1 b2 : B)
-      (p1 : nth_is Γ n b1) (p2 : nth_is Γ n b2) : b1 = b2 :=
-      f_equal (@projT1 _ _) (proof_irrelevance_het_nth_is p1 p2).
-
-    Section WithUIP.
-
-      Context {UIP_B : UIP B}.
-
-      Fixpoint proof_irrelevance_nth_is {Γ} (n : nat) (b : B) {struct Γ} :
-        forall (p q : nth_is Γ n b), p = q :=
-        match Γ with
-        | nil       => fun p q => match q with end
-        | snoc Γ b' => match n with
-                       | 0   => uip
-                       | S n => proof_irrelevance_nth_is n b
-                       end
-        end.
-
-      #[export] Instance eqdec_ctx_nth {Γ n b} : EqDec (nth_is Γ n b) :=
-        fun p q => left (proof_irrelevance_nth_is n b p q).
-
-      Definition proof_irrelevance_nth_is_refl {Γ} (n : nat) (b : B) (p : nth_is Γ n b) :
-        proof_irrelevance_nth_is n b p p = eq_refl := uip _ _.
-
-    End WithUIP.
-
-    Section In.
-       (* In represents context containment proofs. This is essentially a
-          well-typed de Bruijn index, i.e. a de Bruijn index with a proof that it
-          resolves to the binding b.  *)
-      Inductive In (b : B) : Ctx B -> Set :=
-      | in_zero {Γ : Ctx B} : In b (snoc Γ b)
-      | in_succ {Γ : Ctx B} {b' : B} (bIn : In b Γ) : In b (snoc Γ b').
-      Existing Class In.
-      Global Arguments in_zero {b Γ}.
-
-      Set Transparent Obligations.
-      Derive Signature NoConfusion for In.
-
-    End In.
-
-    (* (* Two proofs of context containment are equal of the deBruijn indices are equal *) *)
-    (* Definition In_eqb {Γ} {b1 b2 : B} (b1inΓ : In b1 Γ) (b2inΓ : In b2 Γ) : bool := *)
-    (*   Nat.eqb (in_at b1inΓ) (in_at b2inΓ). *)
-
-    (* Lemma In_eqb_spec `{UIP B} {Γ} {b1 b2 : B} (b1inΓ : In b1 Γ) (b2inΓ : In b2 Γ) : *)
-    (*   reflect *)
-    (*     (existT _ _ b1inΓ = existT _ _ b2inΓ :> sigT (fun b => In b Γ)) *)
-    (*     (In_eqb b1inΓ b2inΓ). *)
-    (* Proof. *)
-    (*   destruct b1inΓ as [m p], b2inΓ as [n q]; cbn. *)
-    (*   destruct (Nat.eqb_spec m n); constructor. *)
-    (*   - subst. pose proof (nth_is_right_exact _ _ _ p q). subst. *)
-    (*     f_equal. f_equal. apply proof_irrelevance_nth_is. *)
-    (*   - intros e. depelim e. destruct n, m; cbn in H0; congruence. *)
-    (* Qed. *)
-
-    (* We define several views on [In] which allows us to define mechanisms for
-       reusable dependent pattern matching. For more information on views as a
-       programming technique see:
-       - Ulf Norell (2009), "Dependently Typed Programming in Agda." AFP'08.
-         https://doi.org/10.1007/978-3-642-04652-0_5
-       - Philip Wadler (1987). "Views: a way for pattern matching to cohabit
-         with data abstraction." POPL'87.
-         https://doi.org/10.1145/41625.41653
-       - Conor McBride & James McKinna (2004). "The view from the left." JFP'04.
-         https://doi.org/10.1017/S0956796803004829 *)
-
-    (* A view expressing that membership in the empty context is uninhabited. *)
-    Variant NilView [b : B] (i : In b nil) : Type :=.
-
-    (* A view for membership in a non-empty context. *)
-    Variant SnocView {b' : B} (Γ : Ctx B) :
-      forall b, In b (snoc Γ b') -> Type :=
-    | isZero                  : SnocView in_zero
-    | isSucc {b} (i : In b Γ) : SnocView (in_succ i).
-    #[global] Arguments SnocView {_ _} [b] _.
-    #[global] Arguments isZero {_ _}.
-
-    (* Instead of defining separate view functions, that construct a value
-       of the *View datatypes, we use a single definition. This way, we
-       avoid definition dummy definitions the other cases like it is usually
-       done in small inversions. We simply define inversions for all cases at
-       once. *)
-    Definition view {b Γ} (bIn : In b Γ) :
-      match Γ return forall b, In b Γ -> Type with
-      | nil      => NilView
-      | snoc _ _ => SnocView
-      end b bIn :=
-      match bIn with
-      | in_zero   => isZero
-      | in_succ i => isSucc i
-      end.
-
-    (* Left and right membership proofs for context concatenation. *)
-    Fixpoint in_cat_left {b Γ} Δ (bIn : In b Γ) : In b (cat Γ Δ) :=
-      match Δ with
-      | nil      => bIn
-      | snoc Δ _ => in_succ (in_cat_left Δ bIn)
-      end.
-
-    Fixpoint in_cat_right {b Γ} Δ (bIn : In b Δ) : In b (cat Γ Δ) :=
-      match bIn with
-      | in_zero   => in_zero
-      | in_succ i => in_succ (in_cat_right i)
-      end.
-
-    (* A view for case splitting on a proof of membership in a concatenation.
-       By pattern matching on this view we get the membership in the left
-       respectively right side of the concatenation and refine the original
-       membership proof. *)
-    Inductive CatView {Γ Δ} [b : B] : In b (cat Γ Δ) -> Type :=
-    | isCatLeft  (bIn : In b Γ) : CatView (in_cat_left Δ bIn)
-    | isCatRight (bIn : In b Δ) : CatView (in_cat_right bIn).
-
-    Definition catView_nil {Γ b} (bIn : In b Γ) : @CatView Γ nil b bIn :=
-      @isCatLeft Γ nil b bIn.
-
-    Definition catView_zero {Γ Δ b} : @CatView Γ (snoc Δ b) b in_zero :=
-      @isCatRight Γ (snoc Δ b) b in_zero.
-
-    Definition catView_succ {Γ Δ b b'} (bIn : In b (cat Γ Δ)) (bInV : CatView bIn) :
-      @CatView Γ (snoc Δ b') b (in_succ bIn) :=
-      match bInV with
-      | isCatLeft bIn => @isCatLeft Γ (@snoc B Δ b') b bIn
-      | isCatRight bIn => @isCatRight Γ (@snoc B Δ b') b (@in_succ b Δ b' bIn)
-      end.
-
-    Equations catView {Γ} Δ {b : B} (bIn : In b (cat Γ Δ)) : CatView bIn :=
-    | nil      | bIn       => catView_nil bIn
-    | snoc Δ _ | in_zero   => catView_zero
-    | snoc Δ _ | in_succ i => catView_succ (catView Δ i).
-
-    Section All.
-
-      Inductive All (P : B -> Type) : Ctx B -> Type :=
-      | all_nil : All P nil
-      | all_snoc {Γ b} : @All P Γ -> P b -> All P (snoc Γ b).
-
-      Definition all_intro {P} (HP : forall b, P b) : forall Γ, All P Γ :=
-        fix all_intro Γ :=
-          match Γ with
-          | nil      => all_nil P
-          | snoc Γ b => all_snoc (all_intro Γ) (HP b)
-          end.
-
-    End All.
-
-    Fixpoint remove (Γ : Ctx B) {b : B} (xIn : In b Γ) : Ctx B :=
-      match xIn with
-      | @in_zero _ Γ => Γ
-      | @in_succ _ _ b' bIn => snoc (remove bIn) b'
-      end.
-    Arguments remove _ [_] _.
-
-    Equations in_thin {b x} {Σ : Ctx B} (bIn : In b Σ) (xIn : In x (remove Σ bIn)) : In x Σ :=
-    | in_zero     , xIn         => in_succ xIn
-    | in_succ bIn , in_zero     => in_zero
-    | in_succ bIn , in_succ xIn => in_succ (in_thin bIn xIn).
-
-    Inductive OccursCheckView {Σ} {x : B} (xIn : In x Σ) : forall y, In y Σ -> Set :=
-    | Same                                 : OccursCheckView xIn xIn
-    | Diff {y} (yIn : In y (remove Σ xIn)) : OccursCheckView xIn (in_thin xIn yIn).
-
-    Equations occurs_check_view {Σ} {x y: B} (xIn : In x Σ) (yIn : In y Σ) : OccursCheckView xIn yIn :=
-    | in_zero     , in_zero     => Same in_zero
-    | in_zero     , in_succ yIn => Diff in_zero yIn
-    | in_succ xIn , in_zero     => Diff (in_succ xIn) in_zero
-    | in_succ xIn , in_succ yIn => match occurs_check_view xIn yIn with
-                                   | Same _     => Same (in_succ xIn)
-                                   | Diff _ yIn => Diff (in_succ xIn) (in_succ yIn)
-                                   end.
-
-    Lemma occurs_check_view_refl {Σ x} (xIn : In x Σ) :
-      occurs_check_view xIn xIn = Same xIn.
-    Proof. induction xIn; cbn; now rewrite ?IHxIn. Qed.
-
-    Lemma occurs_check_view_thin {Σ x y} (xIn : In x Σ) (yIn : In y (remove Σ xIn)) :
-      occurs_check_view xIn (in_thin xIn yIn) = Diff xIn yIn.
-    Proof. induction xIn; [|depelim yIn]; cbn; now rewrite ?IHxIn. Qed.
-
-    Fixpoint length (Γ : Ctx B) : nat :=
-      match Γ with
-      | nil => 0
-      | snoc Γ _ => S (length Γ)
-      end.
-
-    Lemma length_remove {x} (Γ : Ctx B) :
-      forall (xIn : In x Γ),
-        S (length (remove Γ xIn)) = length Γ.
-    Proof.
-      induction xIn using In_ind.
-      - reflexivity.
-      - cbn - [remove].
-        f_equal. apply IHxIn.
-    Qed.
-
-    Import SigTNotations.
-
-    Notation Ref Γ := (sigT (fun x => In x Γ)).
-
-    Definition ref_zero {Γ x} : Ref (snoc Γ x) :=
-      (@existT B (fun x0 : B => In x0 (@snoc B Γ x)) x (@in_zero x Γ)).
-    Definition ref_succ {Γ x} : Ref Γ -> Ref (snoc Γ x).
-    Proof.
-      intros [y yIn]. exists y. now constructor.
-    Defined.
-
-    Definition ref_zero_neq_succ {Γ x} (r : Ref Γ) :
-      ref_zero <> @ref_succ Γ x r :=
-      match r with
-      | (y;yIn) =>
-         eq_rect
-           ref_zero
-           (fun r =>
-              match r with
-              | (z;in_zero) => True
-              | (z;in_succ _) => False
-              end)
-           I
-           (ref_succ (y; yIn))
-      end.
-
+  (* In represents context containment proofs. This is essentially a
+     well-typed de Bruijn index, i.e. a de Bruijn index with a proof that it
+     resolves to the binding b.  *)
+  Inductive In α : World → Type :=
+  | in_zero {w} : α ∈ snoc w α
+  | in_succ {w β} (αIn : α ∈ w) : α ∈ snoc w β
+  where "α ∈ w" := (In α w%world).
+  Section WithUIP.
     Set Equations With UIP.
+    Derive Signature NoConfusion EqDec for In.
+  End WithUIP.
+  Existing Class In.
+  #[global] Arguments in_zero {α w}.
+  #[global] Arguments in_succ {α w β} _.
 
-    Lemma rec_succ_inj {eqB : EqDec B} {Γ z} (r1 r2 : Ref Γ) :
-      @ref_succ Γ z r1 = @ref_succ Γ z r2 -> r1 = r2.
-    Proof.
-      destruct r1 as [x xIn], r2 as [y yIn]; cbn. intros e.
-      now dependent elimination e.
-    Qed.
+  (* We define views on [In] which allows us to define mechanisms for
+     reusable dependent pattern matching. For more information on views as a
+     programming technique see:
+     - Ulf Norell (2009), "Dependently Typed Programming in Agda." AFP'08.
+       https://doi.org/10.1007/978-3-642-04652-0_5
+     - Philip Wadler (1987). "Views: a way for pattern matching to cohabit
+       with data abstraction." POPL'87.
+       https://doi.org/10.1145/41625.41653
+     - Conor McBride & James McKinna (2004). "The view from the left." JFP'04.
+       https://doi.org/10.1017/S0956796803004829 *)
 
-    #[export] Instance In_eqdec {eqB : EqDec B} : forall Γ, EqDec (Ref Γ) :=
-      fix eqdec Γ' :=
-        match Γ' with
-        | nil       => fun x => match view (projT2 x) with end
-        | snoc Γ b => fun '(x;xIn) '(y;yIn) =>
-            match view xIn , view yIn with
-            | isZero     , isZero     => left eq_refl
-            | isZero     , isSucc yIn => right (ref_zero_neq_succ (_; yIn))
-            | isSucc xIn , isZero     => right (not_eq_sym (ref_zero_neq_succ (_; xIn)))
-            | isSucc xIn , isSucc yIn =>
-                match eqdec Γ (_; xIn) (_; yIn) with
-                | left e => left (f_equal ref_succ e)
-                | right n => right (fun e => (n (rec_succ_inj (_; xIn) (_; yIn) e)))
-                end
-            end
-        end.
+  (* A view expressing that membership in the empty context is uninhabited. *)
+  Variant NilView [α] (αIn : In α nil) : Type :=.
 
-    (* In this section we define a generic Bove-Capretta style accessibility
-       predicate for functions that recurse on smaller contexts by removing an
-       element.
+  (* A view for membership in a non-empty context. *)
+  Variant SnocView {β w} : ∀ [α], α ∈ snoc w β → Type :=
+  | isZero                   : SnocView in_zero
+  | isSucc {α} (αIn : α ∈ w) : SnocView (in_succ αIn).
 
-       See: BOVE, ANA, and VENANZIO CAPRETTA. “Modelling General Recursion in
-       Type Theory.” Mathematical Structures in Computer Science, vol. 15,
-       no. 4, 2005, pp. 671–708., doi:10.1017/S0960129505004822. *)
-    Section RemoveAcc.
+  (* Instead of defining separate view functions, that construct a value
+     of the *View datatypes, we use a single definition. This way, we
+     avoid definition dummy definitions the other cases like it is usually
+     done in small inversions. We simply define inversions for all cases at
+     once. *)
+  Definition view {w α} (αIn : α ∈ w) :
+    match w return ∀ β, β ∈ w → Type with
+    | nil      => NilView
+    | snoc _ _ => SnocView
+    end α αIn :=
+    match αIn with
+    | in_zero   => isZero
+    | in_succ i => isSucc i
+    end.
 
-      (* Coq only generates non-dependent elimination schemes for inductive
-         families in Prop. Hence, we disable the automatic generation and
-         define the elimination schemes for the predicate ourselves. *)
-      #[local] Unset Elimination Schemes.
+  Fixpoint remove {w} α {αIn : α ∈ w} : World :=
+    match αIn with
+    | @in_zero _ w        => w
+    | @in_succ _ _ β αIn' => snoc (remove α) β
+    end.
+  #[global] Arguments remove _ _ {_}.
 
-      #[local] Notation "▷ A" :=
-        (fun (Γ : Ctx B) => forall x (xIn : In x Γ), A (remove Γ xIn))
-          (at level 9, right associativity).
-      #[local] Notation "▶ P" :=
-        (fun Γ (d : ▷_ Γ) => forall x (xIn : In x Γ), P (remove Γ xIn) (d x xIn))
-          (at level 9, right associativity).
+  Fixpoint in_thin {w α} (αIn : α ∈ w) [β] : β ∈ remove w α → β ∈ w :=
+    match αIn with
+    | in_zero      => in_succ
+    | in_succ αIn' => fun βIn =>
+                        match view βIn with
+                        | isZero      => in_zero
+                        | isSucc βIn' => in_succ (in_thin αIn' βIn')
+                        end
+    end.
 
-      Inductive remove_acc (Γ : Ctx B) : Prop :=
-        remove_acc_intro : ▷remove_acc Γ -> remove_acc Γ.
+  Inductive OccursCheckView {w α} (αIn : In α w) : ∀ [β], In β w → Type :=
+  | Same                               : OccursCheckView αIn αIn
+  | Diff {β} (βIn : In β (remove w α)) : OccursCheckView αIn (in_thin αIn βIn).
 
-      Definition remove_acc_inv {Γ} (d : remove_acc Γ) : ▷remove_acc Γ :=
-        let (f) := d in f.
-
-      (* We only define a non-dependent elimination scheme for Type. *)
-      Definition remove_acc_rect (P : forall Γ, Type)
-        (f : forall Γ, ▷P Γ -> P Γ) :
-        forall Γ, remove_acc Γ -> P Γ :=
-        fix F Γ (d : remove_acc Γ) {struct d} : P Γ :=
-          f Γ (fun x xIn => F (remove Γ xIn) (remove_acc_inv d xIn)).
-
-      (* Define a dependent elimination scheme for Prop. *)
-      Definition remove_acc_ind (P : forall Γ, remove_acc Γ -> Prop)
-        (f : forall Γ (d : ▷remove_acc Γ), ▶P Γ d -> P Γ (remove_acc_intro d)) :=
-        fix F Γ (d : remove_acc Γ) {struct d} : P Γ d :=
-          let (g) return _ := d in
-          f Γ g (fun x xIn => F (remove Γ xIn) (g x xIn)).
-
-      Fixpoint remove_acc_step {Γ x} (d : remove_acc Γ) {struct d} :
-        remove_acc (snoc Γ x) :=
-        remove_acc_intro
-          (fun β (βIn : In β (snoc Γ x)) =>
-             match view βIn in SnocView βIn
-                   return remove_acc (remove _ βIn) with
-             | isZero   => d
-             | isSucc i => remove_acc_step (remove_acc_inv d i)
-             end).
-
-      Fixpoint remove_acc_all (Γ : Ctx B) : remove_acc Γ :=
-        match Γ with
-        | nil      => remove_acc_intro
-                        (fun x (xIn : In x nil) =>
-                           match view xIn with end)
-        | snoc Γ b => remove_acc_step (remove_acc_all Γ)
-        end.
-
-      (* Calculating the full predicate is costly. It has quadratic running
-         time in the size of the context. It's better to keep this opaque and
-         not unfold it. To prevent computation from being blocked, clients of
-         this code should never pattern match on a witness of the predicate
-         directly and instead use [remove_acc_inv] in the recursive call. The
-         standard library uses the same style and for examples defines [Fix_F]
-         for well-founded induction using [Acc_inv] for recursive calls. *)
-      #[global] Opaque remove_acc_all.
-
-    End RemoveAcc.
-
-  End WithBinding.
-
-  Section WithAB.
-    Context {A B : Set} (f : A -> B).
-
-    Fixpoint map (Γ : Ctx A) : Ctx B :=
-      match Γ with
-      | nil      => nil
-      | snoc Γ a => snoc (map Γ) (f a)
+  Equations occurs_check_view {w α β} (αIn : In α w) (βIn : In β w) :
+    OccursCheckView αIn βIn :=
+  | in_zero      , in_zero      => Same in_zero
+  | in_zero      , in_succ βIn' => Diff in_zero βIn'
+  | in_succ αIn' , in_zero      => Diff (in_succ αIn') in_zero
+  | in_succ αIn' , in_succ βIn' =>
+      match occurs_check_view αIn' βIn' with
+      | Same _     => Same (in_succ αIn')
+      | Diff _ βIn' => Diff (in_succ αIn') (in_succ βIn')
       end.
 
-  End WithAB.
+  Lemma occurs_check_view_refl {w α} (αIn : In α w) :
+    occurs_check_view αIn αIn = Same αIn.
+  Proof. induction αIn; cbn; now rewrite ?IHαIn. Qed.
+
+  Lemma occurs_check_view_thin {w α β} (αIn : In α w) (βIn : In β (remove w α)) :
+    occurs_check_view αIn (in_thin αIn βIn) = Diff αIn βIn.
+  Proof. induction αIn; [|destruct (view βIn)]; cbn; now rewrite ?IHαIn. Qed.
+
+  Fixpoint max (w : World) : nat :=
+    match w with
+    | nil      => 0
+    | snoc w α => Nat.max (max w) α
+    end.
+  Definition fresh (w : World) : nat :=
+    S (max w).
 
   Module notations.
 
-    Open Scope ctx_scope.
+    Open Scope world_scope.
 
-    Notation "'ε'" := nil (only parsing) : ctx_scope.
-    Infix "▻" := snoc : ctx_scope.
-    Notation "Γ1 ▻▻ Γ2" := (cat Γ1%ctx Γ2%ctx) : ctx_scope.
-    Notation "b ∈ Γ" := (In b%ctx Γ%ctx) : type_scope.
+    Notation "'ε'" := nil (only parsing) : world_scope.
+    Infix "▻" := snoc : world_scope.
+    Notation "α ∈ w" := (In α w%world) : type_scope.
 
     (* Use the same notations as in ListNotations. *)
-    Notation "[ ]" := (nil) : ctx_scope.
-    Notation "[ctx]" := (nil) : ctx_scope.
-    Notation "[ x ]" := (snoc nil x) : ctx_scope.
-    Notation "[ x ; y ; .. ; z ]" :=
-      (snoc .. (snoc (snoc nil x) y) .. z) : ctx_scope.
-    Notation "Γ - x" := (@remove _ Γ x _) : ctx_scope.
+    Notation "[ ]" := (nil) : world_scope.
+    Notation "w - x" := (remove w x) : world_scope.
 
   End notations.
-  Import notations.
 
-End ctx.
-Export ctx (Ctx).
-Export (hints) ctx.
-Bind Scope ctx_scope with Ctx.
+End world.
+Export world (World).
+Export (hints) world.
+Bind Scope world_scope with World.

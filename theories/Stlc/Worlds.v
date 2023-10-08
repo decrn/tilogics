@@ -35,14 +35,12 @@ From stdpp Require
 From Em Require Import
   Context Prelude.
 
-
-Import ctx.notations.
+Import world.notations.
 
 #[local] Set Implicit Arguments.
 #[local] Set Transparent Obligations.
 
-Notation World := (Ctx nat).
-(* Polymorphic *) Definition TYPE : Type := World -> Type.
+Definition TYPE : Type := World → Type.
 
 Module ṫy.
 
@@ -54,34 +52,8 @@ Module ṫy.
   #[global] Arguments bool {w}.
   #[global] Arguments func {w} _ _.
 
-  Derive NoConfusion Subterm for Ṫy.
-
-  #[local] Set Equations With UIP.
-  #[export] Instance In_eqdec {w} : EqDec (sigT (fun x : unit => ctx.In x w)).
-  Proof.
-    intros [x xIn] [y yIn].
-    induction xIn; cbn; destruct (ctx.view yIn) as [|y yIn].
-    - left. reflexivity.
-    - right. abstract discriminate.
-    - right. abstract discriminate.
-    - destruct (IHxIn yIn); clear IHxIn; [left|right].
-      + abstract (now dependent elimination e).
-      + abstract (intros e; apply n; clear n;
-                  now dependent elimination e).
-  Defined.
-
-  #[export] Instance eqdec {w} : EqDec (Ṫy w).
-  Proof.
-    change_no_check (forall x y : Ṫy w, dec_eq x y).
-    induction x; destruct y as [β βIn| |]; cbn;
-      try (right; abstract discriminate).
-    - destruct (eq_dec (existT α αIn) (existT β βIn)).
-      + left. abstract now dependent elimination e.
-      + right. abstract (intros H; apply n; clear n; inversion H; auto).
-    - left. auto.
-    - apply f_equal2_dec; auto.
-      now intros H%noConfusion_inv.
-  Defined.
+  Set Equations With UIP.
+  Derive NoConfusion Subterm EqDec for Ṫy.
 
   Lemma no_cycle {w} (t : Ṫy w) : ~ Ṫy_subterm t t.
   Proof.
@@ -101,16 +73,16 @@ Definition Ėnv (w : World) :=
    definitions over the accessibility relation. *)
 Structure ACC : Type :=
   MkAcc
-    { acc :> World -> TYPE;
+    { acc :> World → World → Type;
       #[canonical=no] lk {w0 w1} (θ : acc w0 w1) α (αIn : α ∈ w0) : Ṫy w1;
     }.
-#[global] Arguments acc Θ (_ _)%ctx_scope : rename, simpl never.
+#[global] Arguments acc Θ (_ _)%world_scope : rename, simpl never.
 #[global] Arguments lk {Θ} [w0 w1] !θ [α] αIn : rename.
 
 Class Refl (Θ : ACC) : Type :=
   refl w : Θ w w.
 Class Trans (Θ : ACC) : Type :=
-  trans w0 w1 w2 : Θ w0 w1 -> Θ w1 w2 -> Θ w0 w2.
+  trans w0 w1 w2 : Θ w0 w1 → Θ w1 w2 → Θ w0 w2.
 #[global] Arguments refl {Θ _ w}.
 #[global] Arguments trans {Θ _ w0 w1 w2} _ _.
 
@@ -130,18 +102,17 @@ Class Step (Θ : ACC) : Type :=
 
 Class Thin (Θ : ACC) : Type :=
   thin w α {αIn : α ∈ w} : Θ (w - α) w.
-#[global] Arguments thin {Θ _ w} α {αIn}.
+#[global] Arguments thin {Θ _} [w] α {αIn}.
 
 Class Thick (Θ : ACC) : Type :=
   thick w α {αIn : α ∈ w} (t : Ṫy (w - α)) : Θ w (w - α).
-#[global] Arguments thick {Θ _ w} α {αIn} t.
+#[global] Arguments thick {Θ _} [w] α {αIn} t.
 
-Definition Valid (A : TYPE) : Type :=
-  forall w, A w.
+Definition Valid (A : TYPE) : Type := ∀ w, A w.
 Polymorphic Definition Impl (A B : TYPE) : TYPE :=
-  fun w => A w -> B w.
-Definition Forall {I : Type} (A : I -> TYPE) : TYPE :=
-  fun w => forall i : I, A i w.
+  fun w => A w → B w.
+Definition Forall {I : Type} (A : I → TYPE) : TYPE :=
+  fun w => ∀ i : I, A i w.
 
 Declare Scope indexed_scope.
 Bind    Scope indexed_scope with TYPE.
@@ -153,26 +124,26 @@ Definition Unit : TYPE := fun _ => unit.
 Definition Option (A : TYPE) : TYPE := fun w => option (A w).
 Definition List (A : TYPE) : TYPE := fun w => list (A w).
 Definition Prod (A B : TYPE) : TYPE := fun w => prod (A w) (B w).
-Definition Sum (A B : TYPE) : TYPE := fun w => sum (A w) (B w).
 
 Definition Box (Θ : ACC) (A : TYPE) : TYPE :=
-  fun w0 => forall w1, Θ w0 w1 -> A w1.
+  fun w0 => ∀ w1, Θ w0 w1 → A w1.
 
 Declare Scope box_scope.
 Bind    Scope box_scope with Box.
 Delimit Scope box_scope with B.
 
-#[local] Notation "⊢ʷ A" :=
+#[local] Notation "⊧ A" :=
   (Valid A)
-    (at level 200, right associativity).
-#[local] Notation "A -> B" := (Impl A B) : indexed_scope.
+    (at level 200, right associativity) : type_scope.
+#[local] Notation "A ̂→ B" := (Impl A B)
+  (at level 99, B at level 200, right associativity) :
+    indexed_scope.
 
-
-Class Pure (M : TYPE -> TYPE) : Type :=
-  pure : forall A, ⊢ʷ A -> M A.
+Class Pure (M : TYPE → TYPE) : Type :=
+  pure : ∀ A, ⊧ A ̂→ M A.
 #[global] Arguments pure {M _ A} [w].
-Class Bind (Θ : ACC) (M : TYPE -> TYPE) : Type :=
-  bind : forall A B, ⊢ʷ M A -> Box Θ (A -> M B) -> M B.
+Class Bind (Θ : ACC) (M : TYPE → TYPE) : Type :=
+  bind : ∀ A B, ⊧ M A ̂→ Box Θ (A ̂→ M B) ̂→ M B.
 #[global] Arguments bind {Θ M _ A B} [w].
 
 #[export] Instance pure_option : Pure Option :=
@@ -181,20 +152,19 @@ Class Bind (Θ : ACC) (M : TYPE -> TYPE) : Type :=
   fun A B w m f => option.bind m (fun a => f w refl a).
 
 Module Diamond.
-  Import SigTNotations.
 
   Definition Diamond (Θ : ACC) (A : TYPE) : TYPE :=
     fun w0 => {w1 & Θ w0 w1 * A w1}%type.
-  Definition DiamondT (Θ : ACC) (M : TYPE -> TYPE) : TYPE -> TYPE :=
+  Definition DiamondT (Θ : ACC) (M : TYPE → TYPE) : TYPE → TYPE :=
     fun A => M (Diamond Θ A).
 
   #[export] Instance pure_diamond {Θ} {reflΘ : Refl Θ} : Pure (Diamond Θ) :=
-    fun A w a => (w;(refl,a)).
+    fun A w a => (existT w (refl,a)).
   #[export] Instance bind_diamond {Θ} {transΘ : Trans Θ} : Bind Θ (Diamond Θ) :=
     fun A B w0 m f =>
-      let '(w1;(r01,a1)) := m in
-      let '(w2;(r12,b2)) := f w1 r01 a1 in
-      (w2; (trans r01 r12, b2)).
+      let '(existT w1 (r01,a1)) := m in
+      let '(existT w2 (r12,b2)) := f w1 r01 a1 in
+      (existT w2 (trans r01 r12, b2)).
 
   #[export] Instance pure_diamondt {Θ} {reflΘ : Refl Θ}
     {M} {pureM : Pure M} : Pure (DiamondT Θ M) :=
@@ -207,31 +177,22 @@ Module Diamond.
         (fun '(existT w1 (θ1,a1)) =>
            option.bind (f w1 θ1 a1)
              (fun '(existT w2 (θ2,b2)) =>
-                Some (w2; (trans θ1 θ2, b2)))).
+                Some (existT w2 (trans θ1 θ2, b2)))).
 
 End Diamond.
 Export Diamond (Diamond, DiamondT).
 
-
 Module World.
   Module notations.
-    Notation "⊢ʷ A" :=
-      (Valid A)
-        (at level 200, right associativity).
-    Notation "A -> B" := (Impl A B) : indexed_scope.
+    Notation "⊧ A" := (Valid A) (at level 200, right associativity).
+    Notation "A ̂→ B" := (Impl A B) : indexed_scope.
+
     Notation "A * B" := (Prod A B) : indexed_scope.
     Notation "'∀' x .. y , P " :=
       (Forall (fun x => .. (Forall (fun y => P%W)) ..))
         (at level 200, x binder, y binder, right associativity) : indexed_scope.
 
     Infix "⊙" := trans (at level 60, right associativity).
-
-    (* TODO: switch to superscript *)
-    (* \^s \^+ *)
-
-    (* Notation "□ A" := (Box _ A) (at level 9, format "□ A", right associativity). *)
-
-    (* Notation "◻A" := BoxR A *)
   End notations.
 End World.
 
@@ -249,29 +210,19 @@ Module MonadNotations.
         right associativity).
 End MonadNotations.
 
-Definition Schematic (A : TYPE) : Type :=
-  { w : World & A w }.
-
-    (* Notation "w1 .> w2" := (trans (Θ := Alloc) w1 w2) (at level 80, only parsing). *)
-
-    (* Notation "□⁺ A" := (Box Alloc A) (at level 9, format "□⁺ A", right associativity) *)
-    (*     : indexed_scope. *)
-    (* Notation "◇⁺ A" := (Diamond Alloc A) (at level 9, format "◇⁺ A", right associativity) *)
-    (*     : indexed_scope. *)
-
-Definition T {Θ} {reflΘ : Refl Θ} {A} : ⊢ʷ Box Θ A -> A :=
+Definition T {Θ} {reflΘ : Refl Θ} {A} : ⊧ Box Θ A ̂→ A :=
   fun w a => a w refl.
 #[global] Arguments T {Θ _ A} [_] _ : simpl never.
 
-Definition _4 {Θ} {transΘ : Trans Θ} {A} : ⊢ʷ Box Θ A -> Box Θ (Box Θ A) :=
+Definition _4 {Θ} {transΘ : Trans Θ} {A} : ⊧ Box Θ A ̂→ Box Θ (Box Θ A) :=
   fun w0 a w1 r1 w2 r2 => a w2 (trans r1 r2).
 #[global] Arguments _4 {Θ _ A} [_] _ [_] _ [_] _ : simpl never.
 
 Definition thickIn [w x] (xIn : x ∈ w) (s : Ṫy (w - x)) :
-  forall y, y ∈ w -> Ṫy (w - x) :=
+  ∀ y, y ∈ w → Ṫy (w - x) :=
   fun y yIn =>
-    match ctx.occurs_check_view xIn yIn with
-    | ctx.Same _     => s
-    | ctx.Diff _ yIn => ṫy.var yIn
+    match world.occurs_check_view xIn yIn with
+    | world.Same _     => s
+    | world.Diff _ yIn => ṫy.var yIn
     end.
 #[global] Arguments thickIn [w x] xIn s [y] yIn.

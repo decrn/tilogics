@@ -48,6 +48,8 @@ From Em Require Import
   Stlc.Substitution
   Stlc.Worlds.
 
+Import world.notations.
+
 #[local] Set Implicit Arguments.
 #[local] Arguments step : simpl never.
 #[local] Arguments thick : simpl never.
@@ -74,11 +76,9 @@ Module Pred.
     Context {w : World}.
 
     Record bientails (P Q : Pred w) : Prop :=
-      MkBientails
-        { fromBientails : forall ι, P ι <-> Q ι }.
+      MkBientails { fromBientails : forall ι, P ι <-> Q ι }.
     Record entails (P Q : Pred w) : Prop :=
-      MkEntails
-        { fromEntails : forall ι, P ι -> Q ι }.
+      MkEntails { fromEntails : forall ι, P ι -> Q ι }.
 
     #[export] Instance pred_equiv : Equiv (Pred w) := bientails.
     #[export] Instance pred_equivalence : Equivalence (≡@{Pred w}).
@@ -110,17 +110,17 @@ Module Pred.
   Section Definitions.
     Import World.notations.
 
-    Definition Falseₚ : ⊢ʷ Pred :=
+    Definition Falseₚ : ⊧ Pred :=
       fun w _ => Logic.False.
-    Definition Trueₚ : ⊢ʷ Pred :=
+    Definition Trueₚ : ⊧ Pred :=
       fun w _ => Logic.True.
-    Definition iffₚ : ⊢ʷ Pred -> Pred -> Pred :=
+    Definition iffₚ : ⊧ Pred ̂→ Pred ̂→ Pred :=
       fun w P Q ι => P ι <-> Q ι.
-    Definition implₚ : ⊢ʷ Pred -> Pred -> Pred :=
+    Definition implₚ : ⊧ Pred ̂→ Pred ̂→ Pred :=
       fun w P Q ι => P ι -> Q ι.
-    Definition andₚ : ⊢ʷ Pred -> Pred -> Pred :=
+    Definition andₚ : ⊧ Pred ̂→ Pred ̂→ Pred :=
       fun w P Q ι => P ι /\ Q ι.
-    Definition orₚ : ⊢ʷ Pred -> Pred -> Pred :=
+    Definition orₚ : ⊧ Pred ̂→ Pred ̂→ Pred :=
       fun w P Q ι => P ι \/ Q ι.
     #[global] Arguments andₚ {_} (_ _)%P _/.
     #[global] Arguments orₚ {_} (_ _)%P _/.
@@ -130,7 +130,7 @@ Module Pred.
     #[global] Arguments Falseₚ {_} _/.
 
     Definition eqₚ {T : TYPE} {A : Type} {instTA : Inst T A} :
-      ⊢ʷ T -> T -> Pred :=
+      ⊧ T ̂→ T ̂→ Pred :=
       fun w t1 t2 ι => inst t1 ι = inst t2 ι.
     #[global] Arguments eqₚ {T A _} [w] _ _ _/.
 
@@ -141,7 +141,7 @@ Module Pred.
     #[global] Arguments Forall {I w} A%P ι/.
     #[global] Arguments Exists {I w} A%P ι/.
 
-    Definition TPB : ⊢ʷ Ėnv -> Const Exp -> Ṫy -> Ėxp -> Pred :=
+    Definition TPB : ⊧ Ėnv ̂→ Const Exp ̂→ Ṫy ̂→ Ėxp ̂→ Pred :=
       fun w G e t ee ι => inst G ι |-- e ∷ inst t ι ~> inst ee ι.
     #[global] Arguments TPB [w] G e t ee ι/.
 
@@ -253,20 +253,24 @@ Module Pred.
        change (@interface.bi_forall (@bi_pred ?w)) with (fun A => @Forall A w) in *;
        change (@interface.bi_exist (@bi_pred ?w)) with (fun A => @Exists A w) in *;
        change (@persist Pred persist_pred _ _ ?P _ ?θ ?ι) with (P (inst θ ι)) in *;
-       cbn [andₚ orₚ implₚ iffₚ Forall Exists eqₚ TPB inst inst_ty inst_env] in *
-      );
-    rewrite ?inst_persist, ?inst_lift in *;
-    repeat
-      match goal with
-      | H: context[@inst ?AT ?A ?I ?w ?x ?ι] |- _ =>
-          is_var x; generalize dependent x; intro x;
-          generalize (@inst AT A I w x ι);
-          clear x; intro x; intros; subst
-      | |- context[@inst ?AT ?A ?I ?w ?x ?ι] =>
-          is_var x; generalize dependent x; intro x;
-          generalize (@inst AT A I w x ι);
-          clear x; intro x; intros; subst
-      end.
+       cbn [andₚ orₚ implₚ iffₚ Forall Exists eqₚ TPB inst inst_ty inst_env] in *;
+
+       repeat rewrite ?inst_persist, ?inst_lift, ?inst_refl, ?inst_trans,
+         ?inst_insert, ?ėxp.inst_var, ?ėxp.inst_true, ?ėxp.inst_false,
+         ?ėxp.inst_absu, ?ėxp.inst_abst, ?ėxp.inst_app, ?ėxp.inst_ifte in *;
+       repeat
+         match goal with
+         | |- @interface.bi_emp_valid (@bi_pred _) _ => constructor; intros ι _; cbn
+         | |- @interface.bi_entails (@bi_pred _) _ _ => constructor; intros ι; cbn
+         | H: context[@inst ?AT ?A ?I ?w ?x ?ι] |- _ =>
+             is_var x; generalize dependent x; intro x;
+             generalize (@inst AT A I w x ι);
+             clear x; intro x; intros; subst
+         | |- context[@inst ?AT ?A ?I ?w ?x ?ι] =>
+             is_var x; generalize dependent x; intro x;
+             generalize (@inst AT A I w x ι);
+             clear x; intro x; intros; subst
+         end).
 
   Section Lemmas.
 
@@ -303,7 +307,7 @@ Module Pred.
     Proof. split; [intros []|]; obligation. Qed.
 
     #[local] Hint Rewrite entails_in equiv_in : obligation.
-    #[local] Hint Rewrite <- @Prelude.forall_and_compat : obligation.
+    #[local] Hint Rewrite <- @tactics.forall_and_distr : obligation.
 
     #[export,program] Instance proper_iff {w} :
       Proper ((⊣⊢ₚ) ==> (⊣⊢ₚ) ==> (⊣⊢ₚ)) (@iffₚ w).
@@ -325,12 +329,6 @@ Module Pred.
       Proper (pointwise_relation I (⊣⊢ₚ) ==> (⊣⊢ₚ)) (@Pred.Exists I w).
     #[export,program] Instance proper_persist_bientails {Θ w} :
       Proper ((⊣⊢ₚ) ==> forall_relation (fun _ => eq ==> (⊣⊢ₚ)))
-        (@persist Pred persist_pred Θ w).
-    #[export,program] Instance proper_persist_entails {Θ w} :
-      Proper (entails ==> forall_relation (fun _ => eq ==> entails))
-        (@persist Pred persist_pred Θ w).
-    #[export,program] Instance proper_persist_flip_entails {Θ w} :
-      Proper (entails --> forall_relation (fun _ => eq ==> Basics.flip entails))
         (@persist Pred persist_pred Θ w).
 
     Lemma split_bientails {w} (P Q : Pred w) :
@@ -552,13 +550,7 @@ Module Pred.
 
       Lemma wp_false {w0 w1} (θ : Θ w0 w1) :
         wp θ ⊥ₚ ⊣⊢ₚ ⊥ₚ.
-      Proof. constructor. firstorder. Qed.
-
-      Ltac clean_inst :=
-        repeat change_no_check (@inst (Sub ?w0) _ _ ?w1 ?θ1 ?ι1) with
-          (@inst (acc Sub w0) _ _ w1 θ1 ι1) in *;
-        repeat change_no_check (@inst (Alloc ?w0) _ _ ?w1 ?θ1 ?ι1) with
-          (@inst (acc alloc.acc_alloc w0) _ _ w1 θ1 ι1).
+      Proof. firstorder. Qed.
 
       Lemma and_wp_l {w0 w1} (θ : Θ w0 w1) P Q :
         wp θ P /\ₚ Q ⊣⊢ₚ wp θ (P /\ₚ persist Q θ).
@@ -573,7 +565,7 @@ Module Pred.
       Proof. now rewrite and_comm, and_wp_l, and_comm. Qed.
 
       Lemma wp_thick {thickΘ : Thick Θ} {lkThickΘ : LkThick Θ}
-        {w α} (αIn : ctx.In α w) (t : Ṫy (ctx.remove αIn)) (Q : Pred (ctx.remove αIn)) :
+        {w α} (αIn : world.In α w) (t : Ṫy (w - α)) (Q : Pred (w - α)) :
         wp (thick α t) Q ⊣⊢ₚ ṫy.var αIn =ₚ persist t (thin (Θ := Sub) α) /\ₚ persist Q (thin (Θ := Sub) α).
       Proof.
         constructor. intros ι; pred_unfold; cbn. rewrite inst_thin.
@@ -605,23 +597,23 @@ Module Pred.
 
       Lemma wlp_true {w0 w1} (θ : Θ w0 w1) :
         wlp θ Trueₚ ⊣⊢ₚ Trueₚ.
-      Proof. constructor. firstorder. Qed.
+      Proof. firstorder. Qed.
 
       Lemma wlp_and {w0 w1} (θ : Θ w0 w1) P Q :
         wlp θ P /\ₚ wlp θ Q ⊣⊢ₚ wlp θ (P /\ₚ Q).
-      Proof. constructor. firstorder. Qed.
+      Proof. firstorder. Qed.
 
       Lemma wp_or {w0 w1} (θ : Θ w0 w1) P Q :
         wp θ P \/ₚ wp θ Q ⊣⊢ₚ wp θ (P \/ₚ Q).
-      Proof. constructor. firstorder. Qed.
+      Proof. firstorder. Qed.
 
       Lemma wp_mono {w0 w1} (θ : Θ w0 w1) P Q:
         wlp θ (P ->ₚ Q) ⊢ₚ (wp θ P ->ₚ wp θ Q).
-      Proof. constructor. firstorder. Qed.
+      Proof. firstorder. Qed.
 
       Lemma wlp_mono {w0 w1} (θ : Θ w0 w1) P Q :
         wlp θ (P ->ₚ Q) ⊢ₚ wlp θ P ->ₚ wlp θ Q.
-      Proof. constructor. firstorder. Qed.
+      Proof. firstorder. Qed.
 
       Lemma entails_wlp {w0 w1} (θ : Θ w0 w1) P Q :
         (persist P θ ⊢ₚ Q) <-> (P ⊢ₚ wlp θ Q).
@@ -651,11 +643,11 @@ Module Pred.
 
       Lemma persist_wlp {w0 w1} {θ : Θ w0 w1} (P : Pred w1) :
         persist (wlp θ P) θ ⊢ₚ P.
-      Proof. constructor. intros ι H. now apply H. Qed.
+      Proof. firstorder. Qed.
 
       Lemma persist_wp {w0 w1} {θ : Θ w0 w1} (P : Pred w1) :
         P ⊢ₚ persist (wp θ P) θ.
-      Proof. constructor. intros ι H. hnf. exists ι. auto. Qed.
+      Proof. firstorder. Qed.
 
       Lemma wlp_frame {w0 w1} (θ : Θ w0 w1) (P : Pred _) (Q : Pred _) :
         P ->ₚ wlp θ Q ⊣⊢ₚ wlp θ (persist P θ ->ₚ Q).
@@ -673,29 +665,17 @@ Module Pred.
     Lemma proper_wp_step {Θ1 Θ2 : ACC} {stepΘ1 : Step Θ1} {stepΘ2 : Step Θ2}
       {lkStepΘ1 : LkStep Θ1} {lkStepΘ2 : LkStep Θ2}
       {w α} :
-      forall P Q : Pred (ctx.snoc w α),
+      forall P Q : Pred (world.snoc w α),
         P ⊣⊢ₚ Q -> wp (step (Θ := Θ1)) P ⊣⊢ₚ wp (step (Θ := Θ2)) Q.
     Proof.
       intros P Q [PQ]. constructor. intros ι. cbn. apply base.exist_proper.
       intros ι2. now rewrite !inst_step, PQ.
     Qed.
 
-    Lemma wp_incl {Θ} {reflΘ : Refl Θ} {transΘ : Trans Θ} {stepΘ : Step Θ}
-      {lkReflΘ : LkRefl Θ} {lkTransΘ : LkTrans Θ} {lkStep : LkStep Θ}
-      {w1 w2} (θ : alloc.acc_alloc w1 w2) :
-      forall Q, wp θ Q ⊣⊢ₚ wp (alloc.incl (Θ := Θ) θ) Q.
-    Proof.
-      intros Q. induction θ; cbn.
-      - change alloc.refl with (refl (Θ := alloc.acc_alloc) (w := w)).
-        now rewrite !wp_refl.
-      - change (alloc.fresh ?r) with (step (Θ := alloc.acc_alloc) ⊙ r).
-        rewrite !wp_trans. apply proper_wp_step, IHθ.
-    Qed.
-
     Lemma intro_wp_step {Θ} {stepΘ : Step Θ} {lkStepΘ : LkStep Θ}
-      {w α} (Q : Pred (ctx.snoc w α)) :
+      {w α} (Q : Pred (world.snoc w α)) :
       wp (step (Θ := Θ)) Q ⊣⊢ₚ
-      ∃ₚ t : Ṫy _, wlp step (persist t step =ₚ ṫy.var ctx.in_zero ->ₚ Q).
+      ∃ₚ t : Ṫy _, wlp step (persist t step =ₚ ṫy.var world.in_zero ->ₚ Q).
     Proof.
       constructor. intros ι. pred_unfold. unfold wlp, wp, implₚ, eqₚ. cbn.
       split.
@@ -718,12 +698,8 @@ Module Pred.
     Import (hints) Diamond.
 
     Definition wp_diamond {Θ : ACC} {A} :
-      ⊢ʷ Diamond Θ A -> Box Θ (A -> Pred) -> Pred :=
+      ⊧ Diamond Θ A ̂→ Box Θ (A ̂→ Pred) ̂→ Pred :=
       fun w '(existT w1 (θ, a)) Q => Acc.wp θ (Q w1 θ a).
-
-    Definition wlp_diamond {Θ : ACC} {A} :
-      ⊢ʷ Diamond Θ A -> Box Θ (A -> Pred) -> Pred :=
-      fun w '(existT w1 (θ, a)) Q => Acc.wlp θ (Q w1 θ a).
 
     Definition wp_option {A w1 w2} :
       Option A w1 -> (A w1 -> Pred w2) -> Pred w2 :=
@@ -743,27 +719,12 @@ Module Pred.
       wp_option (option.map f o) Q ⊣⊢ₚ wp_option o (fun a => Q (f a)).
     Proof. constructor; intros ι. now destruct o. Qed.
 
-    Definition wlp_option {A w1 w2} :
-      Option A w1 -> (A w1 -> Pred w2) -> Pred w2 :=
-      fun o Q =>
-        match o with
-        | Some a => Q a
-        | None => Trueₚ
-        end.
-
     Definition wp_optiondiamond {Θ : ACC} {A} :
-      ⊢ʷ DiamondT Θ Option A -> Box Θ (A -> Pred) -> Pred :=
+      ⊧ DiamondT Θ Option A ̂→ Box Θ (A ̂→ Pred) ̂→ Pred :=
       fun w m Q => wp_option m (fun d => wp_diamond d Q).
-
-    Definition wlp_optiondiamond {Θ : ACC} {A} :
-      ⊢ʷ DiamondT Θ Option A -> Box Θ (A -> Pred) -> Pred :=
-      fun w m Q => wlp_option m (fun d => wlp_diamond d Q).
 
     #[global] Arguments wp_optiondiamond {Θ} {A}%indexed_scope [w] _ _%B _.
     #[global] Instance params_wp_optiondiamond : Params (@wp_optiondiamond) 5 := {}.
-
-    #[global] Arguments wlp_optiondiamond {Θ} {A}%indexed_scope [w] _ _%P _.
-    #[global] Instance params_wlp_optiondiamond : Params (@wlp_optiondiamond) 5 := {}.
 
     #[export] Instance proper_wp_optiondiamond_bientails {Θ A w} :
       Proper
@@ -789,32 +750,8 @@ Module Pred.
       apply Acc.proper_wp_entails. apply pq.
     Qed.
 
-    #[export] Instance proper_wlp_optiondiamond_bientails {Θ A w} :
-      Proper
-        (pointwise_relation _
-           (forall_relation
-              (fun _ => pointwise_relation _
-                          (pointwise_relation _ bientails)) ==> bientails))
-        (@wlp_optiondiamond Θ A w).
-    Proof.
-      intros d p q pq. destruct d as [(w1 & θ1 & a)|]; cbn; [|easy].
-      apply Acc.proper_wlp_bientails. apply pq.
-    Qed.
-
-    #[export] Instance proper_wlp_optiondiamond_entails {Θ A w} :
-      Proper
-        (pointwise_relation _
-           (forall_relation
-              (fun _ => pointwise_relation _
-                          (pointwise_relation _ entails)) ==> entails))
-        (@wlp_optiondiamond Θ A w).
-    Proof.
-      intros d p q pq. destruct d as [(w1 & θ1 & a)|]; cbn; [|easy].
-      apply Acc.proper_wlp_entails. apply pq.
-    Qed.
-
     Lemma wp_optiondiamond_and {Θ A w} (d : DiamondT Θ Option A w)
-      (P : Box Θ (A -> Pred) w) (Q : Pred w) :
+      (P : Box Θ (A ̂→ Pred) w) (Q : Pred w) :
        wp_optiondiamond d P /\ₚ Q
        ⊣⊢ₚ wp_optiondiamond d (fun w1 θ1 a1 => P w1 θ1 a1 /\ₚ persist Q θ1).
     Proof.
@@ -824,7 +761,7 @@ Module Pred.
     Qed.
 
     Lemma wp_optiondiamond_monotonic' {Θ A w} (d : DiamondT Θ Option A w)
-      (R : Pred w) (P Q : Box Θ (A -> Pred) w) :
+      (R : Pred w) (P Q : Box Θ (A ̂→ Pred) w) :
       (forall w1 (r : Θ w w1) (a : A w1),
           persist R r ⊢ₚ P w1 r a ->ₚ Q w1 r a) ->
       R ⊢ₚ wp_optiondiamond d P ->ₚ wp_optiondiamond d Q.
@@ -841,13 +778,13 @@ Module Pred.
     Qed.
 
     Lemma wp_optiondiamond_pure {Θ} {reflΘ : Refl Θ} {lkreflΘ : LkRefl Θ}
-      {A w0} (a : A w0) (Q : Box Θ (A -> Pred) w0) :
+      {A w0} (a : A w0) (Q : Box Θ (A ̂→ Pred) w0) :
       wp_optiondiamond (pure (M := DiamondT Θ Option) a) Q ⊣⊢ₚ T Q a.
     Proof. cbn. now rewrite Acc.wp_refl. Qed.
 
     Lemma wp_optiondiamond_bind {Θ} {transΘ : Trans Θ} {lkTransΘ : LkTrans Θ}
-      {A B w0} (d : DiamondT Θ Option A w0) (f : Box Θ (A -> DiamondT Θ Option B) w0)
-      (Q : Box Θ (B -> Pred) w0) :
+      {A B w0} (d : DiamondT Θ Option A w0) (f : Box Θ (A ̂→ DiamondT Θ Option B) w0)
+      (Q : Box Θ (B  ̂→ Pred) w0) :
       wp_optiondiamond (bind d f) Q ⊣⊢ₚ
       wp_optiondiamond d (fun w1 ζ1 a1 => wp_optiondiamond (f w1 ζ1 a1) Q[ζ1]).
     Proof.
@@ -856,44 +793,10 @@ Module Pred.
         now rewrite ?Acc.wp_trans, ?Acc.wp_false.
     Qed.
 
-    Lemma wlp_optiondiamond_monotonic' {Θ A w} (d : DiamondT Θ Option A w)
-        (R : Pred w) (P Q : Box Θ (A -> Pred) w) :
-        (forall w1 (r : Θ w w1) (a : A w1),
-            persist R r ⊢ₚ P w1 r a ->ₚ Q w1 r a) ->
-        R ⊢ₚ wlp_optiondiamond d P ->ₚ wlp_optiondiamond d Q.
-    Proof.
-      intros pq. destruct d as [(w1 & r01 & a)|]; cbn.
-      - specialize (pq w1 r01 a). rewrite <- Acc.wlp_mono.
-        now apply Acc.entails_wlp.
-      - rewrite impl_true_r. apply true_r.
-    Qed.
-
-    Lemma wlp_optiondiamond_pure {Θ} {reflΘ : Refl Θ} {lkreflΘ : LkRefl Θ}
-      {A w0} (a : A w0) (Q : Box Θ (A -> Pred) w0) :
-      wlp_optiondiamond (pure (M := DiamondT Θ Option) a) Q ⊣⊢ₚ T Q a.
-    Proof. cbn. now rewrite Acc.wlp_refl. Qed.
-
-    Lemma wlp_optiondiamond_bind {Θ} {transΘ : Trans Θ} {lkTransΘ : LkTrans Θ}
-      {A B w0} (d : DiamondT Θ Option A w0) (f : Box Θ (A -> DiamondT Θ Option B) w0)
-      (Q : Box Θ (B -> Pred) w0) :
-      wlp_optiondiamond (bind d f) Q ⊣⊢ₚ
-      wlp_optiondiamond d (fun w1 ζ1 a1 => wlp_optiondiamond (f w1 ζ1 a1) (_4 Q ζ1)).
-    Proof.
-      destruct d as [(w1 & r01 & a)|]; cbn; [|reflexivity].
-      destruct (f w1 r01 a) as [(w2 & r12 & b2)|]; cbn;
-        now rewrite ?Acc.wlp_trans, ?Acc.wlp_true.
-    Qed.
-
     Lemma wp_optiondiamond_bind' {Θ : ACC} {A B w1 w2} (o : Option A w1)
-      (f : A w1 -> Option (Diamond Θ B) w2) (Q : Box Θ (B -> Pred) w2) :
+      (f : A w1 -> Option (Diamond Θ B) w2) (Q : Box Θ (B ̂→ Pred) w2) :
       wp_optiondiamond (option.bind o f) Q ⊣⊢ₚ
       wp_option o (fun a => wp_optiondiamond (f a) Q).
-    Proof. constructor; intros ι. now destruct o. Qed.
-
-    Lemma wlp_optiondiamond_bind' {Θ : ACC} {A B w1 w2} (o : Option A w1)
-      (f : A w1 -> Option (Diamond Θ B) w2) (Q : Box Θ (B -> Pred) w2) :
-      wlp_optiondiamond (option.bind o f) Q ⊣⊢ₚ
-      wlp_option o (fun a => wlp_optiondiamond (f a) Q).
     Proof. constructor; intros ι. now destruct o. Qed.
 
   End Transformers.
@@ -902,7 +805,7 @@ Module Pred.
     Import World.notations.
     (* A type class for things that can be interpreted as a predicate. *)
     Class InstPred (A : TYPE) :=
-      instpred : ⊢ʷ A -> Pred.
+      instpred : ⊧ A ̂→ Pred.
     #[global] Arguments instpred {_ _ _}.
 
     #[export] Instance instpred_option {A} `{ipA : InstPred A} :
@@ -932,184 +835,82 @@ Module Pred.
   Lemma pno_cycle {w} (t1 t2 : Ṫy w) (Hsub : ṫy.Ṫy_subterm t1 t2) :
     t1 =ₚ t2 ⊢ₚ ⊥ₚ.
   Proof.
-    constructor. intros ι Heq.
-    apply (inst_subterm ι) in Hsub. cbn in Hsub.
+    constructor. intros ι Heq. apply (inst_subterm ι) in Hsub.
     rewrite <- Heq in Hsub. now apply ty.no_cycle in Hsub.
   Qed.
-
-  (* A predicate-based induction scheme for the typing relation. *)
-  Section InductionScheme.
-
-    Import iris.bi.interface.
-    Import World.notations.
-    Import Pred.notations.
-    Import Pred.proofmode.
-
-    Open Scope pred_scope.
-
-    Context (P : ⊢ʷ Ėnv -> Const Exp -> Ṫy -> Ėxp -> Pred).
-    Context
-      {pvar : forall w,
-        ⊢ ∀ (G : Ėnv w) x t e',
-            lookup x G =ₚ Some t →
-            e' =ₚ Sem.pure (exp.var x) →
-            P G (exp.var x) t e' }
-      {ptrue : forall w,
-        ⊢ ∀ G : Ėnv w, ∀ t : Ṫy w, ∀ e' : Ėxp w,
-            t =ₚ ṫy.bool →
-            e' =ₚ (Sem.pure exp.true) →
-            P G exp.true t e' }
-      {pfalse : forall w,
-        ⊢ ∀ G : Ėnv w, ∀ t : Ṫy w, ∀ e' : Ėxp w,
-            t =ₚ ṫy.bool →
-            e' =ₚ (Sem.pure exp.false) →
-            P G exp.false t e' }
-      {pif : forall w,
-        ⊢ ∀ (G : Ėnv w) (e1 e2 e3 : Exp) (e' e1' e2' e3' : Ėxp w) t,
-            (G |--ₚ e1; ṫy.bool ~> e1') →
-            (G |--ₚ e2; t ~> e2') →
-            (G |--ₚ e3; t ~> e3') →
-            P G e1 ṫy.bool e1' →
-            P G e2 t e2' →
-            P G e3 t e3' →
-            e' =ₚ (fun ι0 => exp.ifte (e1' ι0) (e2' ι0) (e3' ι0)) →
-            P G (exp.ifte e1 e2 e3) t e' }
-      {pabsu : forall w,
-        ⊢ ∀ (G : Ėnv w) x t1 t2 t e1 e1' e',
-            (G ,, x∷t1 |--ₚ e1; t2 ~> e1') →
-            P (G ,, x∷t1) e1 t2 e1' →
-            t =ₚ (ṫy.func t1 t2) →
-            e' =ₚ (fun ι0 => exp.abst x (inst t1 ι0) (e1' ι0)) →
-            P G (exp.absu x e1) t e' }
-      {pabst : forall w,
-        ⊢ ∀ (G : Ėnv w) x t1 t2 e1 e1' e' t,
-            (G ,, x∷lift t1 w |--ₚ e1; t2 ~> e1') →
-            P (G ,, x∷lift t1 w) e1 t2 e1' →
-            t =ₚ (ṫy.func (lift t1 w) t2) →
-            e' =ₚ (fun ι0 => exp.abst x t1 (e1' ι0)) →
-            P G (exp.abst x t1 e1) t e' }
-      {papp : forall w,
-        ⊢ ∀ (G : Ėnv w) e1 t1 e1' e2 t2 e2' e',
-            (G |--ₚ e1; ṫy.func t2 t1 ~> e1') →
-            (G |--ₚ e2; t2 ~> e2') →
-            P G e1 (ṫy.func t2 t1) e1' →
-            P G e2 t2 e2' →
-            e' =ₚ (fun ι0 => exp.app (e1' ι0) (e2' ι0)) →
-            P G (exp.app e1 e2) t1 e' }.
-
-    Lemma TPB_ind w G (e : Exp) (t : Ṫy w) (ee : Ėxp w) :
-      (G |--ₚ e; t ~> ee) ⊢ₚ (P G e t ee).
-    Proof.
-      constructor. intros ι T. hnf in T.
-      remember (inst G ι) as G'.
-      remember (inst t ι) as t'.
-      remember (inst ee ι) as ee'.
-      revert HeqG' Heqt' Heqee'. revert G t ee. revert w ι.
-      induction T; cbn; intros; subst.
-      - apply pvar; cbn; try easy.
-        now rewrite lookup_inst in H.
-      - apply ptrue; cbn; easy.
-      - apply pfalse; cbn; easy.
-      - specialize (IHT1 w ι G ṫy.bool (fun _ => e1') eq_refl eq_refl eq_refl).
-        specialize (IHT2 w ι G t0      (fun _ => e2') eq_refl eq_refl eq_refl).
-        specialize (IHT3 w ι G t0      (fun _ => e3') eq_refl eq_refl eq_refl).
-        eapply pif; cbn; eauto; eauto; easy.
-      - specialize (IHT w ι (G ,, x∷lift t1 _) (lift t2 _) (fun _ => e')).
-        rewrite inst_insert !inst_lift in IHT.
-        specialize (IHT eq_refl eq_refl eq_refl).
-        eapply pabsu; cbn; eauto;
-        change (@inst _ _ (@Sem.inst_sem Exp) _ ?e ?ι) with (e ι) in *;
-          cbn; rewrite ?inst_insert ?inst_lift; try easy.
-      - specialize (IHT w ι (G ,, x∷lift t1 _) (lift t2 _) (fun _ => e')).
-        cbn in IHT. rewrite inst_insert ?inst_lift in IHT.
-        specialize (IHT eq_refl eq_refl eq_refl).
-        eapply pabst; cbn; eauto;
-          cbn; rewrite ?inst_insert ?inst_lift; try easy.
-      - specialize (IHT1 w ι G (ṫy.func (lift t2 _) t) (fun _ => e1')). cbn in IHT1.
-        rewrite ?inst_lift in IHT1. specialize (IHT1 eq_refl eq_refl eq_refl).
-        specialize (IHT2 w ι G (lift t2 _) (fun _ => e2')).
-        rewrite ?inst_lift in IHT2. specialize (IHT2 eq_refl eq_refl eq_refl).
-        eapply papp; cbn; eauto; rewrite ?inst_lift; easy.
-    Abort.
-
-  End InductionScheme.
 
   Lemma eqₚ_insert {w} (G1 G2 : Ėnv w) (x : string) (t1 t2 : Ṫy w) :
     G1 =ₚ G2 /\ₚ t1 =ₚ t2 ⊢ₚ
     (G1 ,, x ∷ t1) =ₚ (G2 ,, x ∷ t2).
-  Proof.
-    constructor. intros ι. pred_unfold. intros [].
-    rewrite !inst_insert. congruence.
-  Qed.
+  Proof. constructor. intros ι []. now pred_unfold. Qed.
 
   Lemma eq_func {w} (s1 s2 t1 t2 : Ṫy w) :
     ṫy.func s1 s2 =ₚ ṫy.func t1 t2 ⊣⊢ₚ (s1 =ₚ t1) /\ₚ (s2 =ₚ t2).
   Proof. now rewrite peq_ty_noconfusion. Qed.
 
-  Section Modalities.
+  #[export] Instance params_tpb : Params (@TPB) 5 := {}.
+  #[export] Instance params_ifte : Params (@ėxp.ifte) 4 := {}.
+  #[export] Instance params_eqₚ : Params (@eqₚ) 6 := {}.
+  #[export] Instance params_persist : Params (@persist) 7 := {}.
 
-    Import Pred.notations.
-    Import (hints) Sub.
-    Import (* ProgramLogic  *)Pred.proofmode.
+  Section AccModality.
+
     Import iris.proofmode.tactics.
-    Open Scope pred_scope.
 
-    Section PersistModality.
+    Context {Θ : ACC} [w0 w1] (θ : Θ w0 w1).
 
-      Context {Θ : ACC} [w0 w1] (θ : Θ w0 w1).
+    Class IntoAcc (P : Pred w0) (Q : Pred w1) :=
+      into_acc : P ⊢ Acc.wlp θ Q.
 
-      Class IntoPersist (P : Pred w1) (Q : Pred w0) :=
-        into_persist : P ⊢ persist Q θ.
+    #[export] Instance into_acc_default (P : Pred w0) : IntoAcc P (persist P θ).
+    Proof. constructor. cbn. intros ι0 HP ι1 <-. apply HP. Qed.
 
-      #[export] Instance into_persist_default (P : Pred w0) : IntoPersist (persist P θ) P.
-      Proof. unfold IntoPersist. reflexivity. Qed.
+    Definition modality_wlp_mixin :
+      modality_mixin (Acc.wlp θ)
+        (MIEnvTransform IntoAcc)
+        (MIEnvTransform IntoAcc).
+    Proof. firstorder. Qed.
 
-      Definition modality_persist_mixin :
-        modality_mixin (fun P => persist P θ)
-          (MIEnvTransform IntoPersist)
-          (MIEnvTransform IntoPersist).
-      Proof. firstorder. Qed.
+    Definition modality_wlp : modality bi_pred bi_pred :=
+      Modality _ (modality_wlp_mixin).
 
-      Definition modality_persist : modality bi_pred bi_pred :=
-        Modality _ (modality_persist_mixin).
+    #[export] Instance from_modal_wlp P :
+      FromModal True modality_wlp (Acc.wlp θ P) (Acc.wlp θ P) P.
+    Proof. firstorder. Qed.
 
-      #[export] Instance from_modal_persist P :
-        FromModal True modality_persist (persist P θ) (persist P θ) P.
-      Proof. firstorder. Qed.
+  End AccModality.
 
-    End PersistModality.
+  #[global] Arguments IntoAcc {Θ} [w0 w1] θ P Q.
+  #[global] Arguments into_acc {Θ} [w0 w1] θ P Q {_}.
+  #[global] Hint Mode IntoAcc + + + + - - : typeclass_instances.
 
-    Section AccModality.
+  Create HintDb predsimpl.
 
-      Context {Θ : ACC} [w0 w1] (θ : Θ w0 w1).
+  #[export] Hint Rewrite (@persist_refl Ėnv _ _) (@persist_refl Ṫy _ _)
+    (@persist_trans Ėnv _ _) (@persist_trans Ṫy _ _) @persist_eq @impl_and
+    @impl_true_l @eqₚ_refl @eq_func @and_true_l @persist_tpb @persist_and
+    @persist_insert @persist_lift @lift_insert @Sem.persist_pure
+    @lk_trans : predsimpl.
+  #[export] Hint Rewrite <- @eqₚ_insert : predsimpl.
 
-      Class IntoAcc (P : Pred w0) (Q : Pred w1) :=
-        into_acc : P ⊢ Acc.wlp θ Q.
-
-      #[export] Instance into_acc_default (P : Pred w0) : IntoAcc P (persist P θ).
-      Proof. constructor. cbn. intros ι0 HP ι1 <-. apply HP. Qed.
-
-      Definition modality_wlp_mixin :
-        modality_mixin (Acc.wlp θ)
-          (MIEnvTransform IntoAcc)
-          (MIEnvTransform IntoAcc).
-      Proof. firstorder. Qed.
-
-      Definition modality_wlp : modality bi_pred bi_pred :=
-        Modality _ (modality_wlp_mixin).
-
-      #[export] Instance from_modal_wlp P :
-        FromModal True modality_wlp (Acc.wlp θ P) (Acc.wlp θ P) P.
-      Proof. firstorder. Qed.
-
-    End AccModality.
-
-    #[global] Arguments IntoAcc {Θ} [w0 w1] θ P Q.
-    #[global] Arguments into_acc {Θ} [w0 w1] θ P Q {_}.
-    #[global] Hint Mode IntoAcc + + + + - - : typeclass_instances.
-
-  End Modalities.
-
+  Ltac predsimpl :=
+    repeat
+      (try (progress cbn);
+       autorewrite with predsimpl; eauto with typeclass_instances;
+       repeat
+         match goal with
+         | |- context[@persist ?A ?I ?Θ ?w0 ?x ?w1 ?θ] =>
+             is_var x; generalize (@persist A I Θ w0 x w1 θ); clear x; intros x;
+             try (clear w0 θ)
+         | |- context[@lk ?Θ (world.snoc ?w0 ?α) ?w1 ?θ ?α world.in_zero] =>
+             is_var θ;
+             generalize (@lk Θ (world.snoc w0 α) w1 θ α world.in_zero);
+             clear θ w0; intros ?t
+         | |- context[fun w : World => Ṫy w] =>
+             change_no_check (fun w : World => Ṫy w) with Ṫy
+         | |- context[fun w : World => Sem ?X w] =>
+             change_no_check (fun w : World => Sem X w) with (Sem X)
+         end).
 
 End Pred.
 Export Pred (Pred).

@@ -27,10 +27,10 @@
 (******************************************************************************)
 
 From Coq Require Import
-  (* Logic.FunctionalExtensionality *)
   Strings.String.
 From Em Require Import
   Environment
+  Prelude
   Stlc.Instantiation
   Stlc.Spec
   Stlc.Persistence
@@ -41,24 +41,20 @@ Import World.notations.
 Module Sem.
 
   Definition Sem (A : Type) : TYPE :=
-    fun w => Assignment w -> A.
+    fun w => Assignment w → A.
 
   (* pure  :: a -> f a *)
   Definition pure {A} (a : A) : Valid (Sem A) := fun _ _ => a.
   #[global] Arguments pure {A} _ {w} ι/.
 
-  Definition fmap {A B} (f : A -> B) : ⊢ʷ Sem A -> Sem B :=
+  Definition fmap {A B} (f : A -> B) : ⊧ Sem A ̂→ Sem B :=
     fun w a ι => f (a ι).
   #[global] Arguments fmap {A B} _ {w} a ι/.
 
-  (* app :: f (a -> b) -> f a -> f b *)
-  Definition app {A B : Type} : ⊢ʷ (Sem (A -> B)) -> Sem A -> Sem B :=
+  (* ap :: f (a -> b) -> f a -> f b *)
+  Definition ap {A B : Type} : ⊧ Sem (A → B) ̂→ Sem A ̂→ Sem B :=
     fun w f a ι => f ι (a ι).
-  #[global] Arguments app {A B} [w] f a ι/.
-
-  (* <&> : f a -> f b -> f (a * b) *)
-  Definition spaceship {A B : Type} : ⊢ʷ (Sem A) -> (Sem B) -> (Sem (A * B)) :=
-    fun w a b ι => (a ι, b ι).
+  #[global] Arguments ap {A B} [w] f a ι/.
 
   #[export] Instance inst_sem {A} : Inst (Sem A) A :=
     fun w x ι => x ι.
@@ -103,8 +99,8 @@ Module Sem.
       inst (fmap f a) ι = f (inst a ι).
     Proof. reflexivity. Qed.
 
-    Lemma inst_app {A B} [w0] (f : Sem (A -> B) w0) (a : Sem A w0) (ι : Assignment w0) :
-      inst (app f a) ι = (inst f ι) (inst a ι).
+    Lemma inst_ap {A B} [w0] (f : Sem (A -> B) w0) (a : Sem A w0) (ι : Assignment w0) :
+      inst (ap f a) ι = (inst f ι) (inst a ι).
     Proof. reflexivity. Qed.
 
   End InstLemmas.
@@ -121,20 +117,20 @@ Module Sem.
     Proof. reflexivity. Qed.
 
     Lemma persist_app {A B} [w0] (f : Sem (A -> B) w0) (a : Sem A w0) [w1] (θ : Θ w0 w1) :
-      persist (app f a) θ = app (persist f θ) (persist a θ).
+      persist (ap f a) θ = ap (persist f θ) (persist a θ).
     Proof. reflexivity. Qed.
 
   End PersistLemmas.
 
-  Definition decode_ty : ⊢ʷ Ṫy -> Sem Ty := fun w t => inst t.
+  Definition decode_ty : ⊧ Ṫy ̂→ Sem Ty := fun w t => inst t.
   #[global] Arguments decode_ty [w] _.
-  Definition decode_env : ⊢ʷ Ėnv -> Sem Env := fun w G => inst G.
+  Definition decode_env : ⊧ Ėnv ̂→ Sem Env := fun w G => inst G.
   #[global] Arguments decode_env [w] _.
 
   Module notations.
 
     Notation "f <$> a" := (@Sem.fmap _ _ f _ a) (at level 61, left associativity).
-    Notation "f <*> a" := (@Sem.app _ _ _ f a) (at level 61, left associativity).
+    Notation "f <*> a" := (@Sem.ap _ _ _ f a) (at level 61, left associativity).
 
   End notations.
 
@@ -149,19 +145,19 @@ Module ėxp.
   Set Implicit Arguments.
   Set Maximal Implicit Insertion.
 
-  Definition var : ⊢ʷ Const string -> Ėxp :=
+  Definition var : ⊧ Const string ̂→ Ėxp :=
     fun _ x => Sem.pure (exp.var x).
-  Definition true : ⊢ʷ Ėxp :=
+  Definition true : ⊧ Ėxp :=
     fun _ => Sem.pure exp.true.
-  Definition false : ⊢ʷ Ėxp :=
+  Definition false : ⊧ Ėxp :=
     fun _ => Sem.pure exp.false.
-  Definition ifte : ⊢ʷ Ėxp -> Ėxp -> Ėxp -> Ėxp :=
+  Definition ifte : ⊧ Ėxp ̂→ Ėxp ̂→ Ėxp ̂→ Ėxp :=
     fun _ e1 e2 e3 => exp.ifte <$> e1 <*> e2 <*> e3.
-  Definition absu : ⊢ʷ Const string -> Ėxp -> Ėxp :=
+  Definition absu : ⊧ Const string ̂→ Ėxp ̂→ Ėxp :=
     fun _ x e => exp.absu x <$> e.
-  Definition abst : ⊢ʷ Const string -> Ṫy -> Ėxp -> Ėxp :=
+  Definition abst : ⊧ Const string ̂→ Ṫy ̂→ Ėxp ̂→ Ėxp :=
     fun _ x t e => exp.abst x <$> decode_ty t <*> e.
-  Definition app : ⊢ʷ Ėxp -> Ėxp -> Ėxp :=
+  Definition app : ⊧ Ėxp ̂→ Ėxp ̂→ Ėxp :=
     fun _ e1 e2 => exp.app <$> e1 <*> e2.
 
   Section InstLemmas.

@@ -37,13 +37,13 @@ From Em Require Import
   Stlc.Spec
   Stlc.Worlds.
 
-Import ctx.notations.
+Import world.notations.
 Import World.notations.
 
 #[local] Set Implicit Arguments.
 
 Class Persistent (A : TYPE) : Type :=
-  persist : forall {Θ}, ⊢ʷ A -> Box Θ A.
+  persist : forall {Θ}, ⊧ A ̂→ Box Θ A.
 #[global] Arguments persist {_ _ _} [w] _ [_] _.
 
 #[export] Instance persist_ty : Persistent Ṫy :=
@@ -182,12 +182,12 @@ Proof. unfold persist, persist_env, Ėnv. now rewrite fmap_insert. Qed.
 
 Class LkStep (Θ : ACC) (stepΘ : Step Θ) : Prop :=
   lk_step w α (αIn : α ∈ w) β :
-    lk (step (α := β)) αIn = ṫy.var (ctx.in_succ αIn).
+    lk (step (α := β)) αIn = ṫy.var (world.in_succ αIn).
 #[global] Arguments LkStep Θ {_}.
 
 Class LkThin (Θ : ACC) (thinΘ : Thin Θ) : Prop :=
   lk_thin w α (αIn : α ∈ w) β (βIn : β ∈ w - α) :
-    lk (thin α) βIn = ṫy.var (ctx.in_thin αIn βIn).
+    lk (thin α) βIn = ṫy.var (world.in_thin αIn βIn).
 #[global] Arguments LkThin Θ {_}.
 
 Class LkThick (Θ : ACC) (thickΘ : Thick Θ) : Prop :=

@@ -28,85 +28,73 @@
 
 From Em Require Import
   Context
+  Prelude
   Stlc.Persistence
   Stlc.Spec
   Stlc.Worlds.
 
-Import ctx.notations.
+Import world.notations.
 
 #[local] Set Implicit Arguments.
 
 Module alloc.
 
   Inductive Alloc (w : World) : TYPE :=
-    | refl         : Alloc w w
-    | fresh {α w'} : Alloc (w ▻ α) w' -> Alloc w w'.
+  | refl        : Alloc w w
+  | snoc {w' α} : Alloc w w' → Alloc w (w' ▻ α).
   #[global] Arguments refl {_}.
-  #[global] Arguments fresh {_ _ _} _.
+  #[global] Arguments snoc {_ _ _} _.
 
-  Fixpoint persist_in {w0 α} (αIn : α ∈ w0) {w1} (θ : Alloc w0 w1) {struct θ} :=
+  Fixpoint persist_in {w0 w1} (θ : Alloc w0 w1) [α] (αIn : α ∈ w0) : α ∈ w1 :=
     match θ with
-    | refl     => αIn
-    | fresh θ' => persist_in (ctx.in_succ αIn) θ'
+    | refl    => αIn
+    | snoc θ' => world.in_succ (persist_in θ' αIn)
     end.
 
   Canonical Structure acc_alloc : ACC :=
     {| acc              := Alloc;
-       lk w0 w1 θ α αIn := ṫy.var (persist_in αIn θ)
+       lk w0 w1 θ α αIn := ṫy.var (persist_in θ αIn)
     |}.
 
   #[export] Instance refl_alloc : Refl Alloc :=
     fun w => refl.
   #[export] Instance trans_alloc : Trans Alloc :=
-    fix trans {w0 w1 w2} (θ1 : Alloc w0 w1) : Alloc w1 w2 -> Alloc w0 w2 :=
-    match θ1 with
-    | refl      => fun θ2 => θ2
-    | fresh θ1' => fun θ2 => fresh (trans θ1' θ2)
-    end.
+    fix trans {w0 w1 w2} (θ1 : Alloc w0 w1) (θ2 : Alloc w1 w2) : Alloc w0 w2 :=
+      match θ2 with
+      | refl     => θ1
+      | snoc θ2' => snoc (trans θ1 θ2')
+      end.
 
   #[export] Instance step_alloc : Step Alloc :=
-    fun w α => fresh refl.
-
+    fun w α => snoc refl.
   #[export] Instance refltrans_alloc : ReflTrans Alloc.
   Proof.
     constructor.
+    - intros ? ? θ; induction θ; cbn; now f_equal.
     - easy.
-    - intros ? ? r; induction r; cbn; [|rewrite IHr]; easy.
-    - induction r1; cbn; firstorder; now rewrite IHr1.
+    - intros ? ? ? ? θ1 θ2 θ3. induction θ3; cbn; now f_equal.
   Qed.
 
-  Lemma snoc_r {w1 w2} (r : Alloc w1 w2) :
-    forall α, Alloc w1 (w2 ▻ α).
-  Proof.
-    induction r; cbn; intros β.
-    - econstructor 2; constructor 1.
-    - econstructor 2. apply IHr.
-  Qed.
-
-  Lemma nil_l {w} : Alloc ctx.nil w.
-  Proof. induction w; [constructor|now apply snoc_r]. Defined.
+  Fixpoint nil {w} : Alloc world.nil w :=
+    match w with
+    | []     => refl
+    | w' ▻ α => snoc nil
+    end.
 
   #[export] Instance lkrefl : LkRefl Alloc.
   Proof. easy. Qed.
   #[export] Instance lktrans : LkTrans Alloc.
   Proof.
-    intros w0 w1 w2 θ1 θ2 α αIn. DepElim.hnf_eq. f_equal.
-    induction θ1; cbn; [easy|]. now rewrite IHθ1.
+    intros w0 w1 w2 θ1 θ2 α αIn. do 2 (unfold lk; cbn).
+    f_equal. induction θ2; cbn; now f_equal.
   Qed.
   #[export] Instance lkstep : LkStep Alloc.
   Proof. easy. Qed.
 
-  Definition incl {Θ} {reflΘ : Refl Θ} {transΘ : Trans Θ} {stepΘ : Step Θ} :=
-    fix incl {w0 w1} (θ : Alloc w0 w1) : Θ w0 w1 :=
-      match θ with
-      | alloc.refl => Worlds.refl
-      | alloc.fresh θ' => Worlds.trans step (incl θ')
-      end.
-
-  Lemma incl_alloc {w0 w1} (θ : alloc.acc_alloc w0 w1) :
-      incl θ = θ.
-  Proof. induction θ; cbn; now f_equal. Qed.
-
 End alloc.
 Export alloc (Alloc).
 Export (hints) alloc.
+Notation "w1 ⊑⁺ w2" := (acc alloc.acc_alloc w1 w2) (at level 80).
+Infix "⊙⁺" := (trans (Θ := alloc.acc_alloc)) (at level 60, right associativity).
+Notation "□⁺ A" := (Box alloc.acc_alloc A)
+  (at level 9, right associativity, format "□⁺ A") : indexed_scope.

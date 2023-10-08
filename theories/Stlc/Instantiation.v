@@ -39,11 +39,11 @@ From Em Require Import
   Stlc.Spec
   Stlc.Worlds.
 
-Import ctx.notations.
+Import world.notations.
 
 #[local] Set Implicit Arguments.
 
-Notation Assignment := (@env.Env nat (fun _ => Ty)).
+Notation Assignment := (env.Env Ty).
 
 Section Inst.
 
@@ -54,12 +54,10 @@ Section Inst.
     Inst (List A) (list a) :=
     fun w xs ass => List.map (fun x => inst x ass) xs.
 
-  #[export] Instance inst_const {A} :
-    Inst (Const A) A | 10 :=
+  #[export] Instance inst_const {A} : Inst (Const A) A | 10 :=
     fun Σ x ι => x.
 
-  #[export] Instance inst_unit :
-    Inst Unit unit :=
+  #[export] Instance inst_unit : Inst Unit unit :=
     fun _ x ass => x.
 
   #[export] Instance inst_prod {AT BT A B} `{Inst AT A, Inst BT B} :
@@ -90,7 +88,7 @@ Section Lift.
   Import World.notations.
 
   Class Lift (AT : TYPE) (A : Type) : Type :=
-    lift : A -> ⊢ʷ AT.
+    lift : A -> ⊧ AT.
 
   (* Indexes a given ty by a world Σ *)
   #[export] Instance lift_ty : Lift Ṫy Ty :=
@@ -122,7 +120,7 @@ Section InstLift.
   #[export] Instance inst_lift_env : InstLift Ėnv Env.
   Proof.
     intros w E ι. unfold inst, inst_env, lift, lift_env.
-    rewrite <- map_fmap_id. rewrite <- map_fmap_compose.
+    rewrite <- map_fmap_id, <- map_fmap_compose.
     apply map_fmap_ext. intros x t Hlk. apply inst_lift.
   Qed.
 
@@ -218,8 +216,8 @@ Lemma inst_thick {Θ} {thickΘ : Thick Θ} {lkthickΘ : LkThick Θ} :
     inst (thick (Θ := Θ) x t) ι = env.insert xIn ι (inst t ι).
 Proof.
   intros. apply env.lookup_extensional. intros β βIn. unfold inst, inst_acc.
-  rewrite env.lookup_tabulate. rewrite lk_thick. cbn. unfold thickIn.
-  destruct ctx.occurs_check_view; cbn.
+  rewrite env.lookup_tabulate, lk_thick. unfold thickIn.
+  destruct world.occurs_check_view; cbn.
   - now rewrite env.lookup_insert.
   - now rewrite env.lookup_thin, env.remove_insert.
 Qed.
@@ -244,10 +242,7 @@ Proof. unfold lift, lift_env. now rewrite <- lookup_fmap. Qed.
 
 Lemma lookup_inst (w : World) (Γ : Ėnv w) (x : string) (ι : Assignment w) :
   lookup x (inst Γ ι) = inst (lookup x Γ) ι.
-Proof.
-  unfold inst at 1, inst_env.
-  now rewrite lookup_fmap.
-Qed.
+Proof. unfold inst at 1, inst_env. now rewrite lookup_fmap. Qed.
 
 Lemma inst_insert {w} (Γ : Ėnv w) (x : string) (t : Ṫy w) (ι : Assignment w) :
   inst (Γ ,, x∷t) ι = inst Γ ι ,, x ∷ inst t ι.
@@ -261,21 +256,8 @@ Lemma lift_insert {w x t Γ} :
   lift (insert x t Γ) w = insert x (lift t w) (lift Γ w).
 Proof. unfold lift, lift_env. now rewrite fmap_insert. Qed.
 
-  (* Lemma persist_split : forall w w' iw (pos : w ↑ iw) (neg : iw ↓ w') x, *)
-  (*   persist w  x iw pos -> *)
-  (*   persist iw x w' neg -> *)
-  (*   persist w  x w' {| iw := iw; pos := pos; neg := neg |}. *)
-
-(* Lemma persist_liftEnv {Θ : ACC} {w0 w1} (e : Env) (θ : Θ w0 w1) : *)
-(*   persist (liftEnv e w0) θ = liftEnv e w1. *)
-(* Proof. *)
-(*   unfold liftEnv, persist, persist_env. rewrite <- map_fmap_compose. *)
-(*   apply (map_fmap_ext (M := gmap string)). intros _ t _. *)
-(*   unfold compose. apply persist_liftTy. *)
-(* Qed. *)
-
 Fixpoint grounding (w : World) : Assignment w :=
   match w with
-  | ctx.nil      => env.nil
-  | ctx.snoc Γ b => env.snoc (grounding Γ) b ty.bool
-  end%ctx.
+  | world.nil      => env.nil
+  | world.snoc Γ b => env.snoc (grounding Γ) b ty.bool
+  end%world.

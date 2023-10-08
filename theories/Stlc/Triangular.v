@@ -26,39 +26,30 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Coq Require Import
-  Classes.Morphisms
-  Relations.Relation_Definitions.
 From Em Require Import
   Context
-  Environment
+  Prelude
   Stlc.Persistence
-  Stlc.Spec
   Stlc.Worlds.
 
-Import ctx.notations.
-Import World.notations.
+Import world.notations World.notations.
 
 #[local] Set Implicit Arguments.
 
 Reserved Notation "w1 ⊒⁻ w2" (at level 80).
 
-Definition Later (A : TYPE) : TYPE :=
-  fun w => forall x (xIn : x ∈ w), A (w - x).
-Definition LaterTm (A : TYPE) : TYPE :=
-  fun w => forall x (xIn : x ∈ w), Ṫy (w - x) -> A (w - x).
-
 Module Tri.
 
-  Inductive Raw (w : World) : World -> Set :=
-  | refl      : Raw w w
-  | cons {w' x} (xIn : x ∈ w) (t : Ṫy (w - x)) (ζ : Raw (w - x) w') : Raw w w'.
-  #[global] Arguments refl {_}.
-  #[global] Arguments cons {_ _} x {_} t ζ.
+  Inductive Rel (w : World) : World -> Set :=
+  | nil : Rel w w
+  | cons {w' α} (αIn : α ∈ w) (τ : Ṫy (w - α)) (θ : w - α ⊒⁻ w') : w ⊒⁻ w'
+  where "w0 ⊒⁻ w1" := (Rel w0 w1).
+  #[global] Arguments nil {_}.
+  #[global] Arguments cons {_ _} α {_} τ θ.
 
   Section InnerRecursion.
 
-    Context [w w' : World] (rec : forall y (yIn : y ∈ w), Ṫy w').
+    Context [w w' : World] (rec : ∀ y (yIn : y ∈ w), Ṫy w').
 
     Fixpoint persist_inner (t : Ṫy w) : Ṫy w' :=
       match t with
@@ -69,84 +60,74 @@ Module Tri.
 
   End InnerRecursion.
 
-  #[export] Instance proper_persist_inner {w0 w1} :
-    Proper (forall_relation (fun y => pointwise_relation (y ∈ w0) eq) ==> pointwise_relation _ eq) (@persist_inner w0 w1).
-  Proof. intros r1 r2 Hr t; induction t; cbn; now f_equal; auto. Qed.
+  Lemma proper_persist_inner {w0 w1} (rec1 rec2 : ∀ α, α ∈ w0 → Ṫy w1)
+    (Hrec : ∀ α (αIn : α ∈ w0), rec1 α αIn = rec2 α αIn) :
+    ∀ τ, persist_inner rec1 τ = persist_inner rec2 τ.
+  Proof. induction τ; cbn; now f_equal; auto. Qed.
 
-  Fixpoint persist_outer {w0} t {w1} (r : Raw w0 w1) {struct r} : Ṫy w1 :=
+  Fixpoint persist_outer {w0} t {w1} (r : w0 ⊒⁻ w1) {struct r} : Ṫy w1 :=
     match r with
-    | refl       => t
+    | nil        => t
     | cons α s r => persist_inner
                       (fun b βIn => persist_outer (thickIn _ s βIn) r)
                       t
     end.
 
   Canonical Structure Tri : ACC :=
-    {| acc              := Raw;
+    {| acc              := Rel;
        lk w1 w2 θ α αIn := persist_outer (ṫy.var αIn) θ;
     |}.
-  Notation "w1 ⊒⁻ w2" := (acc Tri w1 w2).
 
   #[export] Instance thick_tri : Thick Tri :=
-    fun w x xIn t => cons x t refl.
+    fun w x xIn t => cons x t nil.
   #[export] Instance refl_tri : Refl Tri :=
-    fun w => refl.
+    fun w => nil.
   #[export] Instance trans_tri : Trans Tri :=
     fix trans [w0 w1 w2] (ζ1 : w0 ⊒⁻ w1) {struct ζ1} : w1 ⊒⁻ w2 -> w0 ⊒⁻ w2 :=
       match ζ1 with
-      | refl        => fun ζ2 => ζ2
+      | nil         => fun ζ2 => ζ2
       | cons x t ζ1 => fun ζ2 => cons x t (trans ζ1 ζ2)
-      end.
-
-  Module Import notations.
-    Notation "▷ A" := (Later A) (at level 9, right associativity).
-    Notation "▶ A" := (LaterTm A) (at level 9, right associativity).
-    Notation "□⁻ A" := (Box Tri A) (at level 9, format "□⁻ A", right associativity).
-  End notations.
-
-  Definition box_intro_split {A} :
-    ⊢ʷ A -> ▶□⁻A -> □⁻A :=
-    fun w0 a la w1 ζ =>
-      match ζ with
-      | Tri.refl => a
-      | Tri.cons x t ζ' => la x _ t _ ζ'
       end.
 
   #[export] Instance refltrans_tri : ReflTrans Tri.
   Proof.
     constructor.
     - easy.
-    - induction r; cbn; [|rewrite IHr]; easy.
-    - induction r1; cbn; congruence.
+    - induction r; cbn; now f_equal.
+    - induction r1; cbn; intros; now f_equal.
   Qed.
 
   #[export] Instance lkrefl_tri : LkRefl Tri.
-  Proof. intros w α αIn. reflexivity. Qed.
+  Proof. easy. Qed.
 
-  Lemma persist_outer_fix {w0 w1} (θ : Tri w0 w1) (t : Ṫy w0) :
+  Lemma persist_outer_fix {w0 w1} (θ : w0 ⊒⁻ w1) (t : Ṫy w0) :
      persist_outer t θ =
      match t with
      | ṫy.var αIn    => lk θ αIn
      | ṫy.bool       => ṫy.bool
      | ṫy.func t1 t2 => ṫy.func (persist_outer t1 θ) (persist_outer t2 θ)
      end.
-  Proof. induction θ; destruct t; cbn; auto. Qed.
+  Proof. induction θ; destruct t; cbn; now f_equal. Qed.
 
   Lemma persist_outer_refl {w} (t : Ṫy w) : persist_outer t Worlds.refl = t.
   Proof. reflexivity. Qed.
 
-  Lemma persist_persist_inner {w0 w1} (t : Ṫy w0) (rec : forall y (yIn : y ∈ w0), Ṫy w1) {w2} (r : Tri w1 w2) :
-    persist (persist_inner rec t) r = persist_inner (fun y yIn => persist (rec y yIn) r) t.
-  Proof. induction t; cbn; f_equal; auto. Qed.
+  Lemma persist_persist_inner {w0 w1} (t : Ṫy w0)
+    (rec : ∀ y (yIn : y ∈ w0), Ṫy w1) {w2} (r : w1 ⊒⁻ w2) :
+    persist (persist_inner rec t) r =
+    persist_inner (fun y yIn => persist (rec y yIn) r) t.
+  Proof. induction t; cbn; now f_equal. Qed.
 
-  Lemma persist_outer_persist_inner {w0 w1} (t : Ṫy w0) (rec : forall y (yIn : y ∈ w0), Ṫy w1) {w2} (r : Tri w1 w2) :
-    persist_outer (persist_inner rec t) r = persist_inner (fun y yIn => persist_outer (rec y yIn) r) t.
+  Lemma persist_outer_persist_inner {w0 w1} (t : Ṫy w0)
+    (rec : ∀ y (yIn : y ∈ w0), Ṫy w1) {w2} (r : w1 ⊒⁻ w2) :
+    persist_outer (persist_inner rec t) r =
+    persist_inner (fun y yIn => persist_outer (rec y yIn) r) t.
   Proof.
     induction t; cbn; auto; rewrite persist_outer_fix at 1; f_equal; auto.
   Qed.
 
-  Lemma persist_outer_trans {w0} (t : Ṫy w0) {w1 w2} (θ1 : Tri w0 w1) (θ2 : Tri w1 w2) :
-    persist_outer t (θ1 ⊙ θ2) = persist_outer (persist_outer t θ1) θ2.
+  Lemma persist_outer_trans {w0 w1 w2 τ} (θ1 : w0 ⊒⁻ w1) (θ2 : w1 ⊒⁻ w2) :
+    persist_outer τ (θ1 ⊙ θ2) = persist_outer (persist_outer τ θ1) θ2.
   Proof.
     induction θ1; cbn.
     - reflexivity.
@@ -161,14 +142,24 @@ Module Tri.
   #[export] Instance lktrans_tri : LkTrans Tri.
   Proof.
     intros w0 w1 w2 θ1 θ2 α αIn. unfold lk; cbn.
-    generalize (ṫy.var αIn). clear. intros t.
     now rewrite persist_outer_trans, persist_outer_persist.
   Qed.
 
   #[export] Instance lkthick_tri : LkThick Tri.
   Proof. easy. Qed.
 
+  Ltac folddefs :=
+    repeat
+      match goal with
+      | |- context[@Tri.nil ?w] =>
+          change_no_check (@nil w) with (@refl Tri _ w)
+      | |- context[Tri.cons ?x ?t refl] =>
+          change_no_check (cons x t refl) with (thick x t)
+      | |- context[Tri.cons ?x ?t ?r] =>
+          change_no_check (cons x t r) with (trans (Θ := Tri) (thick x t) r)
+      end.
+
 End Tri.
 Export Tri (Tri).
-Notation "w1 ⊒⁻ w2" := (Tri w1 w2) (at level 80).
+Notation "w1 ⊒⁻ w2" := (acc Tri w1 w2) (at level 80).
 Infix "⊙⁻" := (trans (Θ := Tri)) (at level 60, right associativity).

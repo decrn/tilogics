@@ -37,17 +37,15 @@ From Em Require Import
      Stlc.Persistence
      Stlc.Worlds.
 
-Import ctx.notations.
+Import world.notations.
 Import World.notations.
-
-#[local] Set Implicit Arguments.
 
 Reserved Notation "w1 ⊑ˢ w2" (at level 80).
 
 Module Sub.
 
   Canonical Structure Sub : ACC :=
-    {| acc w0 w1        := @env.Env nat (fun _ => Ṫy w1) w0;
+    {| acc w0 w1        := env.Env (Ṫy w1) w0;
        lk w0 w1 θ α αIn := env.lookup θ αIn
     |}.
 
@@ -66,12 +64,9 @@ Module Sub.
   #[export] Instance thick_sub : Thick Sub :=
     fun w x xIn s => env.tabulate (thickIn xIn s).
   #[export] Instance thin_sub : Thin Sub :=
-    fun w α αIn => env.tabulate (fun β βIn => ṫy.var (ctx.in_thin αIn βIn)).
+    fun w α αIn => env.tabulate (fun β βIn => ṫy.var (world.in_thin αIn βIn)).
   #[export] Instance step_sub : Step Sub :=
-    fun w x => thin _ (αIn := ctx.in_zero).
-
-  Definition up1 {w0 w1} (r01 : Sub w0 w1) {n} : Sub (w0 ▻ n) (w1 ▻ n) :=
-    env.snoc (env.map (fun _ (t : Ṫy _) => persist t step) r01) n (ṫy.var ctx.in_zero).
+    fun w x => thin _ (αIn := world.in_zero).
 
   Ltac foldlk :=
     change (env.lookup ?θ ?αIn) with (@lk Sub _ _ θ _ αIn).
@@ -85,7 +80,7 @@ Module Sub.
   #[export] Instance lk_trans_sub : LkTrans Sub.
   Proof.
     intros w0 w1 w2 θ1 θ2 α αIn.
-    induction θ1; destruct (ctx.view αIn); cbn; now foldlk.
+    induction θ1; destruct (world.view αIn); cbn; now foldlk.
   Qed.
 
   #[export] Instance lk_thin_sub : LkThin Sub.
@@ -100,21 +95,6 @@ Module Sub.
     now rewrite env.lookup_tabulate.
   Qed.
 
-  Lemma lk_up1_zero {w0 w1 x} (θ : Sub w0 w1) :
-    lk (up1 θ (n := x)) ctx.in_zero = ṫy.var ctx.in_zero.
-  Proof. reflexivity. Qed.
-
-  Lemma lk_up1_succ {w0 w1 x} (θ : Sub w0 w1) {y} {yIn : y ∈ w0} :
-    lk (up1 θ (n := x)) (ctx.in_succ yIn) = persist (lk θ yIn) step.
-  Proof. cbn - [step]. now rewrite env.lookup_map. Qed.
-
-  (* #[export] Instance persist_preorder_sub {T} `{Persistent T} : PersistPreOrder Sub T. *)
-  (* Proof. *)
-  (*   (* constructor; intros w t *. *) *)
-  (*   (* - induction t; cbn; f_equal; now rewrite ?lk_refl. *) *)
-  (*   (* - induction t; cbn; f_equal; now rewrite ?lk_trans. *) *)
-  (* Admitted. *)
-
   #[export] Instance refltrans_sub : ReflTrans Sub.
   Proof.
     constructor.
@@ -127,7 +107,7 @@ Module Sub.
   Qed.
 
   (* #[export] Instance InstSub : forall w, Inst (Sub w) (Assignment w) := *)
-  (*   fun w0 w1 r ι => env.map (fun _ (t : Ty w1) => inst t ι) r. *)
+  (*   fun w0 w1 r ι => env.map (fun (t : Ṫy w1) => inst t ι) r. *)
   (*   (* fix instsub {w0 w1} (r : Sub w0 w1) (ι : Assignment w1) {struct r} := *) *)
   (*   (*   match r with *) *)
   (*   (*   | env.nil        => env.nil *) *)
@@ -140,16 +120,12 @@ Module Sub.
     apply env.lookup_extensional. intros β βIn. foldlk.
     rewrite lk_trans, lk_refl, lk_thin. cbn. foldlk.
     rewrite lk_thick. unfold thickIn.
-    now rewrite ctx.occurs_check_view_thin.
+    now rewrite world.occurs_check_view_thin.
   Qed.
 
   Lemma thin_thick_pointful {w α} (αIn : α ∈ w) (s : Ṫy (w - α)) (t : Ṫy (w - α)) :
     subst (subst t (thin α)) (thick α s) = t.
   Proof. now rewrite <- persist_trans, comp_thin_thick, persist_refl. Qed.
-
-  (* Lemma subst_thin {w x} (xIn : x ∈ w) (t : Ṫy (w - x)) : *)
-  (*   STLC.thin xIn T = subst T (thin xIn). *)
-  (* Proof. induction T; cbn; f_equal; now rewrite ?lk_thin. Qed. *)
 
   Definition of {Θ : ACC} [w0 w1] (θ01 : Θ w0 w1) : Sub w0 w1 :=
     env.tabulate (@lk _ _ _ θ01).
@@ -174,34 +150,17 @@ Module Sub.
   Qed.
 
   Lemma of_thick {Θ} {thickΘ : Thick Θ} {lkThickΘ : LkThick Θ}
-    w α αIn t :
-    of (@thick Θ thickΘ w α αIn t) = thick (Θ := Sub) α t.
+    w α (αIn : α ∈ w) t :
+    of (thick (Θ := Θ) α t) = thick (Θ := Sub) α t.
   Proof.
     apply env.lookup_extensional. intros β βIn. unfold of, thick at 2, thick_sub.
     now rewrite !env.lookup_tabulate, lk_thick.
-  Qed.
-
-  Lemma of_trans {Θ} {transΘ : Trans Θ} {lktransΘ : LkTrans Θ}
-    {w0 w1 w2} (θ1 : Θ w0 w1) (θ2 : Θ w1 w2) :
-    of (trans θ1 θ2) = trans (of θ1) (of θ2).
-  Proof.
-    apply env.lookup_extensional. intros α αIn. unfold of at 1.
-    rewrite env.lookup_tabulate.
-    change (lk (θ1 ⊙ θ2) αIn = lk (of θ1 ⊙ of θ2) αIn).
-    rewrite !lk_trans, lk_of. apply persist_simulation.
-    intros. now rewrite lk_of.
   Qed.
 
   Lemma persist_sim {Θ : ACC} {T} {persT : Persistent T} {persLT : PersistLaws T}
     [w0 w1] (θ : Θ w0 w1) :
     forall t, persist t (of θ) = persist t θ.
   Proof. intros. apply persist_simulation. intros. now rewrite lk_of. Qed.
-
-  Lemma persist_sim_step {Θ} {stepΘ : Step Θ} {lkStepΘ : LkStep Θ}
-    [T] {persT : Persistent T} {persLT : PersistLaws T}
-    w α (t : T w) :
-    persist t (step (Θ := Θ)) = persist t (step (Θ := Sub) (α := α)).
-  Proof. now rewrite <- persist_sim, of_step. Qed.
 
 End Sub.
 Export Sub (Sub).
