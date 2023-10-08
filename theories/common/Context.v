@@ -374,25 +374,29 @@ Module Import ctx.
          define the elimination schemes for the predicate ourselves. *)
       #[local] Unset Elimination Schemes.
 
+      #[local] Notation "▷ A" :=
+        (fun (Γ : Ctx B) => forall x (xIn : In x Γ), A (remove Γ xIn))
+          (at level 9, right associativity).
+      #[local] Notation "▶ P" :=
+        (fun Γ (d : ▷_ Γ) => forall x (xIn : In x Γ), P (remove Γ xIn) (d x xIn))
+          (at level 9, right associativity).
+
       Inductive remove_acc (Γ : Ctx B) : Prop :=
-        remove_acc_intro :
-          (forall x (xIn : In x Γ), remove_acc (remove Γ xIn)) -> remove_acc Γ.
+        remove_acc_intro : ▷remove_acc Γ -> remove_acc Γ.
 
-      Definition remove_acc_inv {Γ} (d : remove_acc Γ) :
-        forall x (xIn : In x Γ), remove_acc (remove Γ xIn) := let (f) := d in f.
+      Definition remove_acc_inv {Γ} (d : remove_acc Γ) : ▷remove_acc Γ :=
+        let (f) := d in f.
 
-      Definition remove_acc_rect (P : forall Γ, remove_acc Γ -> Type)
-        (f : forall Γ (d : forall x (xIn : In x Γ), remove_acc (remove Γ xIn)),
-            (forall x (xIn : In x Γ),
-                P (remove Γ xIn) (d x xIn)) -> P Γ (remove_acc_intro d)) :=
-        fix F Γ (d : remove_acc Γ) {struct d} : P Γ d :=
-          let (g) return _ := d in
-          f Γ g (fun x xIn => F (remove Γ xIn) (g x xIn)).
+      (* We only define a non-dependent elimination scheme for Type. *)
+      Definition remove_acc_rect (P : forall Γ, Type)
+        (f : forall Γ, ▷P Γ -> P Γ) :
+        forall Γ, remove_acc Γ -> P Γ :=
+        fix F Γ (d : remove_acc Γ) {struct d} : P Γ :=
+          f Γ (fun x xIn => F (remove Γ xIn) (remove_acc_inv d xIn)).
 
+      (* Define a dependent elimination scheme for Prop. *)
       Definition remove_acc_ind (P : forall Γ, remove_acc Γ -> Prop)
-        (f : forall Γ (d : forall x (xIn : In x Γ), remove_acc (remove Γ xIn)),
-            (forall x (xIn : In x Γ),
-                P (remove Γ xIn) (d x xIn)) -> P Γ (remove_acc_intro d)) :=
+        (f : forall Γ (d : ▷remove_acc Γ), ▶P Γ d -> P Γ (remove_acc_intro d)) :=
         fix F Γ (d : remove_acc Γ) {struct d} : P Γ d :=
           let (g) return _ := d in
           f Γ g (fun x xIn => F (remove Γ xIn) (g x xIn)).

@@ -12,6 +12,7 @@ theories/Stlc/Shallow.v
 theories/Stlc/Spec.v
 theories/Stlc/Substitution.v
 theories/Stlc/Symbolic/Free.v
+theories/Stlc/Symbolic/FreeCheck.v
 theories/Stlc/Symbolic/FreeReconstruct.v
 theories/Stlc/Symbolic/FreeSynthesis.v
 theories/Stlc/Triangular.v

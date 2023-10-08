@@ -48,14 +48,7 @@ Definition Later (A : TYPE) : TYPE :=
 Definition LaterTm (A : TYPE) : TYPE :=
   fun w => forall x (xIn : x ∈ w), Ṫy (w - x) -> A (w - x).
 
-Definition Sooner (A : TYPE) : TYPE :=
-  fun w => sigT (fun x => sigT (fun (xIn : x ∈ w) => A (w - x))).
-Definition SoonerTm (A : TYPE) : TYPE :=
-  fun w => sigT (fun x => sigT (fun (xIn : x ∈ w) => Ṫy (w - x) * A (w - x)))%type.
-
 Module Tri.
-
-  (* #[local] Unset Elimination Schemes. *)
 
   Inductive Raw (w : World) : World -> Set :=
   | refl      : Raw w w
@@ -108,8 +101,6 @@ Module Tri.
   Module Import notations.
     Notation "▷ A" := (Later A) (at level 9, right associativity).
     Notation "▶ A" := (LaterTm A) (at level 9, right associativity).
-    Notation "◁ A" := (Sooner A) (at level 9, right associativity).
-    Notation "◀ A" := (SoonerTm A) (at level 9, right associativity).
     Notation "□⁻ A" := (Box Tri A) (at level 9, format "□⁻ A", right associativity).
   End notations.
 

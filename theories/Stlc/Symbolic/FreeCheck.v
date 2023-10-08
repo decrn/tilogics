@@ -427,8 +427,8 @@ Section Correctness.
     destruct m as [(w1 & θ1 & C & t' & ee')|]; cbn; [|now rewrite Acc.wp_false].
     cbn. wsimpl.
     rewrite wp_option_bind.
-    rewrite <- solvelist_correct.
-    destruct (solvelist C) as [(w2 & θ2 & [])|]; cbn.
+    rewrite <- solver_correct.
+    destruct (solver C) as [(w2 & θ2 & [])|]; cbn.
     - rewrite Acc.and_wp_l. wsimpl. clear.
       rewrite eqₚ_sym.
       generalize (t' =ₚ lift t w2). clear. intros P.
@@ -460,7 +460,5 @@ Section Correctness.
     destruct reconstruct_optiondiamond as [(w & θ & [t' ee'])|]; cbn; auto.
     apply base.exist_proper. intros ι. pred_unfold. intuition.
   Qed.
-
-  Print Assumptions correctness.
 
 End Correctness.

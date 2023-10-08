@@ -457,14 +457,6 @@ Section Solve.
       Option (DS (Option TyF)) w :=
     Fix (measure_wf lessthan_wellfounded (fun d => measure (find d))) _ osolve.
 
-  Definition Acc_dep_ind (A : Type) (R : A → A → Prop) (P : ∀ x : A, Acc R x → Prop)
-    (f : ∀ (x : A) (a : ∀ y : A, R y x → Acc R y)
-           (IH : ∀ (y : A) (r : R y x), P y (a y r)), P x (Acc_intro x a)) :=
-    fix F (x : A) (a : Acc R x) {struct a} : P x a :=
-      match a as a0 return (P x a0) with
-        Acc_intro _ a0 => f x a0 (λ (y : A) (y0 : R y x), F y (a0 y y0))
-      end.
-
   Lemma compatible_mergefind {w} (fnd : Ref w -> Ref w) (x y : Ref w) :
     (⊢ x =ₚ y ->ₚ
        compatible_find fnd ->ₚ
@@ -506,7 +498,7 @@ Section Solve.
   Proof.
     unfold solve, Fix.
     generalize (measure_wf lessthan_wellfounded (fun d => measure (DS.find d)) d) as a.
-    induction a as [d a IH] using Acc_dep_ind.
+    induction a as [d a IH] using Acc_inv_dep.
     induction cs; cbn.
     - easy.
     - destruct a0. destruct eq_dec; cbn.
