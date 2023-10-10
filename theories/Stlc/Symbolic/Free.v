@@ -87,11 +87,11 @@ Definition choose : ⊧ Free Ṫy :=
 #[global] Arguments choose {w}.
 
 #[global] Instance freeCstr : CstrMonad Free :=
-{| ret := @Ret;
+{| ret  := @Ret;
    fail := @Fail;
-  bind := bind_freem;
-  eq   := assert;
-  pick := @choose |}.
+   bind := bind_freem;
+   eq   := assert;
+   pick := @choose |}.
 
 Section PrenexConversion.
 
