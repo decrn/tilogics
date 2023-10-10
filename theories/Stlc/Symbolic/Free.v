@@ -50,6 +50,7 @@ Set Implicit Arguments.
 Class CstrMonad (M : TYPE -> TYPE) : Type := {
   ret {A}    : ⊧ A  ̂→ M A;
   bind {A B} : ⊧ M A  ̂→ □⁺ (A  ̂→ M B)  ̂→ M B;
+  fail {A}   : ⊧ M A;
   eq         : ⊧ Ṫy  ̂→ Ṫy  ̂→ M Unit;
   pick       : ⊧ M Ṫy;
   }.
@@ -87,6 +88,7 @@ Definition choose : ⊧ Free Ṫy :=
 
 #[global] Instance freeCstr : CstrMonad Free :=
 {| ret := @Ret;
+   fail := @Fail;
   bind := bind_freem;
   eq   := assert;
   pick := @choose |}.
