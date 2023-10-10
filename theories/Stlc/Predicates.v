@@ -680,7 +680,7 @@ Module Pred.
       constructor. intros ι. pred_unfold. unfold wlp, wp, implₚ, eqₚ. cbn.
       split.
       - intros (ι' & Heq & HQ). subst. destruct (env.view ι').
-        exists (lift v _). intros ι' Heq1 Heq2.
+        exists (lift v). intros ι' Heq1 Heq2.
         rewrite inst_step_snoc in Heq1. subst.
         rewrite inst_persist, inst_lift in Heq2. subst.
         destruct (env.view ι'). rewrite inst_step_snoc in HQ.

@@ -89,6 +89,7 @@ Section Lift.
 
   Class Lift (AT : TYPE) (A : Type) : Type :=
     lift : A -> ⊧ AT.
+  #[global] Arguments lift {_ _ _} _ {_}.
 
   (* Indexes a given ty by a world Σ *)
   #[export] Instance lift_ty : Lift Ṫy Ty :=
@@ -99,11 +100,11 @@ Section Lift.
       end.
 
   #[export] Instance lift_env : Lift Ėnv Env :=
-    fun E w => fmap (fun t => lift t w) E.
+    fun E w => fmap (fun t => lift t) E.
 
   #[export] Instance lift_prod {AT BT A B} `{Lift AT A, Lift BT B} :
     Lift (Prod AT BT) (A * B) :=
-    fun '(a , b) w => (lift a w, lift b w).
+    fun '(a , b) w => (lift a, lift b).
 
 End Lift.
 
@@ -111,7 +112,7 @@ Section InstLift.
 
   Class InstLift AT A `{Inst AT A, Lift AT A} : Prop :=
     inst_lift (w : World) (a : A) (ι : Assignment w) :
-      inst (lift a w) ι = a.
+      inst (lift a) ι = a.
   #[global] Arguments InstLift _ _ {_ _}.
 
   #[export] Instance inst_lift_ty : InstLift Ṫy Ty.
@@ -159,7 +160,7 @@ End InstPersist.
 Section PersistLift.
   Class PersistLift AT A {liftA : Lift AT A} {persA: Persistent AT} : Prop :=
     persist_lift [Θ : ACC] {w0 w1} (a : A) (θ : Θ w0 w1) :
-      persist (lift a w0) θ = lift a w1.
+      persist (lift a) θ = lift a.
   #[global] Arguments PersistLift _ _ {_ _}.
 
   #[export] Instance persist_lift_ty : PersistLift Ṫy Ty.
@@ -236,8 +237,7 @@ Proof.
 Qed.
 
 Lemma lookup_lift (Γ : Env) (x : string) (w : World) :
-  lookup x (lift Γ w) =
-    option.map (fun t => lift t w) (lookup x Γ).
+  lookup x (lift (w:=w) Γ) = option.map (fun t => lift t) (lookup x Γ).
 Proof. unfold lift, lift_env. now rewrite <- lookup_fmap. Qed.
 
 Lemma lookup_inst (w : World) (Γ : Ėnv w) (x : string) (ι : Assignment w) :
@@ -253,7 +253,7 @@ Lemma inst_empty {w} (ι : Assignment w) :
 Proof. cbv [inst inst_env Ėnv]. now rewrite fmap_empty. Qed.
 
 Lemma lift_insert {w x t Γ} :
-  lift (insert x t Γ) w = insert x (lift t w) (lift Γ w).
+  lift (w:=w) (insert x t Γ) = insert x (lift t) (lift Γ).
 Proof. unfold lift, lift_env. now rewrite fmap_insert. Qed.
 
 Fixpoint grounding (w : World) : Assignment w :=

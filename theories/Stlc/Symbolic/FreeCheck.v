@@ -56,7 +56,7 @@ Set Implicit Arguments.
     (at level 8, left associativity,
       format "s [ ζ ]").
 
-Section Generate.
+Section Implementation.
   Import MonadNotations.
   Import World.notations.
 
@@ -65,17 +65,12 @@ Section Generate.
       match e with
       | exp.var x =>
           match lookup x Γ with
-          | Some τ' =>
-              [ θ ] _ <- assert τ τ' ;;
-              Ret (ėxp.var x)
-          | None   => Fail
+          | Some τ' => [ θ ] _ <- assert τ τ' ;;
+                       Ret (ėxp.var x)
+          | None    => Fail
           end
-      | exp.true  =>
-          [ θ ] _ <- assert τ ṫy.bool ;;
-          Ret ėxp.true
-      | exp.false =>
-          [ θ ] _ <- assert τ ṫy.bool ;;
-          Ret ėxp.false
+      | exp.true  => [ θ ] _ <- assert τ ṫy.bool ;; Ret ėxp.true
+      | exp.false => [ θ ] _ <- assert τ ṫy.bool ;; Ret ėxp.false
       | exp.ifte e1 e2 e3 =>
           [ θ1 ] e1' <- gen e1 Γ ṫy.bool ;;
           [ θ2 ] e2' <- gen e2 Γ[θ1] τ[θ1] ;;
@@ -89,9 +84,9 @@ Section Generate.
           Ret (ėxp.abst x t1[θ2⊙θ3⊙θ4] e'[θ4])
       | exp.abst x t1 e =>
           [ θ1 ] t2  <- choose ;;
-          [ θ2 ] e'  <- gen e (Γ[θ1] ,, x∷lift t1 _) t2 ;;
-          [ θ3 ] _   <- assert (τ[θ1⊙θ2]) (ṫy.func (lift t1 _) t2[θ2]) ;;
-          Ret (ėxp.abst x (lift t1 _) e'[θ3])
+          [ θ2 ] e'  <- gen e (Γ[θ1] ,, x∷lift t1) t2 ;;
+          [ θ3 ] _   <- assert (τ[θ1⊙θ2]) (ṫy.func (lift t1) t2[θ2]) ;;
+          Ret (ėxp.abst x (lift t1) e'[θ3])
       | exp.app e1 e2 =>
           [ θ1 ] t1  <- choose ;;
           [ θ2 ] e1' <- gen e1 Γ[θ1] (ṫy.func t1 τ[θ1]) ;;
@@ -99,23 +94,25 @@ Section Generate.
           Ret (ėxp.app e1'[θ3] e2')
       end.
 
-  Definition reconstruct_free (e : Exp) :
+  Definition generate' (e : Exp) :
     ⊧ Ėnv ̂→ Free (Prod Ṫy Ėxp) :=
     fun w G =>
       [θ1] τ  <- choose ;;
       [θ2] e' <- generate e G[θ1] τ ;;
       Ret (τ[θ2] , e').
 
-  Definition reconstruct_optiondiamond (e : Exp) :
-    Option (Diamond alloc.acc_alloc (Ṫy * Sem Exp)) world.nil :=
-    option.bind (prenex (reconstruct_free e empty)) solveoptiondiamond.
+  Definition reconstruct (G : Env) (e : Exp) :
+    option { w & Ṫy w * Ėxp w }%type :=
+    option.bind (prenex (generate' (w:=world.nil) e (lift G)))
+      (fun '(existT w1 (_ , (C , te))) =>
+          option.bind (solve C)
+            (fun '(existT w2 (θ2 , _)) =>
+               Some (existT w2 te[θ2]))).
 
-  Definition reconstruct_grounded (e : Exp) : option (Ty * Exp) :=
-    option.map
-      (fun '(existT w (_ , te)) => inst te (grounding w))
-      (reconstruct_optiondiamond e).
+  Definition reconstruct_grounded G (e : Exp) : option (Ty * Exp) :=
+    option.map (fun '(existT w te) => inst te (grounding w)) (reconstruct G e).
 
-End Generate.
+End Implementation.
 
 Section Correctness.
 
@@ -173,9 +170,8 @@ Section Correctness.
       iStopProof. constructor. intros ι [HT Heq]. pred_unfold.
       rewrite inst_insert in HT. now constructor.
     - iIntros "!>". rewrite wlp_bind. unfold _4. cbn.
-      iPoseProof (IHe _ (G[step] ,, x∷lift t (w ▻ world.fresh w)) (ṫy.var world.in_zero)) as "-#IH". iRevert "IH". clear IHe.
-      iApply (@wlp_mono alloc.acc_alloc). iIntros (w1 θ1 e1') "!> HT". cbn.
-      rewrite persist_insert. predsimpl.
+      iPoseProof (IHe _ (G[step] ,, x∷lift t) (ṫy.var world.in_zero)) as "-#IH". iRevert "IH". clear IHe.
+      iApply (@wlp_mono alloc.acc_alloc). iIntros (w1 θ1 e1') "!> HT". predsimpl.
       iStopProof. constructor. intros ι HT1. pred_unfold.
       rewrite inst_insert inst_lift in HT1. now constructor.
     - iIntros "!>". rewrite wlp_bind. unfold _4.
@@ -192,7 +188,7 @@ Section Correctness.
   Definition TPB_algo : ⊧ Ėnv ̂→ Const Exp ̂→ Ṫy ̂→ Ėxp ̂→ Pred :=
     fun w0 G0 e t0 e0 =>
     WP (Θ := alloc.acc_alloc)
-      (reconstruct_free e G0)
+      (generate' e G0)
       (fun w1 (θ1 : alloc.acc_alloc w0 w1) '(t1,e1) =>
          t0[θ1] =ₚ t1 /\ₚ
          e0[θ1] =ₚ e1).
@@ -200,7 +196,7 @@ Section Correctness.
   Lemma generate_sound (e : Exp) (w0 : World) (G0 : Ėnv w0) t0 e0 :
     TPB_algo G0 e t0 e0 ⊢ₚ G0 |--ₚ e; t0 ~> e0.
   Proof.
-    iStartProof. rewrite wand_is_impl. rewrite wp_impl. unfold reconstruct_free.
+    iStartProof. rewrite wand_is_impl. rewrite wp_impl. unfold generate'.
     rewrite wlp_bind. cbn. unfold _4. iIntros "!>".
     rewrite wlp_bind. cbn. unfold _4. predsimpl.
     iPoseProof (@generate_sound_aux e _ G0[step] (ṫy.var world.in_zero)) as "-#Hsound".
@@ -210,8 +206,8 @@ Section Correctness.
 
   Lemma generate_complete_aux {G e t ee} (T : G |-- e ∷ t ~> ee) :
     forall w0 (G0 : Ėnv w0) (t0 : Ṫy w0),
-      ⊢ lift G _ =ₚ G0 ->ₚ
-        lift t _ =ₚ t0 ->ₚ
+      ⊢ lift G =ₚ G0 ->ₚ
+        lift t =ₚ t0 ->ₚ
       WP (Θ := alloc.acc_alloc) (generate e G0 t0)
           (fun w1 r01 e' => Sem.pure ee =ₚ e')%P.
   Proof.
@@ -232,7 +228,7 @@ Section Correctness.
       now iApply eqₚ_refl.
     - iIntros "#HeqG #Heqt". cbn.
       rewrite wp_bind. unfold _4.
-      iPoseProof (eqₚ_intro (lift ty.bool w0)) as "Heqbool".
+      iPoseProof (eqₚ_intro (lift ty.bool)) as "Heqbool".
       iPoseProof (IH1 _ G0 ṫy.bool with "HeqG Heqbool") as "-#IH". clear IH1.
       iRevert "IH".
       iApply (@wp_mono alloc.acc_alloc). iIntros (w1 r1 e1'') "!> #Heq1". predsimpl.
@@ -253,9 +249,9 @@ Section Correctness.
 
     - iIntros "#HeqG #Heqt". cbn.
       rewrite Acc.intro_wp_step.
-      iExists (lift t1 _). iIntros "!> #Heq1".
+      iExists (lift t1). iIntros "!> #Heq1".
       rewrite Acc.intro_wp_step.
-      iExists (lift t2 _). iIntros "!> #Heq2".
+      iExists (lift t2). iIntros "!> #Heq2".
       rewrite wp_bind. unfold _4. predsimpl.
       iPoseProof (IH _ (G0 ,, x∷lk step world.in_zero) (ṫy.var world.in_zero)) as "IH".
       clear IH. predsimpl.
@@ -274,10 +270,10 @@ Section Correctness.
 
     - iIntros "#HeqG #Heqt". cbn.
       rewrite Acc.intro_wp_step.
-      iExists (lift t2 _). iIntros "!> #Heq1". predsimpl.
+      iExists (lift t2). iIntros "!> #Heq1". predsimpl.
 
       rewrite wp_bind. unfold _4.
-      iPoseProof (IH _ (G0 ,, x∷lift t1 _) (ṫy.var world.in_zero)) as "IH". clear IH.
+      iPoseProof (IH _ (G0 ,, x∷lift t1) (ṫy.var world.in_zero)) as "IH". clear IH.
       predsimpl.
       iPoseProof ("IH" with "HeqG Heq1") as "-#IH'"; iClear "IH". iRevert "IH'".
       iApply (@wp_mono alloc.acc_alloc).
@@ -287,7 +283,7 @@ Section Correctness.
 
     - iIntros "#HeqG #Heqt". cbn.
       rewrite Acc.intro_wp_step.
-      iExists (lift t1 _). iIntros "!> #Heq1". predsimpl.
+      iExists (lift t1). iIntros "!> #Heq1". predsimpl.
       rewrite wp_bind. unfold _4. predsimpl.
       iPoseProof (IH1 _ G0[step] (ṫy.func (ṫy.var world.in_zero) t0)) as "IH"; clear IH1.
       predsimpl.
@@ -307,7 +303,7 @@ Section Correctness.
   Lemma generate_complete (e : Exp) (w0 : World) (G0 : Ėnv w0) t0 e0 :
     G0 |--ₚ e; t0 ~> e0 ⊢ₚ TPB_algo G0 e t0 e0.
   Proof.
-    iIntros "HT". unfold TPB_algo, reconstruct_free. rewrite wp_bind. cbn. unfold _4.
+    iIntros "HT". unfold TPB_algo, generate'. rewrite wp_bind. cbn. unfold _4.
     rewrite Acc.intro_wp_step.
     iExists t0. iIntros "!> Heq1". predsimpl.
     rewrite wp_bind. unfold _4. cbn.
@@ -319,68 +315,38 @@ Section Correctness.
     intros ι1 <-. now pred_unfold.
   Qed.
 
-  Lemma generate_correct (e : Exp) (w0 : World) (G0 : Ėnv w0) t0 e0 :
-    G0 |--ₚ e; t0 ~> e0 ⊣⊢ₚ TPB_algo G0 e t0 e0.
-  Proof. apply split_bientails. auto using generate_complete, generate_sound. Qed.
+  Lemma generate_correct {w} (Γ : Ėnv w) (e : Exp) (τ : Ṫy w) (e' : Ėxp w) :
+    Γ |--ₚ e; τ ~> e' ⊣⊢ₚ TPB_algo Γ e τ e'.
+  Proof. apply split_bientails; auto using generate_complete, generate_sound. Qed.
 
-  Import (hints) Triangular.Tri.
   Import (hints) Acc.
 
-  Definition TPB_OD (e : Exp) (t : Ty) (ee : Exp) : Pred world.nil :=
-    wp_optiondiamond (reconstruct_optiondiamond e)
-      (fun w θ '(t', ee') => t' =ₚ lift t w /\ₚ ee' =ₚ lift ee w).
-
-  Lemma proper_wp_option_bientails {A : TYPE} {w1 w2: World} (m : Option A w1) :
-    Proper (pointwise_relation (A w1) bientails ==> bientails) (@wp_option A w1 w2 m).
-  Proof.
-    intros P Q PQ. unfold pointwise_relation in PQ.
-    destruct m; cbn; easy.
-  Qed.
-
-  Lemma reconstruct_schematic_correct (e : Exp) t ee :
-    ∅ |--ₚ e; lift t _ ~> lift ee _ ⊣⊢ₚ TPB_OD e t ee.
-  Proof.
-    rewrite generate_correct. unfold TPB_algo, TPB_OD, reconstruct_free.
-    rewrite wp_bind. unfold reconstruct_optiondiamond.
-    rewrite wp_optiondiamond_bind'.
-    unfold reconstruct_free. cbn.
-    rewrite wp_option_bind. unfold T, _4. predsimpl.
-    rewrite <- prenex_correct.
-    destruct prenex as [(w1 & θ1 & C & t' & ee')|]; cbn; [|now rewrite Acc.wp_false].
-    unfold wp_prenex, wp_optiondiamond. predsimpl.
-    rewrite wp_option_bind.
-    rewrite <- solver_correct.
-    destruct (solver C) as [(w2 & θ2 & [])|]; cbn.
-    - rewrite Acc.and_wp_l. predsimpl. clear.
-      rewrite eqₚ_sym.
-      generalize (t' =ₚ lift t w2). clear. intros P.
-      rewrite eqₚ_sym.
-      generalize (P /\ₚ ee' =ₚ lift ee w2). clear. intros P.
-      constructor; intros ι.
-      destruct (env.view ι). cbn.
-      split; intros [ι]; firstorder.
-      exists (env.snoc env.nil _ (inst (lk θ1 world.in_zero) (inst θ2 ι))).
-      split; auto.
-      exists (inst θ2 ι). firstorder.
-    - now rewrite and_false_l !Acc.wp_false.
-  Qed.
-
-  Definition tpb_algo (e : Exp) (t : Ty) (ee : Exp) : Prop :=
-    match reconstruct_optiondiamond e with
-    | Some (existT w (_ , (t', ee'))) =>
-        exists ι : Assignment w, inst t' ι = t /\ inst ee' ι = ee
+  Definition algorithmic_typing (Γ : Env) (e : Exp) (τ : Ty) (e' : Exp) : Prop :=
+    match reconstruct Γ e with
+    | Some (existT w1 (τ1, e1)) =>
+        exists ι : Assignment w1, inst τ1 ι = τ /\ inst e1 ι = e'
     | None => False
     end.
 
-  Lemma correctness (e : Exp) (t : Ty) (ee : Exp) :
-    tpb empty e t ee <-> tpb_algo e t ee.
+  Lemma correctness (Γ : Env) (e : Exp) (τ : Ty) (e' : Exp) :
+    algorithmic_typing Γ e τ e' <-> tpb Γ e τ e'.
   Proof.
-    generalize (reconstruct_schematic_correct e t ee).
-    unfold TPB_OD, tpb_algo.
-    intros [HE]. specialize (HE env.nil). pred_unfold.
-    rewrite inst_empty in HE. rewrite HE. clear HE.
-    destruct reconstruct_optiondiamond as [(w & θ & [t' ee'])|]; cbn; auto.
-    apply base.exist_proper. intros ι. pred_unfold. intuition.
+    generalize (generate_correct (w:=world.nil) (lift Γ) e (lift τ) (lift e')).
+    unfold TPB_algo, algorithmic_typing, reconstruct. rewrite <- prenex_correct.
+    destruct prenex as [(w1 & θ1 & C & t1 & e1)|]; cbn.
+    - rewrite <- (solve_correct C).
+      destruct (solve C) as [(w2 & θ2 & [])|]; predsimpl.
+      + rewrite Acc.and_wp_l. predsimpl.
+        intros [HE]. specialize (HE env.nil). pred_unfold.
+        rewrite HE. clear HE. unfold Acc.wp.
+        split.
+        * intros (ι2 & Heq1 & Heq2). exists (inst θ2 ι2).
+          split; [now destruct (env.view (inst θ1 (inst θ2 ι2)))|].
+          exists ι2. subst. now pred_unfold.
+        * intros (ι1 & Heq1 & ι2 & Heq2 & Heq3 & Heq4).
+          exists ι2. now pred_unfold.
+      + intros [HE]. specialize (HE env.nil). now pred_unfold.
+    - intros [HE]. specialize (HE env.nil). now pred_unfold.
   Qed.
 
 End Correctness.
