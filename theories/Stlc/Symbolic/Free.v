@@ -47,6 +47,13 @@ Import World.notations.
 
 Set Implicit Arguments.
 
+Class CstrMonad (M : TYPE -> TYPE) : Type := {
+  ret {A}    : ⊧ A  ̂→ M A;
+  bind {A B} : ⊧ M A  ̂→ □⁺ (A  ̂→ M B)  ̂→ M B;
+  eq         : ⊧ Ṫy  ̂→ Ṫy  ̂→ M Unit;
+  pick       : ⊧ M Ṫy;
+  }.
+
 Inductive Free (A : TYPE) (w : World) : Type :=
 | Ret (a : A w)
 | Fail
@@ -77,6 +84,12 @@ Definition choose : ⊧ Free Ṫy :=
     let α := world.fresh w in
     Choosek α (Ret (ṫy.var world.in_zero)).
 #[global] Arguments choose {w}.
+
+#[global] Instance freeCstr : CstrMonad Free :=
+{| ret := @Ret;
+  bind := bind_freem;
+  eq   := assert;
+  pick := @choose |}.
 
 Section PrenexConversion.
 
