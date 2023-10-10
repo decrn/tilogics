@@ -100,14 +100,16 @@ End Generate.
 
 Section Reconstruct.
 
-  Definition reconstruct_optiondiamond (e : Exp) :
-    Option (Diamond alloc.acc_alloc (Ṫy * Sem Exp)) world.nil :=
-    option.bind (prenex (generate e ∅)) solveoptiondiamond.
+  Definition reconstruct (G : Env) (e : Exp) :
+    option { w & Ṫy w * Ėxp w }%type :=
+    option.bind (prenex (generate e (lift G world.nil)))
+      (fun '(existT w1 (_ , (C , te))) =>
+          option.bind (solve C)
+            (fun '(existT w2 (θ2 , _)) =>
+               Some (existT w2 te[θ2]))).
 
-  Definition reconstruct_grounded (e : Exp) : option (Ty * Exp) :=
-    option.map
-      (fun '(existT w (_ , te)) => inst te (grounding w))
-      (reconstruct_optiondiamond e).
+  Definition reconstruct_grounded G (e : Exp) : option (Ty * Exp) :=
+    option.map (fun '(existT w te) => inst te (grounding w)) (reconstruct G e).
 
 End Reconstruct.
 
@@ -276,63 +278,34 @@ Section Correctness.
     G0 |--ₚ e; t0 ~> e0 ⊣⊢ₚ TPB_algo G0 e t0 e0.
   Proof. apply split_bientails. auto using generate_complete, generate_sound. Qed.
 
-  Import (hints) Triangular.Tri.
   Import (hints) Acc.
 
-  Definition TPB_OD (e : Exp) (t : Ty) (ee : Exp) : Pred world.nil :=
-    wp_optiondiamond (reconstruct_optiondiamond e)
-      (fun w θ '(t', ee') => t' =ₚ lift t w /\ₚ ee' =ₚ lift ee w).
-
-  Lemma proper_wp_option_bientails {A : TYPE} {w1 w2: World} (m : Option A w1) :
-    Proper (pointwise_relation (A w1) bientails ==> bientails) (@wp_option A w1 w2 m).
-  Proof.
-    intros P Q PQ. unfold pointwise_relation in PQ.
-    destruct m; cbn; easy.
-  Qed.
-
-  Lemma reconstruct_schematic_correct (e : Exp) t ee :
-    ∅ |--ₚ e; lift t _ ~> lift ee _ ⊣⊢ₚ TPB_OD e t ee.
-  Proof.
-    rewrite generate_correct. unfold TPB_algo, TPB_OD.
-    rewrite <- prenex_correct.
-    unfold reconstruct_optiondiamond.
-    rewrite wp_optiondiamond_bind'.
-    unfold wp_prenex.
-    unfold wp_optiondiamond at 1.
-    apply proper_wp_option_bientails.
-    intros (w & θ & C & [t' ee']). cbn.
-    rewrite wp_optiondiamond_bind'.
-    rewrite <- solver_correct.
-    unfold wp_optiondiamond.
-    destruct (solver C) as [(w2 & θ2 & [])|]; cbn.
-    - rewrite Acc.and_wp_l. predsimpl.
-      rewrite eqₚ_sym.
-      generalize (t' =ₚ lift t w2). clear. intros P.
-      rewrite eqₚ_sym.
-      generalize (P /\ₚ ee' =ₚ lift ee w2). clear. intros P.
-      constructor; intros ι.
-      destruct (env.view ι). cbn.
-      split; intros [ι]; firstorder.
-      exists (inst θ2 ι). firstorder.
-    - now rewrite and_false_l Acc.wp_false.
-  Qed.
-
-  Definition tpb_algo (e : Exp) (t : Ty) (ee : Exp) : Prop :=
-    match reconstruct_optiondiamond e with
-    | Some (existT w (_ , (t', ee'))) =>
+  Definition tpb_algo (G : Env) (e : Exp) (t : Ty) (ee : Exp) : Prop :=
+    match reconstruct G e with
+    | Some (existT w (t', ee')) =>
         exists ι : Assignment w, inst t' ι = t /\ inst ee' ι = ee
     | None => False
     end.
 
-  Lemma correctness (e : Exp) (t : Ty) (ee : Exp) :
-    tpb empty e t ee <-> tpb_algo e t ee.
+  Lemma correctness (G : Env) (e : Exp) (t : Ty) (ee : Exp) :
+    tpb G e t ee <-> tpb_algo G e t ee.
   Proof.
-    generalize (reconstruct_schematic_correct e t ee).
-    unfold TPB_OD, tpb_algo.
-    intros [HE]. specialize (HE env.nil). pred_unfold.
-    rewrite inst_empty in HE. rewrite HE. clear HE.
-    destruct reconstruct_optiondiamond as [(w & θ & [t' ee'])|]; cbn; auto.
-    apply base.exist_proper. intros ι. pred_unfold. intuition.
+    generalize (generate_correct e (lift G world.nil) (lift t _) (lift ee _)).
+    unfold TPB_algo, tpb_algo, reconstruct. rewrite <- prenex_correct.
+    destruct prenex as [(w1 & θ1 & C & t1 & e1)|]; cbn.
+    - rewrite <- (solve_correct C).
+      destruct (solve C) as [(w2 & θ2 & [])|]; predsimpl.
+      + rewrite Acc.and_wp_l. predsimpl.
+        intros [HE]. specialize (HE env.nil). pred_unfold.
+        rewrite HE. clear HE. unfold Acc.wp.
+        split.
+        * intros (ι1 & Heq1 & ι2 & Heq2 & Heq3 & Heq4).
+          exists ι2. now pred_unfold.
+        * intros (ι2 & Heq1 & Heq2). exists (inst θ2 ι2).
+          split; [now destruct (env.view (inst θ1 (inst θ2 ι2)))|].
+          exists ι2. subst. now pred_unfold.
+      + intros [HE]. specialize (HE env.nil). now pred_unfold.
+    - intros [HE]. specialize (HE env.nil). now pred_unfold.
   Qed.
 
 End Correctness.

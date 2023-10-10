@@ -285,23 +285,15 @@ Section Implementation.
   Definition mgu : ⊧ Ṫy ̂→ Ṫy ̂→ OptionDiamond Unit :=
     fun w s t => T (@amgu w s t).
 
-  Definition asolver : ⊧ List (Prod Ṫy Ṫy) ̂→ C :=
-    fix asolver {w} cs {struct cs} :=
+  Definition asolve : ⊧ List (Prod Ṫy Ṫy) ̂→ C :=
+    fix asolve {w} cs {struct cs} :=
       match cs with
       | List.nil             => ctrue
-      | List.cons (t1,t2) cs => cand (amgu t1 t2) (asolver cs)
+      | List.cons (t1,t2) cs => cand (amgu t1 t2) (asolve cs)
       end.
 
-  Definition solver : ⊧ List (Prod Ṫy Ṫy) ̂→ OptionDiamond Unit :=
-    fun w cs => asolver cs refl.
-
-  Definition solveoptiondiamond {A} {pA : Persistent A} :
-    Diamond alloc.acc_alloc (List (Ṫy * Ṫy) * A) world.nil ->
-    Option (Diamond alloc.acc_alloc A) world.nil :=
-    fun '(existT w1 (θ1, (cs, a))) =>
-      option.bind (solver cs)
-        (fun '(existT w2 (θ2, tt)) =>
-           Some (existT w2 (alloc.nil,persist a θ2))).
+  Definition solve : ⊧ List (Prod Ṫy Ṫy) ̂→ OptionDiamond Unit :=
+    fun w cs => asolve cs refl.
 
 End Implementation.
 
@@ -384,17 +376,17 @@ Section Correctness.
 
   #[local] Existing Instance instpred_prod_ty.
 
-  Lemma asolver_correct {w0} (C : List (Ṫy * Ṫy) w0) :
+  Lemma asolve_correct {w0} (C : List (Ṫy * Ṫy) w0) :
     forall w1 (θ1 : w0 ⊒⁻ w1),
-      instpred (asolver C θ1) ⊣⊢ₚ (instpred C)[θ1].
+      instpred (asolve C θ1) ⊣⊢ₚ (instpred C)[θ1].
   Proof.
     induction C as [|[t1 t2]]; cbn - [ctrue cand]; intros.
     - now rewrite instpred_ctrue.
     - apply instpred_cand_intro; auto. intros. apply amgu_correct.
   Qed.
 
-  Lemma solver_correct {w} (C : List (Ṫy * Ṫy) w) :
-    instpred (solver C) ⊣⊢ₚ instpred C.
-  Proof. unfold solver, T. now rewrite asolver_correct, persist_pred_refl. Qed.
+  Lemma solve_correct {w} (C : List (Ṫy * Ṫy) w) :
+    instpred (solve C) ⊣⊢ₚ instpred C.
+  Proof. unfold solve, T. now rewrite asolve_correct, persist_pred_refl. Qed.
 
 End Correctness.

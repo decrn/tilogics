@@ -887,10 +887,10 @@ Module Pred.
   Create HintDb predsimpl.
 
   #[export] Hint Rewrite (@persist_refl Ėnv _ _) (@persist_refl Ṫy _ _)
-    (@persist_trans Ėnv _ _) (@persist_trans Ṫy _ _) @persist_eq @impl_and
-    @impl_true_l @eqₚ_refl @eq_func @and_true_l @persist_tpb @persist_and
-    @persist_insert @persist_lift @lift_insert @Sem.persist_pure
-    @lk_trans : predsimpl.
+    (@persist_trans Ėnv _ _) (@persist_trans Ṫy _ _) @persist_eq @persist_tpb
+    @persist_and @persist_insert @persist_lift @lift_insert @Sem.persist_pure
+    @impl_and @and_false_l @impl_true_l @eqₚ_refl @eq_func @and_true_l
+    @Acc.wp_false @lk_trans : predsimpl.
   #[export] Hint Rewrite <- @eqₚ_insert : predsimpl.
 
   Ltac predsimpl :=
