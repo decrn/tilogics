@@ -47,9 +47,7 @@ Import World.notations.
 
 Set Implicit Arguments.
 
-Class CstrMonad (M : TYPE -> TYPE) : Type := {
-  ret {A}    : ⊧ A  ̂→ M A;
-  bind {A B} : ⊧ M A  ̂→ □⁺ (A  ̂→ M B)  ̂→ M B;
+Class CstrMonad (M : TYPE -> TYPE) {HP : Pure M} {HB : Bind alloc.acc_alloc M} : Type := {
   fail {A}   : ⊧ M A;
   eq         : ⊧ Ṫy  ̂→ Ṫy  ̂→ M Unit;
   pick       : ⊧ M Ṫy;
@@ -63,6 +61,8 @@ Inductive Free (A : TYPE) (w : World) : Type :=
 #[global] Arguments Ret {A} [w] a.
 #[global] Arguments Fail {A w}.
 #[global] Arguments Choosek {A} [w] α k.
+
+#[global] Instance freePure : Pure Free := @Ret.
 
 Section Bind.
   Context {Θ} {reflΘ : Refl Θ} {transΘ : Trans Θ} {stepΘ : Step Θ}.
@@ -86,10 +86,8 @@ Definition choose : ⊧ Free Ṫy :=
     Choosek α (Ret (ṫy.var world.in_zero)).
 #[global] Arguments choose {w}.
 
-#[global] Instance freeCstr : CstrMonad Free :=
-{| ret  := @Ret;
-   fail := @Fail;
-   bind := bind_freem;
+#[global] Instance freeCstr : (@CstrMonad Free freePure bind_freem) :=
+{| fail := @Fail;
    eq   := assert;
    pick := @choose |}.
 
