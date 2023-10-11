@@ -135,15 +135,15 @@ Delimit Scope box_scope with B.
 #[local] Notation "⊧ A" :=
   (Valid A)
     (at level 200, right associativity) : type_scope.
-#[local] Notation "A ̂→ B" := (Impl A B)
+#[local] Notation "A ⇢ B" := (Impl A B)
   (at level 99, B at level 200, right associativity) :
     indexed_scope.
 
 Class Pure (M : TYPE → TYPE) : Type :=
-  pure : ∀ A, ⊧ A ̂→ M A.
+  pure : ∀ A, ⊧ A ⇢ M A.
 #[global] Arguments pure {M _ A} [w].
 Class Bind (Θ : ACC) (M : TYPE → TYPE) : Type :=
-  bind : ∀ A B, ⊧ M A ̂→ Box Θ (A ̂→ M B) ̂→ M B.
+  bind : ∀ A B, ⊧ M A ⇢ Box Θ (A ⇢ M B) ⇢ M B.
 #[global] Arguments bind {Θ M _ A B} [w].
 
 #[export] Instance pure_option : Pure Option :=
@@ -185,7 +185,7 @@ Export Diamond (Diamond, DiamondT).
 Module World.
   Module notations.
     Notation "⊧ A" := (Valid A) (at level 200, right associativity).
-    Notation "A ̂→ B" := (Impl A B) : indexed_scope.
+    Notation "A ⇢ B" := (Impl A B) : indexed_scope.
 
     Notation "A * B" := (Prod A B) : indexed_scope.
     Notation "'∀' x .. y , P " :=
@@ -210,11 +210,11 @@ Module MonadNotations.
         right associativity).
 End MonadNotations.
 
-Definition T {Θ} {reflΘ : Refl Θ} {A} : ⊧ Box Θ A ̂→ A :=
+Definition T {Θ} {reflΘ : Refl Θ} {A} : ⊧ Box Θ A ⇢ A :=
   fun w a => a w refl.
 #[global] Arguments T {Θ _ A} [_] _ : simpl never.
 
-Definition _4 {Θ} {transΘ : Trans Θ} {A} : ⊧ Box Θ A ̂→ Box Θ (Box Θ A) :=
+Definition _4 {Θ} {transΘ : Trans Θ} {A} : ⊧ Box Θ A ⇢ Box Θ (Box Θ A) :=
   fun w0 a w1 r1 w2 r2 => a w2 (trans r1 r2).
 #[global] Arguments _4 {Θ _ A} [_] _ [_] _ [_] _ : simpl never.
 

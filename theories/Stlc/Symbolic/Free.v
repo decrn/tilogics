@@ -49,7 +49,7 @@ Set Implicit Arguments.
 
 Class CstrMonad (M : TYPE -> TYPE) {HP : Pure M} {HB : Bind alloc.acc_alloc M} : Type := {
   fail {A}   : ⊧ M A;
-  eq         : ⊧ Ṫy  ̂→ Ṫy  ̂→ M Unit;
+  eq         : ⊧ Ṫy  ⇢ Ṫy  ⇢ M Unit;
   pick       : ⊧ M Ṫy;
   }.
 
@@ -78,7 +78,7 @@ Section Bind.
       end.
 End Bind.
 
-Definition assert : ⊧ Ṫy ̂→ Ṫy ̂→ Free Unit :=
+Definition assert : ⊧ Ṫy ⇢ Ṫy ⇢ Free Unit :=
   fun w t1 t2 => Assertk t1 t2 (Ret tt).
 Definition choose : ⊧ Free Ṫy :=
   fun w =>
@@ -96,7 +96,7 @@ Section PrenexConversion.
   Import option.notations.
 
   Definition prenex {A} :
-    ⊧ Free A ̂→ Option (Diamond alloc.acc_alloc (Prod (List (Prod Ṫy Ṫy)) A)) :=
+    ⊧ Free A ⇢ Option (Diamond alloc.acc_alloc (Prod (List (Prod Ṫy Ṫy)) A)) :=
     fix pr {w} m {struct m} :=
     match m with
     | Ret a => Some (existT w (refl, (List.nil, a)))
@@ -130,8 +130,8 @@ Section WithPredicates.
       {transΘ : Trans Θ} {lktransΘ : LkTrans Θ}
       {stepΘ : Step Θ} {lkstepΘ : LkStep Θ}.
 
-    Definition WP {A} : ⊧ Free A ̂→ Box Θ (A ̂→ Pred) ̂→ Pred :=
-      fix WP (w : World) (m : Free A w) (POST : Box Θ (A ̂→ Pred) w) {struct m} :=
+    Definition WP {A} : ⊧ Free A ⇢ Box Θ (A ⇢ Pred) ⇢ Pred :=
+      fix WP (w : World) (m : Free A w) (POST : Box Θ (A ⇢ Pred) w) {struct m} :=
         match m with
         | Ret a => POST _ refl a
         | Fail => ⊥ₚ
@@ -140,8 +140,8 @@ Section WithPredicates.
             Acc.wp step (WP (w ▻ α) k (fun w1 r01 => _4 POST step r01))
         end%P.
 
-    Definition WLP {A} : ⊧ Free A ̂→ Box Θ (A ̂→ Pred) ̂→ Pred :=
-      fix WLP (w : World) (m : Free A w) (POST : Box Θ (A ̂→ Pred) w) {struct m} :=
+    Definition WLP {A} : ⊧ Free A ⇢ Box Θ (A ⇢ Pred) ⇢ Pred :=
+      fix WLP (w : World) (m : Free A w) (POST : Box Θ (A ⇢ Pred) w) {struct m} :=
         match m with
         | Ret a => POST _ refl a
         | Fail => ⊤ₚ
@@ -150,7 +150,7 @@ Section WithPredicates.
             Acc.wlp step (WLP (w ▻ α) k (fun w1 r01 => _4 POST step r01))
         end%P.
 
-    Lemma wp_mono {A w0} (m : Free A w0) (P Q : Box Θ (A ̂→ Pred) w0) :
+    Lemma wp_mono {A w0} (m : Free A w0) (P Q : Box Θ (A ⇢ Pred) w0) :
       (∀ w1 (θ : Θ w0 w1) (a : A w1), Acc.wlp θ (P w1 θ a → Q w1 θ a)) ⊢
       (WP m P -∗ WP m Q).
     Proof.
@@ -169,7 +169,7 @@ Section WithPredicates.
         now rewrite Acc.persist_wlp.
     Qed.
 
-    Lemma wlp_mono {A w0} (m : Free A w0) (P Q : Box Θ (A ̂→ Pred) w0) :
+    Lemma wlp_mono {A w0} (m : Free A w0) (P Q : Box Θ (A ⇢ Pred) w0) :
       (∀ w1 (θ : Θ w0 w1) (a : A w1), Acc.wlp θ (P w1 θ a → Q w1 θ a)) ⊢
       (WLP m P -∗ WLP m Q).
     Proof.
@@ -224,8 +224,8 @@ Section WithPredicates.
     Qed.
 
     Lemma wp_bind {refltransθ : ReflTrans Θ}
-      {A B w0} (m : Free A w0) (f : Box Θ (A ̂→ Free B) w0) :
-      forall (Q : Box Θ (B ̂→ Pred) w0),
+      {A B w0} (m : Free A w0) (f : Box Θ (A ⇢ Free B) w0) :
+      forall (Q : Box Θ (B ⇢ Pred) w0),
         WP (bind m f) Q ⊣⊢ₚ
         WP m (fun w1 θ1 a => WP (f _ θ1 a) (_4 Q θ1)).
     Proof.
@@ -239,8 +239,8 @@ Section WithPredicates.
     Qed.
 
     Lemma wlp_bind  {refltransθ : ReflTrans Θ}
-      {A B w1} (m : Free A w1) (f : Box Θ (A ̂→ Free B) w1) :
-      forall (Q : Box Θ (B ̂→ Pred) w1),
+      {A B w1} (m : Free A w1) (f : Box Θ (A ⇢ Free B) w1) :
+      forall (Q : Box Θ (B ⇢ Pred) w1),
         WLP (bind m f) Q ⊣⊢ₚ
         WLP m (fun w1 θ1 a => WLP (f _ θ1 a) (_4 Q θ1)).
     Proof.
@@ -253,7 +253,7 @@ Section WithPredicates.
         now rewrite trans_assoc.
     Qed.
 
-    Lemma wp_impl {A w} (m : Free A w) (P : Box Θ (A ̂→ Pred) w) (Q : Pred w) :
+    Lemma wp_impl {A w} (m : Free A w) (P : Box Θ (A ⇢ Pred) w) (Q : Pred w) :
       (WP m P ->ₚ Q) ⊣⊢ₚ WLP m (fun w1 r01 a1 => P w1 r01 a1 ->ₚ persist Q r01)%P.
     Proof.
       induction m; cbn; unfold _4, Basics.impl.
@@ -269,11 +269,11 @@ Section WithPredicates.
   #[local] Existing Instance instpred_prod_ty.
 
   Definition wp_prenex {A} :
-    ⊧ Option (Diamond alloc.acc_alloc (List (Ṫy * Ṫy) * A)) ̂→
-      Box alloc.acc_alloc (A ̂→ Pred) ̂→ Pred :=
+    ⊧ Option (Diamond alloc.acc_alloc (List (Ṫy * Ṫy) * A)) ⇢
+      Box alloc.acc_alloc (A ⇢ Pred) ⇢ Pred :=
     fun w0 o Q => wp_optiondiamond o (fun w1 θ '(C,a) => instpred C /\ₚ Q w1 θ a)%P.
 
-  Lemma prenex_correct {A w} (m : Free A w) (Q : Box alloc.acc_alloc (A ̂→ Pred) w) :
+  Lemma prenex_correct {A w} (m : Free A w) (Q : Box alloc.acc_alloc (A ⇢ Pred) w) :
     wp_prenex (prenex m) Q ⊣⊢ₚ WP m Q.
   Proof.
     induction m; cbn - [step].

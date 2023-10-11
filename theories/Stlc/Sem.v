@@ -47,12 +47,12 @@ Module Sem.
   Definition pure {A} (a : A) : Valid (Sem A) := fun _ _ => a.
   #[global] Arguments pure {A} _ {w} ι/.
 
-  Definition fmap {A B} (f : A -> B) : ⊧ Sem A ̂→ Sem B :=
+  Definition fmap {A B} (f : A -> B) : ⊧ Sem A ⇢ Sem B :=
     fun w a ι => f (a ι).
   #[global] Arguments fmap {A B} _ {w} a ι/.
 
   (* ap :: f (a -> b) -> f a -> f b *)
-  Definition ap {A B : Type} : ⊧ Sem (A → B) ̂→ Sem A ̂→ Sem B :=
+  Definition ap {A B : Type} : ⊧ Sem (A → B) ⇢ Sem A ⇢ Sem B :=
     fun w f a ι => f ι (a ι).
   #[global] Arguments ap {A B} [w] f a ι/.
 
@@ -122,9 +122,9 @@ Module Sem.
 
   End PersistLemmas.
 
-  Definition decode_ty : ⊧ Ṫy ̂→ Sem Ty := fun w t => inst t.
+  Definition decode_ty : ⊧ Ṫy ⇢ Sem Ty := fun w t => inst t.
   #[global] Arguments decode_ty [w] _.
-  Definition decode_env : ⊧ Ėnv ̂→ Sem Env := fun w G => inst G.
+  Definition decode_env : ⊧ Ėnv ⇢ Sem Env := fun w G => inst G.
   #[global] Arguments decode_env [w] _.
 
   Module notations.
@@ -145,19 +145,19 @@ Module ėxp.
   Set Implicit Arguments.
   Set Maximal Implicit Insertion.
 
-  Definition var : ⊧ Const string ̂→ Ėxp :=
+  Definition var : ⊧ Const string ⇢ Ėxp :=
     fun _ x => Sem.pure (exp.var x).
   Definition true : ⊧ Ėxp :=
     fun _ => Sem.pure exp.true.
   Definition false : ⊧ Ėxp :=
     fun _ => Sem.pure exp.false.
-  Definition ifte : ⊧ Ėxp ̂→ Ėxp ̂→ Ėxp ̂→ Ėxp :=
+  Definition ifte : ⊧ Ėxp ⇢ Ėxp ⇢ Ėxp ⇢ Ėxp :=
     fun _ e1 e2 e3 => exp.ifte <$> e1 <*> e2 <*> e3.
-  Definition absu : ⊧ Const string ̂→ Ėxp ̂→ Ėxp :=
+  Definition absu : ⊧ Const string ⇢ Ėxp ⇢ Ėxp :=
     fun _ x e => exp.absu x <$> e.
-  Definition abst : ⊧ Const string ̂→ Ṫy ̂→ Ėxp ̂→ Ėxp :=
+  Definition abst : ⊧ Const string ⇢ Ṫy ⇢ Ėxp ⇢ Ėxp :=
     fun _ x t e => exp.abst x <$> decode_ty t <*> e.
-  Definition app : ⊧ Ėxp ̂→ Ėxp ̂→ Ėxp :=
+  Definition app : ⊧ Ėxp ⇢ Ėxp ⇢ Ėxp :=
     fun _ e1 e2 => exp.app <$> e1 <*> e2.
 
   Section InstLemmas.

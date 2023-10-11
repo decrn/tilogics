@@ -60,7 +60,7 @@ Section Implementation.
   Import MonadNotations.
   Import World.notations.
 
-  Definition generate : Exp -> ⊧ Ėnv ̂→ Ṫy ̂→ Free Ėxp :=
+  Definition generate : Exp -> ⊧ Ėnv ⇢ Ṫy ⇢ Free Ėxp :=
     fix gen e {w} Γ τ :=
       match e with
       | exp.var x =>
@@ -95,7 +95,7 @@ Section Implementation.
       end.
 
   Definition generate' (e : Exp) :
-    ⊧ Ėnv ̂→ Free (Prod Ṫy Ėxp) :=
+    ⊧ Ėnv ⇢ Free (Prod Ṫy Ėxp) :=
     fun w G =>
       [θ1] τ  <- choose ;;
       [θ2] e' <- generate e G[θ1] τ ;;
@@ -185,7 +185,7 @@ Section Correctness.
       econstructor; eauto.
   Qed.
 
-  Definition TPB_algo : ⊧ Ėnv ̂→ Const Exp ̂→ Ṫy ̂→ Ėxp ̂→ Pred :=
+  Definition TPB_algo : ⊧ Ėnv ⇢ Const Exp ⇢ Ṫy ⇢ Ėxp ⇢ Pred :=
     fun w0 G0 e t0 e0 =>
     WP (Θ := alloc.acc_alloc)
       (generate' e G0)

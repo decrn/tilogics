@@ -114,13 +114,13 @@ Module Pred.
       fun w _ => Logic.False.
     Definition Trueₚ : ⊧ Pred :=
       fun w _ => Logic.True.
-    Definition iffₚ : ⊧ Pred ̂→ Pred ̂→ Pred :=
+    Definition iffₚ : ⊧ Pred ⇢ Pred ⇢ Pred :=
       fun w P Q ι => P ι <-> Q ι.
-    Definition implₚ : ⊧ Pred ̂→ Pred ̂→ Pred :=
+    Definition implₚ : ⊧ Pred ⇢ Pred ⇢ Pred :=
       fun w P Q ι => P ι -> Q ι.
-    Definition andₚ : ⊧ Pred ̂→ Pred ̂→ Pred :=
+    Definition andₚ : ⊧ Pred ⇢ Pred ⇢ Pred :=
       fun w P Q ι => P ι /\ Q ι.
-    Definition orₚ : ⊧ Pred ̂→ Pred ̂→ Pred :=
+    Definition orₚ : ⊧ Pred ⇢ Pred ⇢ Pred :=
       fun w P Q ι => P ι \/ Q ι.
     #[global] Arguments andₚ {_} (_ _)%P _/.
     #[global] Arguments orₚ {_} (_ _)%P _/.
@@ -130,7 +130,7 @@ Module Pred.
     #[global] Arguments Falseₚ {_} _/.
 
     Definition eqₚ {T : TYPE} {A : Type} {instTA : Inst T A} :
-      ⊧ T ̂→ T ̂→ Pred :=
+      ⊧ T ⇢ T ⇢ Pred :=
       fun w t1 t2 ι => inst t1 ι = inst t2 ι.
     #[global] Arguments eqₚ {T A _} [w] _ _ _/.
 
@@ -141,7 +141,7 @@ Module Pred.
     #[global] Arguments Forall {I w} A%P ι/.
     #[global] Arguments Exists {I w} A%P ι/.
 
-    Definition TPB : ⊧ Ėnv ̂→ Const Exp ̂→ Ṫy ̂→ Ėxp ̂→ Pred :=
+    Definition TPB : ⊧ Ėnv ⇢ Const Exp ⇢ Ṫy ⇢ Ėxp ⇢ Pred :=
       fun w G e t ee ι => inst G ι |-- e ∷ inst t ι ~> inst ee ι.
     #[global] Arguments TPB [w] G e t ee ι/.
 
@@ -698,7 +698,7 @@ Module Pred.
     Import (hints) Diamond.
 
     Definition wp_diamond {Θ : ACC} {A} :
-      ⊧ Diamond Θ A ̂→ Box Θ (A ̂→ Pred) ̂→ Pred :=
+      ⊧ Diamond Θ A ⇢ Box Θ (A ⇢ Pred) ⇢ Pred :=
       fun w '(existT w1 (θ, a)) Q => Acc.wp θ (Q w1 θ a).
 
     Definition wp_option {A w1 w2} :
@@ -720,7 +720,7 @@ Module Pred.
     Proof. constructor; intros ι. now destruct o. Qed.
 
     Definition wp_optiondiamond {Θ : ACC} {A} :
-      ⊧ DiamondT Θ Option A ̂→ Box Θ (A ̂→ Pred) ̂→ Pred :=
+      ⊧ DiamondT Θ Option A ⇢ Box Θ (A ⇢ Pred) ⇢ Pred :=
       fun w m Q => wp_option m (fun d => wp_diamond d Q).
 
     #[global] Arguments wp_optiondiamond {Θ} {A}%indexed_scope [w] _ _%B _.
@@ -751,7 +751,7 @@ Module Pred.
     Qed.
 
     Lemma wp_optiondiamond_and {Θ A w} (d : DiamondT Θ Option A w)
-      (P : Box Θ (A ̂→ Pred) w) (Q : Pred w) :
+      (P : Box Θ (A ⇢ Pred) w) (Q : Pred w) :
        wp_optiondiamond d P /\ₚ Q
        ⊣⊢ₚ wp_optiondiamond d (fun w1 θ1 a1 => P w1 θ1 a1 /\ₚ persist Q θ1).
     Proof.
@@ -761,7 +761,7 @@ Module Pred.
     Qed.
 
     Lemma wp_optiondiamond_monotonic' {Θ A w} (d : DiamondT Θ Option A w)
-      (R : Pred w) (P Q : Box Θ (A ̂→ Pred) w) :
+      (R : Pred w) (P Q : Box Θ (A ⇢ Pred) w) :
       (forall w1 (r : Θ w w1) (a : A w1),
           persist R r ⊢ₚ P w1 r a ->ₚ Q w1 r a) ->
       R ⊢ₚ wp_optiondiamond d P ->ₚ wp_optiondiamond d Q.
@@ -778,13 +778,13 @@ Module Pred.
     Qed.
 
     Lemma wp_optiondiamond_pure {Θ} {reflΘ : Refl Θ} {lkreflΘ : LkRefl Θ}
-      {A w0} (a : A w0) (Q : Box Θ (A ̂→ Pred) w0) :
+      {A w0} (a : A w0) (Q : Box Θ (A ⇢ Pred) w0) :
       wp_optiondiamond (pure (M := DiamondT Θ Option) a) Q ⊣⊢ₚ T Q a.
     Proof. cbn. now rewrite Acc.wp_refl. Qed.
 
     Lemma wp_optiondiamond_bind {Θ} {transΘ : Trans Θ} {lkTransΘ : LkTrans Θ}
-      {A B w0} (d : DiamondT Θ Option A w0) (f : Box Θ (A ̂→ DiamondT Θ Option B) w0)
-      (Q : Box Θ (B  ̂→ Pred) w0) :
+      {A B w0} (d : DiamondT Θ Option A w0) (f : Box Θ (A ⇢ DiamondT Θ Option B) w0)
+      (Q : Box Θ (B  ⇢ Pred) w0) :
       wp_optiondiamond (bind d f) Q ⊣⊢ₚ
       wp_optiondiamond d (fun w1 ζ1 a1 => wp_optiondiamond (f w1 ζ1 a1) Q[ζ1]).
     Proof.
@@ -794,7 +794,7 @@ Module Pred.
     Qed.
 
     Lemma wp_optiondiamond_bind' {Θ : ACC} {A B w1 w2} (o : Option A w1)
-      (f : A w1 -> Option (Diamond Θ B) w2) (Q : Box Θ (B ̂→ Pred) w2) :
+      (f : A w1 -> Option (Diamond Θ B) w2) (Q : Box Θ (B ⇢ Pred) w2) :
       wp_optiondiamond (option.bind o f) Q ⊣⊢ₚ
       wp_option o (fun a => wp_optiondiamond (f a) Q).
     Proof. constructor; intros ι. now destruct o. Qed.
@@ -805,7 +805,7 @@ Module Pred.
     Import World.notations.
     (* A type class for things that can be interpreted as a predicate. *)
     Class InstPred (A : TYPE) :=
-      instpred : ⊧ A ̂→ Pred.
+      instpred : ⊧ A ⇢ Pred.
     #[global] Arguments instpred {_ _ _}.
 
     #[export] Instance instpred_option {A} `{ipA : InstPred A} :

@@ -64,7 +64,7 @@ Section Implementation.
   Existing Instance trans.
   Hint Mode acc - + - : typeclass_instances.
 
-  Definition generate : Exp -> ⊧ Ėnv ̂→ Free (Ṫy * Ėxp) :=
+  Definition generate : Exp -> ⊧ Ėnv ⇢ Free (Ṫy * Ėxp) :=
     fix gen e {w} Γ :=
       match e with
       | exp.var x =>
@@ -124,7 +124,7 @@ Section Correctness.
   #[local] Arguments step : simpl never.
   (* #[local] Arguments Free.choose : simpl never. *)
 
-  Definition TPB_algo : ⊧ Ėnv ̂→ Const Exp ̂→ Ṫy ̂→ Ėxp ̂→ Pred :=
+  Definition TPB_algo : ⊧ Ėnv ⇢ Const Exp ⇢ Ṫy ⇢ Ėxp ⇢ Pred :=
     fun w0 G0 e t0 e0 =>
     WP (Θ := alloc.acc_alloc)
       (generate e G0)

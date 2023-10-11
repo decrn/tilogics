@@ -121,10 +121,10 @@ Section RemoveAcc.
      for well-founded induction using [Acc_inv] for recursive calls. *)
   #[global] Opaque remove_acc_all.
 
-  Definition löb {A : World -> Type} : (⊧ ▷A ̂→ A)%W -> (⊧ A) :=
+  Definition löb {A : World -> Type} : (⊧ ▷A ⇢ A)%W -> (⊧ A) :=
     fun step w => remove_acc_rect A step (remove_acc_all w).
 
-  Definition löb_elim {A} (step : ⊧ ▷A ̂→ A) (P : forall w, A w -> Prop)
+  Definition löb_elim {A} (step : ⊧ ▷A ⇢ A) (P : forall w, A w -> Prop)
     (IH: forall w (f : ▷A w) (pf : forall x xIn, P (w - x) (f x xIn)), P w (step w f)) :
     forall w, P w (löb step w).
   Proof. intros w. unfold löb. induction (remove_acc_all w). now apply IH. Qed.
@@ -147,14 +147,14 @@ Section OccursCheck.
   Import option.notations.
   Import (hints) Sub.
 
-  Definition occurs_check_in : ⊧ ∀ x, world.In x ̂→ ▷(Option (world.In x)) :=
+  Definition occurs_check_in : ⊧ ∀ x, world.In x ⇢ ▷(Option (world.In x)) :=
     fun w x xIn y yIn =>
       match world.occurs_check_view yIn xIn with
       | world.Same _      => None
       | world.Diff _ xIn' => Some xIn'
       end.
 
-  Definition occurs_check : ⊧ Ṫy ̂→ ▷(Option Ṫy) :=
+  Definition occurs_check : ⊧ Ṫy ⇢ ▷(Option Ṫy) :=
     fun w =>
       fix oc (t : Ṫy w) β (βIn : β ∈ w) {struct t} :=
       match t with
@@ -210,16 +210,16 @@ Section Implementation.
     fun w0 w1 r01 => pure tt.
   Definition cfalse : ⊧ C :=
     fun w0 w1 r01 => fail.
-  Definition cand : ⊧ C ̂→ C ̂→ C :=
+  Definition cand : ⊧ C ⇢ C ⇢ C :=
     fun w0 c1 c2 w1 r01 =>
       bind (c1 w1 r01) (fun w2 r12 _ => _4 c2 r01 r12).
   #[global] Arguments cfalse {w} [w1] _.
   #[global] Arguments ctrue {w} [w1] _.
 
   Definition BoxUnifier : TYPE :=
-    Ṫy ̂→ Ṫy ̂→ C.
+    Ṫy ⇢ Ṫy ⇢ C.
 
-  Definition flex : ⊧ ∀ α, world.In α ̂→ Ṫy ̂→ OptionDiamond Unit :=
+  Definition flex : ⊧ ∀ α, world.In α ⇢ Ṫy ⇢ OptionDiamond Unit :=
     fun w α αIn τ =>
       match varview τ with
       | is_var βIn =>
@@ -248,7 +248,7 @@ Section Implementation.
         end.
     #[global] Arguments aflex α {αIn} τ [w1] _.
 
-    Definition atrav : (Ṫy ̂→ Ṫy ̂→ C)%W w :=
+    Definition atrav : (Ṫy ⇢ Ṫy ⇢ C)%W w :=
       fix bmgu s t {struct s} :=
         match s , t with
         | @ṫy.var _ α _  , t             => aflex α t
@@ -282,17 +282,17 @@ Section Implementation.
   Definition amgu : ⊧ BoxUnifier :=
     löb atrav.
 
-  Definition mgu : ⊧ Ṫy ̂→ Ṫy ̂→ OptionDiamond Unit :=
+  Definition mgu : ⊧ Ṫy ⇢ Ṫy ⇢ OptionDiamond Unit :=
     fun w s t => T (@amgu w s t).
 
-  Definition asolve : ⊧ List (Prod Ṫy Ṫy) ̂→ C :=
+  Definition asolve : ⊧ List (Prod Ṫy Ṫy) ⇢ C :=
     fix asolve {w} cs {struct cs} :=
       match cs with
       | List.nil             => ctrue
       | List.cons (t1,t2) cs => cand (amgu t1 t2) (asolve cs)
       end.
 
-  Definition solve : ⊧ List (Prod Ṫy Ṫy) ̂→ OptionDiamond Unit :=
+  Definition solve : ⊧ List (Prod Ṫy Ṫy) ⇢ OptionDiamond Unit :=
     fun w cs => asolve cs refl.
 
 End Implementation.
@@ -318,7 +318,7 @@ Section Correctness.
     cbn. rewrite and_true_l, <- persist_pred_trans. apply H2.
   Qed.
 
-  Definition BoxUnifierCorrect : ⊧ BoxUnifier ̂→ PROP :=
+  Definition BoxUnifierCorrect : ⊧ BoxUnifier ⇢ PROP :=
     fun w0 bu =>
       forall (t1 t2 : Ṫy w0) w1 (θ1 : w0 ⊒⁻ w1),
         instpred (bu t1 t2 w1 θ1) ⊣⊢ₚ (t1 =ₚ t2)[θ1].
