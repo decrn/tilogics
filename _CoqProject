@@ -1,17 +1,19 @@
 -Q theories Em
-theories/common/Context.v
 theories/common/Environment.v
 theories/Prelude.v
 theories/Stlc/Alloc.v
+theories/Stlc/GeneratorCheck.v
+theories/Stlc/GeneratorSynthesise.v
 theories/Stlc/Instantiation.v
+theories/Stlc/MonadFree.v
+theories/Stlc/MonadInterface.v
+theories/Stlc/MonadPrenex.v
 theories/Stlc/Persistence.v
 theories/Stlc/Predicates.v
+theories/Stlc/PrenexConversion.v
 theories/Stlc/Sem.v
 theories/Stlc/Spec.v
 theories/Stlc/Substitution.v
-theories/Stlc/Symbolic/Free.v
-theories/Stlc/Symbolic/FreeCheck.v
-theories/Stlc/Symbolic/FreeReconstruct.v
 theories/Stlc/Triangular.v
 theories/Stlc/Unification.v
 theories/Stlc/Worlds.v

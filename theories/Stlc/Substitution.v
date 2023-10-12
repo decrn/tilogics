@@ -27,29 +27,27 @@
 (******************************************************************************)
 
 From Equations Require Import
-     Equations.
+  Equations.
 From Em Require Import
-     Context
-     Environment
-     Prelude
-     Stlc.Instantiation
-     Stlc.Spec
-     Stlc.Persistence
-     Stlc.Worlds.
+  Environment
+  Prelude
+  Stlc.Instantiation
+  Stlc.Spec
+  Stlc.Persistence
+  Stlc.Worlds.
 
 Import world.notations.
-Import World.notations.
 
 Reserved Notation "w1 ⊑ˢ w2" (at level 80).
 
 Module Sub.
 
-  Canonical Structure Sub : ACC :=
-    {| acc w0 w1        := env.Env (Ṫy w1) w0;
+  Canonical Structure Sub : SUB :=
+    {| sub w0 w1        := env.Env (Ṫy w1) w0;
        lk w0 w1 θ α αIn := env.lookup θ αIn
     |}.
 
-  #[local] Notation "w0 ⊑ˢ w1" := (acc Sub w0 w1).
+  #[local] Notation "w0 ⊑ˢ w1" := (sub Sub w0 w1).
   #[local] Notation "□ˢ A" := (Box Sub A) (at level 9, format "□ˢ A", right associativity).
   #[local] Notation subst t θ := (persist t θ) (only parsing).
 
@@ -127,10 +125,10 @@ Module Sub.
     subst (subst t (thin α)) (thick α s) = t.
   Proof. now rewrite <- persist_trans, comp_thin_thick, persist_refl. Qed.
 
-  Definition of {Θ : ACC} [w0 w1] (θ01 : Θ w0 w1) : Sub w0 w1 :=
+  Definition of {Θ : SUB} [w0 w1] (θ01 : Θ w0 w1) : Sub w0 w1 :=
     env.tabulate (@lk _ _ _ θ01).
 
-  Lemma lk_of {Θ : ACC} [w0 w1] (θ : Θ w0 w1) α (αIn : α ∈ w0) :
+  Lemma lk_of {Θ : SUB} [w0 w1] (θ : Θ w0 w1) α (αIn : α ∈ w0) :
     lk (of θ) αIn = lk θ αIn.
   Proof. unfold of, lk at 1; cbn. now rewrite env.lookup_tabulate. Qed.
 
@@ -157,11 +155,11 @@ Module Sub.
     now rewrite !env.lookup_tabulate, lk_thick.
   Qed.
 
-  Lemma persist_sim {Θ : ACC} {T} {persT : Persistent T} {persLT : PersistLaws T}
+  Lemma persist_sim {Θ : SUB} {T} {persT : Persistent T} {persLT : PersistLaws T}
     [w0 w1] (θ : Θ w0 w1) :
     forall t, persist t (of θ) = persist t θ.
   Proof. intros. apply persist_simulation. intros. now rewrite lk_of. Qed.
 
 End Sub.
 Export Sub (Sub).
-Notation "w0 ⊑ˢ w1" := (acc Sub w0 w1).
+Notation "w0 ⊑ˢ w1" := (sub Sub w0 w1).

@@ -36,8 +36,6 @@ From Em Require Import
   Stlc.Persistence
   Stlc.Worlds.
 
-Import World.notations.
-
 Module Sem.
 
   Definition Sem (A : Type) : TYPE :=
@@ -106,7 +104,7 @@ Module Sem.
   End InstLemmas.
 
   Section PersistLemmas.
-    Context {Θ : ACC}.
+    Context {Θ : SUB}.
 
     Lemma persist_pure {A} (a : A) [w0 w1] (θ : Θ w0 w1) :
       persist (pure a) θ = pure a.

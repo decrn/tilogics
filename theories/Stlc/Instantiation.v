@@ -32,7 +32,6 @@ From Coq Require Import
 From stdpp Require Import
   base gmap.
 From Em Require Import
-  Context
   Environment
   Prelude
   Stlc.Persistence
@@ -79,13 +78,12 @@ Section Inst.
   #[export] Instance inst_env : Inst Ėnv Env :=
     fun w Γ ι => base.fmap (fun t : Ṫy w => inst t ι) Γ.
 
-  #[export] Instance inst_acc {Θ : ACC} :
+  #[export] Instance inst_acc {Θ : SUB} :
     forall w, Inst (Θ w) (Assignment w) :=
     fun w0 w1 θ ι => env.tabulate (fun α αIn => inst (lk θ αIn) ι).
 End Inst.
 
 Section Lift.
-  Import World.notations.
 
   Class Lift (AT : TYPE) (A : Type) : Type :=
     lift : A -> ⊧ AT.
@@ -134,7 +132,7 @@ End InstLift.
 Section InstPersist.
 
   Class InstPersist AT A `{Persistent AT, Inst AT A} : Prop :=
-    inst_persist [Θ : ACC] {w0 w1} (θ : Θ w0 w1) (t : AT w0) (ι : Assignment w1) :
+    inst_persist [Θ : SUB] {w0 w1} (θ : Θ w0 w1) (t : AT w0) (ι : Assignment w1) :
       inst (persist t θ) ι = inst t (inst θ ι).
   #[global] Arguments InstPersist _ _ {_ _}.
 
@@ -159,7 +157,7 @@ End InstPersist.
 
 Section PersistLift.
   Class PersistLift AT A {liftA : Lift AT A} {persA: Persistent AT} : Prop :=
-    persist_lift [Θ : ACC] {w0 w1} (a : A) (θ : Θ w0 w1) :
+    persist_lift [Θ : SUB] {w0 w1} (a : A) (θ : Θ w0 w1) :
       persist (lift a) θ = lift a.
   #[global] Arguments PersistLift _ _ {_ _}.
 
@@ -245,15 +243,15 @@ Lemma lookup_inst (w : World) (Γ : Ėnv w) (x : string) (ι : Assignment w) :
 Proof. unfold inst at 1, inst_env. now rewrite lookup_fmap. Qed.
 
 Lemma inst_insert {w} (Γ : Ėnv w) (x : string) (t : Ṫy w) (ι : Assignment w) :
-  inst (Γ ,, x∷t) ι = inst Γ ι ,, x ∷ inst t ι.
-Proof. cbv [inst inst_env]. now rewrite fmap_insert. Qed.
+  inst (insert (M := Ėnv w) x t Γ) ι = inst Γ ι ,, x ∷ inst t ι.
+Proof. cbv [inst inst_env Ėnv]. now rewrite fmap_insert. Qed.
 
 Lemma inst_empty {w} (ι : Assignment w) :
   inst (A := Ėnv) empty ι = empty.
 Proof. cbv [inst inst_env Ėnv]. now rewrite fmap_empty. Qed.
 
 Lemma lift_insert {w x t Γ} :
-  lift (w:=w) (insert x t Γ) = insert x (lift t) (lift Γ).
+  lift (insert x t Γ) = insert (M := Ėnv w) x (lift t) (lift Γ).
 Proof. unfold lift, lift_env. now rewrite fmap_insert. Qed.
 
 Fixpoint grounding (w : World) : Assignment w :=

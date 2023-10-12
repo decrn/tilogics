@@ -26,23 +26,146 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Coq Require Import
-  Strings.String.
-From Equations Require Import
-  Equations.
-From stdpp Require
-  gmap.
-From Em Require Import
-  Context Prelude.
+From Coq Require Import Strings.String.
+From Equations Require Import Equations.
+From stdpp Require Import base gmap.
+From Em Require Import Prelude.
+
+#[local] Unset Equations Derive Equations.
+#[local] Set Transparent Obligations.
+
+Declare Scope world_scope.
+Delimit Scope world_scope with world.
+
+Module Import world.
+
+  (* Type of contexts. This is a list of bindings of type B. This type and
+     subsequent types use the common notation of snoc lists. *)
+  Inductive World : Type :=
+  | nil
+  | snoc (w : World) (α : nat).
+  Derive NoConfusion EqDec for World.
+
+  (* In represents context containment proofs. This is essentially a
+     well-typed de Bruijn index, i.e. a de Bruijn index with a proof that it
+     resolves to the binding b.  *)
+  Inductive In α : World → Type :=
+  | in_zero {w} : α ∈ snoc w α
+  | in_succ {w β} (αIn : α ∈ w) : α ∈ snoc w β
+  where "α ∈ w" := (In α w%world).
+  Section WithUIP.
+    Set Equations With UIP.
+    Derive Signature NoConfusion EqDec for In.
+  End WithUIP.
+  Existing Class In.
+  #[global] Arguments in_zero {α w}.
+  #[global] Arguments in_succ {α w β} _.
+
+  (* We define views on [In] which allows us to define mechanisms for
+     reusable dependent pattern matching. For more information on views as a
+     programming technique see:
+     - Ulf Norell (2009), "Dependently Typed Programming in Agda." AFP'08.
+       https://doi.org/10.1007/978-3-642-04652-0_5
+     - Philip Wadler (1987). "Views: a way for pattern matching to cohabit
+       with data abstraction." POPL'87.
+       https://doi.org/10.1145/41625.41653
+     - Conor McBride & James McKinna (2004). "The view from the left." JFP'04.
+       https://doi.org/10.1017/S0956796803004829 *)
+
+  (* A view expressing that membership in the empty context is uninhabited. *)
+  Variant NilView [α] (αIn : In α nil) : Type :=.
+
+  (* A view for membership in a non-empty context. *)
+  Variant SnocView {β w} : ∀ [α], α ∈ snoc w β → Type :=
+  | isZero                   : SnocView in_zero
+  | isSucc {α} (αIn : α ∈ w) : SnocView (in_succ αIn).
+
+  (* Instead of defining separate view functions, that construct a value
+     of the *View datatypes, we use a single definition. This way, we
+     avoid definition dummy definitions the other cases like it is usually
+     done in small inversions. We simply define inversions for all cases at
+     once. *)
+  Definition view {w α} (αIn : α ∈ w) :
+    match w return ∀ β, β ∈ w → Type with
+    | nil      => NilView
+    | snoc _ _ => SnocView
+    end α αIn :=
+    match αIn with
+    | in_zero   => isZero
+    | in_succ i => isSucc i
+    end.
+
+  Fixpoint remove {w} α {αIn : α ∈ w} : World :=
+    match αIn with
+    | @in_zero _ w        => w
+    | @in_succ _ _ β αIn' => snoc (remove α) β
+    end.
+  #[global] Arguments remove _ _ {_}.
+
+  Fixpoint in_thin {w α} (αIn : α ∈ w) [β] : β ∈ remove w α → β ∈ w :=
+    match αIn with
+    | in_zero      => in_succ
+    | in_succ αIn' => fun βIn =>
+                        match view βIn with
+                        | isZero      => in_zero
+                        | isSucc βIn' => in_succ (in_thin αIn' βIn')
+                        end
+    end.
+
+  Inductive OccursCheckView {w α} (αIn : In α w) : ∀ [β], In β w → Type :=
+  | Same                               : OccursCheckView αIn αIn
+  | Diff {β} (βIn : In β (remove w α)) : OccursCheckView αIn (in_thin αIn βIn).
+
+  Equations occurs_check_view {w α β} (αIn : In α w) (βIn : In β w) :
+    OccursCheckView αIn βIn :=
+  | in_zero      , in_zero      => Same in_zero
+  | in_zero      , in_succ βIn' => Diff in_zero βIn'
+  | in_succ αIn' , in_zero      => Diff (in_succ αIn') in_zero
+  | in_succ αIn' , in_succ βIn' =>
+      match occurs_check_view αIn' βIn' with
+      | Same _     => Same (in_succ αIn')
+      | Diff _ βIn' => Diff (in_succ αIn') (in_succ βIn')
+      end.
+
+  Lemma occurs_check_view_refl {w α} (αIn : In α w) :
+    occurs_check_view αIn αIn = Same αIn.
+  Proof. induction αIn; cbn; now rewrite ?IHαIn. Qed.
+
+  Lemma occurs_check_view_thin {w α β} (αIn : In α w) (βIn : In β (remove w α)) :
+    occurs_check_view αIn (in_thin αIn βIn) = Diff αIn βIn.
+  Proof. induction αIn; [|destruct (view βIn)]; cbn; now rewrite ?IHαIn. Qed.
+
+  Fixpoint max (w : World) : nat :=
+    match w with
+    | nil      => 0
+    | snoc w α => Nat.max (max w) α
+    end.
+  Definition fresh (w : World) : nat :=
+    S (max w).
+
+  Module notations.
+
+    Open Scope world_scope.
+
+    Notation "'ε'" := nil : world_scope.
+    Infix "▻" := snoc : world_scope.
+    Notation "α ∈ w" := (In α w%world) : type_scope.
+    Notation "w - x" := (remove w x) : world_scope.
+
+  End notations.
+
+End world.
+Export world (World, nil, snoc, fresh).
+Export (hints) world.
+Bind Scope world_scope with World.
 
 Import world.notations.
-
-#[local] Set Implicit Arguments.
-#[local] Set Transparent Obligations.
 
 Definition TYPE : Type := World → Type.
 
 Module ṫy.
+
+  #[local] Set Implicit Arguments.
 
   Inductive Ṫy (w : World) : Type :=
   | var {α} (αIn : α ∈ w)
@@ -68,23 +191,24 @@ Export (hints) ṫy.
 Definition Ėnv (w : World) :=
   stdpp.gmap.gmap string (Ṫy w).
 
-(* The type of accessibility relations between worlds. Because we work with
-   multiple different definitions of accessibility, we generalize many
-   definitions over the accessibility relation. *)
-Structure ACC : Type :=
-  MkAcc
-    { acc :> World → World → Type;
-      #[canonical=no] lk {w0 w1} (θ : acc w0 w1) α (αIn : α ∈ w0) : Ṫy w1;
+(* Substitutions types as relations between worlds. Because we work with
+   multiple different definitions of substitutions, we abstract many
+   definitions over an relation. *)
+Structure SUB : Type :=
+  MkSub
+    { sub :> World → World → Type;
+      #[canonical=no] lk {w0 w1} (θ : sub w0 w1) α (αIn : α ∈ w0) : Ṫy w1;
     }.
-#[global] Arguments acc Θ (_ _)%world_scope : rename, simpl never.
+#[global] Arguments sub Θ (_ _)%world_scope : rename, simpl never.
 #[global] Arguments lk {Θ} [w0 w1] !θ [α] αIn : rename.
 
-Class Refl (Θ : ACC) : Type :=
+Class Refl (Θ : SUB) : Type :=
   refl w : Θ w w.
-Class Trans (Θ : ACC) : Type :=
+Class Trans (Θ : SUB) : Type :=
   trans w0 w1 w2 : Θ w0 w1 → Θ w1 w2 → Θ w0 w2.
 #[global] Arguments refl {Θ _ w}.
 #[global] Arguments trans {Θ _ w0 w1 w2} _ _.
+Infix "⊙" := trans (at level 60, right associativity).
 
 Class ReflTrans Θ {reflΘ : Refl Θ} {transΘ : Trans Θ} : Prop :=
   { trans_refl_l {w1 w2} {r : Θ w1 w2} :
@@ -96,15 +220,15 @@ Class ReflTrans Θ {reflΘ : Refl Θ} {transΘ : Trans Θ} : Prop :=
   }.
 #[global] Arguments ReflTrans Θ {_ _}.
 
-Class Step (Θ : ACC) : Type :=
+Class Step (Θ : SUB) : Type :=
   step w α : Θ w (w ▻ α).
 #[global] Arguments step {Θ _ w α}.
 
-Class Thin (Θ : ACC) : Type :=
+Class Thin (Θ : SUB) : Type :=
   thin w α {αIn : α ∈ w} : Θ (w - α) w.
 #[global] Arguments thin {Θ _} [w] α {αIn}.
 
-Class Thick (Θ : ACC) : Type :=
+Class Thick (Θ : SUB) : Type :=
   thick w α {αIn : α ∈ w} (t : Ṫy (w - α)) : Θ w (w - α).
 #[global] Arguments thick {Θ _} [w] α {αIn} t.
 
@@ -125,8 +249,11 @@ Definition Option (A : TYPE) : TYPE := fun w => option (A w).
 Definition List (A : TYPE) : TYPE := fun w => list (A w).
 Definition Prod (A B : TYPE) : TYPE := fun w => prod (A w) (B w).
 
-Definition Box (Θ : ACC) (A : TYPE) : TYPE :=
+Definition Box (Θ : SUB) (A : TYPE) : TYPE :=
   fun w0 => ∀ w1, Θ w0 w1 → A w1.
+
+Definition Diamond (Θ : SUB) (A : TYPE) : TYPE :=
+  fun w0 => {w1 & Θ w0 w1 * A w1}%type.
 
 Declare Scope box_scope.
 Bind    Scope box_scope with Box.
@@ -139,80 +266,14 @@ Delimit Scope box_scope with B.
   (at level 99, B at level 200, right associativity) :
     indexed_scope.
 
-Class Pure (M : TYPE → TYPE) : Type :=
-  pure : ∀ A, ⊧ A ⇢ M A.
-#[global] Arguments pure {M _ A} [w].
-Class Bind (Θ : ACC) (M : TYPE → TYPE) : Type :=
-  bind : ∀ A B, ⊧ M A ⇢ Box Θ (A ⇢ M B) ⇢ M B.
-#[global] Arguments bind {Θ M _ A B} [w].
+Notation "⊧ A" := (Valid A) (at level 200, right associativity) : type_scope.
+Notation "A ⇢ B" := (Impl A B) : indexed_scope.
 
-#[export] Instance pure_option : Pure Option :=
-  fun A w a => Some a.
-#[export] Instance bind_option {Θ} {reflΘ : Refl Θ} : Bind Θ Option :=
-  fun A B w m f => option.bind m (fun a => f w refl a).
-
-Module Diamond.
-
-  Definition Diamond (Θ : ACC) (A : TYPE) : TYPE :=
-    fun w0 => {w1 & Θ w0 w1 * A w1}%type.
-  Definition DiamondT (Θ : ACC) (M : TYPE → TYPE) : TYPE → TYPE :=
-    fun A => M (Diamond Θ A).
-
-  #[export] Instance pure_diamond {Θ} {reflΘ : Refl Θ} : Pure (Diamond Θ) :=
-    fun A w a => (existT w (refl,a)).
-  #[export] Instance bind_diamond {Θ} {transΘ : Trans Θ} : Bind Θ (Diamond Θ) :=
-    fun A B w0 m f =>
-      let '(existT w1 (r01,a1)) := m in
-      let '(existT w2 (r12,b2)) := f w1 r01 a1 in
-      (existT w2 (trans r01 r12, b2)).
-
-  #[export] Instance pure_diamondt {Θ} {reflΘ : Refl Θ}
-    {M} {pureM : Pure M} : Pure (DiamondT Θ M) :=
-    fun A w a => pure (M := M) (pure (M := Diamond Θ) a).
-
-  #[export] Instance bind_diamondt {Θ} {transΘ : Trans Θ} :
-    Bind Θ (DiamondT Θ Option) :=
-    fun A B w m f =>
-      option.bind m
-        (fun '(existT w1 (θ1,a1)) =>
-           option.bind (f w1 θ1 a1)
-             (fun '(existT w2 (θ2,b2)) =>
-                Some (existT w2 (trans θ1 θ2, b2)))).
-
-End Diamond.
-Export Diamond (Diamond, DiamondT).
-
-Module World.
-  Module notations.
-    Notation "⊧ A" := (Valid A) (at level 200, right associativity).
-    Notation "A ⇢ B" := (Impl A B) : indexed_scope.
-
-    Notation "A * B" := (Prod A B) : indexed_scope.
-    Notation "'∀' x .. y , P " :=
-      (Forall (fun x => .. (Forall (fun y => P%W)) ..))
-        (at level 200, x binder, y binder, right associativity) : indexed_scope.
-
-    Infix "⊙" := trans (at level 60, right associativity).
-  End notations.
-End World.
-
-Module MonadNotations.
-  Notation "[ r ] x <- ma ;; mb" :=
-    (bind ma (fun _ r x => mb))
-      (at level 80, x at next level,
-        ma at next level, mb at level 200,
-        right associativity).
-
-  Notation "[ r ] ' x <- ma ;; mb" :=
-    (bind ma (fun _ r x => mb))
-      (at level 80, x pattern,
-        ma at next level, mb at level 200,
-        right associativity).
-End MonadNotations.
-
-Definition T {Θ} {reflΘ : Refl Θ} {A} : ⊧ Box Θ A ⇢ A :=
-  fun w a => a w refl.
-#[global] Arguments T {Θ _ A} [_] _ : simpl never.
+Notation "A * B" := (Prod A B) : indexed_scope.
+Notation "'∀' x .. y , P " :=
+  (Forall (fun x => .. (Forall (fun y => P%W)) ..))
+    (at level 200, x binder, y binder, right associativity) : indexed_scope.
+Notation "( α ∈)" := (world.In α) (format "( α  ∈)") : indexed_scope.
 
 Definition _4 {Θ} {transΘ : Trans Θ} {A} : ⊧ Box Θ A ⇢ Box Θ (Box Θ A) :=
   fun w0 a w1 r1 w2 r2 => a w2 (trans r1 r2).

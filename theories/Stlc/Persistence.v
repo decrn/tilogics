@@ -31,14 +31,12 @@ From Coq Require Import
 From stdpp Require Import
   base gmap.
 From Em Require Import
-  Context
   Environment
   Prelude
   Stlc.Spec
   Stlc.Worlds.
 
 Import world.notations.
-Import World.notations.
 
 #[local] Set Implicit Arguments.
 
@@ -62,11 +60,11 @@ Proof.
   intros t. apply (persist t θ).
 Defined.
 
-Class LkRefl (Θ : ACC) (reflΘ : Refl Θ) : Prop :=
+Class LkRefl (Θ : SUB) (reflΘ : Refl Θ) : Prop :=
   lk_refl w α (αIn : α ∈ w) :
     lk refl αIn = ṫy.var αIn.
 #[global] Arguments LkRefl Θ {_}.
-Class LkTrans (Θ : ACC) (transΘ : Trans Θ) : Prop :=
+Class LkTrans (Θ : SUB) (transΘ : Trans Θ) : Prop :=
   lk_trans w0 w1 w2 (θ1 : Θ w0 w1) (θ2 : Θ w1 w2) α (αIn : α ∈ w0) :
     lk (trans θ1 θ2) αIn = persist (lk θ1 αIn) θ2.
 #[global] Arguments LkRefl Θ {_}.
@@ -76,10 +74,10 @@ Class PersistLaws A {persA : Persistent A} : Type :=
   { persist_refl {Θ} {reflΘ : Refl Θ} {lkreflΘ : LkRefl Θ} :
       forall w (a : A w),
         persist a (refl (Θ := Θ)) = a;
-    persist_trans {Θ : ACC} {transΘ : Trans Θ} {lktransΘ : LkTrans Θ} :
+    persist_trans {Θ : SUB} {transΘ : Trans Θ} {lktransΘ : LkTrans Θ} :
       forall w0 (a : A w0) w1 (θ1 : Θ w0 w1) w2 (θ2 : Θ w1 w2),
         persist a (trans θ1 θ2) = persist (persist a θ1) θ2;
-    persist_simulation {Θ1 Θ2 : ACC} :
+    persist_simulation {Θ1 Θ2 : SUB} :
       forall w0 a w1 (θ1 : Θ1 w0 w1) (θ2 : Θ2 w0 w1),
         (forall α (αIn : α ∈ w0), lk θ1 αIn = lk θ2 αIn) ->
         persist a θ1 = persist a θ2;
@@ -160,7 +158,7 @@ Qed.
 #[export] Instance persistent_const {A} : Persistent (Const A) :=
   fun _ _ a _ _ => a.
 
-Lemma lookup_persist {Θ : ACC}
+Lemma lookup_persist {Θ : SUB}
   {w0 w1} (θ : Θ w0 w1) (G : Ėnv w0) (x : string) :
   lookup x (persist G θ) = persist (lookup x G) θ.
 Proof.
@@ -168,29 +166,29 @@ Proof.
   now rewrite lookup_fmap.
 Qed.
 
-Lemma persist_empty {Θ : ACC}
+Lemma persist_empty {Θ : SUB}
   {w0 w1} (θ : Θ w0 w1) :
   persist (empty (A := Ėnv w0)) θ = empty.
 Proof.
   apply (fmap_empty (M := gmap string)).
 Qed.
 
-Lemma persist_insert {Θ : ACC}
+Lemma persist_insert {Θ : SUB}
   {w0 w1} (θ : Θ w0 w1) (G : Ėnv w0) (x : string) (t : Ṫy w0) :
   persist (insert x t G) θ = insert x (persist t θ) (persist G θ).
 Proof. unfold persist, persist_env, Ėnv. now rewrite fmap_insert. Qed.
 
-Class LkStep (Θ : ACC) (stepΘ : Step Θ) : Prop :=
+Class LkStep (Θ : SUB) (stepΘ : Step Θ) : Prop :=
   lk_step w α (αIn : α ∈ w) β :
     lk (step (α := β)) αIn = ṫy.var (world.in_succ αIn).
 #[global] Arguments LkStep Θ {_}.
 
-Class LkThin (Θ : ACC) (thinΘ : Thin Θ) : Prop :=
+Class LkThin (Θ : SUB) (thinΘ : Thin Θ) : Prop :=
   lk_thin w α (αIn : α ∈ w) β (βIn : β ∈ w - α) :
     lk (thin α) βIn = ṫy.var (world.in_thin αIn βIn).
 #[global] Arguments LkThin Θ {_}.
 
-Class LkThick (Θ : ACC) (thickΘ : Thick Θ) : Prop :=
+Class LkThick (Θ : SUB) (thickΘ : Thick Θ) : Prop :=
   lk_thick w α (αIn : α ∈ w) (t : Ṫy (w - α)) β (βIn : β ∈ w) :
     lk (thick α t) βIn = thickIn αIn t βIn.
 #[global] Arguments LkThick Θ {_}.

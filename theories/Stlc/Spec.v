@@ -26,12 +26,9 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Coq Require Import
-  Strings.String.
-From Equations Require Import
-  Equations.
-From stdpp Require Import
-  gmap.
+From Coq Require Import Strings.String.
+From Equations Require Import Equations.
+From stdpp Require Import gmap.
 
 #[local] Set Implicit Arguments.
 #[local] Set Transparent Obligations.
@@ -131,95 +128,3 @@ Module tpb.
 End tpb.
 Export (notations) tpb.
 Export tpb (tpb).
-
-
-
-
-(* Inductive SolvedM (A : TYPE) (Σ : World) : Type := *)
-(*   | Ret_Solved           : A Σ -> SolvedM A Σ *)
-(*   | Fail_Solved          : SolvedM A Σ *)
-(*   | Bind_Exists_Solved   : forall (i : nat), SolvedM A (Σ ▻ i) -> SolvedM A Σ. *)
-
-(* #[export] Instance lk_alloc : Lk Alloc := *)
-(*   fun w1 w2 r x xIn => Ty_hole _ x (persist _ xIn _ r). *)
-
-(* #[export] Instance PersistLaws_Ty : PersistLaws Ty. *)
-(* Proof. *)
-(*   constructor. *)
-(*   - induction V; cbn; f_equal; auto. *)
-(*   - induction V; cbn; f_equal; auto. *)
-(*     unfold lk, lk_alloc. f_equal. *)
-(*     apply assoc_persist. *)
-(* Qed. *)
-
-(* #[export] Instance PersistLaws_Env : PersistLaws Env. *)
-(* Proof. *)
-(*   constructor. *)
-(*   - induction V as [|[]]; cbn; f_equal; auto. *)
-(*     f_equal. apply refl_persist. *)
-(*   - induction V as [|[]]; cbn; f_equal; auto. *)
-(*     f_equal. apply assoc_persist. *)
-(* Qed. *)
-
-(* #[export] Instance InstAlloc : forall w, Inst (Alloc w) (Assignment w) := *)
-(*   fix installoc {w0 w1} (r : Alloc w0 w1) := *)
-(*     match r with *)
-(*     | alloc.refl _        => fun ι => ι *)
-(*     | alloc.fresh _ α w r => fun ι => let (r',_) := env.view (inst (Inst := @installoc _) r ι) in r' *)
-(*     end. *)
-
-
-
-
-(* Class LkPreOrder {R} `{Lk R, Persistent R Ty, Refl R, Trans R} : Prop := *)
-(*   { lk_refl {w x} (xIn : x ∈ w) : *)
-(*       lk refl xIn = Ty_hole w x xIn; *)
-(*     lk_trans {w1 w2 w3 x} (xIn : x ∈ w1) (ζ1 : R w1 w2) (ζ2 : R w2 w3) : *)
-(*       lk (trans ζ1 ζ2) xIn = persist _ (lk ζ1 xIn) _ ζ2; *)
-(*   }. *)
-(* #[global] Arguments LkPreOrder R {_ _ _ _}. *)
-
-(* Class PersistPreOrder {R A} `{Persistent R A, Refl R, Trans R} : Prop := *)
-(*   { persist_refl {w} (a : A w) : *)
-(*       persist _ a _ refl = a; *)
-(*     persist_trans {w1} (a : A w1) {w2 w3} (ζ1 : R w1 w2) (ζ2 : R w2 w3) : *)
-(*       persist _ a _ (trans ζ1 ζ2) = persist _ (persist _ a _ ζ1) _ ζ2; *)
-(*   }. *)
-(* #[global] Arguments PersistPreOrder R A {_ _ _}. *)
-
-
-(* Section Thin. *)
-
-(*   Fixpoint thin {w x} (xIn : x ∈ w) (T : Ty (w - x)) : Ty w := *)
-(*     match T with *)
-(*     | Ty_hole _ _ yIn => Ty_hole _ _ (ctx.in_thin xIn yIn) *)
-(*     | Ty_bool _ => Ty_bool _ *)
-(*     | Ty_func _ T1 T2 => Ty_func _ (thin xIn T1) (thin xIn T2) *)
-(*     end. *)
-
-(*   (* Definition fancy_thin : ⊢ ◁Ty -> Ty := *) *)
-(*   (*   fun w '(x; (xIn; T)) => thin xIn T. *) *)
-
-(* End Thin. *)
-
-(* Section ShallowConstraints. *)
-(*   Import World.notations. *)
-
-(*   Inductive TyF (w : World) : Type := *)
-(*   | TyF_bool       : TyF w *)
-(*   | TyF_func {x y} : x ∈ w -> y ∈ w -> TyF w. *)
-(*   #[global] Arguments TyF_bool {w}. *)
-(*   #[global] Arguments TyF_func {w x y}. *)
-
-(*   Definition inj : ⊢ʷ TyF -> Ty := *)
-(*     fun w t => *)
-(*       match t with *)
-(*       | TyF_bool     => Ty_bool _ *)
-(*       | TyF_func x y => Ty_func _ (Ty_hole _ _ x) (Ty_hole _ _ y) *)
-(*       end. *)
-
-(*   Variant ShallowConstraint (w : World) : Type := *)
-(*     | FlexFlex {x y} (xIn : x ∈ w) (yIn : y ∈ w) *)
-(*     | FlexRigid {x} (xIn : x ∈ w) (t : TyF w). *)
-
-(* End ShallowConstraints. *)

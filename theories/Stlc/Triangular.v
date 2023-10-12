@@ -27,12 +27,11 @@
 (******************************************************************************)
 
 From Em Require Import
-  Context
   Prelude
   Stlc.Persistence
   Stlc.Worlds.
 
-Import world.notations World.notations.
+Import world.notations.
 
 #[local] Set Implicit Arguments.
 
@@ -73,8 +72,8 @@ Module Tri.
                       t
     end.
 
-  Canonical Structure Tri : ACC :=
-    {| acc              := Rel;
+  Canonical Structure Tri : SUB :=
+    {| sub              := Rel;
        lk w1 w2 θ α αIn := persist_outer (ṫy.var αIn) θ;
     |}.
 
@@ -109,7 +108,7 @@ Module Tri.
      end.
   Proof. induction θ; destruct t; cbn; now f_equal. Qed.
 
-  Lemma persist_outer_refl {w} (t : Ṫy w) : persist_outer t Worlds.refl = t.
+  Lemma persist_outer_refl {w} (t : Ṫy w) : persist_outer t refl = t.
   Proof. reflexivity. Qed.
 
   Lemma persist_persist_inner {w0 w1} (t : Ṫy w0)
@@ -161,5 +160,9 @@ Module Tri.
 
 End Tri.
 Export Tri (Tri).
-Notation "w1 ⊒⁻ w2" := (acc Tri w1 w2) (at level 80).
+Notation "w1 ⊒⁻ w2" := (sub Tri w1 w2) (at level 80).
 Infix "⊙⁻" := (trans (Θ := Tri)) (at level 60, right associativity).
+Notation "□⁻ A" := (Box Tri A)
+  (at level 9, right associativity, format "□⁻ A") : indexed_scope.
+Notation "◇⁻ A" := (Diamond Tri A)
+  (at level 9, right associativity, format "◇⁻ A") : indexed_scope.

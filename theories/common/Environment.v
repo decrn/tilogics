@@ -27,7 +27,7 @@
 (******************************************************************************)
 
 From Em Require Import
-     Context Prelude.
+  Prelude Stlc.Worlds.
 Import world.notations.
 
 #[local] Set Implicit Arguments.
@@ -43,10 +43,10 @@ Section WithBinding.
     Context {D : Set}.
 
     Inductive Env : World → Set :=
-    | nil                              : Env []
+    | nil                              : Env ε
     | snoc {w} (E : Env w) {α} (d : D) : Env (w ▻ α).
 
-    Variant NilView : Env [] → Set :=
+    Variant NilView : Env ε → Set :=
       isNil : NilView nil.
 
     Variant SnocView {w α} : Env (w ▻ α) → Set :=
@@ -54,7 +54,7 @@ Section WithBinding.
 
     Definition view (w : World) (E : Env w) :
       match w with
-      | []    => NilView
+      | ε     => NilView
       | w ▻ α => SnocView
       end E :=
       match E with
@@ -73,7 +73,7 @@ Section WithBinding.
 
     Fixpoint tabulate {w} : (∀ α, α ∈ w → D) → Env w :=
       match w with
-      | []    => fun _ => nil
+      | ε     => fun _ => nil
       | w ▻ α => fun Ewα =>
                    snoc
                      (tabulate (fun β βIn => Ewα β (world.in_succ βIn)))

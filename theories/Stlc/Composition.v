@@ -27,75 +27,62 @@
 (******************************************************************************)
 
 From Em Require Import
+  Context
+  Environment
   Prelude
+  Stlc.Alloc
+  Stlc.GeneratorSynthesise
+  Stlc.Instantiation
   Stlc.Persistence
+  Stlc.Predicates
+  Stlc.PrenexConversion
+  Stlc.MonadFree
+  Stlc.Sem
   Stlc.Spec
+  Stlc.Unification
   Stlc.Worlds.
 
-Import world.notations.
+Import option.notations.
+Import Pred Pred.Acc.
 
-#[local] Set Implicit Arguments.
+Definition run {A} `{Persistent A} (m : Free A world.nil) :
+  option { w & A w } :=
+  '(existT w1 (θ1 , (xs , a))) <- (prenex m) ;;
+  '(existT w2 (θ2 , _))        <- solve xs ;;
+  Some (existT w2 (persist a θ2)).
 
-Module alloc.
+Definition reconstruct (Γ : Env) (e : Exp) :
+  option { w & Ṫy w * Ėxp w }%type :=
+  run (generate e (lift Γ)).
 
-  Inductive Rel (w : World) : TYPE :=
-  | refl        : Rel w w
-  | snoc {w' α} : Rel w w' → Rel w (w' ▻ α).
-  #[global] Arguments refl {_}.
-  #[global] Arguments snoc {_ _ _} _.
+Definition reconstruct_grounded (Γ : Env) (e : Exp) : option (Ty * Exp) :=
+  '(existT w te) <- reconstruct Γ e ;;
+  Some (inst te (grounding w)).
 
-  Fixpoint persist_in {w0 w1} (θ : Rel w0 w1) [α] (αIn : α ∈ w0) : α ∈ w1 :=
-    match θ with
-    | refl    => αIn
-    | snoc θ' => world.in_succ (persist_in θ' αIn)
-    end.
+Definition algorithmic_typing (Γ : Env) (e : Exp) (τ : Ty) (e' : Exp) : Prop :=
+  match reconstruct Γ e with
+  | Some (existT w1 (τ1, e1)) =>
+      exists ι : Assignment w1, inst τ1 ι = τ /\ inst e1 ι = e'
+  | None => False
+  end.
 
-  Canonical Structure Alloc : SUB :=
-    {| sub              := Rel;
-       lk w0 w1 θ α αIn := ṫy.var (persist_in θ αIn)
-    |}.
-
-  #[export] Instance refl_alloc : Refl Alloc :=
-    fun w => refl.
-  #[export] Instance trans_alloc : Trans Alloc :=
-    fix trans {w0 w1 w2} (θ1 : Alloc w0 w1) (θ2 : Alloc w1 w2) : Alloc w0 w2 :=
-      match θ2 with
-      | refl     => θ1
-      | snoc θ2' => snoc (trans θ1 θ2')
-      end.
-
-  #[export] Instance step_alloc : Step Alloc :=
-    fun w α => snoc refl.
-  #[export] Instance refltrans_alloc : ReflTrans Alloc.
-  Proof.
-    constructor.
-    - intros ? ? θ; induction θ; cbn; now f_equal.
-    - easy.
-    - intros ? ? ? ? θ1 θ2 θ3. induction θ3; cbn; now f_equal.
-  Qed.
-
-  Fixpoint nil {w} : Alloc world.nil w :=
-    match w with
-    | ε      => refl
-    | w' ▻ α => snoc nil
-    end.
-
-  #[export] Instance lkrefl : LkRefl Alloc.
-  Proof. easy. Qed.
-  #[export] Instance lktrans : LkTrans Alloc.
-  Proof.
-    intros w0 w1 w2 θ1 θ2 α αIn. do 2 (unfold lk; cbn).
-    f_equal. induction θ2; cbn; now f_equal.
-  Qed.
-  #[export] Instance lkstep : LkStep Alloc.
-  Proof. easy. Qed.
-
-End alloc.
-Export alloc (Alloc).
-Export (hints) alloc.
-Notation "w1 ⊑⁺ w2" := (sub Alloc w1 w2) (at level 80).
-Infix "⊙⁺" := (trans (Θ := Alloc)) (at level 60, right associativity).
-Notation "□⁺ A" := (Box Alloc A)
-  (at level 9, right associativity, format "□⁺ A") : indexed_scope.
-Notation "◇⁺ A" := (Diamond Alloc A)
-  (at level 9, right associativity, format "◇⁺ A") : indexed_scope.
+Lemma correctness (Γ : Env) (e : Exp) (τ : Ty) (e' : Exp) :
+  algorithmic_typing Γ e τ e' <-> tpb Γ e τ e'.
+Proof.
+  generalize (generate_correct (w:=world.nil) (lift Γ) e (lift τ) (lift e')).
+  unfold TPB_algo, algorithmic_typing, reconstruct, run. rewrite <- prenex_correct.
+  destruct prenex as [(w1 & θ1 & C & t1 & e1)|]; cbn.
+  - rewrite <- (solve_correct C).
+    destruct (solve C) as [(w2 & θ2 & [])|]; predsimpl.
+    + rewrite Acc.and_wp_l. predsimpl. unfold Acc.wp; pred_unfold.
+      intros HE. specialize (HE env.nil).
+      rewrite HE. clear HE.
+      split.
+      * intros (ι2 & Heq1 & Heq2). exists (inst θ2 ι2).
+        split; [now destruct (env.view (inst θ1 (inst θ2 ι2)))|].
+        exists ι2. now subst.
+      * pred_unfold. intros (ι1 & Heq1 & ι2 & Heq2 & Heq3 & Heq4).
+        exists ι2. now subst.
+    + pred_unfold. intros HE. now specialize (HE env.nil).
+  - pred_unfold. intros HE. now specialize (HE env.nil).
+Qed.

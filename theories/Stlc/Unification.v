@@ -31,22 +31,20 @@ From Coq Require Import
 From Equations Require Import
   Equations.
 From Em Require Import
-  Context
   Prelude
   Stlc.Alloc
   Stlc.Instantiation
+  Stlc.MonadInterface
   Stlc.Predicates
   Stlc.Persistence
   Stlc.Substitution
   Stlc.Triangular
   Stlc.Worlds.
 
-Import Pred world.notations World.notations Pred.notations.
-Import (hints) Diamond Sub Tri.
+Import Pred world.notations Pred.notations.
+Import (hints) Sub Tri.
 
 Set Implicit Arguments.
-
-Notation OptionDiamond := (DiamondT Tri Option).
 
 #[local] Notation "s [ ζ ]" :=
   (persist s ζ)
@@ -54,10 +52,7 @@ Notation OptionDiamond := (DiamondT Tri Option).
       format "s [ ζ ]").
 
 #[local] Notation "▷ A" :=
-  (fun (w : World) => forall α (αIn : α ∈ w), A (w - α))
-    (at level 9, right associativity).
-#[local] Notation "▶ P" :=
-  (fun w (d : ▷_ w) => forall α (αIn : α ∈ w), P (w - α) (d α αIn))
+  (fun (w : World) => ∀ α (αIn : α ∈ w), A (w - α))
     (at level 9, right associativity).
 
 (* In this section we define a generic Bove-Capretta style accessibility
@@ -69,48 +64,54 @@ Notation OptionDiamond := (DiamondT Tri Option).
    no. 4, 2005, pp. 671–708., doi:10.1017/S0960129505004822. *)
 Section RemoveAcc.
 
+  #[local] Notation "▶ P" :=
+    (fun (d : ▷_ _) => forall α (αIn : α ∈ _), P (_ - α) (d α αIn))
+      (at level 9, right associativity).
+
   (* Coq only generates non-dependent elimination schemes for inductive
      families in Prop. Hence, we disable the automatic generation and
      define the elimination schemes for the predicate ourselves. *)
   #[local] Unset Elimination Schemes.
 
-  Inductive remove_acc (w : World) : Prop :=
-    remove_acc_intro : ▷remove_acc w -> remove_acc w.
+  Inductive remove_acc : World → Prop :=
+    remove_acc_intro : ⊧ ▷remove_acc ⇢ remove_acc.
 
-  Definition remove_acc_inv {w} (d : remove_acc w) : ▷remove_acc w :=
-    let (f) := d in f.
+  Definition remove_acc_inv : ⊧ remove_acc ⇢ ▷remove_acc :=
+    fun w d => match d with remove_acc_intro f => f end.
 
   (* We only define a non-dependent elimination scheme for Type. *)
-  Definition remove_acc_rect (P : forall Γ, Type)
-    (f : forall w, ▷P w -> P w) :
-    forall w, remove_acc w -> P w :=
+  Definition remove_acc_rect (P : TYPE) (f : ⊧ ▷P ⇢ P) :
+    ⊧ remove_acc ⇢ P :=
     fix F w (d : remove_acc w) {struct d} : P w :=
       f w (fun α αIn => F (w - α) (remove_acc_inv d αIn)).
 
   (* Define a dependent elimination scheme for Prop. *)
-  Definition remove_acc_ind (P : forall w, remove_acc w -> Prop)
-    (f : forall w (d : ▷remove_acc w), ▶P w d -> P w (remove_acc_intro d)) :=
-    fix F w (d : remove_acc w) {struct d} : P w d :=
-      let (g) return _ := d in
-      f w g (fun x xIn => F (w - x) (g x xIn)).
+  Definition remove_acc_ind (P : ∀ [w], remove_acc w → Prop)
+    (f : ∀ [w] (d : ▷remove_acc w), ▶P d → P (remove_acc_intro d)) :
+    ∀ {w} (d : remove_acc w), P d :=
+    fix F {w} (d : remove_acc w) {struct d} : P d :=
+      match d with
+        remove_acc_intro g => f g (fun α αIn => F (g α αIn))
+      end.
 
   Fixpoint remove_acc_step {w α} (r : remove_acc w) {struct r} :
     remove_acc (world.snoc w α) :=
     remove_acc_intro
-      (fun β (βIn : β ∈ (world.snoc w α)) =>
+      (fun β (βIn : β ∈ world.snoc w α) =>
          match world.view βIn in @world.SnocView _ _ β βIn
                return remove_acc (world.snoc w α - β) with
          | world.isZero   => r
          | world.isSucc i => remove_acc_step (remove_acc_inv r i)
          end).
 
-  Fixpoint remove_acc_all (w : World) : remove_acc w :=
-    match w with
-    | world.nil      => remove_acc_intro
-                        (fun x (xIn : x ∈ world.nil) =>
-                           match world.view xIn with end)
-    | world.snoc w b => remove_acc_step (remove_acc_all w)
-    end.
+  Definition remove_acc_all : ⊧ remove_acc :=
+    fix all w :=
+      match w with
+      | world.nil      => remove_acc_intro
+                            (fun x (xIn : x ∈ world.nil) =>
+                               match world.view xIn with end)
+      | world.snoc w b => remove_acc_step (all w)
+      end.
 
   (* Calculating the full predicate is costly. It has quadratic running
      time in the size of the context. It's better to keep this opaque and
@@ -121,24 +122,23 @@ Section RemoveAcc.
      for well-founded induction using [Acc_inv] for recursive calls. *)
   #[global] Opaque remove_acc_all.
 
-  Definition löb {A : World -> Type} : (⊧ ▷A ⇢ A)%W -> (⊧ A) :=
-    fun step w => remove_acc_rect A step (remove_acc_all w).
+  Definition löb {A : World → Type} : (⊧ ▷A ⇢ A) → (⊧ A) :=
+    fun step w => remove_acc_rect step (remove_acc_all w).
 
-  Definition löb_elim {A} (step : ⊧ ▷A ⇢ A) (P : forall w, A w -> Prop)
-    (IH: forall w (f : ▷A w) (pf : forall x xIn, P (w - x) (f x xIn)), P w (step w f)) :
-    forall w, P w (löb step w).
-  Proof. intros w. unfold löb. induction (remove_acc_all w). now apply IH. Qed.
+  Definition löb_elim {A} (step : ⊧ ▷A ⇢ A) (P : ∀ [w], A w → Prop)
+    (pstep: ∀ w (f : ▷A w) (IH : ▶P f), P (step w f)) w : P (löb step w).
+  Proof. unfold löb. induction (remove_acc_all w). cbn. now apply pstep. Qed.
 
 End RemoveAcc.
 
 Section Operations.
 
-  Definition fail {A} : ⊧ OptionDiamond A :=
+  Definition fail {A} : ⊧ OptionDiamond Tri A :=
     fun w => None.
   #[global] Arguments fail {A w}.
 
   Definition singleton {w x} (xIn : x ∈ w) (t : Ṫy (w - x)) :
-    OptionDiamond Unit w :=
+    OptionDiamond Tri Unit w :=
     Some (existT (w - x) (thick (Θ := Tri) x t, tt)).
 
 End Operations.
@@ -147,7 +147,7 @@ Section OccursCheck.
   Import option.notations.
   Import (hints) Sub.
 
-  Definition occurs_check_in : ⊧ ∀ x, world.In x ⇢ ▷(Option (world.In x)) :=
+  Definition occurs_check_in : ⊧ ∀ α, (α ∈) ⇢ ▷(Option (α ∈)) :=
     fun w x xIn y yIn =>
       match world.occurs_check_view yIn xIn with
       | world.Same _      => None
@@ -189,22 +189,22 @@ End OccursCheck.
 
 Section VarView.
 
-  Inductive VarView {w} : Ṫy w -> Type :=
+  Inductive VarView {w} : Ṫy w → Type :=
   | is_var {x} (xIn : x ∈ w) : VarView (ṫy.var xIn)
-  | not_var {t} (H: forall x (xIn : x ∈ w), t <> ṫy.var xIn) : VarView t.
+  | not_var {t} (H: ∀ x (xIn : x ∈ w), t <> ṫy.var xIn) : VarView t.
   #[global] Arguments not_var {w t} &.
 
   Definition varview {w} (t : Ṫy w) : VarView t :=
     match t with
     | ṫy.var xIn => is_var xIn
-    | _         => not_var (fun _ _ => noConfusion_inv)
+    | _         => not_var (fun _ _ e => noConfusion_inv e)
     end.
 
 End VarView.
 
 Section Implementation.
 
-  Definition C := Box Tri (OptionDiamond Unit).
+  Definition C := Box Tri (OptionDiamond Tri Unit).
 
   Definition ctrue : ⊧ C :=
     fun w0 w1 r01 => pure tt.
@@ -219,7 +219,7 @@ Section Implementation.
   Definition BoxUnifier : TYPE :=
     Ṫy ⇢ Ṫy ⇢ C.
 
-  Definition flex : ⊧ ∀ α, world.In α ⇢ Ṫy ⇢ OptionDiamond Unit :=
+  Definition flex : ⊧ ∀ α, world.In α ⇢ Ṫy ⇢ OptionDiamond Tri Unit :=
     fun w α αIn τ =>
       match varview τ with
       | is_var βIn =>
@@ -260,19 +260,19 @@ Section Implementation.
 
     Section atrav_elim.
 
-      Context (P : Ṫy w -> Ṫy w -> C w -> Type).
-      Context (fflex1 : forall (x : nat) (xIn : x ∈ w) (t : Ṫy w), P (ṫy.var xIn) t (aflex x t)).
-      Context (fflex2 : forall (x : nat) (xIn : x ∈ w) (t : Ṫy w), P t (ṫy.var xIn) (aflex x t)).
+      Context (P : Ṫy w → Ṫy w → C w → Type).
+      Context (fflex1 : ∀ (x : nat) (xIn : x ∈ w) (t : Ṫy w), P (ṫy.var xIn) t (aflex x t)).
+      Context (fflex2 : ∀ (x : nat) (xIn : x ∈ w) (t : Ṫy w), P t (ṫy.var xIn) (aflex x t)).
       Context (fbool : P ṫy.bool ṫy.bool ctrue).
-      Context (fbool_func : forall T1 T2 : Ṫy w, P ṫy.bool (ṫy.func T1 T2) cfalse).
-      Context (ffunc_bool : forall T1 T2 : Ṫy w, P (ṫy.func T1 T2) ṫy.bool cfalse).
-      Context (ffunc : forall s1 s2 t1 t2 : Ṫy w,
-        (P s1 t1 (atrav s1 t1)) ->
-        (P s2 t2 (atrav s2 t2)) ->
+      Context (fbool_func : ∀ T1 T2 : Ṫy w, P ṫy.bool (ṫy.func T1 T2) cfalse).
+      Context (ffunc_bool : ∀ T1 T2 : Ṫy w, P (ṫy.func T1 T2) ṫy.bool cfalse).
+      Context (ffunc : ∀ s1 s2 t1 t2 : Ṫy w,
+        (P s1 t1 (atrav s1 t1)) →
+        (P s2 t2 (atrav s2 t2)) →
         P (ṫy.func s1 s2) (ṫy.func t1 t2)
           (cand (atrav s1 t1) (atrav s2 t2))).
 
-      Lemma atrav_elim : forall (t1 t2 : Ṫy w), P t1 t2 (atrav t1 t2).
+      Lemma atrav_elim : ∀ (t1 t2 : Ṫy w), P t1 t2 (atrav t1 t2).
       Proof. induction t1; intros t2; cbn; auto; destruct t2; auto. Qed.
 
     End atrav_elim.
@@ -282,8 +282,8 @@ Section Implementation.
   Definition amgu : ⊧ BoxUnifier :=
     löb atrav.
 
-  Definition mgu : ⊧ Ṫy ⇢ Ṫy ⇢ OptionDiamond Unit :=
-    fun w s t => T (@amgu w s t).
+  Definition mgu : ⊧ Ṫy ⇢ Ṫy ⇢ OptionDiamond Tri Unit :=
+    fun w s t => @amgu w s t _ refl.
 
   Definition asolve : ⊧ List (Prod Ṫy Ṫy) ⇢ C :=
     fix asolve {w} cs {struct cs} :=
@@ -292,25 +292,26 @@ Section Implementation.
       | List.cons (t1,t2) cs => cand (amgu t1 t2) (asolve cs)
       end.
 
-  Definition solve : ⊧ List (Prod Ṫy Ṫy) ⇢ OptionDiamond Unit :=
+  Definition solve : ⊧ List (Prod Ṫy Ṫy) ⇢ OptionDiamond Tri Unit :=
     fun w cs => asolve cs refl.
 
 End Implementation.
 
 Section Correctness.
 
+  Local Existing Instance proper_persist_bientails.
   Lemma instpred_ctrue {w0 w1} (θ1 : Tri w0 w1) :
-    instpred (ctrue θ1) ⊣⊢ₚ Trueₚ.
+    instpred (ctrue θ1) ⊣⊢ₚ ⊤ₚ.
   Proof. cbn. now rewrite Acc.wp_refl. Qed.
 
   Lemma instpred_cfalse {w0 w1} (θ1 : Tri w0 w1) :
-    instpred (cfalse θ1) ⊣⊢ₚ Falseₚ.
+    instpred (cfalse θ1) ⊣⊢ₚ ⊥ₚ.
   Proof. reflexivity. Qed.
 
   Lemma instpred_cand_intro {w0} (c1 c2 : C w0) P Q :
-    (forall w1 (θ1 : Tri w0 w1), instpred (c1 w1 θ1) ⊣⊢ₚ P[θ1]) ->
-    (forall w1 (θ1 : Tri w0 w1), instpred (c2 w1 θ1) ⊣⊢ₚ Q[θ1]) ->
-    (forall w1 (θ1 : Tri w0 w1), instpred (cand c1 c2 θ1) ⊣⊢ₚ (P /\ₚ Q)[θ1]).
+    (∀ w1 (θ1 : Tri w0 w1), instpred (c1 w1 θ1) ⊣⊢ₚ P[θ1]) →
+    (∀ w1 (θ1 : Tri w0 w1), instpred (c2 w1 θ1) ⊣⊢ₚ Q[θ1]) →
+    (∀ w1 (θ1 : Tri w0 w1), instpred (cand c1 c2 θ1) ⊣⊢ₚ (P /\ₚ Q)[θ1]).
   Proof.
     unfold instpred, instpred_optiondiamond, cand. intros H1 H2 w1 θ1.
     rewrite wp_optiondiamond_bind, persist_and, <- H1, wp_optiondiamond_and.
@@ -320,19 +321,17 @@ Section Correctness.
 
   Definition BoxUnifierCorrect : ⊧ BoxUnifier ⇢ PROP :=
     fun w0 bu =>
-      forall (t1 t2 : Ṫy w0) w1 (θ1 : w0 ⊒⁻ w1),
+      ∀ (t1 t2 : Ṫy w0) w1 (θ1 : w0 ⊒⁻ w1),
         instpred (bu t1 t2 w1 θ1) ⊣⊢ₚ (t1 =ₚ t2)[θ1].
 
   Lemma flex_correct {w α} (αIn : α ∈ w) (t : Ṫy w) :
     instpred (flex α t) ⊣⊢ₚ ṫy.var αIn =ₚ t.
   Proof.
     unfold flex. destruct varview; cbn.
-    - destruct world.occurs_check_view; cbn.
-      + now rewrite Acc.wp_refl, eqₚ_refl.
-      + rewrite Acc.wp_thick, persist_true, and_true_r.
-        cbn. now rewrite lk_thin.
+    - destruct world.occurs_check_view; predsimpl.
+      rewrite Acc.wp_thick; predsimpl. now rewrite lk_thin.
     - pose proof (occurs_check_spec αIn t) as HOC. destruct occurs_check; cbn.
-      + subst. now rewrite Acc.wp_thick, persist_true, and_true_r.
+      + subst. now rewrite Acc.wp_thick; predsimpl.
       + destruct HOC as [HOC|HOC].
         * subst. now contradiction (H α αIn).
         * apply pno_cycle in HOC. apply split_bientails. now split.
@@ -341,7 +340,7 @@ Section Correctness.
   Section InnerRecursion.
 
     Context [w] (lamgu : ▷BoxUnifier w).
-    Context (lamgu_correct : forall x (xIn : x ∈ w),
+    Context (lamgu_correct : ∀ x (xIn : x ∈ w),
                 BoxUnifierCorrect (lamgu xIn)).
 
     Lemma aflex_correct {α} (αIn : α ∈ w) (t : Ṫy w) w1 (θ1 : w ⊒⁻ w1) :
@@ -358,26 +357,26 @@ Section Correctness.
       intros t1 t2. pattern (atrav lamgu t1 t2). apply atrav_elim; clear t1 t2.
       - intros α αIn t w1 θ1. now rewrite aflex_correct.
       - intros α αIn t w1 θ1. now rewrite aflex_correct.
-      - intros. now rewrite instpred_ctrue, eqₚ_refl.
-      - intros. now rewrite instpred_cfalse, peq_ty_noconfusion.
-      - intros. now rewrite instpred_cfalse, peq_ty_noconfusion.
+      - intros. now rewrite instpred_ctrue.
+      - intros. predsimpl.
+      - intros. predsimpl.
       - intros s1 s2 t1 t2 IH1 IH2 w1 θ1.
         rewrite peq_ty_noconfusion. now apply instpred_cand_intro.
     Qed.
 
   End InnerRecursion.
 
-  Lemma amgu_correct : forall w, BoxUnifierCorrect (@amgu w).
+  Lemma amgu_correct : ∀ w, BoxUnifierCorrect (@amgu w).
   Proof. apply löb_elim, atrav_correct. Qed.
 
   Definition mgu_correct w (t1 t2 : Ṫy w) :
     instpred (mgu t1 t2) ⊣⊢ₚ t1 =ₚ t2.
-  Proof. unfold mgu, T. now rewrite amgu_correct, persist_pred_refl. Qed.
+  Proof. unfold mgu. now rewrite amgu_correct, persist_pred_refl. Qed.
 
   #[local] Existing Instance instpred_prod_ty.
 
   Lemma asolve_correct {w0} (C : List (Ṫy * Ṫy) w0) :
-    forall w1 (θ1 : w0 ⊒⁻ w1),
+    ∀ w1 (θ1 : w0 ⊒⁻ w1),
       instpred (asolve C θ1) ⊣⊢ₚ (instpred C)[θ1].
   Proof.
     induction C as [|[t1 t2]]; cbn - [ctrue cand]; intros.
@@ -387,6 +386,6 @@ Section Correctness.
 
   Lemma solve_correct {w} (C : List (Ṫy * Ṫy) w) :
     instpred (solve C) ⊣⊢ₚ instpred C.
-  Proof. unfold solve, T. now rewrite asolve_correct, persist_pred_refl. Qed.
+  Proof. unfold solve. now rewrite asolve_correct, persist_pred_refl. Qed.
 
 End Correctness.
