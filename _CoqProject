@@ -2,6 +2,7 @@
 theories/common/Environment.v
 theories/Prelude.v
 theories/Stlc/Alloc.v
+theories/Stlc/Composition.v
 theories/Stlc/GeneratorCheck.v
 theories/Stlc/GeneratorSynthesise.v
 theories/Stlc/Instantiation.v

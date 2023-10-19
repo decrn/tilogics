@@ -27,7 +27,6 @@
 (******************************************************************************)
 
 From Em Require Import
-  Context
   Environment
   Prelude
   Stlc.Alloc

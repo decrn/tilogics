@@ -26,27 +26,11 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Coq Require Import
-  Strings.String.
-From Equations Require Import
-  Equations.
-From stdpp Require Import
-  base gmap.
-From Em Require Import
-  Environment
-  Prelude
-  Stlc.Alloc
-  Stlc.Instantiation
-  Stlc.Persistence
-  Stlc.Predicates
-  Stlc.Sem
-  Stlc.Spec
-  Stlc.Worlds.
+From iris Require Import proofmode.tactics.
+From Em Require Export
+  Environment Prelude Instantiation Persistence Predicates Spec Worlds.
 
-Import world.notations.
-Import Pred Pred.notations.
-Import Pred.proofmode.
-Import iris.proofmode.tactics.
+Import world.notations Pred Pred.notations Pred.proofmode.
 
 #[local] Notation "s [ ζ ]" :=
   (persist s ζ)
@@ -89,13 +73,13 @@ Class WeakestLiberalPre (Θ : SUB) (M : TYPE -> TYPE) : Type :=
   WLP [A] : ⊧ M A ⇢ Box Θ (A ⇢ Pred) ⇢ Pred.
 
 Class TypeCheckLogicM
-  Θ {reflΘ : Refl Θ} {stepΘ : Step Θ} {transΘ : Trans Θ}
+  Θ {reflΘ : Refl Θ} {stepΘ : Step Θ} {transΘ : Trans Θ } {lkStepθ : LkStep Θ}
   M {pureM : Pure M} {bindM : Bind Θ M} {tcM : TypeCheckM M}
     {wpM : WeakestPre Θ M} {wlpM : WeakestLiberalPre Θ M} : Type :=
   { wp_pure [A w] (a : A w) (Q : Box Θ (A ⇢ Pred) w) :
       WP (pure a) Q ⊣⊢ₚ Q _ refl a;
     wp_bind [A B w0] (m : M A w0) (f : Box Θ (A ⇢ M B) w0) (Q : Box Θ (B ⇢ Pred) w0) :
-      WP (bind m f) Q ⊣⊢ₚ WP m (fun w1 θ1 a => WP (f _ θ1 a) (_4 Q θ1));
+      WP (bind m f) Q ⊣⊢ₚ WP m (fun w1 θ1 a => WP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2)));
     wp_assert [w] (σ τ : Ṫy w) (Q : Box Θ (Unit ⇢ Pred) w) :
       WP (assert σ τ) Q ⊣⊢ₚ σ =ₚ τ /\ₚ Q _ refl tt;
     wp_pick [w] (Q : Box Θ (Ṫy ⇢ Pred) w) :
@@ -110,7 +94,7 @@ Class TypeCheckLogicM
     wlp_pure [A w] (a : A w) (Q : Box Θ (A ⇢ Pred) w) :
       WLP (pure a) Q ⊣⊢ₚ Q _ refl a;
     wlp_bind [A B w0] (m : M A w0) (f : Box Θ (A ⇢ M B) w0) (Q : Box Θ (B ⇢ Pred) w0) :
-      WLP (bind m f) Q ⊣⊢ₚ WLP m (fun w1 θ1 a => WLP (f _ θ1 a) (_4 Q θ1));
+      WLP (bind m f) Q ⊣⊢ₚ WLP m (fun w1 θ1 a => WLP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2)));
     wlp_assert [w] (σ τ : Ṫy w) (Q : Box Θ (Unit ⇢ Pred) w) :
       WLP (assert σ τ) Q ⊣⊢ₚ σ =ₚ τ ->ₚ Q _ refl tt;
     wlp_pick [w] (Q : Box Θ (Ṫy ⇢ Pred) w) :
@@ -125,7 +109,7 @@ Class TypeCheckLogicM
     wp_impl [A w] (m : M A w) (P : Box Θ (A ⇢ Pred) w) (Q : Pred w) :
       (WP m P ->ₚ Q) ⊣⊢ₚ WLP m (fun w1 θ1 a1 => P w1 θ1 a1 ->ₚ Q[θ1]);
   }.
-#[global] Arguments TypeCheckLogicM Θ {_ _ _} _ {_ _ _ _ _}.
+#[global] Arguments TypeCheckLogicM Θ {_ _ _ _} _ {_ _ _ _ _}.
 
 Lemma wp_mono' `{TypeCheckLogicM Θ M} {A w} (m : M A w) (P Q : Box Θ (A ⇢ Pred) w) :
   (WP m P -∗ (∀ₚ w1 θ1 a1, Acc.wlp θ1 (P w1 θ1 a1 -∗ Q w1 θ1 a1)) -∗ WP m Q)%P.
@@ -134,6 +118,39 @@ Proof. iIntros "WP PQ". iRevert "WP". now iApply wp_mono. Qed.
 Lemma wlp_mono' `{TypeCheckLogicM Θ M} {A w} (m : M A w) (P Q : Box Θ (A ⇢ Pred) w) :
   (WLP m P -∗ (∀ₚ w1 θ1 a1, Acc.wlp θ1 (P w1 θ1 a1 -∗ Q w1 θ1 a1)) -∗ WLP m Q)%P.
 Proof. iIntros "WP PQ". iRevert "WP". now iApply wlp_mono. Qed.
+
+Lemma wlp_pick' `{TypeCheckLogicM Θ M} [w] (Q : Box Θ (Ṫy ⇢ Pred) w) :
+  (∀ₚ w' (θ : Θ w w') (t : Ṫy w'), Acc.wlp θ (Q w' θ t)) ⊢ₚ WLP pick Q.
+Proof. rewrite wlp_pick. iIntros "HQ". iApply "HQ". Qed.
+
+Lemma wp_pick' `{TypeCheckLogicM Θ M} [w] {Q : Box Θ (Ṫy ⇢ Pred) w} (τ : Ty) :
+  (∀ₚ w' (θ : Θ w w'), Acc.wlp θ (∀ₚ τ', lift τ =ₚ τ' ->ₚ Q w' θ τ')) ⊢ₚ WP pick Q.
+Proof.
+  iIntros "#HQ".
+  iSpecialize ("HQ" $! (w ▻ world.fresh w) (step (Step := stepΘ))).
+  rewrite wp_pick.
+  iApply (Acc.intro_wp_step τ).
+  iModIntro. rewrite Acc.persist_wlp.
+  iApply "HQ".
+Qed.
+
+(* Alternative rule for pick which substitutes the last variable away
+   as discussed in the papter. *)
+Lemma wp_pick_substitute `{TypeCheckLogicM Θ M, Thick Θ} {lkThickΘ : LkThick Θ}
+  [w] (Q : Box Θ (Ṫy ⇢ Pred) w) :
+  WP pick Q ⊣⊢ₚ
+    let α := world.fresh w in
+    (∃ₚ τ : Ṫy w, (Q (w ▻ α) step (ṫy.var world.in_zero))[thick α (αIn := world.in_zero) τ]).
+Proof.
+  rewrite wp_pick; cbn. constructor; intros ι.
+  unfold Acc.wp; pred_unfold. split.
+  - intros (ι' & Heq & HQ). destruct (env.view ι') as [ι' τ].
+    erewrite inst_step_snoc in Heq. subst.
+    exists (lift τ). now rewrite inst_thick inst_lift.
+  - intros (τ & HQ). rewrite inst_thick in HQ.
+    exists (env.snoc ι _ (inst τ ι)).
+    now rewrite inst_step_snoc.
+Qed.
 
 Definition wp_diamond {Θ : SUB} {A} :
   ⊧ Diamond Θ A ⇢ Box Θ (A ⇢ Pred) ⇢ Pred :=
@@ -249,7 +266,7 @@ Section OptionDiamond.
 
 End OptionDiamond.
 
-#[local] Instance instpred_diamond {Θ A} `{ipA : InstPred A} :
+#[export] Instance instpred_diamond {Θ A} `{ipA : InstPred A} :
   InstPred (Diamond Θ A) :=
   fun w m => wp_diamond m (fun _ _ a => instpred a).
 #[export] Instance instpred_optiondiamond {Θ A} `{ipA : InstPred A} :

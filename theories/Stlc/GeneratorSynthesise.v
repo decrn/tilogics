@@ -131,17 +131,21 @@ Section Generator.
       iIntros (w3 θ3 (t3 & e3')) "!> #HT3".
       clear IHe1 IHe2 IHe3.
 
-      do 2 rewrite wlp_bind wlp_assert. rewrite wlp_pure.
-      iIntros "#Heq1 #Heq2". predsimpl.
+      do 2 rewrite wlp_bind wlp_assert. iIntros "#Heq1 #Heq2".
+      rewrite wlp_pure. predsimpl.
       iStopProof. pred_unfold. intros (HT1 & HT2 & HT3 & Heq1 & Heq2).
       subst; now constructor.
 
-    - rewrite wlp_bind wlp_pick. iIntros "!>".
-      rewrite wlp_bind. set (α := world.fresh w).
-      iApply (wlp_mono' $! (IHe (w ▻ α) (G[step] ,, x∷ṫy.var world.in_zero))).
-      iIntros (w1 θ1 (t1 & e1')) "!> #HT".
-      rewrite wlp_pure. predsimpl.
-      generalize (lk θ1 world.in_zero). intros ?τ.
+    - rewrite wlp_bind wlp_pick. iModIntro.
+      set (α := world.fresh w).
+      set (θ1 := @step Θ stepΘ w α).
+      set (τ1 := @ṫy.var (w ▻ α) α (@world.in_zero α w)).
+      rewrite wlp_bind.
+      iPoseProof (IHe _ (G[θ1] ,, x∷τ1)) as "-#IH". iRevert "IH".
+      iApply wlp_mono. iIntros (w2 θ2 (t2 & e1')) "!> #HT".
+      rewrite wlp_pure. rewrite persist_insert -persist_trans trans_refl_r.
+      generalize G[θ1 ⊙ θ2]. clear G. intros G.
+      generalize τ1[θ2]. clear. intros τ1.
       iStopProof. pred_unfold. now constructor.
 
     - rewrite wlp_bind. iApply (wlp_mono' $! (IHe _ (G ,, x∷lift t))).
@@ -153,14 +157,28 @@ Section Generator.
       rewrite wlp_bind. iApply (wlp_mono' $! (IHe2 _ G[_])).
       iIntros (w2 θ2 (t11 & e2')) "!> #HT2".
       clear IHe1 IHe2.
-      rewrite wlp_bind wlp_pick. iIntros "!>".
+      rewrite wlp_bind -wlp_pick'. iIntros "%w3 %θ3 %τ12 !>".
       rewrite wlp_bind wlp_assert. iIntros "#Heq1".
       rewrite wlp_pure. predsimpl.
-      generalize (@ṫy.var (w2 ▻ world.fresh w2) (world.fresh w2)
-                (@world.in_zero (world.fresh w2) w2)).
-      intros τ12.
       iStopProof. pred_unfold. intros (HT1 & HT2 & Heq). subst.
       econstructor; eauto.
+   (* Restart. *)
+   (*  induction e; intros w G; cbn; try (iStartProof; *)
+   (*    repeat *)
+   (*      (rewrite ?wlp_bind ?wlp_assert ?wlp_pure; *)
+   (*       try *)
+   (*         match goal with *)
+   (*         | IH: forall w G, bi_emp_valid (WLP (generate ?e G) _) |- *)
+   (*                             environments.envs_entails _ (WLP (generate ?e ?G) _) => *)
+   (*             iApply (wlp_mono' $! (IH _ G)); *)
+   (*             iIntros (?w ?θ (?t & ?e')) "!> #?" *)
+   (*         | |- environments.envs_entails _ (WLP pick _) => *)
+   (*             rewrite -wlp_pick'; iIntros (?w ?θ ?τ) "!>" *)
+   (*         end); predsimpl; iStopProof; pred_unfold; intuition (subst; econstructor; eauto); fail). *)
+   (*  - destruct lookup eqn:?; predsimpl. *)
+   (*    + rewrite wlp_pure. pred_unfold. constructor. *)
+   (*      now rewrite lookup_inst Heqo. *)
+   (*    + rewrite wlp_fail. easy. *)
   Qed.
 
   Lemma generate_sound (e : Exp) (w0 : World) (G0 : Ėnv w0) t0 e0 :
@@ -208,14 +226,13 @@ Section Generator.
       iStopProof. pred_unfold. intuition subst; auto.
 
     - iIntros "#HeqG".
-      rewrite wp_bind wp_pick. predsimpl.
-      iApply (Acc.intro_wp_step t1). iIntros "!> #Heq1".
+      rewrite wp_bind -(wp_pick' t1). iIntros "%w1 %θ1 !> %τ1' #Heq1".
       rewrite wp_bind. predsimpl.
-      iPoseProof (IH _ (G0 ,, x∷ṫy.var world.in_zero)) as "IH".
+      iPoseProof (IH _ (G0 ,, x∷τ1')) as "IH".
       rewrite lift_insert. predsimpl.
       iPoseProof ("IH" with "HeqG Heq1") as "-#IH'"; iClear "IH".
       iApply (wp_mono' with "IH'").
-      iIntros (w1 θ1 (t2' & e1'')) "!> (#Heq2 & #Heq3)".
+      iIntros (w2 θ2 (t2' & e1'')) "!> (#Heq2 & #Heq3)".
       rewrite wp_pure. predsimpl.
       iStopProof. pred_unfold. intuition subst; auto.
 
@@ -234,20 +251,16 @@ Section Generator.
       iPoseProof (IH1 _ G0) as "IH"; clear IH1.
       iPoseProof ("IH" with "HeqG") as "-#IH'"; iClear "IH".
       iApply (wp_mono' with "IH'").
-      iIntros (w1 r1 (tf & e1'')) "!> (#Heq1 & #Heq2)"; predsimpl.
+      iIntros (w1 θ1 (tf & e1'')) "!> (#Heq1 & #Heq2)"; predsimpl.
 
       rewrite wp_bind. unfold _4.
       iPoseProof (IH2 w1 G0 with "HeqG") as "-#IH"; clear IH2.
       iApply (wp_mono' with "IH").
-      iIntros (w2 r2 (t1' & e2'')) "!> (#Heq3 & #Heq4)".
+      iIntros (w2 θ2 (t1' & e2'')) "!> (#Heq3 & #Heq4)".
 
-      rewrite wp_bind wp_pick. unfold _4.
-      iApply (Acc.intro_wp_step t2). iIntros "!> #Heq5".
-      rewrite wp_bind wp_assert. unfold _4.
-      rewrite wp_pure. predsimpl.
+      rewrite wp_bind -(wp_pick' t2). iIntros "%w3 %θ3 !> %τ2' #Heq5".
+      rewrite wp_bind wp_assert wp_pure. predsimpl.
       repeat (rewrite ?persist_eq ?persist_lift; predsimpl).
-
-      generalize (@ṫy.var (w2 ▻ world.fresh w2) (world.fresh w2) (@world.in_zero (world.fresh w2) w2)). intros t2'.
 
       iStopProof. pred_unfold. intuition subst; auto.
   Qed.
@@ -266,6 +279,6 @@ Section Generator.
 
   Lemma generate_correct {w} (Γ : Ėnv w) (e : Exp) (τ : Ṫy w) (e' : Ėxp w) :
     Γ |--ₚ e; τ ~> e' ⊣⊢ₚ TPB_algo Γ e τ e'.
-  Proof. apply split_bientails; auto using generate_complete, generate_sound. Qed.
+  Proof. iSplit. iApply generate_complete. iApply generate_sound. Qed.
 
 End Generator.

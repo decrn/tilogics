@@ -26,20 +26,9 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Coq Require Import
-  Arith.PeanoNat.
-From Equations Require Import
-  Equations.
-From Em Require Import
-  Prelude
-  Stlc.Alloc
-  Stlc.Instantiation
-  Stlc.MonadInterface
-  Stlc.Predicates
-  Stlc.Persistence
-  Stlc.Substitution
-  Stlc.Triangular
-  Stlc.Worlds.
+From Equations Require Import Equations.
+From Em Require Import Instantiation MonadInterface Persistence Predicates
+  Prelude Substitution Triangular Worlds.
 
 Import Pred world.notations Pred.notations.
 Import (hints) Sub Tri.
@@ -122,12 +111,12 @@ Section RemoveAcc.
      for well-founded induction using [Acc_inv] for recursive calls. *)
   #[global] Opaque remove_acc_all.
 
-  Definition löb {A : World → Type} : (⊧ ▷A ⇢ A) → (⊧ A) :=
+  Definition loeb {A : World → Type} : (⊧ ▷A ⇢ A) → (⊧ A) :=
     fun step w => remove_acc_rect step (remove_acc_all w).
 
-  Definition löb_elim {A} (step : ⊧ ▷A ⇢ A) (P : ∀ [w], A w → Prop)
-    (pstep: ∀ w (f : ▷A w) (IH : ▶P f), P (step w f)) w : P (löb step w).
-  Proof. unfold löb. induction (remove_acc_all w). cbn. now apply pstep. Qed.
+  Definition loeb_elim {A} (step : ⊧ ▷A ⇢ A) (P : ∀ [w], A w → Prop)
+    (pstep: ∀ w (f : ▷A w) (IH : ▶P f), P (step w f)) w : P (loeb step w).
+  Proof. unfold loeb. induction (remove_acc_all w). cbn. now apply pstep. Qed.
 
 End RemoveAcc.
 
@@ -280,7 +269,7 @@ Section Implementation.
   End MguO.
 
   Definition amgu : ⊧ BoxUnifier :=
-    löb atrav.
+    fun w => loeb atrav w.
 
   Definition mgu : ⊧ Ṫy ⇢ Ṫy ⇢ OptionDiamond Tri Unit :=
     fun w s t => @amgu w s t _ refl.
@@ -367,7 +356,7 @@ Section Correctness.
   End InnerRecursion.
 
   Lemma amgu_correct : ∀ w, BoxUnifierCorrect (@amgu w).
-  Proof. apply löb_elim, atrav_correct. Qed.
+  Proof. apply loeb_elim, atrav_correct. Qed.
 
   Definition mgu_correct w (t1 t2 : Ṫy w) :
     instpred (mgu t1 t2) ⊣⊢ₚ t1 =ₚ t2.

@@ -354,10 +354,10 @@ Module Pred.
 
     Lemma exists_l {I : Type} {w} (P : I -> Pred w) (Q : Pred w) :
       (forall x : I, P x ⊢ₚ Q) -> (∃ₚ x : I, P x) ⊢ₚ Q.
-    Proof. obligation. firstorder. Qed.
+    Proof. obligation; firstorder. Qed.
     Lemma exists_r {I : Type} {w} P (Q : I -> Pred w) :
       (exists x : I, P ⊢ₚ Q x) -> P ⊢ₚ (∃ₚ x : I, Q x).
-    Proof. obligation. firstorder. Qed.
+    Proof. obligation; firstorder. Qed.
     #[global] Arguments exists_r {I w P Q} _.
 
     Lemma wand_is_impl [w] (P Q : Pred w) :
