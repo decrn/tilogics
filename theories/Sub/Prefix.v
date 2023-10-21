@@ -26,54 +26,75 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Coq Require Import
-  Strings.String.
-From Equations Require Import
-  Equations.
-From Em Require Import
-  Prelude
-  Stlc.Alloc
-  Stlc.MonadInterface
-  Stlc.MonadFree
-  Stlc.MonadPrenex
-  Stlc.Instantiation
-  Stlc.Persistence
-  Stlc.Predicates
-  Stlc.Spec
-  Stlc.Substitution
-  Stlc.Worlds.
+From Em Require Import Prelude Persistence Spec Worlds.
 
 Import world.notations.
-Import option.notations.
-Import Pred Pred.notations.
-Import (hints) Pred.Acc.
 
 #[local] Set Implicit Arguments.
 
-Definition prenex {A} : ⊧ Free A ⇢ Prenex A :=
-  fix pr {w} m {struct m} :=
-    match m with
-    | Ret a => pure a
-    | Fail => None
-    | Assertk t1 t2 m =>
-        '(existT w1 (r1, (cs, a))) <- pr m;;
-        let t1' := persist t1 r1 in
-        let t2' := persist t2 r1 in
-        let c   := (t1', t2') in
-        Some (existT w1 (r1, (cons c cs, a)))
-    | Choosek α m =>
-        '(existT w1 (r1, csa)) <- pr m ;;
-        Some (existT w1 (step ⊙ r1, csa))
+Module prefix.
+
+  Inductive Rel (w : World) : TYPE :=
+  | refl        : Rel w w
+  | snoc {w' α} : Rel w w' → Rel w (w' ▻ α).
+  #[global] Arguments refl {_}.
+  #[global] Arguments snoc {_ _ _} _.
+
+  Fixpoint persist_in {w0 w1} (θ : Rel w0 w1) [α] (αIn : α ∈ w0) : α ∈ w1 :=
+    match θ with
+    | refl    => αIn
+    | snoc θ' => world.in_succ (persist_in θ' αIn)
     end.
 
-Lemma prenex_correct {A w} (m : Free A w) (Q : Box Alloc (A ⇢ Pred) w) :
-  WP (prenex m) Q ⊣⊢ₚ WP m Q.
-Proof.
-  induction m; predsimpl.
-  - rewrite <- IHm. clear IHm.
-    destruct (prenex m) as [(w1 & θ1 & C1 & a1)|]; predsimpl.
-    rewrite Acc.and_wp_r. apply Acc.proper_wp_bientails. predsimpl.
-    now rewrite and_assoc.
-  - rewrite <- IHm. clear IHm.
-    destruct (prenex m) as [(w1 & θ1 & C1 & a1)|]; predsimpl.
-Qed.
+  Canonical Structure Prefix : SUB :=
+    {| sub              := Rel;
+       lk w0 w1 θ α αIn := ṫy.var (persist_in θ αIn)
+    |}.
+
+  #[export] Instance refl_prefix : Refl Prefix :=
+    fun w => refl.
+  #[export] Instance trans_prefix : Trans Prefix :=
+    fix trans {w0 w1 w2} (θ1 : Prefix w0 w1) (θ2 : Prefix w1 w2) : Prefix w0 w2 :=
+      match θ2 with
+      | refl     => θ1
+      | snoc θ2' => snoc (trans θ1 θ2')
+      end.
+
+  #[export] Instance step_prefix : Step Prefix :=
+    fun w α => snoc refl.
+  #[export] Instance refltrans_prefix : ReflTrans Prefix.
+  Proof.
+    constructor.
+    - intros ? ? θ; induction θ; cbn; now f_equal.
+    - easy.
+    - intros ? ? ? ? θ1 θ2 θ3. induction θ3; cbn; now f_equal.
+  Qed.
+
+  Fixpoint nil {w} : Prefix world.nil w :=
+    match w with
+    | ε      => refl
+    | w' ▻ α => snoc nil
+    end.
+
+  Lemma nil_unique {w} (θ : Prefix world.nil w) : nil = θ.
+  Proof. induction θ; subst; auto. Qed.
+
+  #[export] Instance lkrefl : LkRefl Prefix.
+  Proof. easy. Qed.
+  #[export] Instance lktrans : LkTrans Prefix.
+  Proof.
+    intros w0 w1 w2 θ1 θ2 α αIn. do 2 (unfold lk; cbn).
+    f_equal. induction θ2; cbn; now f_equal.
+  Qed.
+  #[export] Instance lkstep : LkStep Prefix.
+  Proof. easy. Qed.
+
+End prefix.
+Export prefix (Prefix).
+Export (hints) prefix.
+Notation "w1 ⊑⁺ w2" := (sub Prefix w1 w2) (at level 80).
+Infix "⊙⁺" := (trans (Θ := Prefix)) (at level 60, right associativity).
+Notation "□⁺ A" := (Box Prefix A)
+  (at level 9, right associativity, format "□⁺ A") : indexed_scope.
+Notation "◇⁺ A" := (Diamond Prefix A)
+  (at level 9, right associativity, format "◇⁺ A") : indexed_scope.

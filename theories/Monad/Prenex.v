@@ -26,17 +26,9 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From iris Require Import
-  proofmode.tactics.
-From Em Require Import
-  Prelude
-  Stlc.Alloc
-  Stlc.MonadInterface
-  Stlc.Instantiation
-  Stlc.Persistence
-  Stlc.Predicates
-  Stlc.Spec
-  Stlc.Worlds.
+From iris Require Import proofmode.tactics.
+From Em Require Export Monad.Interface Prefix.
+From Em Require Import BaseLogic Spec.
 
 Import MonadNotations Pred Pred.Acc Pred.notations Pred.proofmode
   world.notations.
@@ -47,9 +39,9 @@ Definition Prenex A := Option ◇⁺(List (Ṫy * Ṫy) * A).
 
 #[export] Instance pure_prenex : Pure Prenex :=
   fun A w a => Some (existT w (refl, (List.nil, a))).
-#[export] Instance bind_prenex : Bind Alloc Prenex :=
-  fun A B w (m : OptionDiamond Alloc (List (Ṫy * Ṫy) * A) w)
-      (f : Box Alloc (A ⇢ OptionDiamond Alloc (List (Ṫy * Ṫy) * B)) w) =>
+#[export] Instance bind_prenex : Bind Prefix Prenex :=
+  fun A B w (m : OptionDiamond Prefix (List (Ṫy * Ṫy) * A) w)
+      (f : Box Prefix (A ⇢ OptionDiamond Prefix (List (Ṫy * Ṫy) * B)) w) =>
     '(C1,a1) <- m ;;
     '(C2,b2) <- f _ _ a1 ;;
     pure (persist C1 _ ++ C2, b2).
@@ -63,14 +55,14 @@ Definition Prenex A := Option ◇⁺(List (Ṫy * Ṫy) * A).
 #[local] Existing Instance instpred_prod_ty.
 #[local] Existing Instance instpred_persist_prod_ty.
 
-#[export] Instance wp_prenex : WeakestPre Alloc Prenex :=
+#[export] Instance wp_prenex : WeakestPre Prefix Prenex :=
   fun A w o Q =>
     wp_option o
       (fun d =>
          wp_diamond d
            (fun w1 θ1 '(C,a) => instpred C /\ₚ Q w1 θ1 a))%P.
 
-#[export] Instance wlp_prenex : WeakestLiberalPre Alloc Prenex :=
+#[export] Instance wlp_prenex : WeakestLiberalPre Prefix Prenex :=
   fun A w o Q =>
     wlp_option o
       (fun d =>
@@ -78,7 +70,7 @@ Definition Prenex A := Option ◇⁺(List (Ṫy * Ṫy) * A).
            (fun w1 θ1 '(C,a) => instpred C ->ₚ Q w1 θ1 a))%P.
 
 
-#[export] Instance tcmlogic_prenex : TypeCheckLogicM Alloc Prenex.
+#[export] Instance axiomatic_prenex : AxiomaticSemantics Prefix Prenex.
 Proof.
   constructor; intros; predsimpl.
   - destruct m as [(w1 & θ1 & C1 & a1)|]; predsimpl.
@@ -88,9 +80,8 @@ Proof.
     rewrite instpred_list_app. apply bi.and_proper; auto.
     now rewrite instpred_persist.
   - destruct m as [(w1 & θ1 & C1 & a1)|]; predsimpl.
-    iIntros "PQ". iApply Acc.wp_mono. iPoseProof ("PQ" $! w1 θ1 a1) as "PQ".
-    iIntros "!> [HC HP]". rewrite Acc.persist_wlp.
-    iSplit; auto. iApply "PQ"; auto.
+    iIntros "PQ". iApply Acc.wp_mono. iIntros "!> [HC HP]".
+    iMod "PQ". iSplit; auto. iApply "PQ"; auto.
   - destruct m as [(w1 & θ1 & C1 & a1)|]; predsimpl.
     destruct f as [(w2 & θ2 & C2 & b2)|]; predsimpl.
     rewrite Acc.wlp_frame. apply Acc.proper_wlp_bientails.
@@ -98,9 +89,8 @@ Proof.
     rewrite instpred_list_app. apply bi.and_proper; auto.
     now rewrite instpred_persist_list.
   - destruct m as [(w1 & θ1 & C1 & a1)|]; predsimpl.
-    iIntros "PQ". iApply Acc.wlp_mono. iPoseProof ("PQ" $! w1 θ1 a1) as "PQ".
-    iIntros "!> CP C". rewrite Acc.persist_wlp -wand_is_impl.
-    iApply "PQ". by iApply "CP".
+    iIntros "#PQ". iApply Acc.wlp_mono. iIntros "!> #HP #HC".
+    iMod "PQ". iApply "PQ". now iApply "HP".
   - destruct m as [(w1 & θ1 & C1 & a1)|]; predsimpl.
     rewrite Acc.wp_impl. predsimpl.
 Qed.

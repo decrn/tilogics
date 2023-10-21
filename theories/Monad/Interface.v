@@ -28,7 +28,7 @@
 
 From iris Require Import proofmode.tactics.
 From Em Require Export
-  Environment Prelude Instantiation Persistence Predicates Spec Worlds.
+  BaseLogic Environment Prelude Instantiation Persistence Spec Worlds.
 
 Import world.notations Pred Pred.notations Pred.proofmode.
 
@@ -59,6 +59,9 @@ Module MonadNotations.
   #[export] Hint Mode sub - + - : typeclass_instances.
 End MonadNotations.
 
+Import Pred Pred.Acc.
+
+
 Class TypeCheckM (M : TYPE -> TYPE) : Type :=
   { assert   : ⊧ Ṫy ⇢ Ṫy ⇢ M Unit;
     pick     : ⊧ M Ṫy;
@@ -72,77 +75,57 @@ Class WeakestPre (Θ : SUB) (M : TYPE -> TYPE) : Type :=
 Class WeakestLiberalPre (Θ : SUB) (M : TYPE -> TYPE) : Type :=
   WLP [A] : ⊧ M A ⇢ Box Θ (A ⇢ Pred) ⇢ Pred.
 
-Class TypeCheckLogicM
-  Θ {reflΘ : Refl Θ} {stepΘ : Step Θ} {transΘ : Trans Θ } {lkStepθ : LkStep Θ}
+Class AxiomaticSemantics
+  Θ {reflΘ : Refl Θ} {stepΘ : Step Θ} {transΘ : Trans Θ } {reflTransΘ : ReflTrans Θ}
+    {lkreflΘ : LkRefl Θ} {lkStepθ : LkStep Θ} {lktransΘ : LkTrans Θ}
   M {pureM : Pure M} {bindM : Bind Θ M} {tcM : TypeCheckM M}
     {wpM : WeakestPre Θ M} {wlpM : WeakestLiberalPre Θ M} : Type :=
-  { wp_pure [A w] (a : A w) (Q : Box Θ (A ⇢ Pred) w) :
+
+  { ax_wp_pure [A w] (a : A w) (Q : Box Θ (A ⇢ Pred) w) :
       WP (pure a) Q ⊣⊢ₚ Q _ refl a;
-    wp_bind [A B w0] (m : M A w0) (f : Box Θ (A ⇢ M B) w0) (Q : Box Θ (B ⇢ Pred) w0) :
+    ax_wp_bind [A B w0] (m : M A w0) (f : Box Θ (A ⇢ M B) w0) (Q : Box Θ (B ⇢ Pred) w0) :
       WP (bind m f) Q ⊣⊢ₚ WP m (fun w1 θ1 a => WP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2)));
-    wp_assert [w] (σ τ : Ṫy w) (Q : Box Θ (Unit ⇢ Pred) w) :
+    ax_wp_assert [w] (σ τ : Ṫy w) (Q : Box Θ (Unit ⇢ Pred) w) :
       WP (assert σ τ) Q ⊣⊢ₚ σ =ₚ τ /\ₚ Q _ refl tt;
-    wp_pick [w] (Q : Box Θ (Ṫy ⇢ Pred) w) :
+    ax_wp_pick [w] (Q : Box Θ (Ṫy ⇢ Pred) w) :
       let α := world.fresh w in
       WP pick Q ⊣⊢ₚ Acc.wp step (Q (w ▻ α) step (ṫy.var world.in_zero));
-    wp_fail [A w] (Q : Box Θ (A ⇢ Pred) w) :
+    ax_wp_fail [A w] (Q : Box Θ (A ⇢ Pred) w) :
       WP fail Q ⊣⊢ₚ ⊥ₚ;
-    wp_mono [A w] (m : M A w) (P Q : Box Θ (A ⇢ Pred) w) :
-      (∀ w1 (θ : Θ w w1) (a : A w1), Acc.wlp θ (P w1 θ a -∗ Q w1 θ a)) ⊢
+    ax_wp_mono [A w] (m : M A w) (P Q : Box Θ (A ⇢ Pred) w) :
+      PBox (fun w1 θ1 => ∀ (a : A w1), P w1 θ1 a -∗ Q w1 θ1 a) ⊢
       (WP m P -∗ WP m Q);
 
-    wlp_pure [A w] (a : A w) (Q : Box Θ (A ⇢ Pred) w) :
+    ax_wlp_pure [A w] (a : A w) (Q : Box Θ (A ⇢ Pred) w) :
       WLP (pure a) Q ⊣⊢ₚ Q _ refl a;
-    wlp_bind [A B w0] (m : M A w0) (f : Box Θ (A ⇢ M B) w0) (Q : Box Θ (B ⇢ Pred) w0) :
+    ax_wlp_bind [A B w0] (m : M A w0) (f : Box Θ (A ⇢ M B) w0) (Q : Box Θ (B ⇢ Pred) w0) :
       WLP (bind m f) Q ⊣⊢ₚ WLP m (fun w1 θ1 a => WLP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2)));
-    wlp_assert [w] (σ τ : Ṫy w) (Q : Box Θ (Unit ⇢ Pred) w) :
+    ax_wlp_assert [w] (σ τ : Ṫy w) (Q : Box Θ (Unit ⇢ Pred) w) :
       WLP (assert σ τ) Q ⊣⊢ₚ σ =ₚ τ ->ₚ Q _ refl tt;
-    wlp_pick [w] (Q : Box Θ (Ṫy ⇢ Pred) w) :
+    ax_wlp_pick [w] (Q : Box Θ (Ṫy ⇢ Pred) w) :
       let α := world.fresh w in
       WLP pick Q ⊣⊢ₚ Acc.wlp step (Q (w ▻ α) step (ṫy.var world.in_zero));
-    wlp_fail [A w] (Q : Box Θ (A ⇢ Pred) w) :
+    ax_wlp_fail [A w] (Q : Box Θ (A ⇢ Pred) w) :
       WLP fail Q ⊣⊢ₚ ⊤ₚ;
-    wlp_mono [A w] (m : M A w) (P Q : Box Θ (A ⇢ Pred) w) :
-      (∀ w1 (θ : Θ w w1) (a : A w1), Acc.wlp θ (P w1 θ a -∗ Q w1 θ a)) ⊢
+    ax_wlp_mono [A w] (m : M A w) (P Q : Box Θ (A ⇢ Pred) w) :
+      PBox (fun w1 θ1 => ∀ (a : A w1), P w1 θ1 a -∗ Q w1 θ1 a) ⊢
       (WLP m P -∗ WLP m Q);
 
-    wp_impl [A w] (m : M A w) (P : Box Θ (A ⇢ Pred) w) (Q : Pred w) :
+    ax_wp_impl [A w] (m : M A w) (P : Box Θ (A ⇢ Pred) w) (Q : Pred w) :
       (WP m P ->ₚ Q) ⊣⊢ₚ WLP m (fun w1 θ1 a1 => P w1 θ1 a1 ->ₚ Q[θ1]);
   }.
-#[global] Arguments TypeCheckLogicM Θ {_ _ _ _} _ {_ _ _ _ _}.
+#[global] Arguments AxiomaticSemantics Θ {_ _ _ _ _ _ _} _ {_ _ _ _ _}.
 
-Lemma wp_mono' `{TypeCheckLogicM Θ M} {A w} (m : M A w) (P Q : Box Θ (A ⇢ Pred) w) :
-  (WP m P -∗ (∀ₚ w1 θ1 a1, Acc.wlp θ1 (P w1 θ1 a1 -∗ Q w1 θ1 a1)) -∗ WP m Q)%P.
-Proof. iIntros "WP PQ". iRevert "WP". now iApply wp_mono. Qed.
-
-Lemma wlp_mono' `{TypeCheckLogicM Θ M} {A w} (m : M A w) (P Q : Box Θ (A ⇢ Pred) w) :
-  (WLP m P -∗ (∀ₚ w1 θ1 a1, Acc.wlp θ1 (P w1 θ1 a1 -∗ Q w1 θ1 a1)) -∗ WLP m Q)%P.
-Proof. iIntros "WP PQ". iRevert "WP". now iApply wlp_mono. Qed.
-
-Lemma wlp_pick' `{TypeCheckLogicM Θ M} [w] (Q : Box Θ (Ṫy ⇢ Pred) w) :
-  (∀ₚ w' (θ : Θ w w') (t : Ṫy w'), Acc.wlp θ (Q w' θ t)) ⊢ₚ WLP pick Q.
-Proof. rewrite wlp_pick. iIntros "HQ". iApply "HQ". Qed.
-
-Lemma wp_pick' `{TypeCheckLogicM Θ M} [w] {Q : Box Θ (Ṫy ⇢ Pred) w} (τ : Ty) :
-  (∀ₚ w' (θ : Θ w w'), Acc.wlp θ (∀ₚ τ', lift τ =ₚ τ' ->ₚ Q w' θ τ')) ⊢ₚ WP pick Q.
-Proof.
-  iIntros "#HQ".
-  iSpecialize ("HQ" $! (w ▻ world.fresh w) (step (Step := stepΘ))).
-  rewrite wp_pick.
-  iApply (Acc.intro_wp_step τ).
-  iModIntro. rewrite Acc.persist_wlp.
-  iApply "HQ".
-Qed.
 
 (* Alternative rule for pick which substitutes the last variable away
-   as discussed in the papter. *)
-Lemma wp_pick_substitute `{TypeCheckLogicM Θ M, Thick Θ} {lkThickΘ : LkThick Θ}
+ as discussed in the papter. *)
+Lemma ax_wp_pick_substitute `{AxiomaticSemantics Θ M, Thick Θ} {lkThickΘ : LkThick Θ}
   [w] (Q : Box Θ (Ṫy ⇢ Pred) w) :
   WP pick Q ⊣⊢ₚ
     let α := world.fresh w in
     (∃ₚ τ : Ṫy w, (Q (w ▻ α) step (ṫy.var world.in_zero))[thick α (αIn := world.in_zero) τ]).
 Proof.
-  rewrite wp_pick; cbn. constructor; intros ι.
+  rewrite ax_wp_pick; cbn. constructor; intros ι.
   unfold Acc.wp; pred_unfold. split.
   - intros (ι' & Heq & HQ). destruct (env.view ι') as [ι' τ].
     erewrite inst_step_snoc in Heq. subst.
@@ -151,6 +134,82 @@ Proof.
     exists (env.snoc ι _ (inst τ ι)).
     now rewrite inst_step_snoc.
 Qed.
+
+Class TypeCheckLogicM
+  Θ {reflΘ : Refl Θ} {stepΘ : Step Θ} {transΘ : Trans Θ }
+    {lkreflΘ : LkRefl Θ} {lkStepθ : LkStep Θ}
+  M {pureM : Pure M} {bindM : Bind Θ M} {tcM : TypeCheckM M}
+    {wpM : WeakestPre Θ M} {wlpM : WeakestLiberalPre Θ M} : Type :=
+
+  { wp_pure [A] {persA : Persistent A}
+      [w] (a : A w) (Q : Box Θ (A ⇢ Pred) w) :
+      Q _ refl a ⊢ₚ WP (pure a) Q;
+    wp_bind [A B w0] (m : M A w0) (f : Box Θ (A ⇢ M B) w0) (Q : Box Θ (B ⇢ Pred) w0) :
+      WP m (fun w1 θ1 a => WP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2))) ⊢ₚ WP (bind m f) Q;
+    wp_assert [w] (σ τ : Ṫy w) (Q : Box Θ (Unit ⇢ Pred) w) :
+      σ =ₚ τ /\ₚ PBox (fun _ θ => Q _ θ tt) ⊢ₚ WP (assert σ τ) Q;
+    wp_pick [w] [Q : Box Θ (Ṫy ⇢ Pred) w] (τ : Ty) :
+      PBox (fun _ θ => ∀ₚ τ', lift τ =ₚ τ' ->ₚ Q _ θ τ') ⊢ₚ WP pick Q;
+    wp_mono [A w] (m : M A w) (P Q : Box Θ (A ⇢ Pred) w) :
+      PBox (fun _ θ => ∀ₚ (a : A _), P _ θ a -∗ Q _ θ a)%I ⊢ₚ
+      (WP m P -∗ WP m Q)%I;
+
+    wlp_pure [A] {persA : Persistent A}
+      [w] (a : A w) (Q : Box Θ (A ⇢ Pred) w) :
+      Q _ refl a ⊢ₚ WLP (pure a) Q;
+    wlp_bind [A B w0] (m : M A w0) (f : Box Θ (A ⇢ M B) w0) (Q : Box Θ (B ⇢ Pred) w0) :
+      WLP m (fun w1 θ1 a => WLP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2))) ⊢ₚ WLP (bind m f) Q;
+    wlp_assert [w] (σ τ : Ṫy w) (Q : Box Θ (Unit ⇢ Pred) w) :
+      σ =ₚ τ ->ₚ PBox (fun _ θ => Q _ θ tt) ⊢ₚ WLP (assert σ τ) Q;
+    wlp_pick [w] (Q : Box Θ (Ṫy ⇢ Pred) w) :
+      PBox (fun _ θ => ∀ₚ (τ : Ṫy _), Q _ θ τ) ⊢ₚ WLP pick Q;
+    wlp_fail [A w] (Q : Box Θ (A ⇢ Pred) w) :
+      ⊤ₚ ⊢ₚ WLP fail Q;
+    wlp_mono [A w] (m : M A w) (P Q : Box Θ (A ⇢ Pred) w) :
+      PBox (fun _ θ => ∀ₚ (a : A _), P _ θ a -∗ Q _ θ a)%I ⊢ₚ
+      (WLP m P -∗ WLP m Q)%I;
+
+    wp_impl [A w] (m : M A w) (P : Box Θ (A ⇢ Pred) w) (Q : Pred w) :
+      WLP m (fun w1 θ1 a1 => P w1 θ1 a1 ->ₚ Q[θ1]) ⊢ₚ (WP m P ->ₚ Q);
+
+  }.
+#[global] Arguments TypeCheckLogicM Θ {_ _ _ _ _} _ {_ _ _ _ _}.
+
+#[export] Instance axiomatic_tcmlogic `{AxiomaticSemantics Θ M} :
+  TypeCheckLogicM Θ M.
+Proof.
+  constructor; intros.
+  - now rewrite ax_wp_pure.
+  - now rewrite ax_wp_bind.
+  - rewrite ax_wp_assert. iIntros "[#Heq >HQ]". now iSplit.
+  - rewrite ax_wp_pick. rewrite <- (Acc.intro_wp_step τ).
+    iIntros "#H !> #Heq". iMod "H".
+    iSpecialize ("H" $! (ṫy.var world.in_zero) with "Heq").
+    now rewrite trans_refl_r.
+  - apply ax_wp_mono.
+  - now rewrite ax_wlp_pure.
+  - now rewrite ax_wlp_bind.
+  - rewrite ax_wlp_assert. iIntros "#HQ #Heq".
+    iSpecialize ("HQ" with "Heq"). now iMod "HQ".
+  - rewrite ax_wlp_pick. iIntros "#HQ !>". iMod "HQ".
+    iSpecialize ("HQ" $! (ṫy.var world.in_zero)).
+    now rewrite trans_refl_r.
+  - now rewrite ax_wlp_fail.
+  - apply ax_wlp_mono.
+  - now rewrite ax_wp_impl.
+Qed.
+
+Lemma wp_fail `{TypeCheckLogicM Θ M} [A w] (Q : Box Θ (A ⇢ Pred) w) :
+  ⊥ₚ ⊢ₚ WP fail Q.
+Proof. easy. Qed.
+
+Lemma wp_mono' `{TypeCheckLogicM Θ M} {A w} (m : M A w) (P Q : Box Θ (A ⇢ Pred) w) :
+  (WP m P -∗ PBox (fun w1 θ1 => ∀ₚ a1, P w1 θ1 a1 -∗ Q w1 θ1 a1) -∗ WP m Q)%P.
+Proof. iIntros "WP PQ". iRevert "WP". now rewrite -wp_mono. Qed.
+
+Lemma wlp_mono' `{TypeCheckLogicM Θ M} {A w} (m : M A w) (P Q : Box Θ (A ⇢ Pred) w) :
+  (WLP m P -∗ PBox (fun w1 θ1 => ∀ₚ a1, P w1 θ1 a1 -∗ Q w1 θ1 a1) -∗ WLP m Q)%P.
+Proof. iIntros "WP PQ". iRevert "WP". now rewrite -wlp_mono. Qed.
 
 Definition wp_diamond {Θ : SUB} {A} :
   ⊧ Diamond Θ A ⇢ Box Θ (A ⇢ Pred) ⇢ Pred :=
@@ -219,23 +278,6 @@ Section OptionDiamond.
     - now rewrite bi.False_and.
   Qed.
 
-  Lemma wp_optiondiamond_monotonic' {Θ A w} (d : OptionDiamond Θ A w)
-    (R : Pred w) (P Q : Box Θ (A ⇢ Pred) w) :
-    (forall w1 (r : Θ w w1) (a : A w1),
-        persist R r ⊢ₚ P w1 r a ->ₚ Q w1 r a) ->
-    R ⊢ₚ WP d P ->ₚ WP d Q.
-  Proof.
-    intros pq. destruct d as [(w1 & r01 & a)|]; cbn.
-    - specialize (pq w1 r01 a).
-      apply impl_and_adjoint.
-      rewrite Acc.and_wp_r.
-      apply Acc.proper_wp_entails.
-      apply impl_and_adjoint.
-      apply pq.
-    - apply impl_and_adjoint.
-      now rewrite and_false_r.
-  Qed.
-
   #[export] Instance pure_optiondiaomd {Θ} {reflΘ : Refl Θ} :
     Pure (OptionDiamond Θ) :=
     fun A w a => Some (existT w (refl, a)).
@@ -272,3 +314,81 @@ End OptionDiamond.
 #[export] Instance instpred_optiondiamond {Θ A} `{ipA : InstPred A} :
   InstPred (OptionDiamond Θ A) :=
   fun w m => WP m (fun _ _ a => instpred a).
+
+
+(* Create HintDb wpeq. *)
+(* #[export] Hint Rewrite *)
+(*   (@persist_eq Ėnv _ _ _ _) *)
+(*   (@persist_eq Ṫy _ _ _ _) *)
+(*   (@persist_trans Ėnv _ _) *)
+(*   (@persist_trans Ṫy _ _) *)
+(*   @persist_lift *)
+(*   @lift_insert *)
+(*   : wpeq. *)
+
+Ltac wpeq :=
+  progress
+    (try done;
+     try progress cbn;
+     (* Unfortunately, autorewrite and rewrite strategy blow up with some long
+        typeclass searches. Simply use rewrite for now. *)
+     rewrite ?(@persist_eq Ėnv _ _ _ _)
+       ?(@persist_eq Ṫy _ _ _ _)
+       ?(@persist_trans Ėnv _ _)
+       ?(@persist_trans Ṫy _ _)
+       ?@persist_lift
+       ?@lift_insert;
+     try done;
+     try match goal with
+       | |- environments.envs_entails _
+              (eqₚ ?x ?x) =>
+           iApply eqₚ_intro
+       | |- environments.envs_entails _
+              (eqₚ (insert ?x _ _) (insert ?x _ _)) =>
+           iApply eqₚ_insert; iSplit
+       end;
+     auto 1 with typeclass_instances;
+     try (iStopProof; pred_unfold;
+          intuition (subst; auto; fail))).
+
+Ltac wpsimpl :=
+  match goal with
+  | |- context[fun w : World => prod (?A w) (?B w)] =>
+      change_no_check (fun w : World => prod (A w) (B w)) with (Prod A B)
+
+  | |- environments.envs_entails _ (bi_impl _ _) =>
+      iIntros "#?"
+  | |- environments.envs_entails _ (bi_affinely _) =>
+      iModIntro
+  | |- environments.envs_entails _ (bi_and _ _) =>
+      iSplit
+  | |- environments.envs_entails _ (eqₚ _ _) =>
+      wpeq
+  | |- environments.envs_entails _ (bi_pure True) =>
+      done
+  | |- environments.envs_entails _ (WP (pure _) _) =>
+      rewrite -wp_pure ?trans_refl_r ?trans_refl_r ?persist_refl
+      (* try (iStopProof; pred_unfold; intuition (subst; auto; fail)) *)
+  | |- environments.envs_entails _ (WP (bind _ _) _) =>
+      iApply wp_bind
+  | |- environments.envs_entails _ (WP pick _) =>
+      rewrite -wp_pick; iIntros (?w ?θ) "!>"; iIntros (?τ) "#?"
+  | |- environments.envs_entails _ (WP (assert _ _) _) =>
+      rewrite -wp_assert; iSplit;
+      [ iStopProof; pred_unfold; intuition (subst; auto; fail)
+      | iIntros (?w ?θ) "!>"
+      ]
+  | |- environments.envs_entails _ (WP fail _) =>
+      rewrite -wp_fail
+
+  | |- environments.envs_entails _ (WLP (pure _) _) =>
+      rewrite -wlp_pure ?trans_refl_r ?trans_refl_r ?persist_refl
+  | |- environments.envs_entails _ (WLP (bind _ _) _) =>
+      rewrite -wlp_bind
+  | |- environments.envs_entails _ (WLP pick _) =>
+      rewrite -wlp_pick; iIntros (?w ?θ) "!>"; iIntros (?τ)
+  | |- environments.envs_entails _ (WLP (assert _ _) _) =>
+      rewrite -wlp_assert; iIntros "#?" (?w ?θ) "!>"
+  | |- environments.envs_entails _ (WLP fail _) =>
+      rewrite -wlp_fail
+  end.

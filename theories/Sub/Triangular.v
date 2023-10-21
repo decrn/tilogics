@@ -26,10 +26,7 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Em Require Import
-  Prelude
-  Stlc.Persistence
-  Stlc.Worlds.
+From Em Require Import Prelude Persistence Worlds.
 
 Import world.notations.
 

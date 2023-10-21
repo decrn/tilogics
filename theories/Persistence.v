@@ -26,15 +26,9 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Coq Require Import
-  Strings.String.
-From stdpp Require Import
-  base gmap.
-From Em Require Import
-  Environment
-  Prelude
-  Stlc.Spec
-  Stlc.Worlds.
+From Coq Require Import Strings.String.
+From stdpp Require Import base gmap.
+From Em Require Import Environment Prelude Spec Worlds.
 
 Import world.notations.
 

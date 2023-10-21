@@ -26,62 +26,35 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Em Require Import
-  Environment
-  Prelude
-  Stlc.Alloc
-  Stlc.GeneratorSynthesise
-  Stlc.Instantiation
-  Stlc.Persistence
-  Stlc.Predicates
-  Stlc.PrenexConversion
-  Stlc.MonadFree
-  Stlc.Sem
-  Stlc.Spec
-  Stlc.Unification
-  Stlc.Worlds.
+From Em Require Export Monad.Free Monad.Prenex.
+Import option.notations Pred Pred.Acc Pred.notations.
 
-Import option.notations.
-Import Pred Pred.Acc.
+#[local] Set Implicit Arguments.
 
-Definition run {A} `{Persistent A} (m : Free A world.nil) :
-  option { w & A w } :=
-  '(existT w1 (θ1 , (xs , a))) <- (prenex m) ;;
-  '(existT w2 (θ2 , _))        <- solve xs ;;
-  Some (existT w2 (persist a θ2)).
+Definition prenex {A} : ⊧ Free A ⇢ Prenex A :=
+  fix pr {w} m {struct m} :=
+    match m with
+    | Ret a => pure a
+    | Fail => None
+    | Assertk t1 t2 m =>
+        '(existT w1 (r1, (cs, a))) <- pr m;;
+        let t1' := persist t1 r1 in
+        let t2' := persist t2 r1 in
+        let c   := (t1', t2') in
+        Some (existT w1 (r1, (cons c cs, a)))
+    | Choosek α m =>
+        '(existT w1 (r1, csa)) <- pr m ;;
+        Some (existT w1 (step ⊙ r1, csa))
+    end.
 
-Definition reconstruct (Γ : Env) (e : Exp) :
-  option { w & Ṫy w * Ėxp w }%type :=
-  run (generate e (lift Γ)).
-
-Definition reconstruct_grounded (Γ : Env) (e : Exp) : option (Ty * Exp) :=
-  '(existT w te) <- reconstruct Γ e ;;
-  Some (inst te (grounding w)).
-
-Definition algorithmic_typing (Γ : Env) (e : Exp) (τ : Ty) (e' : Exp) : Prop :=
-  match reconstruct Γ e with
-  | Some (existT w1 (τ1, e1)) =>
-      exists ι : Assignment w1, inst τ1 ι = τ /\ inst e1 ι = e'
-  | None => False
-  end.
-
-Lemma correctness (Γ : Env) (e : Exp) (τ : Ty) (e' : Exp) :
-  algorithmic_typing Γ e τ e' <-> tpb Γ e τ e'.
+Lemma prenex_correct {A w} (m : Free A w) (Q : Box Prefix (A ⇢ Pred) w) :
+  WP (prenex m) Q ⊣⊢ₚ WP m Q.
 Proof.
-  generalize (generate_correct (w:=world.nil) (lift Γ) e (lift τ) (lift e')).
-  unfold TPB_algo, algorithmic_typing, reconstruct, run. rewrite <- prenex_correct.
-  destruct prenex as [(w1 & θ1 & C & t1 & e1)|]; cbn.
-  - rewrite <- (solve_correct C).
-    destruct (solve C) as [(w2 & θ2 & [])|]; predsimpl.
-    + rewrite Acc.and_wp_l. predsimpl. unfold Acc.wp; pred_unfold.
-      intros HE. specialize (HE env.nil).
-      rewrite HE. clear HE.
-      split.
-      * intros (ι2 & Heq1 & Heq2). exists (inst θ2 ι2).
-        split; [now destruct (env.view (inst θ1 (inst θ2 ι2)))|].
-        exists ι2. now subst.
-      * pred_unfold. intros (ι1 & Heq1 & ι2 & Heq2 & Heq3 & Heq4).
-        exists ι2. now subst.
-    + pred_unfold. intros HE. now specialize (HE env.nil).
-  - pred_unfold. intros HE. now specialize (HE env.nil).
+  induction m; predsimpl.
+  - rewrite <- IHm. clear IHm.
+    destruct (prenex m) as [(w1 & θ1 & C1 & a1)|]; predsimpl.
+    rewrite Acc.and_wp_r. apply Acc.proper_wp_bientails. predsimpl.
+    now rewrite and_assoc.
+  - rewrite <- IHm. clear IHm.
+    destruct (prenex m) as [(w1 & θ1 & C1 & a1)|]; predsimpl.
 Qed.

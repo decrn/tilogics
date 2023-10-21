@@ -26,7 +26,7 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Coq Require Import Strings.String.
+From Coq Require Export Strings.String.
 From Equations Require Import Equations.
 From stdpp Require Import gmap.
 

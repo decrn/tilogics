@@ -26,74 +26,72 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Equations Require Import
-  Equations.
-From Em Require Import
-  Environment
-  Prelude
-  Stlc.Instantiation
-  Stlc.Spec
-  Stlc.Persistence
-  Stlc.Worlds.
+From Em Require Import Environment Instantiation Persistence Prelude Spec Worlds.
 
 Import world.notations.
 
 Reserved Notation "w1 ⊑ˢ w2" (at level 80).
 
-Module Sub.
+Module Par.
 
-  Canonical Structure Sub : SUB :=
+  Canonical Structure Par : SUB :=
     {| sub w0 w1        := env.Env (Ṫy w1) w0;
        lk w0 w1 θ α αIn := env.lookup θ αIn
     |}.
 
-  #[local] Notation "w0 ⊑ˢ w1" := (sub Sub w0 w1).
-  #[local] Notation "□ˢ A" := (Box Sub A) (at level 9, format "□ˢ A", right associativity).
+  #[local] Notation "w0 ⊑ˢ w1" := (sub Par w0 w1).
+  #[local] Notation "□ˢ A" := (Box Par A) (at level 9, format "□ˢ A", right associativity).
   #[local] Notation subst t θ := (persist t θ) (only parsing).
 
-  #[export] Instance refl_sub : Refl Sub :=
+  #[export] Instance refl_par : Refl Par :=
     fun w => env.tabulate (@ṫy.var w).
-  #[export] Instance trans_sub : Trans Sub :=
+  #[export] Instance trans_par : Trans Par :=
     fix trans {w0 w1 w2} θ1 θ2 {struct θ1} :=
       match θ1 with
       | env.nil         => env.nil
       | env.snoc θ1 x t => env.snoc (trans θ1 θ2) x (persist t θ2)
       end.
-  #[export] Instance thick_sub : Thick Sub :=
+  #[export] Instance thick_par : Thick Par :=
     fun w x xIn s => env.tabulate (thickIn xIn s).
-  #[export] Instance thin_sub : Thin Sub :=
+  #[export] Instance thin_par : Thin Par :=
     fun w α αIn => env.tabulate (fun β βIn => ṫy.var (world.in_thin αIn βIn)).
-  #[export] Instance step_sub : Step Sub :=
-    fun w x => thin _ (αIn := world.in_zero).
+  #[export] Instance step_par : Step Par :=
+    fun w α => env.tabulate (fun β βIn => ṫy.var (world.in_succ βIn)).
 
   Ltac foldlk :=
-    change (env.lookup ?θ ?αIn) with (@lk Sub _ _ θ _ αIn).
+    change (env.lookup ?θ ?αIn) with (@lk Par _ _ θ _ αIn).
 
-  #[export] Instance lk_refl_sub : LkRefl Sub.
+  #[export] Instance lk_refl_par : LkRefl Par.
   Proof.
     intros w α αIn.
     apply (env.lookup_tabulate (fun _ βIn => ṫy.var βIn)).
   Qed.
 
-  #[export] Instance lk_trans_sub : LkTrans Sub.
+  #[export] Instance lk_trans_par : LkTrans Par.
   Proof.
     intros w0 w1 w2 θ1 θ2 α αIn.
     induction θ1; destruct (world.view αIn); cbn; now foldlk.
   Qed.
 
-  #[export] Instance lk_thin_sub : LkThin Sub.
+  #[export] Instance lk_step_par : LkStep Par.
   Proof.
-    intros w0 α αIn β βIn. unfold lk, thin, thin_sub; cbn.
+    intros w α αIn β. unfold lk, step, step_par; cbn.
     now rewrite env.lookup_tabulate.
   Qed.
 
-  #[export] Instance lk_thick_sub : LkThick Sub.
+  #[export] Instance lk_thin_par : LkThin Par.
   Proof.
-    intros w0 α αIn t β βIn. unfold lk, thick, thick_sub; cbn.
+    intros w0 α αIn β βIn. unfold lk, thin, thin_par; cbn.
     now rewrite env.lookup_tabulate.
   Qed.
 
-  #[export] Instance refltrans_sub : ReflTrans Sub.
+  #[export] Instance lk_thick_par : LkThick Par.
+  Proof.
+    intros w0 α αIn t β βIn. unfold lk, thick, thick_par; cbn.
+    now rewrite env.lookup_tabulate.
+  Qed.
+
+  #[export] Instance refltrans_par : ReflTrans Par.
   Proof.
     constructor.
     - intros. apply env.lookup_extensional. intros. foldlk.
@@ -103,14 +101,6 @@ Module Sub.
     - intros. apply env.lookup_extensional. intros. foldlk.
       now rewrite ?lk_trans, persist_trans.
   Qed.
-
-  (* #[export] Instance InstSub : forall w, Inst (Sub w) (Assignment w) := *)
-  (*   fun w0 w1 r ι => env.map (fun (t : Ṫy w1) => inst t ι) r. *)
-  (*   (* fix instsub {w0 w1} (r : Sub w0 w1) (ι : Assignment w1) {struct r} := *) *)
-  (*   (*   match r with *) *)
-  (*   (*   | env.nil        => env.nil *) *)
-  (*   (*   | env.snoc r _ t => env.snoc (inst (Inst := @instsub _) r ι) _ (inst t ι) *) *)
-  (*   (*   end. *) *)
 
   Lemma comp_thin_thick {w α} (αIn : α ∈ w) (s : Ṫy (w - α)) :
     trans (thin α) (thick α s) = refl.
@@ -125,14 +115,14 @@ Module Sub.
     subst (subst t (thin α)) (thick α s) = t.
   Proof. now rewrite <- persist_trans, comp_thin_thick, persist_refl. Qed.
 
-  Definition of {Θ : SUB} [w0 w1] (θ01 : Θ w0 w1) : Sub w0 w1 :=
+  Definition of {Θ : SUB} [w0 w1] (θ01 : Θ w0 w1) : Par w0 w1 :=
     env.tabulate (@lk _ _ _ θ01).
 
   Lemma lk_of {Θ : SUB} [w0 w1] (θ : Θ w0 w1) α (αIn : α ∈ w0) :
     lk (of θ) αIn = lk θ αIn.
   Proof. unfold of, lk at 1; cbn. now rewrite env.lookup_tabulate. Qed.
 
-  Lemma Ty_subterm_subst {w1 w2} (s t : Ṫy w1) (θ : Sub w1 w2) :
+  Lemma Ty_subterm_subst {w1 w2} (s t : Ṫy w1) (θ : Par w1 w2) :
     ṫy.Ṫy_subterm s t -> ṫy.Ṫy_subterm (persist s θ) (persist t θ).
   Proof.
     unfold ṫy.Ṫy_subterm. induction 1; cbn.
@@ -141,25 +131,25 @@ Module Sub.
   Qed.
 
   Lemma of_step {Θ} {stepΘ : Step Θ} {lkStepΘ : LkStep Θ} w α :
-    of (@step Θ stepΘ w α) = step (Θ := Sub).
+    of (@step Θ stepΘ w α) = step (Θ := Par).
   Proof.
-    apply env.lookup_extensional. intros β βIn. unfold of. cbn.
-    rewrite !env.lookup_tabulate. now rewrite lk_step.
+    apply env.lookup_extensional. intros β βIn. unfold of.
+    rewrite env.lookup_tabulate. foldlk. now rewrite ?lk_step.
   Qed.
 
   Lemma of_thick {Θ} {thickΘ : Thick Θ} {lkThickΘ : LkThick Θ}
     w α (αIn : α ∈ w) t :
-    of (thick (Θ := Θ) α t) = thick (Θ := Sub) α t.
+    of (thick (Θ := Θ) α t) = thick (Θ := Par) α t.
   Proof.
-    apply env.lookup_extensional. intros β βIn. unfold of, thick at 2, thick_sub.
+    apply env.lookup_extensional. intros β βIn. unfold of, thick at 2, thick_par.
     now rewrite !env.lookup_tabulate, lk_thick.
   Qed.
 
-  Lemma persist_sim {Θ : SUB} {T} {persT : Persistent T} {persLT : PersistLaws T}
+  Lemma persist_par {Θ : SUB} {T} {persT : Persistent T} {persLT : PersistLaws T}
     [w0 w1] (θ : Θ w0 w1) :
     forall t, persist t (of θ) = persist t θ.
   Proof. intros. apply persist_simulation. intros. now rewrite lk_of. Qed.
 
-End Sub.
-Export Sub (Sub).
-Notation "w0 ⊑ˢ w1" := (sub Sub w0 w1).
+End Par.
+Export Par (Par).
+Notation "w0 ⊑ˢ w1" := (sub Par w0 w1).

@@ -53,6 +53,3 @@ Module option.
   End notations.
 
 End option.
-
-Reserved Infix "▻" (at level 61, left associativity).
-Reserved Notation "[ ]" (format "[ ]").

@@ -26,28 +26,14 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Coq Require Import
-  Classes.Morphisms
-  Classes.Morphisms_Prop
-  Classes.RelationClasses
-  Relations.Relation_Definitions
-  Strings.String.
-From iris Require
-  bi.derived_connectives
-  bi.interface
-  proofmode.tactics.
-From stdpp Require Import
-  base.
-From Em Require Import
-  Environment
-  Prelude
-  Stlc.Alloc
-  Stlc.Instantiation
-  Stlc.Persistence
-  Stlc.Sem
-  Stlc.Spec
-  Stlc.Substitution
-  Stlc.Worlds.
+From Coq Require Import Classes.Morphisms Classes.Morphisms_Prop
+  Classes.RelationClasses Relations.Relation_Definitions Strings.String.
+From iris Require bi.derived_connectives bi.interface proofmode.tactics.
+From stdpp Require Import base.
+
+From Em Require Export Environment Open Prelude Instantiation Persistence
+  Sub.Parallel Worlds.
+From Em Require Import Prefix Spec.
 
 Import world.notations.
 
@@ -61,7 +47,6 @@ Import world.notations.
 (*       format "Q [ ζ ]") : box_scope. *)
 
 Module Pred.
-  #[local] Notation Ėxp := (Sem Exp).
 
   Declare Scope pred_scope.
   Delimit Scope pred_scope with P.
@@ -239,9 +224,9 @@ Module Pred.
     (@inst_lift Ėnv Env _ _ _)
     (@inst_lift Ėxp Exp _ _ _)
     (@inst_lift Ṫy Ty _ _ _)
-    (@inst_thin Sub _ Sub.lk_thin_sub)
+    (@inst_thin Par _ Par.lk_thin_par)
     @inst_refl @inst_trans @inst_insert
-    @Sem.inst_pure
+    @Open.inst_pure
     @ėxp.inst_var @ėxp.inst_true @ėxp.inst_false @ėxp.inst_ifte @ėxp.inst_absu
     @ėxp.inst_abst @ėxp.inst_app : punfold.
 
@@ -468,7 +453,7 @@ Module Pred.
   End Lemmas.
 
   Module Acc.
-    Import (hints) Sub.
+    Import (hints) Par.
     Section WithAccessibilityRelation.
       Context {Θ : SUB}.
 
@@ -531,7 +516,7 @@ Module Pred.
 
       Lemma wp_thick {thickΘ : Thick Θ} {lkThickΘ : LkThick Θ}
         {w α} (αIn : world.In α w) (t : Ṫy (w - α)) (Q : Pred (w - α)) :
-        wp (thick α t) Q ⊣⊢ₚ ṫy.var αIn =ₚ persist t (thin (Θ := Sub) α) /\ₚ persist Q (thin (Θ := Sub) α).
+        wp (thick α t) Q ⊣⊢ₚ ṫy.var αIn =ₚ persist t (thin (Θ := Par) α) /\ₚ persist Q (thin (Θ := Par) α).
       Proof.
         unfold wp; pred_unfold. intros ι. split.
         - intros (ι1 & Heq & HQ). subst.
@@ -652,22 +637,22 @@ Module Pred.
       wp θ ⊤ₚ /\ₚ wlp θ P ⊢ₚ wp θ P.
     Proof. now rewrite and_wp_l, persist_wlp, and_true_l. Qed.
 
-    Lemma wp_sub_of {Θ : SUB} [w0 w1] (θ : Θ w0 w1) P :
-      wp (Sub.of θ) P ⊣⊢ₚ wp θ P.
+    Lemma wp_par_of {Θ : SUB} [w0 w1] (θ : Θ w0 w1) P :
+      wp (Par.of θ) P ⊣⊢ₚ wp θ P.
     Proof.
       constructor. intros ι0; cbn. apply ex_iff_morphism; intro ι1.
       apply and_iff_compat_r.
       split; intros; subst; apply env.lookup_extensional; intros α αIn;
-        unfold Sub.of, inst, inst_acc, lk; cbn; now rewrite !env.lookup_tabulate.
+        unfold Par.of, inst, inst_acc, lk; cbn; now rewrite !env.lookup_tabulate.
     Qed.
 
-    Lemma wlp_sub_of {Θ : SUB} [w0 w1] (θ : Θ w0 w1) P :
-      wlp (Sub.of θ) P ⊣⊢ₚ wlp θ P.
+    Lemma wlp_par_of {Θ : SUB} [w0 w1] (θ : Θ w0 w1) P :
+      wlp (Par.of θ) P ⊣⊢ₚ wlp θ P.
     Proof.
       constructor. intros ι0; cbn. apply all_iff_morphism; intro ι1.
       apply imp_iff_compat_r.
       split; intros; subst; apply env.lookup_extensional; intros α αIn;
-        unfold Sub.of, inst, inst_acc, lk; cbn; now rewrite !env.lookup_tabulate.
+        unfold Par.of, inst, inst_acc, lk; cbn; now rewrite !env.lookup_tabulate.
     Qed.
 
   End Acc.
@@ -675,7 +660,7 @@ Module Pred.
   Section InstPred.
     Import iris.bi.derived_laws.
     Import iris.bi.interface.
-    Import Stlc.Persistence.
+    Import Persistence.
     (* A type class for things that can be interpreted as a predicate. *)
     Class InstPred (A : TYPE) :=
       instpred : ⊧ A ⇢ Pred.
@@ -743,22 +728,82 @@ Module Pred.
   #[export] Instance params_eqₚ : Params (@eqₚ) 4 := {}.
   #[export] Instance params_persist : Params (@persist) 4 := {}.
 
-  Section AccModality.
+  Section PBoxModality.
+    Import iris.proofmode.tactics.
+
+    Definition PBox {Θ} : ⊧ Box Θ Pred ⇢ Pred :=
+      fun w Q => (∀ₚ w' (θ : Θ w w'), Acc.wlp θ (Q w' θ))%P.
+
+    #[export] Instance elimupdate `{LkRefl Θ} (p : bool)
+      {w} (P : Box Θ Pred w) (Q : Pred w) :
+      ElimModal True p true (PBox P) (P w refl) Q Q.
+    Proof.
+      intros _. unfold PBox. cbn. iIntros "[#H1 H2]". iApply "H2".
+      destruct p; cbn; iSpecialize ("H1" $! w (refl (Refl := reflΘ)));
+        now erewrite Acc.wlp_refl.
+    Qed.
+
+    Lemma persist_update `{LkTrans Θ} [w] (Q : Box Θ Pred w) [w1] (θ1 : Θ w w1) :
+      persist (PBox Q) θ1 ⊢ₚ PBox (fun _ θ2 => Q _ (θ1 ⊙ θ2)).
+    Proof.
+      constructor; intros ι1 HQ w2 θ2 ι2 <-.
+      apply HQ. now rewrite inst_trans.
+    Qed.
+
+  End PBoxModality.
+
+  Section IntoPersist.
+
+    Context {Θ : SUB}.
+
+    Class IntoPersist `{Inst T A, Persistent T}
+      [w0 w1] (θ : Θ w0 w1) (x : T w0) (y : T w1) : Prop :=
+      into_persist : forall ι : Assignment w1, inst (persist x θ) ι = inst y ι.
+
+    #[export] Instance into_persist_default `{Inst T A, Persistence.Persistent T}
+      [w0 w1] (θ : Θ w0 w1) (t : T w0) : IntoPersist θ t (persist t θ) | 10.
+    Proof. easy. Qed.
+
+    (* #[export] Instance into_persist_persist `{LkTrans Θ, InstPersist T A} *)
+    (*   [w0 w1 w2] (θ1 : Θ w0 w1) (θ2 : Θ w1 w2) (t : T w0) : *)
+    (*   IntoPersist θ2 (persist t θ1) (persist t (trans θ1 θ2)) | 0. *)
+    (* Proof. intros ι. now rewrite !inst_persist, inst_trans. Qed. *)
+
+    #[export] Instance into_persist_lift {T A} {instTA : Inst T A} {liftTA : Lift T A}
+      {persT : Persistent T} {instLiftTA : InstLift T A} {instPersTA : InstPersist T A}
+      [w0 w1] (θ : Θ w0 w1) (a : A) :
+      IntoPersist θ (lift a) (lift a) | 0.
+    Proof. intros ι. now rewrite inst_persist, !inst_lift. Qed.
+
+    #[export] Instance into_persist_insert
+      [w0 w1] (θ : Θ w0 w1) (G0 : Ėnv w0) x (τ0 : Ṫy w0) G1 τ1
+      (HG : IntoPersist θ G0 G1) (Hτ : IntoPersist θ τ0 τ1) :
+      IntoPersist θ (G0 ,, x ∷ τ0) (G1 ,, x ∷ τ1) | 0.
+    Proof.
+      intros ι1. specialize (HG ι1). specialize (Hτ ι1).
+      change_no_check (@gmap.gmap string _ _ (Ṫy ?w)) with (Ėnv w).
+      rewrite persist_insert, !inst_insert. now f_equal.
+    Qed.
+
+  End IntoPersist.
+
+  Section WlpModality.
 
     Import iris.proofmode.tactics.
 
     Context {Θ : SUB} [w0 w1] (θ : Θ w0 w1).
 
-    Class IntoAcc (P : Pred w0) (Q : Pred w1) :=
-      into_acc : P ⊢ Acc.wlp θ Q.
+    Class IntoWlp (P : Pred w0) (Q : Pred w1) :=
+      into_wlp : P ⊢ Acc.wlp θ Q.
 
-    #[export] Instance into_acc_default (P : Pred w0) : IntoAcc P (persist P θ).
-    Proof. constructor. cbn. intros ι0 HP ι1 <-. apply HP. Qed.
+    #[export] Instance into_wlp_default (P : Pred w0) :
+      IntoWlp P (persist P θ) | 10.
+    Proof. unfold IntoWlp. now apply Acc.entails_wlp. Qed.
 
     Definition modality_wlp_mixin :
       modality_mixin (Acc.wlp θ)
-        (MIEnvTransform IntoAcc)
-        (MIEnvTransform IntoAcc).
+        (MIEnvTransform IntoWlp)
+        (MIEnvTransform IntoWlp).
     Proof. firstorder. Qed.
 
     Definition modality_wlp : modality bi_pred bi_pred :=
@@ -768,13 +813,40 @@ Module Pred.
       FromModal True modality_wlp (Acc.wlp θ P) (Acc.wlp θ P) P.
     Proof. firstorder. Qed.
 
-  End AccModality.
+    #[export] Instance into_wlp_update `{LkTrans Θ} (P : Box Θ Pred w0) :
+      IntoWlp (PBox P) (PBox (fun _ θ2 => P _ (θ ⊙ θ2))) | 0.
+    Proof. unfold IntoWlp. iIntros "H !>". now rewrite persist_update. Qed.
 
-  #[global] Arguments IntoAcc {Θ} [w0 w1] θ P Q.
-  #[global] Arguments into_acc {Θ} [w0 w1] θ P Q {_}.
-  #[global] Hint Mode IntoAcc + + + + - - : typeclass_instances.
+    #[export] Instance into_wlp_tpb (G1 : Ėnv w0) (e : Exp) (τ1 : Ṫy w0)
+      (ee1 : Ėxp w0) G2 τ2 ee2 (HG : IntoPersist θ G1 G2)
+      (Hτ : IntoPersist θ τ1 τ2) (Hee : IntoPersist θ ee1 ee2) :
+      IntoWlp (TPB G1 e τ1 ee1) (TPB G2 e τ2 ee2) | 0.
+    Proof.
+      constructor. intros ι0 HT ι1 <-. pred_unfold.
+      specialize (HG ι1). specialize (Hτ ι1). specialize (Hee ι1).
+      rewrite !inst_persist in HG, Hτ, Hee. congruence.
+    Qed.
 
-  Import (hints) Sub.
+    #[export] Instance into_wlp_eqp `{InstPersist T A}
+      (x1 x2 : T w0) (y1 y2 : T w1) (Hxy1 : IntoPersist θ x1 y1) (Hxy2 :IntoPersist θ x2 y2) :
+      IntoWlp (eqₚ x1 x2) (eqₚ y1 y2) | 0.
+    Proof.
+      constructor. pred_unfold. intros ι0 Heq ι1 ?Heq; cbn.
+      specialize (Hxy1 ι1). specialize (Hxy2 ι1).
+      rewrite !inst_persist in Hxy1, Hxy2. congruence.
+    Qed.
+
+    #[export] Instance into_wlp_wlp `{InstPersist T V} (P : Pred w1) :
+      IntoWlp (Acc.wlp θ P) P | 0.
+    Proof. unfold IntoWlp. reflexivity. Qed.
+
+  End WlpModality.
+
+  #[global] Arguments IntoWlp {Θ} [w0 w1] θ P Q.
+  #[global] Arguments into_wlp {Θ} [w0 w1] θ P Q {_}.
+  #[global] Hint Mode IntoWlp + + + + - - : typeclass_instances.
+
+  Import (hints) Par.
 
   Create HintDb predsimpl.
   #[export] Hint Rewrite
@@ -790,7 +862,6 @@ Module Pred.
     @Acc.wp_false
     @Acc.wp_refl
     @Acc.wp_trans
-    @Sem.persist_pure
     @and_false_l
     @and_false_r
     @and_true_l
@@ -801,21 +872,17 @@ Module Pred.
     @impl_false_l
     @impl_true_l
     @impl_true_r
-    @lift_insert
     @lk_refl
     @lk_step
     @lk_trans
     @persist_and
     @persist_false
-    @persist_insert
-    @persist_lift
     @persist_pred_refl
     @persist_pred_trans
     @persist_tpb
     @persist_true
     @trans_refl_r
     : predsimpl.
-  #[export] Hint Rewrite <- @eqₚ_insert : predsimpl.
 
   Ltac predsimpl :=
     repeat
@@ -823,13 +890,6 @@ Module Pred.
        change_no_check (@gmap.gmap string _ _ (Ṫy ?w)) with (Ėnv w) in *;
        repeat
          match goal with
-         | |- context[fun w : World => Ṫy w] =>
-             change_no_check (fun w : World => Ṫy w) with Ṫy
-         | |- context[fun w : World => Sem ?X w] =>
-             change_no_check (fun w : World => Sem X w) with (Sem X)
-         | |- context[fun w : World => prod (?A w) (?B w)] =>
-             change_no_check (fun w : World => prod (A w) (B w)) with (Prod A B)
-
          | |- Acc.wp ?θ _ ⊣⊢ₚ Acc.wp ?θ _ =>
              apply Acc.proper_wp_bientails
          | |- Acc.wlp ?θ _ ⊣⊢ₚ Acc.wlp ?θ _ =>
@@ -837,9 +897,6 @@ Module Pred.
          end;
        try easy;
        repeat rewrite_db predsimpl;
-       repeat rewrite ?trans_refl_r, ?persist_eq, ?persist_lift,
-         ?persist_pred_refl, ?persist_tpb, ?persist_trans, ?persist_trans,
-         <- ?persist_pred_trans;
        auto 1 with typeclass_instances;
        repeat
          match goal with

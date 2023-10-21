@@ -26,17 +26,9 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Coq Require Import
-  Relations.Relation_Operators
-  Strings.String.
-From stdpp Require Import
-  base gmap.
-From Em Require Import
-  Environment
-  Prelude
-  Stlc.Persistence
-  Stlc.Spec
-  Stlc.Worlds.
+From Coq Require Import Relations.Relation_Operators Strings.String.
+From stdpp Require Import base gmap.
+From Em Require Import Environment Prelude Persistence Spec Worlds.
 
 Import world.notations.
 
@@ -251,7 +243,7 @@ Lemma inst_empty {w} (ι : Assignment w) :
 Proof. cbv [inst inst_env Ėnv]. now rewrite fmap_empty. Qed.
 
 Lemma lift_insert {w x t Γ} :
-  lift (insert x t Γ) = insert (M := Ėnv w) x (lift t) (lift Γ).
+  lift (insert (M := Env) x t Γ) = insert (M := Ėnv w) x (lift t) (lift Γ).
 Proof. unfold lift, lift_env. now rewrite fmap_insert. Qed.
 
 Fixpoint grounding (w : World) : Assignment w :=

@@ -28,7 +28,9 @@ Makefile.coq: _CoqProject Makefile $(SRCS)
 clean: Makefile.coq
 	$(Q)$(MAKE) -f Makefile.coq clean
 	$(Q)rm -f $(AUXS)
-	$(Q)rm -f Makefile.coq *.bak *.d *.glob *~ result*
+	$(Q)rm -f Makefile.coq *.bak *.d *~ result*
+	$(Q)find theories \( -name "*.vo" -o -name "*.vo[sk]" \
+		-o -name ".*.aux" -o -name ".*.cache" -o -name "*.glob" \) -delete
 
 install uninstall pretty-timed make-pretty-timed-before make-pretty-timed-after print-pretty-timed-diff: Makefile.coq
 	$(Q)$(MAKE) -f Makefile.coq $@

@@ -27,7 +27,8 @@
 (******************************************************************************)
 
 From Coq Require Import Strings.String.
-From Equations Require Import Equations.
+From Equations.Prop Require Import
+  Equations EqDecInstances.
 From stdpp Require Import base gmap.
 From Em Require Import Prelude.
 
@@ -39,11 +40,14 @@ Delimit Scope world_scope with world.
 
 Module Import world.
 
+  #[export] Instance eqdec_string : EqDec string :=
+    string_dec.
+
   (* Type of contexts. This is a list of bindings of type B. This type and
      subsequent types use the common notation of snoc lists. *)
   Inductive World : Type :=
   | nil
-  | snoc (w : World) (α : nat).
+  | snoc (w : World) (α : string).
   Derive NoConfusion EqDec for World.
 
   (* In represents context containment proofs. This is essentially a
@@ -135,24 +139,63 @@ Module Import world.
     occurs_check_view αIn (in_thin αIn βIn) = Diff αIn βIn.
   Proof. induction αIn; [|destruct (view βIn)]; cbn; now rewrite ?IHαIn. Qed.
 
-  Fixpoint max (w : World) : nat :=
-    match w with
-    | nil      => 0
-    | snoc w α => Nat.max (max w) α
-    end.
-  Definition fresh (w : World) : nat :=
-    S (max w).
-
-  Module notations.
+  Module Import notations.
 
     Open Scope world_scope.
 
     Notation "'ε'" := nil : world_scope.
-    Infix "▻" := snoc : world_scope.
+    Infix "▻" := snoc (at level 61, left associativity) : world_scope.
     Notation "α ∈ w" := (In α w%world) : type_scope.
     Notation "w - x" := (remove w x) : world_scope.
 
   End notations.
+
+  Section Fresh.
+    Import Strings.Ascii Strings.String.
+    Open Scope string_scope.
+
+    Definition incr_char (a:ascii) : bool * ascii :=
+      match a with
+      |"a" => (false,"b")|"b" => (false,"c")|"c" => (false,"d")
+      |"d" => (false,"e")|"e" => (false,"f")|"f" => (false,"g")
+      |"g" => (false,"h")|"h" => (false,"i")|"i" => (false,"j")
+      |"j" => (false,"k")|"k" => (false,"l")|"l" => (false,"m")
+      |"m" => (false,"n")|"n" => (false,"o")|"o" => (false,"p")
+      |"p" => (false,"q")|"q" => (false,"r")|"r" => (false,"s")
+      |"s" => (false,"t")|"t" => (false,"u")|"u" => (false,"v")
+      |"v" => (false,"w")|"w" => (false,"x")|"x" => (false,"y")
+      |"y" => (false,"z")| _   => (true,"a")
+      end%char.
+
+    Fixpoint incr (s : string) : bool * string :=
+      match s with
+      | ""          => (false, "a")
+      | String a "" => let (b, a') := incr_char a in
+                       (b, String a' "")
+      | String a s  => let (b, s') := incr s in
+                       if b
+                       then let (b', a') := incr_char a in
+                            (b', String a' s')
+                       else (false , String a s')
+      end.
+
+    Fixpoint max (α : string) (w : World) : string :=
+      match w with
+      | nil      => α
+      | snoc w β => if String.ltb α β then max β w else max α w
+      end.
+
+    Definition fresh (w : World) : string :=
+      let (b, s') := incr (max "" w) in
+      if b then String "a" s' else s'.
+
+    Example fresh_nil : fresh nil = "a" := eq_refl.
+    Example fresh_1   : fresh (ε ▻ "1") = "aa" := eq_refl.
+    Example fresh_a   : fresh (ε ▻ "a") = "b"  := eq_refl.
+    Example fresh_z   : fresh (ε ▻ "z") = "aa" := eq_refl.
+    Example fresh_tld : fresh (ε ▻ "~") = "aa" := eq_refl.
+
+  End Fresh.
 
 End world.
 Export world (World, nil, snoc, fresh).
@@ -276,8 +319,8 @@ Notation "'∀' x .. y , P " :=
 Notation "( α ∈)" := (world.In α) (format "( α  ∈)") : indexed_scope.
 
 Definition _4 {Θ} {transΘ : Trans Θ} {A} : ⊧ Box Θ A ⇢ Box Θ (Box Θ A) :=
-  fun w0 a w1 r1 w2 r2 => a w2 (trans r1 r2).
-#[global] Arguments _4 {Θ _ A} [_] _ [_] _ [_] _ : simpl never.
+  fun w0 a w1 θ1 w2 θ2 => a w2 (trans θ1 θ2).
+#[global] Arguments _4 {Θ _ A} [_] _ [_] _ [_] _.
 
 Definition thickIn [w x] (xIn : x ∈ w) (s : Ṫy (w - x)) :
   ∀ y, y ∈ w → Ṫy (w - x) :=

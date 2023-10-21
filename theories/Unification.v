@@ -27,11 +27,10 @@
 (******************************************************************************)
 
 From Equations Require Import Equations.
-From Em Require Import Instantiation MonadInterface Persistence Predicates
-  Prelude Substitution Triangular Worlds.
+From Em Require Import BaseLogic Monad.Interface Triangular.
 
 Import Pred world.notations Pred.notations.
-Import (hints) Sub Tri.
+Import (hints) Par Tri.
 
 Set Implicit Arguments.
 
@@ -134,7 +133,7 @@ End Operations.
 
 Section OccursCheck.
   Import option.notations.
-  Import (hints) Sub.
+  Import (hints) Par.
 
   Definition occurs_check_in : ⊧ ∀ α, (α ∈) ⇢ ▷(Option (α ∈)) :=
     fun w x xIn y yIn =>
@@ -159,16 +158,16 @@ Section OccursCheck.
     end.
   Proof.
     induction t; cbn.
-    - unfold occurs_check_in.
-      destruct (world.occurs_check_view αIn αIn0); cbn.
-      + left. reflexivity.
+    - unfold occurs_check_in. destruct world.occurs_check_view; cbn.
+      + now left.
       + now rewrite lk_thin.
     - reflexivity.
-    - destruct (occurs_check t1 αIn), (occurs_check t2 αIn); cbn; subst; auto; right;
+    - destruct (occurs_check t1 αIn), (occurs_check t2 αIn);
+        cbn; subst; auto; right;
         match goal with
-               | H: _ \/ ṫy.Ṫy_subterm _ ?t |- _ =>
-                   destruct H;
-                   [ subst; constructor; constructor
+        | H: _ \/ ṫy.Ṫy_subterm _ ?t |- _ =>
+            destruct H;
+            [ subst; constructor; constructor
             | constructor 2 with t; auto; constructor; constructor
             ]
         end.
@@ -250,8 +249,8 @@ Section Implementation.
     Section atrav_elim.
 
       Context (P : Ṫy w → Ṫy w → C w → Type).
-      Context (fflex1 : ∀ (x : nat) (xIn : x ∈ w) (t : Ṫy w), P (ṫy.var xIn) t (aflex x t)).
-      Context (fflex2 : ∀ (x : nat) (xIn : x ∈ w) (t : Ṫy w), P t (ṫy.var xIn) (aflex x t)).
+      Context (fflex1 : ∀ α (αIn : α ∈ w) (t : Ṫy w), P (ṫy.var αIn) t (aflex α t)).
+      Context (fflex2 : ∀ α (αIn : α ∈ w) (t : Ṫy w), P t (ṫy.var αIn) (aflex α t)).
       Context (fbool : P ṫy.bool ṫy.bool ctrue).
       Context (fbool_func : ∀ T1 T2 : Ṫy w, P ṫy.bool (ṫy.func T1 T2) cfalse).
       Context (ffunc_bool : ∀ T1 T2 : Ṫy w, P (ṫy.func T1 T2) ṫy.bool cfalse).

@@ -1,20 +1,25 @@
+-arg "-w all"
+-arg "-w -disj-pattern-notation"
 -Q theories Em
-theories/common/Environment.v
+
+theories/BaseLogic.v
+theories/Composition.v
+theories/Environment.v
+theories/Gen/Bidirectional.v
+theories/Gen/Check.v
+theories/Gen/Synthesise.v
+theories/Instantiation.v
+theories/Monad/Free.v
+theories/Monad/Interface.v
+theories/Monad/Prenex.v
+theories/Monad/Solved.v
+theories/Open.v
+theories/Persistence.v
 theories/Prelude.v
-theories/Stlc/Alloc.v
-theories/Stlc/Composition.v
-theories/Stlc/GeneratorCheck.v
-theories/Stlc/GeneratorSynthesise.v
-theories/Stlc/Instantiation.v
-theories/Stlc/MonadFree.v
-theories/Stlc/MonadInterface.v
-theories/Stlc/MonadPrenex.v
-theories/Stlc/Persistence.v
-theories/Stlc/Predicates.v
-theories/Stlc/PrenexConversion.v
-theories/Stlc/Sem.v
-theories/Stlc/Spec.v
-theories/Stlc/Substitution.v
-theories/Stlc/Triangular.v
-theories/Stlc/Unification.v
-theories/Stlc/Worlds.v
+theories/PrenexConversion.v
+theories/Spec.v
+theories/Sub/Parallel.v
+theories/Sub/Prefix.v
+theories/Sub/Triangular.v
+theories/Unification.v
+theories/Worlds.v

@@ -26,8 +26,7 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Em Require Import
-  Prelude Stlc.Worlds.
+From Em Require Import Prelude Worlds.
 Import world.notations.
 
 #[local] Set Implicit Arguments.
