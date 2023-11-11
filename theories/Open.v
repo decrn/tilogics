@@ -98,10 +98,10 @@ Module Open.
 
   End PersistLemmas.
 
-  Definition decode_ty : ⊧ Ṫy ⇢ Open Ty := fun w t => inst t.
+  Definition decode_ty : ⊧ OTy ⇢ Open Ty := fun w t => inst t.
   #[global] Arguments decode_ty [w] _.
-  Definition decode_env : ⊧ Ėnv ⇢ Open Env := fun w G => inst G.
-  #[global] Arguments decode_env [w] _.
+  (* Definition decode_env : ⊧ OEnv ⇢ Open Env := fun w G => inst G. *)
+  (* #[global] Arguments decode_env [w] _. *)
 
   Module notations.
 
@@ -114,26 +114,26 @@ End Open.
 Export (hints) Open.
 Export Open (Open).
 
-Notation Ėxp := (Open Exp).
-Module ėxp.
+Notation OExp := (Open Exp).
+Module oexp.
   Import Open Open.notations.
 
   Set Implicit Arguments.
   Set Maximal Implicit Insertion.
 
-  Definition var : ⊧ Const string ⇢ Ėxp :=
+  Definition var : ⊧ Const string ⇢ OExp :=
     fun _ x => Open.pure (exp.var x).
-  Definition true : ⊧ Ėxp :=
+  Definition true : ⊧ OExp :=
     fun _ => Open.pure exp.true.
-  Definition false : ⊧ Ėxp :=
+  Definition false : ⊧ OExp :=
     fun _ => Open.pure exp.false.
-  Definition ifte : ⊧ Ėxp ⇢ Ėxp ⇢ Ėxp ⇢ Ėxp :=
+  Definition ifte : ⊧ OExp ⇢ OExp ⇢ OExp ⇢ OExp :=
     fun _ e1 e2 e3 => exp.ifte <$> e1 <*> e2 <*> e3.
-  Definition absu : ⊧ Const string ⇢ Ėxp ⇢ Ėxp :=
+  Definition absu : ⊧ Const string ⇢ OExp ⇢ OExp :=
     fun _ x e => exp.absu x <$> e.
-  Definition abst : ⊧ Const string ⇢ Ṫy ⇢ Ėxp ⇢ Ėxp :=
+  Definition abst : ⊧ Const string ⇢ OTy ⇢ OExp ⇢ OExp :=
     fun _ x t e => exp.abst x <$> decode_ty t <*> e.
-  Definition app : ⊧ Ėxp ⇢ Ėxp ⇢ Ėxp :=
+  Definition app : ⊧ OExp ⇢ OExp ⇢ OExp :=
     fun _ e1 e2 => exp.app <$> e1 <*> e2.
 
   Section InstLemmas.
@@ -158,4 +158,4 @@ Module ėxp.
     Proof. reflexivity. Qed.
   End InstLemmas.
 
-End ėxp.
+End oexp.

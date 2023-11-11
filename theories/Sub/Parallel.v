@@ -35,7 +35,7 @@ Reserved Notation "w1 ⊑ˢ w2" (at level 80).
 Module Par.
 
   Canonical Structure Par : SUB :=
-    {| sub w0 w1        := env.Env (Ṫy w1) w0;
+    {| sub w0 w1        := env.Env (OTy w1) w0;
        lk w0 w1 θ α αIn := env.lookup θ αIn
     |}.
 
@@ -44,7 +44,7 @@ Module Par.
   #[local] Notation subst t θ := (persist t θ) (only parsing).
 
   #[export] Instance refl_par : Refl Par :=
-    fun w => env.tabulate (@ṫy.var w).
+    fun w => env.tabulate (@oty.var w).
   #[export] Instance trans_par : Trans Par :=
     fix trans {w0 w1 w2} θ1 θ2 {struct θ1} :=
       match θ1 with
@@ -54,9 +54,9 @@ Module Par.
   #[export] Instance thick_par : Thick Par :=
     fun w x xIn s => env.tabulate (thickIn xIn s).
   #[export] Instance thin_par : Thin Par :=
-    fun w α αIn => env.tabulate (fun β βIn => ṫy.var (world.in_thin αIn βIn)).
+    fun w α αIn => env.tabulate (fun β βIn => oty.var (world.in_thin αIn βIn)).
   #[export] Instance step_par : Step Par :=
-    fun w α => env.tabulate (fun β βIn => ṫy.var (world.in_succ βIn)).
+    fun w α => env.tabulate (fun β βIn => oty.var (world.in_succ βIn)).
 
   Ltac foldlk :=
     change (env.lookup ?θ ?αIn) with (@lk Par _ _ θ _ αIn).
@@ -64,7 +64,7 @@ Module Par.
   #[export] Instance lk_refl_par : LkRefl Par.
   Proof.
     intros w α αIn.
-    apply (env.lookup_tabulate (fun _ βIn => ṫy.var βIn)).
+    apply (env.lookup_tabulate (fun _ βIn => oty.var βIn)).
   Qed.
 
   #[export] Instance lk_trans_par : LkTrans Par.
@@ -102,7 +102,7 @@ Module Par.
       now rewrite ?lk_trans, persist_trans.
   Qed.
 
-  Lemma comp_thin_thick {w α} (αIn : α ∈ w) (s : Ṫy (w - α)) :
+  Lemma comp_thin_thick {w α} (αIn : α ∈ w) (s : OTy (w - α)) :
     trans (thin α) (thick α s) = refl.
   Proof.
     apply env.lookup_extensional. intros β βIn. foldlk.
@@ -111,7 +111,7 @@ Module Par.
     now rewrite world.occurs_check_view_thin.
   Qed.
 
-  Lemma thin_thick_pointful {w α} (αIn : α ∈ w) (s : Ṫy (w - α)) (t : Ṫy (w - α)) :
+  Lemma thin_thick_pointful {w α} (αIn : α ∈ w) (s : OTy (w - α)) (t : OTy (w - α)) :
     subst (subst t (thin α)) (thick α s) = t.
   Proof. now rewrite <- persist_trans, comp_thin_thick, persist_refl. Qed.
 
@@ -125,10 +125,10 @@ Module Par.
     now rewrite env.lookup_tabulate.
   Qed.
 
-  Lemma Ty_subterm_subst {w1 w2} (s t : Ṫy w1) (θ : Par w1 w2) :
-    ṫy.Ṫy_subterm s t -> ṫy.Ṫy_subterm (persist s θ) (persist t θ).
+  Lemma Ty_subterm_subst {w1 w2} (s t : OTy w1) (θ : Par w1 w2) :
+    oty.OTy_subterm s t -> oty.OTy_subterm (persist s θ) (persist t θ).
   Proof.
-    unfold ṫy.Ṫy_subterm. induction 1; cbn.
+    unfold oty.OTy_subterm. induction 1; cbn.
     - constructor 1; destruct H; constructor.
     - econstructor 2; eauto.
   Qed.

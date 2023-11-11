@@ -38,30 +38,30 @@ Module Tri.
 
   Inductive Rel (w : World) : World -> Set :=
   | nil : Rel w w
-  | cons {w' α} (αIn : α ∈ w) (τ : Ṫy (w - α)) (θ : w - α ⊒⁻ w') : w ⊒⁻ w'
+  | cons {w' α} (αIn : α ∈ w) (τ : OTy (w - α)) (θ : w - α ⊒⁻ w') : w ⊒⁻ w'
   where "w0 ⊒⁻ w1" := (Rel w0 w1).
   #[global] Arguments nil {_}.
   #[global] Arguments cons {_ _} α {_} τ θ.
 
   Section InnerRecursion.
 
-    Context [w w' : World] (rec : ∀ y (yIn : y ∈ w), Ṫy w').
+    Context [w w' : World] (rec : ∀ y (yIn : y ∈ w), OTy w').
 
-    Fixpoint persist_inner (t : Ṫy w) : Ṫy w' :=
+    Fixpoint persist_inner (t : OTy w) : OTy w' :=
       match t with
-      | ṫy.var xIn    => rec xIn
-      | ṫy.bool       => ṫy.bool
-      | ṫy.func t1 t2 => ṫy.func (persist_inner t1) (persist_inner t2)
+      | oty.var xIn    => rec xIn
+      | oty.bool       => oty.bool
+      | oty.func t1 t2 => oty.func (persist_inner t1) (persist_inner t2)
       end.
 
   End InnerRecursion.
 
-  Lemma proper_persist_inner {w0 w1} (rec1 rec2 : ∀ α, α ∈ w0 → Ṫy w1)
+  Lemma proper_persist_inner {w0 w1} (rec1 rec2 : ∀ α, α ∈ w0 → OTy w1)
     (Hrec : ∀ α (αIn : α ∈ w0), rec1 α αIn = rec2 α αIn) :
     ∀ τ, persist_inner rec1 τ = persist_inner rec2 τ.
   Proof. induction τ; cbn; now f_equal; auto. Qed.
 
-  Fixpoint persist_outer {w0} t {w1} (r : w0 ⊒⁻ w1) {struct r} : Ṫy w1 :=
+  Fixpoint persist_outer {w0} t {w1} (r : w0 ⊒⁻ w1) {struct r} : OTy w1 :=
     match r with
     | nil        => t
     | cons α s r => persist_inner
@@ -71,7 +71,7 @@ Module Tri.
 
   Canonical Structure Tri : SUB :=
     {| sub              := Rel;
-       lk w1 w2 θ α αIn := persist_outer (ṫy.var αIn) θ;
+       lk w1 w2 θ α αIn := persist_outer (oty.var αIn) θ;
     |}.
 
   #[export] Instance thick_tri : Thick Tri :=
@@ -96,26 +96,26 @@ Module Tri.
   #[export] Instance lkrefl_tri : LkRefl Tri.
   Proof. easy. Qed.
 
-  Lemma persist_outer_fix {w0 w1} (θ : w0 ⊒⁻ w1) (t : Ṫy w0) :
+  Lemma persist_outer_fix {w0 w1} (θ : w0 ⊒⁻ w1) (t : OTy w0) :
      persist_outer t θ =
      match t with
-     | ṫy.var αIn    => lk θ αIn
-     | ṫy.bool       => ṫy.bool
-     | ṫy.func t1 t2 => ṫy.func (persist_outer t1 θ) (persist_outer t2 θ)
+     | oty.var αIn    => lk θ αIn
+     | oty.bool       => oty.bool
+     | oty.func t1 t2 => oty.func (persist_outer t1 θ) (persist_outer t2 θ)
      end.
   Proof. induction θ; destruct t; cbn; now f_equal. Qed.
 
-  Lemma persist_outer_refl {w} (t : Ṫy w) : persist_outer t refl = t.
+  Lemma persist_outer_refl {w} (t : OTy w) : persist_outer t refl = t.
   Proof. reflexivity. Qed.
 
-  Lemma persist_persist_inner {w0 w1} (t : Ṫy w0)
-    (rec : ∀ y (yIn : y ∈ w0), Ṫy w1) {w2} (r : w1 ⊒⁻ w2) :
+  Lemma persist_persist_inner {w0 w1} (t : OTy w0)
+    (rec : ∀ y (yIn : y ∈ w0), OTy w1) {w2} (r : w1 ⊒⁻ w2) :
     persist (persist_inner rec t) r =
     persist_inner (fun y yIn => persist (rec y yIn) r) t.
   Proof. induction t; cbn; now f_equal. Qed.
 
-  Lemma persist_outer_persist_inner {w0 w1} (t : Ṫy w0)
-    (rec : ∀ y (yIn : y ∈ w0), Ṫy w1) {w2} (r : w1 ⊒⁻ w2) :
+  Lemma persist_outer_persist_inner {w0 w1} (t : OTy w0)
+    (rec : ∀ y (yIn : y ∈ w0), OTy w1) {w2} (r : w1 ⊒⁻ w2) :
     persist_outer (persist_inner rec t) r =
     persist_inner (fun y yIn => persist_outer (rec y yIn) r) t.
   Proof.
@@ -131,7 +131,7 @@ Module Tri.
       now apply proper_persist_inner.
   Qed.
 
-  Lemma persist_outer_persist {w0 w1} (θ : w0 ⊒⁻ w1) (t : Ṫy w0) :
+  Lemma persist_outer_persist {w0 w1} (θ : w0 ⊒⁻ w1) (t : OTy w0) :
     persist_outer t θ = persist t θ.
   Proof. induction t; cbn; rewrite persist_outer_fix; f_equal; auto. Qed.
 

@@ -39,7 +39,7 @@ Section WithSub.
   #[export] Instance tcm_solved : TypeCheckM (Solved Θ) :=
     {| assert w τ1 τ2 := mgu τ1 τ2;
        pick w := let α := world.fresh w in
-                 Some (existT (w ▻ α) (step, ṫy.var world.in_zero));
+                 Some (existT (w ▻ α) (step, oty.var world.in_zero));
     |}.
 
   Context {reflTransΘ : ReflTrans Θ} {lkreflΘ : LkRefl Θ} {lkTransΘ : LkTrans Θ}

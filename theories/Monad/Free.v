@@ -37,7 +37,7 @@ Import Pred Pred.notations Pred.Acc Pred.proofmode world.notations.
 Inductive Free (A : OType) (w : World) : Type :=
 | Ret (a : A w)
 | Fail
-| Assertk (t1 t2 : Ṫy w) (k : Free A w)
+| Assertk (t1 t2 : OTy w) (k : Free A w)
 | Choosek α (k : Free A (w ▻ α)).
 #[global] Arguments Ret {A} [w] a.
 #[global] Arguments Fail {A w}.
@@ -62,7 +62,7 @@ Inductive Free (A : OType) (w : World) : Type :=
 #[export] Instance tcm_free : TypeCheckM Free :=
   {| assert w τ1 τ2 := Assertk τ1 τ2 (Ret tt);
      pick w := let α := world.fresh w in
-               Choosek α (Ret (ṫy.var world.in_zero));
+               Choosek α (Ret (oty.var world.in_zero));
   |}.
 
 #[export] Instance wp_free : WeakestPre Prefix Free :=

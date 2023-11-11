@@ -46,36 +46,36 @@ Section Generator.
     {reflTransΘ: ReflTrans Θ}.
   Context `{pureM:Pure M, bindM:Bind Θ M, failM:Fail M, tcM:TypeCheckM M}.
 
-  Definition generate : Exp -> ⊧ Ėnv ⇢ M (Ṫy * Ėxp) :=
+  Definition generate : Exp -> ⊧ OEnv ⇢ M (OTy * OExp) :=
     fix gen e {w} Γ :=
       match e with
       | exp.var x =>
           match lookup x Γ with
-          | Some t => pure (t , ėxp.var x)
+          | Some t => pure (t , oexp.var x)
           | None   => fail
           end
-      | exp.true  => pure (ṫy.bool, ėxp.true)
-      | exp.false => pure (ṫy.bool, ėxp.false)
+      | exp.true  => pure (oty.bool, oexp.true)
+      | exp.false => pure (oty.bool, oexp.false)
       | exp.ifte e1 e2 e3 =>
           '(t1,e1') <- gen e1 Γ ;;
           '(t2,e2') <- gen e2 Γ[_] ;;
           '(t3,e3') <- gen e3 Γ[_] ;;
-          _         <- assert ṫy.bool t1[_] ;;
+          _         <- assert oty.bool t1[_] ;;
           _         <- assert t2[_] t3[_] ;;
-          pure (t3[_], ėxp.ifte e1'[_] e2'[_] e3'[_])
+          pure (t3[_], oexp.ifte e1'[_] e2'[_] e3'[_])
       | exp.absu x e =>
           t1       <- pick ;;
-          '(t2,e') <- gen e (insert (M := Ėnv _) x t1 Γ[_]) ;;
-          pure (ṫy.func t1[_] t2, ėxp.abst x t1[_] e')
+          '(t2,e') <- gen e (insert (M := OEnv _) x t1 Γ[_]) ;;
+          pure (oty.func t1[_] t2, oexp.abst x t1[_] e')
       | exp.abst x t1 e =>
-          '(t2,e') <- gen e (insert (M := Ėnv _) x (lift t1) Γ) ;;
-          pure (ṫy.func (lift t1) t2, ėxp.abst x (lift t1) e')
+          '(t2,e') <- gen e (insert (M := OEnv _) x (lift t1) Γ) ;;
+          pure (oty.func (lift t1) t2, oexp.abst x (lift t1) e')
       | exp.app e1 e2 =>
           '(tf, e1') <- gen e1 Γ ;;
           '(t1, e2') <- gen e2 Γ[_] ;;
           t2 <- pick ;;
-          _  <- assert tf[_] (ṫy.func t1[_] t2) ;;
-          pure (t2[_], ėxp.app e1'[_] e2'[_])
+          _  <- assert tf[_] (oty.func t1[_] t2) ;;
+          pure (t2[_], oexp.app e1'[_] e2'[_])
       end.
 
   Import Pred Pred.notations.
@@ -86,7 +86,7 @@ Section Generator.
   Context {wpM : WeakestPre Θ M} {wlpM : WeakestLiberalPre Θ M}
     {tcLogicM : TypeCheckLogicM Θ M}.
 
-  Definition TPB_algo : ⊧ Ėnv ⇢ Const Exp ⇢ Ṫy ⇢ Ėxp ⇢ Pred :=
+  Definition TPB_algo : ⊧ OEnv ⇢ Const Exp ⇢ OTy ⇢ OExp ⇢ Pred :=
     fun w0 G0 e t0 e0 =>
     WP (generate e G0)
       (fun w1 (θ1 : Θ w0 w1) '(t1,e1) =>
@@ -105,7 +105,7 @@ Section Generator.
   Ltac wlpauto := repeat (repeat wpsimpl; try wlpindhyp).
 
   Lemma generate_sound_aux e :
-    ∀ w (G : Ėnv w),
+    ∀ w (G : OEnv w),
       ⊢ WLP (generate e G) (fun _ θ '(t,ee) => G[θ] |--ₚ e; t ~> ee).
   Proof.
     induction e; cbn; intros w G; iStartProof; wlpauto.
@@ -113,7 +113,7 @@ Section Generator.
     constructor. now rewrite lookup_inst HGx.
   Qed.
 
-  Lemma generate_sound (e : Exp) {w0} (G0 : Ėnv w0) t0 e0 :
+  Lemma generate_sound (e : Exp) {w0} (G0 : OEnv w0) t0 e0 :
     TPB_algo G0 e t0 e0 ⊢ₚ G0 |--ₚ e; t0 ~> e0.
   Proof.
     iStartProof. rewrite wand_is_impl. iApply wp_impl.
@@ -136,7 +136,7 @@ Section Generator.
   Ltac wpauto := repeat (repeat wpsimpl; try wpindhyp).
 
   Lemma generate_complete_aux {G e t ee} (T : G |-- e ∷ t ~> ee) :
-    ∀ w0 (G0 : Ėnv w0), ⊢ lift G =ₚ G0 →
+    ∀ w0 (G0 : OEnv w0), ⊢ lift G =ₚ G0 →
       WP (generate e G0)
           (fun _ _ '(t',e') => lift t =ₚ t' /\ₚ Open.pure ee =ₚ e')%P.
   Proof.
@@ -145,7 +145,7 @@ Section Generator.
       intros ? ->; rewrite lookup_inst HGx in H; cbn in H; congruence.
   Qed.
 
-  Lemma generate_complete {w} (Γ : Ėnv w) (e : Exp) (τ : Ṫy w) (e' : Ėxp w) :
+  Lemma generate_complete {w} (Γ : OEnv w) (e : Exp) (τ : OTy w) (e' : OExp w) :
     Γ |--ₚ e; τ ~> e' ⊢ₚ TPB_algo Γ e τ e'.
   Proof.
     pred_unfold. intros ι HT.
@@ -157,7 +157,7 @@ Section Generator.
     pred_unfold.
   Qed.
 
-  Lemma generate_correct {w} (Γ : Ėnv w) (e : Exp) (τ : Ṫy w) (e' : Ėxp w) :
+  Lemma generate_correct {w} (Γ : OEnv w) (e : Exp) (τ : OTy w) (e' : OExp w) :
     Γ |--ₚ e; τ ~> e' ⊣⊢ₚ TPB_algo Γ e τ e'.
   Proof. iSplit. iApply generate_complete. iApply generate_sound. Qed.
 

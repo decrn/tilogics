@@ -115,7 +115,7 @@ End RemoveAcc.
 
 Section Operations.
 
-  Definition singleton {w x} (xIn : x ∈ w) (t : Ṫy (w - x)) :
+  Definition singleton {w x} (xIn : x ∈ w) (t : OTy (w - x)) :
     Solved Tri Unit w :=
     Some (existT (w - x) (thick (Θ := Tri) x t, tt)).
 
@@ -132,19 +132,19 @@ Section OccursCheck.
       | world.Diff _ xIn' => Some xIn'
       end.
 
-  Definition occurs_check : ⊧ Ṫy ⇢ ▷(Option Ṫy) :=
+  Definition occurs_check : ⊧ OTy ⇢ ▷(Option OTy) :=
     fun w =>
-      fix oc (t : Ṫy w) β (βIn : β ∈ w) {struct t} :=
+      fix oc (t : OTy w) β (βIn : β ∈ w) {struct t} :=
       match t with
-      | ṫy.var αIn    => ṫy.var <$> occurs_check_in αIn βIn
-      | ṫy.bool       => Some ṫy.bool
-      | ṫy.func t1 t2 => ṫy.func <$> oc t1 β βIn <*> oc t2 β βIn
+      | oty.var αIn    => oty.var <$> occurs_check_in αIn βIn
+      | oty.bool       => Some oty.bool
+      | oty.func t1 t2 => oty.func <$> oc t1 β βIn <*> oc t2 β βIn
       end.
 
-  Lemma occurs_check_spec {w α} (αIn : α ∈ w) (t : Ṫy w) :
+  Lemma occurs_check_spec {w α} (αIn : α ∈ w) (t : OTy w) :
     match occurs_check t αIn with
     | Some t' => t = t'[thin α]
-    | None => t = ṫy.var αIn \/ ṫy.Ṫy_subterm (ṫy.var αIn) t
+    | None => t = oty.var αIn \/ oty.OTy_subterm (oty.var αIn) t
     end.
   Proof.
     induction t; cbn.
@@ -155,7 +155,7 @@ Section OccursCheck.
     - destruct (occurs_check t1 αIn), (occurs_check t2 αIn);
         cbn; subst; auto; right;
         match goal with
-        | H: _ \/ ṫy.Ṫy_subterm _ ?t |- _ =>
+        | H: _ \/ oty.OTy_subterm _ ?t |- _ =>
             destruct H;
             [ subst; constructor; constructor
             | constructor 2 with t; auto; constructor; constructor
@@ -167,14 +167,14 @@ End OccursCheck.
 
 Section VarView.
 
-  Inductive VarView {w} : Ṫy w → Type :=
-  | is_var {x} (xIn : x ∈ w) : VarView (ṫy.var xIn)
-  | not_var {t} (H: ∀ x (xIn : x ∈ w), t <> ṫy.var xIn) : VarView t.
+  Inductive VarView {w} : OTy w → Type :=
+  | is_var {x} (xIn : x ∈ w) : VarView (oty.var xIn)
+  | not_var {t} (H: ∀ x (xIn : x ∈ w), t <> oty.var xIn) : VarView t.
   #[global] Arguments not_var {w t} &.
 
-  Definition varview {w} (t : Ṫy w) : VarView t :=
+  Definition varview {w} (t : OTy w) : VarView t :=
     match t with
-    | ṫy.var xIn => is_var xIn
+    | oty.var xIn => is_var xIn
     | _         => not_var (fun _ _ e => noConfusion_inv e)
     end.
 
@@ -182,13 +182,13 @@ End VarView.
 
 Section Implementation.
 
-  Definition flex : ⊧ ∀ α, world.In α ⇢ Ṫy ⇢ Solved Tri Unit :=
+  Definition flex : ⊧ ∀ α, world.In α ⇢ OTy ⇢ Solved Tri Unit :=
     fun w α αIn τ =>
       match varview τ with
       | is_var βIn =>
           match world.occurs_check_view αIn βIn with
           | world.Same _      => pure tt
-          | world.Diff _ βIn' => singleton αIn (ṫy.var βIn')
+          | world.Diff _ βIn' => singleton αIn (oty.var βIn')
           end
       | not_var _ =>
           match occurs_check τ αIn with
@@ -211,14 +211,14 @@ Section Implementation.
   #[global] Arguments ctrue {w} [w1] _.
 
   Definition AUnifier : OType :=
-    Ṫy ⇢ Ṫy ⇢ C.
+    OTy ⇢ OTy ⇢ C.
 
   Section MguO.
 
     Context [w] (lamgu : ▷AUnifier w).
     Arguments lamgu {_ _} _ _ {_} _.
 
-    Definition aflex α {αIn : α ∈ w} (τ : Ṫy w) : C w :=
+    Definition aflex α {αIn : α ∈ w} (τ : OTy w) : C w :=
       fun _ θ =>
         match θ with
         | Tri.nil          => flex α τ
@@ -226,31 +226,31 @@ Section Implementation.
         end.
     #[global] Arguments aflex α {αIn} τ [w1] _.
 
-    Definition atrav : (Ṫy ⇢ Ṫy ⇢ C)%W w :=
+    Definition atrav : (OTy ⇢ OTy ⇢ C)%W w :=
       fix bmgu s t {struct s} :=
         match s , t with
-        | @ṫy.var _ α _  , t             => aflex α t
-        | s             , @ṫy.var _ β _  => aflex β s
-        | ṫy.bool       , ṫy.bool       => ctrue
-        | ṫy.func s1 s2 , ṫy.func t1 t2 => cand (bmgu s1 t1) (bmgu s2 t2)
+        | @oty.var _ α _  , t             => aflex α t
+        | s             , @oty.var _ β _  => aflex β s
+        | oty.bool       , oty.bool       => ctrue
+        | oty.func s1 s2 , oty.func t1 t2 => cand (bmgu s1 t1) (bmgu s2 t2)
         | _             , _             => cfalse
         end.
 
     Section atrav_elim.
 
-      Context (P : Ṫy w → Ṫy w → C w → Type).
-      Context (fflex1 : ∀ α (αIn : α ∈ w) (t : Ṫy w), P (ṫy.var αIn) t (aflex α t)).
-      Context (fflex2 : ∀ α (αIn : α ∈ w) (t : Ṫy w), P t (ṫy.var αIn) (aflex α t)).
-      Context (fbool : P ṫy.bool ṫy.bool ctrue).
-      Context (fbool_func : ∀ T1 T2 : Ṫy w, P ṫy.bool (ṫy.func T1 T2) cfalse).
-      Context (ffunc_bool : ∀ T1 T2 : Ṫy w, P (ṫy.func T1 T2) ṫy.bool cfalse).
-      Context (ffunc : ∀ s1 s2 t1 t2 : Ṫy w,
+      Context (P : OTy w → OTy w → C w → Type).
+      Context (fflex1 : ∀ α (αIn : α ∈ w) (t : OTy w), P (oty.var αIn) t (aflex α t)).
+      Context (fflex2 : ∀ α (αIn : α ∈ w) (t : OTy w), P t (oty.var αIn) (aflex α t)).
+      Context (fbool : P oty.bool oty.bool ctrue).
+      Context (fbool_func : ∀ T1 T2 : OTy w, P oty.bool (oty.func T1 T2) cfalse).
+      Context (ffunc_bool : ∀ T1 T2 : OTy w, P (oty.func T1 T2) oty.bool cfalse).
+      Context (ffunc : ∀ s1 s2 t1 t2 : OTy w,
         (P s1 t1 (atrav s1 t1)) →
         (P s2 t2 (atrav s2 t2)) →
-        P (ṫy.func s1 s2) (ṫy.func t1 t2)
+        P (oty.func s1 s2) (oty.func t1 t2)
           (cand (atrav s1 t1) (atrav s2 t2))).
 
-      Lemma atrav_elim : ∀ (t1 t2 : Ṫy w), P t1 t2 (atrav t1 t2).
+      Lemma atrav_elim : ∀ (t1 t2 : OTy w), P t1 t2 (atrav t1 t2).
       Proof. induction t1; intros t2; cbn; auto; destruct t2; auto. Qed.
 
     End atrav_elim.
@@ -260,17 +260,17 @@ Section Implementation.
   Definition amgu : ⊧ AUnifier :=
     fun w => loeb atrav w.
 
-  Definition mgu `{HMap Tri Θ} : ⊧ Ṫy ⇢ Ṫy ⇢ Solved Θ Unit :=
+  Definition mgu `{HMap Tri Θ} : ⊧ OTy ⇢ OTy ⇢ Solved Θ Unit :=
     fun w s t => solved_hmap (@amgu w s t _ refl).
 
-  Definition asolve : ⊧ List (Prod Ṫy Ṫy) ⇢ C :=
+  Definition asolve : ⊧ List (Prod OTy OTy) ⇢ C :=
     fix asolve {w} cs {struct cs} :=
       match cs with
       | List.nil             => ctrue
       | List.cons (t1,t2) cs => cand (amgu t1 t2) (asolve cs)
       end.
 
-  Definition solve `{HMap Tri Θ} : ⊧ List (Prod Ṫy Ṫy) ⇢ Solved Θ Unit :=
+  Definition solve `{HMap Tri Θ} : ⊧ List (Prod OTy OTy) ⇢ Solved Θ Unit :=
     fun w cs => solved_hmap (asolve cs refl).
 
 End Implementation.
@@ -299,11 +299,11 @@ Section Correctness.
 
   Definition AUnifierCorrect : ⊧ AUnifier ⇢ PROP :=
     fun w0 bu =>
-      ∀ (t1 t2 : Ṫy w0) w1 (θ1 : w0 ⊑⁻ w1),
+      ∀ (t1 t2 : OTy w0) w1 (θ1 : w0 ⊑⁻ w1),
         instpred (bu t1 t2 w1 θ1) ⊣⊢ₚ (t1 =ₚ t2)[θ1].
 
-  Lemma flex_correct {w α} (αIn : α ∈ w) (t : Ṫy w) :
-    instpred (flex α t) ⊣⊢ₚ ṫy.var αIn =ₚ t.
+  Lemma flex_correct {w α} (αIn : α ∈ w) (t : OTy w) :
+    instpred (flex α t) ⊣⊢ₚ oty.var αIn =ₚ t.
   Proof.
     unfold flex. destruct varview; cbn.
     - destruct world.occurs_check_view; predsimpl.
@@ -321,8 +321,8 @@ Section Correctness.
     Context (lamgu_correct : ∀ x (xIn : x ∈ w),
                 AUnifierCorrect (lamgu xIn)).
 
-    Lemma aflex_correct {α} (αIn : α ∈ w) (t : Ṫy w) w1 (θ1 : w ⊑⁻ w1) :
-      instpred (aflex lamgu α t θ1) ⊣⊢ₚ (ṫy.var αIn =ₚ t)[θ1].
+    Lemma aflex_correct {α} (αIn : α ∈ w) (t : OTy w) w1 (θ1 : w ⊑⁻ w1) :
+      instpred (aflex lamgu α t θ1) ⊣⊢ₚ (oty.var αIn =ₚ t)[θ1].
     Proof.
       destruct θ1; cbn; Tri.folddefs.
       Tri.folddefs.
@@ -347,7 +347,7 @@ Section Correctness.
   Lemma amgu_correct : ∀ w, AUnifierCorrect (@amgu w).
   Proof. apply loeb_elim, atrav_correct. Qed.
 
-  Definition mgu_correct `{LkHMap Tri Θ} w (t1 t2 : Ṫy w) :
+  Definition mgu_correct `{LkHMap Tri Θ} w (t1 t2 : OTy w) :
     instpred (mgu (Θ := Θ) t1 t2) ⊣⊢ₚ t1 =ₚ t2.
   Proof.
     unfold mgu. rewrite instpred_solved_hmap.
@@ -356,7 +356,7 @@ Section Correctness.
 
   #[local] Existing Instance instpred_prod_ty.
 
-  Lemma asolve_correct {w0} (C : List (Ṫy * Ṫy) w0) :
+  Lemma asolve_correct {w0} (C : List (OTy * OTy) w0) :
     ∀ w1 (θ1 : w0 ⊑⁻ w1),
       instpred (asolve C θ1) ⊣⊢ₚ (instpred C)[θ1].
   Proof.
@@ -365,7 +365,7 @@ Section Correctness.
     - apply instpred_cand_intro; auto. intros. apply amgu_correct.
   Qed.
 
-  Lemma solve_correct `{LkHMap Tri Θ} {w} (C : List (Ṫy * Ṫy) w) :
+  Lemma solve_correct `{LkHMap Tri Θ} {w} (C : List (OTy * OTy) w) :
     instpred (solve (Θ := Θ) C) ⊣⊢ₚ instpred C.
   Proof.
     unfold solve. rewrite instpred_solved_hmap.

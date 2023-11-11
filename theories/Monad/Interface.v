@@ -67,8 +67,8 @@ Import Pred Pred.Acc.
 
 
 Class TypeCheckM (M : OType -> OType) : Type :=
-  { assert   : ⊧ Ṫy ⇢ Ṫy ⇢ M Unit;
-    pick     : ⊧ M Ṫy;
+  { assert   : ⊧ OTy ⇢ OTy ⇢ M Unit;
+    pick     : ⊧ M OTy;
   }.
 #[global] Arguments fail {_ _ _ w}.
 #[global] Arguments pick {_ _ w}.
@@ -88,11 +88,11 @@ Class AxiomaticSemantics
       WP (pure a) Q ⊣⊢ₚ Q _ refl a;
     ax_wp_bind [A B w0] (m : M A w0) (f : Box Θ (A ⇢ M B) w0) (Q : Box Θ (B ⇢ Pred) w0) :
       WP (bind m f) Q ⊣⊢ₚ WP m (fun w1 θ1 a => WP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2)));
-    ax_wp_assert [w] (σ τ : Ṫy w) (Q : Box Θ (Unit ⇢ Pred) w) :
+    ax_wp_assert [w] (σ τ : OTy w) (Q : Box Θ (Unit ⇢ Pred) w) :
       WP (assert σ τ) Q ⊣⊢ₚ σ =ₚ τ /\ₚ Q _ refl tt;
-    ax_wp_pick [w] (Q : Box Θ (Ṫy ⇢ Pred) w) :
+    ax_wp_pick [w] (Q : Box Θ (OTy ⇢ Pred) w) :
       let α := world.fresh w in
-      WP pick Q ⊣⊢ₚ Acc.wp step (Q (w ▻ α) step (ṫy.var world.in_zero));
+      WP pick Q ⊣⊢ₚ Acc.wp step (Q (w ▻ α) step (oty.var world.in_zero));
     ax_wp_fail [A w] (Q : Box Θ (A ⇢ Pred) w) :
       WP fail Q ⊣⊢ₚ ⊥ₚ;
     ax_wp_mono [A w] (m : M A w) (P Q : Box Θ (A ⇢ Pred) w) :
@@ -103,11 +103,11 @@ Class AxiomaticSemantics
       WLP (pure a) Q ⊣⊢ₚ Q _ refl a;
     ax_wlp_bind [A B w0] (m : M A w0) (f : Box Θ (A ⇢ M B) w0) (Q : Box Θ (B ⇢ Pred) w0) :
       WLP (bind m f) Q ⊣⊢ₚ WLP m (fun w1 θ1 a => WLP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2)));
-    ax_wlp_assert [w] (σ τ : Ṫy w) (Q : Box Θ (Unit ⇢ Pred) w) :
+    ax_wlp_assert [w] (σ τ : OTy w) (Q : Box Θ (Unit ⇢ Pred) w) :
       WLP (assert σ τ) Q ⊣⊢ₚ σ =ₚ τ ->ₚ Q _ refl tt;
-    ax_wlp_pick [w] (Q : Box Θ (Ṫy ⇢ Pred) w) :
+    ax_wlp_pick [w] (Q : Box Θ (OTy ⇢ Pred) w) :
       let α := world.fresh w in
-      WLP pick Q ⊣⊢ₚ Acc.wlp step (Q (w ▻ α) step (ṫy.var world.in_zero));
+      WLP pick Q ⊣⊢ₚ Acc.wlp step (Q (w ▻ α) step (oty.var world.in_zero));
     ax_wlp_fail [A w] (Q : Box Θ (A ⇢ Pred) w) :
       WLP fail Q ⊣⊢ₚ ⊤ₚ;
     ax_wlp_mono [A w] (m : M A w) (P Q : Box Θ (A ⇢ Pred) w) :
@@ -123,10 +123,10 @@ Class AxiomaticSemantics
 (* Alternative rule for pick which substitutes the last variable away
  as discussed in the papter. *)
 Lemma ax_wp_pick_substitute `{AxiomaticSemantics Θ M, Thick Θ} {lkThickΘ : LkThick Θ}
-  [w] (Q : Box Θ (Ṫy ⇢ Pred) w) :
+  [w] (Q : Box Θ (OTy ⇢ Pred) w) :
   WP pick Q ⊣⊢ₚ
     let α := world.fresh w in
-    (∃ₚ τ : Ṫy w, (Q (w ▻ α) step (ṫy.var world.in_zero))[thick α (αIn := world.in_zero) τ]).
+    (∃ₚ τ : OTy w, (Q (w ▻ α) step (oty.var world.in_zero))[thick α (αIn := world.in_zero) τ]).
 Proof.
   rewrite ax_wp_pick; cbn. constructor; intros ι.
   unfold Acc.wp; pred_unfold. split.
@@ -149,9 +149,9 @@ Class TypeCheckLogicM
       Q _ refl a ⊢ₚ WP (pure a) Q;
     wp_bind [A B w0] (m : M A w0) (f : Box Θ (A ⇢ M B) w0) (Q : Box Θ (B ⇢ Pred) w0) :
       WP m (fun w1 θ1 a => WP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2))) ⊢ₚ WP (bind m f) Q;
-    wp_assert [w] (σ τ : Ṫy w) (Q : Box Θ (Unit ⇢ Pred) w) :
+    wp_assert [w] (σ τ : OTy w) (Q : Box Θ (Unit ⇢ Pred) w) :
       σ =ₚ τ /\ₚ PBox (fun _ θ => Q _ θ tt) ⊢ₚ WP (assert σ τ) Q;
-    wp_pick [w] [Q : Box Θ (Ṫy ⇢ Pred) w] (τ : Ty) :
+    wp_pick [w] [Q : Box Θ (OTy ⇢ Pred) w] (τ : Ty) :
       PBox (fun _ θ => ∀ₚ τ', lift τ =ₚ τ' ->ₚ Q _ θ τ') ⊢ₚ WP pick Q;
     wp_mono [A w] (m : M A w) (P Q : Box Θ (A ⇢ Pred) w) :
       PBox (fun _ θ => ∀ₚ (a : A _), P _ θ a -∗ Q _ θ a)%I ⊢ₚ
@@ -162,10 +162,10 @@ Class TypeCheckLogicM
       Q _ refl a ⊢ₚ WLP (pure a) Q;
     wlp_bind [A B w0] (m : M A w0) (f : Box Θ (A ⇢ M B) w0) (Q : Box Θ (B ⇢ Pred) w0) :
       WLP m (fun w1 θ1 a => WLP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2))) ⊢ₚ WLP (bind m f) Q;
-    wlp_assert [w] (σ τ : Ṫy w) (Q : Box Θ (Unit ⇢ Pred) w) :
+    wlp_assert [w] (σ τ : OTy w) (Q : Box Θ (Unit ⇢ Pred) w) :
       σ =ₚ τ ->ₚ PBox (fun _ θ => Q _ θ tt) ⊢ₚ WLP (assert σ τ) Q;
-    wlp_pick [w] (Q : Box Θ (Ṫy ⇢ Pred) w) :
-      PBox (fun _ θ => ∀ₚ (τ : Ṫy _), Q _ θ τ) ⊢ₚ WLP pick Q;
+    wlp_pick [w] (Q : Box Θ (OTy ⇢ Pred) w) :
+      PBox (fun _ θ => ∀ₚ (τ : OTy _), Q _ θ τ) ⊢ₚ WLP pick Q;
     wlp_fail [A w] (Q : Box Θ (A ⇢ Pred) w) :
       ⊤ₚ ⊢ₚ WLP fail Q;
     wlp_mono [A w] (m : M A w) (P Q : Box Θ (A ⇢ Pred) w) :
@@ -187,7 +187,7 @@ Proof.
   - rewrite ax_wp_assert. iIntros "[#Heq >HQ]". now iSplit.
   - rewrite ax_wp_pick. rewrite <- (Acc.intro_wp_step τ).
     iIntros "#H !> #Heq". iMod "H".
-    iSpecialize ("H" $! (ṫy.var world.in_zero) with "Heq").
+    iSpecialize ("H" $! (oty.var world.in_zero) with "Heq").
     now rewrite trans_refl_r.
   - apply ax_wp_mono.
   - now rewrite ax_wlp_pure.
@@ -195,7 +195,7 @@ Proof.
   - rewrite ax_wlp_assert. iIntros "#HQ #Heq".
     iSpecialize ("HQ" with "Heq"). now iMod "HQ".
   - rewrite ax_wlp_pick. iIntros "#HQ !>". iMod "HQ".
-    iSpecialize ("HQ" $! (ṫy.var world.in_zero)).
+    iSpecialize ("HQ" $! (oty.var world.in_zero)).
     now rewrite trans_refl_r.
   - now rewrite ax_wlp_fail.
   - apply ax_wlp_mono.
@@ -239,7 +239,7 @@ Definition wlp_option {A w1 w2} :
     end%P.
 
 Definition Solved (Θ : SUB) (A : OType) : OType := Option (Diamond Θ A).
-Definition Prenex (A : OType) : OType := Solved Prefix (List (Ṫy * Ṫy) * A).
+Definition Prenex (A : OType) : OType := Solved Prefix (List (OTy * OTy) * A).
 
 Section Solved.
 
@@ -334,10 +334,10 @@ Proof. destruct m as [(w' & θ & a)|]; cbn; now rewrite ?Acc.wp_hmap. Qed.
 
 (* Create HintDb wpeq. *)
 (* #[export] Hint Rewrite *)
-(*   (@persist_eq Ėnv _ _ _ _) *)
-(*   (@persist_eq Ṫy _ _ _ _) *)
-(*   (@persist_trans Ėnv _ _) *)
-(*   (@persist_trans Ṫy _ _) *)
+(*   (@persist_eq OEnv _ _ _ _) *)
+(*   (@persist_eq OTy _ _ _ _) *)
+(*   (@persist_trans OEnv _ _) *)
+(*   (@persist_trans OTy _ _) *)
 (*   @persist_lift *)
 (*   @lift_insert *)
 (*   : wpeq. *)
@@ -348,10 +348,10 @@ Ltac wpeq :=
      try progress cbn;
      (* Unfortunately, autorewrite and rewrite strategy blow up with some long
         typeclass searches. Simply use rewrite for now. *)
-     rewrite ?(@persist_eq Ėnv _ _ _ _)
-       ?(@persist_eq Ṫy _ _ _ _)
-       ?(@persist_trans Ėnv _ _)
-       ?(@persist_trans Ṫy _ _)
+     rewrite ?(@persist_eq OEnv _ _ _ _)
+       ?(@persist_eq OTy _ _ _ _)
+       ?(@persist_trans OEnv _ _)
+       ?(@persist_trans OTy _ _)
        ?@persist_lift
        ?@lift_insert;
      try done;

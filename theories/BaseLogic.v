@@ -61,7 +61,7 @@ Module Pred.
       fun w t1 t2 ι => inst t1 ι = inst t2 ι.
     #[global] Arguments eqₚ {T A _} [w] _ _ _/.
 
-    Definition TPB : ⊧ Ėnv ⇢ Const Exp ⇢ Ṫy ⇢ Ėxp ⇢ Pred :=
+    Definition TPB : ⊧ OEnv ⇢ Const Exp ⇢ OTy ⇢ OExp ⇢ Pred :=
       fun w G e t ee ι => inst G ι |-- e ∷ inst t ι ~> inst ee ι.
     #[global] Arguments TPB [w] G e t ee ι/.
 
@@ -217,17 +217,17 @@ Module Pred.
   Create HintDb punfold.
   #[export] Hint Rewrite bientails_unfold entails_unfold sep_unfold wand_unfold
     intuitionistically_unfold
-    (@inst_persist Ėnv Env _ _ _)
-    (@inst_persist Ėxp Exp _ _ _)
-    (@inst_persist Ṫy Ty _ _ _)
-    (@inst_lift Ėnv Env _ _ _)
-    (@inst_lift Ėxp Exp _ _ _)
-    (@inst_lift Ṫy Ty _ _ _)
+    (@inst_persist OEnv Env _ _ _)
+    (@inst_persist OExp Exp _ _ _)
+    (@inst_persist OTy Ty _ _ _)
+    (@inst_lift OEnv Env _ _ _)
+    (@inst_lift OExp Exp _ _ _)
+    (@inst_lift OTy Ty _ _ _)
     (@inst_thin Par _ Par.lk_thin_par)
     @inst_refl @inst_trans @inst_insert
     @Open.inst_pure
-    @ėxp.inst_var @ėxp.inst_true @ėxp.inst_false @ėxp.inst_ifte @ėxp.inst_absu
-    @ėxp.inst_abst @ėxp.inst_app : punfold.
+    @oexp.inst_var @oexp.inst_true @oexp.inst_false @oexp.inst_ifte @oexp.inst_absu
+    @oexp.inst_abst @oexp.inst_app : punfold.
 
   Ltac punfold_connectives :=
     change (@interface.bi_and (@bi_pred _) ?P ?Q ?ι) with (P ι /\ Q ι) in *;
@@ -246,8 +246,8 @@ Module Pred.
        try rewrite_db punfold; auto 1 with typeclass_instances;
        cbn [eqₚ TPB inst inst_ty inst_env] in *;
        (* repeat rewrite ?inst_persist, ?inst_lift, ?inst_refl, ?inst_trans, *)
-       (*   ?inst_insert, ?ėxp.inst_var, ?ėxp.inst_true, ?ėxp.inst_false, *)
-       (*   ?ėxp.inst_absu, ?ėxp.inst_abst, ?ėxp.inst_app, ?ėxp.inst_ifte in *; *)
+       (*   ?inst_insert, ?oexp.inst_var, ?oexp.inst_true, ?oexp.inst_false, *)
+       (*   ?oexp.inst_absu, ?oexp.inst_abst, ?oexp.inst_app, ?oexp.inst_ifte in *; *)
        try
          match goal with
          | |- forall ι : Assignment _, _ =>
@@ -375,13 +375,13 @@ Module Pred.
     End Eq.
     #[global] Arguments eqₚ_trans {T A _ w} s t u.
 
-    Lemma peq_ty_noconfusion {w} (t1 t2 : Ṫy w) :
+    Lemma peq_ty_noconfusion {w} (t1 t2 : OTy w) :
       t1 =ₚ t2 ⊣⊢ₚ
             match t1 , t2 with
-            | ṫy.var  _       , _               => t1 =ₚ t2
-            | _               , ṫy.var _        => t1 =ₚ t2
-            | ṫy.bool         , ṫy.bool         => ⊤ₚ
-            | ṫy.func t11 t12 , ṫy.func t21 t22 => t11 =ₚ t21 /\ₚ t12 =ₚ t22
+            | oty.var  _       , _               => t1 =ₚ t2
+            | _               , oty.var _        => t1 =ₚ t2
+            | oty.bool         , oty.bool         => ⊤ₚ
+            | oty.func t11 t12 , oty.func t21 t22 => t11 =ₚ t21 /\ₚ t12 =ₚ t22
             | _               , _               => ⊥ₚ
             end.
     Proof. destruct t1, t2; obligation. Qed.
@@ -442,7 +442,7 @@ Module Pred.
         persist (∃ₚ a : A, Q a) θ ⊣⊢ₚ (∃ₚ a : A, persist (Q a) θ).
       Proof. obligation. Qed.
 
-      Lemma persist_tpb {w0 w1} (θ : Θ w0 w1) G (e : Exp) (t : Ṫy w0) (ee : Ėxp w0) :
+      Lemma persist_tpb {w0 w1} (θ : Θ w0 w1) G (e : Exp) (t : OTy w0) (ee : OExp w0) :
         persist (G |--ₚ e; t ~> ee) θ ⊣⊢ₚ
         persist G θ |--ₚ e; persist t θ ~> persist ee θ.
       Proof. obligation. Qed.
@@ -514,8 +514,8 @@ Module Pred.
       Proof. now rewrite and_comm, and_wp_l, and_comm. Qed.
 
       Lemma wp_thick {thickΘ : Thick Θ} {lkThickΘ : LkThick Θ}
-        {w α} (αIn : world.In α w) (t : Ṫy (w - α)) (Q : Pred (w - α)) :
-        wp (thick α t) Q ⊣⊢ₚ ṫy.var αIn =ₚ persist t (thin (Θ := Par) α) /\ₚ persist Q (thin (Θ := Par) α).
+        {w α} (αIn : world.In α w) (t : OTy (w - α)) (Q : Pred (w - α)) :
+        wp (thick α t) Q ⊣⊢ₚ oty.var αIn =ₚ persist t (thin (Θ := Par) α) /\ₚ persist Q (thin (Θ := Par) α).
       Proof.
         unfold wp; pred_unfold. intros ι. split.
         - intros (ι1 & Heq & HQ). subst.
@@ -618,7 +618,7 @@ Module Pred.
 
     Lemma intro_wp_step' {Θ} {stepΘ : Step Θ} {lkStepΘ : LkStep Θ}
       {w α} (P : Pred w) (Q : Pred (world.snoc w α)) (t : Ty) :
-      (persist P step ⊢ₚ lift t =ₚ @ṫy.var _ α world.in_zero ->ₚ Q) ->
+      (persist P step ⊢ₚ lift t =ₚ @oty.var _ α world.in_zero ->ₚ Q) ->
       (P ⊢ₚ wp (step (Θ := Θ)) Q).
     Proof.
       pred_unfold. intros H ι HP. set (ι1 := env.snoc ι α t).
@@ -629,7 +629,7 @@ Module Pred.
     (* Better for iris proof mode. *)
     Lemma intro_wp_step {Θ} {stepΘ : Step Θ} {lkStepΘ : LkStep Θ}
       t {w α} (Q : Pred (world.snoc w α)) :
-      wlp step (lift t =ₚ ṫy.var world.in_zero ->ₚ Q) ⊢ₚ wp (step (Θ := Θ)) Q.
+      wlp step (lift t =ₚ oty.var world.in_zero ->ₚ Q) ⊢ₚ wp (step (Θ := Θ)) Q.
     Proof. apply (intro_wp_step' t). now rewrite persist_wlp. Qed.
 
     Lemma wp_split  {Θ : SUB} [w0 w1] (θ : Θ w0 w1) P :
@@ -672,7 +672,7 @@ Module Pred.
         | nil       => ⊤ₚ
         | cons y ys => instpred y /\ₚ ip ys
         end%P.
-    #[local] Instance instpred_prod_ty : InstPred (Ṫy * Ṫy) :=
+    #[local] Instance instpred_prod_ty : InstPred (OTy * OTy) :=
       fun w '(t1,t2) => eqₚ t1 t2.
     #[export] Instance instpred_unit : InstPred Unit :=
       fun w 'tt => ⊤ₚ%P.
@@ -697,29 +697,29 @@ Module Pred.
       induction xs; cbn; [easy|]. now rewrite instpred_persist IHxs.
     Qed.
 
-    #[local] Instance instpred_persist_prod_ty : InstPredPersist (Ṫy * Ṫy).
+    #[local] Instance instpred_persist_prod_ty : InstPredPersist (OTy * OTy).
     Proof. intros Θ w0 w1 θ [τ1 τ2]; cbn. now rewrite persist_eq. Qed.
 
   End InstPred.
 
-  Lemma pno_cycle {w} (t1 t2 : Ṫy w) (Hsub : ṫy.Ṫy_subterm t1 t2) :
+  Lemma pno_cycle {w} (t1 t2 : OTy w) (Hsub : oty.OTy_subterm t1 t2) :
     t1 =ₚ t2 ⊢ₚ ⊥ₚ.
   Proof.
     constructor. intros ι Heq. apply (inst_subterm ι) in Hsub.
     rewrite <- Heq in Hsub. now apply ty.no_cycle in Hsub.
   Qed.
 
-  Lemma eqₚ_insert {w} (G1 G2 : Ėnv w) (x : string) (t1 t2 : Ṫy w) :
+  Lemma eqₚ_insert {w} (G1 G2 : OEnv w) (x : string) (t1 t2 : OTy w) :
     G1 =ₚ G2 /\ₚ t1 =ₚ t2 ⊢ₚ
-    insert (M := Ėnv w) x t1 G1 =ₚ insert (M := Ėnv w) x t2 G2.
+    insert (M := OEnv w) x t1 G1 =ₚ insert (M := OEnv w) x t2 G2.
   Proof. pred_unfold. intros []. now f_equal. Qed.
 
-  Lemma eq_func {w} (s1 s2 t1 t2 : Ṫy w) :
-    ṫy.func s1 s2 =ₚ ṫy.func t1 t2 ⊣⊢ₚ (s1 =ₚ t1) /\ₚ (s2 =ₚ t2).
+  Lemma eq_func {w} (s1 s2 t1 t2 : OTy w) :
+    oty.func s1 s2 =ₚ oty.func t1 t2 ⊣⊢ₚ (s1 =ₚ t1) /\ₚ (s2 =ₚ t2).
   Proof. now rewrite peq_ty_noconfusion. Qed.
 
   #[export] Instance params_tpb : Params (@TPB) 1 := {}.
-  #[export] Instance params_ifte : Params (@ėxp.ifte) 1 := {}.
+  #[export] Instance params_ifte : Params (@oexp.ifte) 1 := {}.
   #[export] Instance params_eqₚ : Params (@eqₚ) 4 := {}.
   #[export] Instance params_persist : Params (@persist) 4 := {}.
 
@@ -771,12 +771,12 @@ Module Pred.
     Proof. intros ι. now rewrite inst_persist, !inst_lift. Qed.
 
     #[export] Instance into_persist_insert
-      [w0 w1] (θ : Θ w0 w1) (G0 : Ėnv w0) x (τ0 : Ṫy w0) G1 τ1
+      [w0 w1] (θ : Θ w0 w1) (G0 : OEnv w0) x (τ0 : OTy w0) G1 τ1
       (HG : IntoPersist θ G0 G1) (Hτ : IntoPersist θ τ0 τ1) :
       IntoPersist θ (G0 ,, x ∷ τ0) (G1 ,, x ∷ τ1) | 0.
     Proof.
       intros ι1. specialize (HG ι1). specialize (Hτ ι1).
-      change_no_check (@gmap.gmap string _ _ (Ṫy ?w)) with (Ėnv w).
+      change_no_check (@gmap.gmap string _ _ (OTy ?w)) with (OEnv w).
       rewrite persist_insert, !inst_insert. now f_equal.
     Qed.
 
@@ -812,8 +812,8 @@ Module Pred.
       IntoWlp (PBox P) (PBox (fun _ θ2 => P _ (θ ⊙ θ2))) | 0.
     Proof. unfold IntoWlp. iIntros "H !>". now rewrite persist_update. Qed.
 
-    #[export] Instance into_wlp_tpb (G1 : Ėnv w0) (e : Exp) (τ1 : Ṫy w0)
-      (ee1 : Ėxp w0) G2 τ2 ee2 (HG : IntoPersist θ G1 G2)
+    #[export] Instance into_wlp_tpb (G1 : OEnv w0) (e : Exp) (τ1 : OTy w0)
+      (ee1 : OExp w0) G2 τ2 ee2 (HG : IntoPersist θ G1 G2)
       (Hτ : IntoPersist θ τ1 τ2) (Hee : IntoPersist θ ee1 ee2) :
       IntoWlp (TPB G1 e τ1 ee1) (TPB G2 e τ2 ee2) | 0.
     Proof.
@@ -845,12 +845,12 @@ Module Pred.
 
   Create HintDb predsimpl.
   #[export] Hint Rewrite
-    (@persist_eq Ėnv _ _ _ _)
-    (@persist_eq Ṫy _ _ _ _)
-    (@persist_refl Ėnv _ _)
-    (@persist_refl Ṫy _ _)
-    (@persist_trans Ėnv _ _)
-    (@persist_trans Ṫy _ _)
+    (@persist_eq OEnv _ _ _ _)
+    (@persist_eq OTy _ _ _ _)
+    (@persist_refl OEnv _ _)
+    (@persist_refl OTy _ _)
+    (@persist_trans OEnv _ _)
+    (@persist_trans OTy _ _)
     @Acc.wlp_refl
     @Acc.wlp_trans
     @Acc.wlp_true
@@ -882,7 +882,7 @@ Module Pred.
   Ltac predsimpl :=
     repeat
       (try (progress cbn); unfold _4;
-       change_no_check (@gmap.gmap string _ _ (Ṫy ?w)) with (Ėnv w) in *;
+       change_no_check (@gmap.gmap string _ _ (OTy ?w)) with (OEnv w) in *;
        repeat
          match goal with
          | |- Acc.wp ?θ _ ⊣⊢ₚ Acc.wp ?θ _ =>

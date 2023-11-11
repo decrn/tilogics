@@ -38,25 +38,25 @@ Class Persistent (A : OType) : Type :=
   persist : forall {Θ}, ⊧ A ⇢ Box Θ A.
 #[global] Arguments persist {_ _ _} [w] _ [_] _.
 
-#[export] Instance persist_ty : Persistent Ṫy :=
+#[export] Instance persist_ty : Persistent OTy :=
   fun Θ =>
-    fix pers {w0} (t : Ṫy w0) {w1} θ : Ṫy w1 :=
+    fix pers {w0} (t : OTy w0) {w1} θ : OTy w1 :=
       match t with
-      | ṫy.var αIn    => lk θ αIn
-      | ṫy.bool       => ṫy.bool
-      | ṫy.func t1 t2 => ṫy.func (pers t1 θ) (pers t2 θ)
+      | oty.var αIn    => lk θ αIn
+      | oty.bool       => oty.bool
+      | oty.func t1 t2 => oty.func (pers t1 θ) (pers t2 θ)
       end.
 
-#[export] Instance persist_env : Persistent Ėnv.
+#[export] Instance persist_env : Persistent OEnv.
 Proof.
   intros Θ w0 Γ w1 θ. revert Γ.
-  unfold Ėnv. eapply base.fmap.
+  unfold OEnv. eapply base.fmap.
   intros t. apply (persist t θ).
 Defined.
 
 Class LkRefl (Θ : SUB) (reflΘ : Refl Θ) : Prop :=
   lk_refl w α (αIn : α ∈ w) :
-    lk refl αIn = ṫy.var αIn.
+    lk refl αIn = oty.var αIn.
 #[global] Arguments LkRefl Θ {_}.
 Class LkTrans (Θ : SUB) (transΘ : Trans Θ) : Prop :=
   lk_trans w0 w1 w2 (θ1 : Θ w0 w1) (θ2 : Θ w1 w2) α (αIn : α ∈ w0) :
@@ -83,7 +83,7 @@ Class PersistLaws A {persA : Persistent A} : Type :=
   }.
 #[global] Arguments PersistLaws A {_}.
 
-#[export] Instance persistlaws_ty : PersistLaws Ṫy.
+#[export] Instance persistlaws_ty : PersistLaws OTy.
 Proof.
   constructor.
   - intros * ? w t. induction t; cbn.
@@ -127,14 +127,14 @@ Proof.
   - intros. destruct a; cbn; f_equal; now apply persist_simulation.
 Qed.
 
-#[export] Instance persistlaws_env : PersistLaws Ėnv.
+#[export] Instance persistlaws_env : PersistLaws OEnv.
 Proof.
   constructor.
-  - intros * ? w Γ. unfold persist, persist_env, Ėnv.
+  - intros * ? w Γ. unfold persist, persist_env, OEnv.
     apply map_eq. intros x. rewrite lookup_fmap.
     destruct lookup as [t|]; cbn; f_equal.
     apply persist_refl.
-  - intros * ? w0 Γ *. unfold persist, persist_env, Ėnv.
+  - intros * ? w0 Γ *. unfold persist, persist_env, OEnv.
     apply map_eq. intros x. rewrite !lookup_fmap.
     destruct lookup as [t|]; cbn; f_equal.
     apply persist_trans.
@@ -158,36 +158,36 @@ Qed.
   fun _ _ a _ _ => a.
 
 Lemma lookup_persist {Θ : SUB}
-  {w0 w1} (θ : Θ w0 w1) (G : Ėnv w0) (x : string) :
+  {w0 w1} (θ : Θ w0 w1) (G : OEnv w0) (x : string) :
   lookup x (persist G θ) = persist (lookup x G) θ.
 Proof.
-  unfold persist at 1, persist_env, Ėnv.
+  unfold persist at 1, persist_env, OEnv.
   now rewrite lookup_fmap.
 Qed.
 
 Lemma persist_empty {Θ : SUB}
   {w0 w1} (θ : Θ w0 w1) :
-  persist (empty (A := Ėnv w0)) θ = empty.
+  persist (empty (A := OEnv w0)) θ = empty.
 Proof.
   apply (fmap_empty (M := gmap string)).
 Qed.
 
 Lemma persist_insert {Θ : SUB}
-  {w0 w1} (θ : Θ w0 w1) (G : Ėnv w0) (x : string) (t : Ṫy w0) :
+  {w0 w1} (θ : Θ w0 w1) (G : OEnv w0) (x : string) (t : OTy w0) :
   persist (insert x t G) θ = insert x (persist t θ) (persist G θ).
-Proof. unfold persist, persist_env, Ėnv. now rewrite fmap_insert. Qed.
+Proof. unfold persist, persist_env, OEnv. now rewrite fmap_insert. Qed.
 
 Class LkStep (Θ : SUB) (stepΘ : Step Θ) : Prop :=
   lk_step w α (αIn : α ∈ w) β :
-    lk (step (α := β)) αIn = ṫy.var (world.in_succ αIn).
+    lk (step (α := β)) αIn = oty.var (world.in_succ αIn).
 #[global] Arguments LkStep Θ {_}.
 
 Class LkThin (Θ : SUB) (thinΘ : Thin Θ) : Prop :=
   lk_thin w α (αIn : α ∈ w) β (βIn : β ∈ w - α) :
-    lk (thin α) βIn = ṫy.var (world.in_thin αIn βIn).
+    lk (thin α) βIn = oty.var (world.in_thin αIn βIn).
 #[global] Arguments LkThin Θ {_}.
 
 Class LkThick (Θ : SUB) (thickΘ : Thick Θ) : Prop :=
-  lk_thick w α (αIn : α ∈ w) (t : Ṫy (w - α)) β (βIn : β ∈ w) :
+  lk_thick w α (αIn : α ∈ w) (t : OTy (w - α)) β (βIn : β ∈ w) :
     lk (thick α t) βIn = thickIn αIn t βIn.
 #[global] Arguments LkThick Θ {_}.

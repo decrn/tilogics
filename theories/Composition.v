@@ -58,7 +58,7 @@ End Run.
 Section Reconstruct.
   Import option.notations.
 
-  Definition reconstruct (Γ : Env) (e : Exp) : option { w & Ṫy w * Ėxp w }%type :=
+  Definition reconstruct (Γ : Env) (e : Exp) : option { w & OTy w * OExp w }%type :=
     '(existT w (_ , te)) <- run _ (generate (w := world.nil) e (lift Γ)) ;;
     Some (existT w te).
 
@@ -66,7 +66,7 @@ Section Reconstruct.
     '(existT w te) <- reconstruct empty e ;;
     Some (inst te (grounding w)).
 
-  Definition infer (e : Exp) : option { w & Ṫy w }%type :=
+  Definition infer (e : Exp) : option { w & OTy w }%type :=
     '(existT w (t,e)) <- reconstruct empty e ;;
     Some (existT w t).
 End Reconstruct.
@@ -78,7 +78,7 @@ Section Examples.
         exp.absu "x" (exp.absu "y" (exp.var "x"))
       ].
 
-  Arguments ṫy.var {w}%world_scope α%string_scope {αIn}.
+  Arguments oty.var {w}%world_scope α%string_scope {αIn}.
   Import world.notations.
   Notation "( x , .. , y )" := (snoc .. (snoc nil x) .. y) : world_scope.
 End Examples.
@@ -143,7 +143,7 @@ Proof.
   - pred_unfold. intros HE. now specialize (HE env.nil).
 Qed.
 
-Lemma decidable_type_instantiation (τ : Ty) {w} (oτ : Ṫy w) :
+Lemma decidable_type_instantiation (τ : Ty) {w} (oτ : OTy w) :
   decidable (∃ ι : Assignment w, τ = inst oτ ι).
 Proof.
   pose proof (mgu_correct (lift τ) oτ) as [H].

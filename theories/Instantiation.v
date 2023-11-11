@@ -59,16 +59,16 @@ Section Inst.
     Inst (Option AT) (option A) :=
     fun w ma ass => option_map (fun a => inst a ass) ma.
 
-  #[export] Instance inst_ty : Inst Ṫy Ty :=
+  #[export] Instance inst_ty : Inst OTy Ty :=
     fix inst_ty {w} t ι :=
       match t with
-      | ṫy.var αIn    => env.lookup ι αIn
-      | ṫy.bool       => ty.bool
-      | ṫy.func t1 t2 => ty.func (inst_ty t1 ι) (inst_ty t2 ι)
+      | oty.var αIn    => env.lookup ι αIn
+      | oty.bool       => ty.bool
+      | oty.func t1 t2 => ty.func (inst_ty t1 ι) (inst_ty t2 ι)
       end.
 
-  #[export] Instance inst_env : Inst Ėnv Env :=
-    fun w Γ ι => base.fmap (fun t : Ṫy w => inst t ι) Γ.
+  #[export] Instance inst_env : Inst OEnv Env :=
+    fun w Γ ι => base.fmap (fun t : OTy w => inst t ι) Γ.
 
   #[export] Instance inst_acc {Θ : SUB} :
     forall w, Inst (Θ w) (Assignment w) :=
@@ -82,14 +82,14 @@ Section Lift.
   #[global] Arguments lift {_ _ _} _ {_}.
 
   (* Indexes a given ty by a world Σ *)
-  #[export] Instance lift_ty : Lift Ṫy Ty :=
-    fix lift_ty (t : Ty) w : Ṫy w :=
+  #[export] Instance lift_ty : Lift OTy Ty :=
+    fix lift_ty (t : Ty) w : OTy w :=
       match t with
-      | ty.bool       => ṫy.bool
-      | ty.func t1 t2 => ṫy.func (lift_ty t1 w) (lift_ty t2 w)
+      | ty.bool       => oty.bool
+      | ty.func t1 t2 => oty.func (lift_ty t1 w) (lift_ty t2 w)
       end.
 
-  #[export] Instance lift_env : Lift Ėnv Env :=
+  #[export] Instance lift_env : Lift OEnv Env :=
     fun E w => fmap (fun t => lift t) E.
 
   #[export] Instance lift_prod {AT BT A B} `{Lift AT A, Lift BT B} :
@@ -105,10 +105,10 @@ Section InstLift.
       inst (lift a) ι = a.
   #[global] Arguments InstLift _ _ {_ _}.
 
-  #[export] Instance inst_lift_ty : InstLift Ṫy Ty.
+  #[export] Instance inst_lift_ty : InstLift OTy Ty.
   Proof. intros w t ι. induction t; cbn; f_equal; auto. Qed.
 
-  #[export] Instance inst_lift_env : InstLift Ėnv Env.
+  #[export] Instance inst_lift_env : InstLift OEnv Env.
   Proof.
     intros w E ι. unfold inst, inst_env, lift, lift_env.
     rewrite <- map_fmap_id, <- map_fmap_compose.
@@ -128,13 +128,13 @@ Section InstPersist.
       inst (persist t θ) ι = inst t (inst θ ι).
   #[global] Arguments InstPersist _ _ {_ _}.
 
-  #[export] Instance inst_persist_ty : InstPersist Ṫy Ty.
+  #[export] Instance inst_persist_ty : InstPersist OTy Ty.
   Proof.
     intros Θ w0 w1 θ t ι. induction t; cbn; f_equal; auto.
     unfold inst at 2, inst_acc. now rewrite env.lookup_tabulate.
   Qed.
 
-  #[export] Instance inst_persist_env : InstPersist Ėnv Env.
+  #[export] Instance inst_persist_env : InstPersist OEnv Env.
   Proof.
     intros Θ w0 w1 θ E ι. unfold persist, persist_env, inst at 1 2, inst_env.
     rewrite <- map_fmap_compose. apply map_fmap_ext.
@@ -153,12 +153,12 @@ Section PersistLift.
       persist (lift a) θ = lift a.
   #[global] Arguments PersistLift _ _ {_ _}.
 
-  #[export] Instance persist_lift_ty : PersistLift Ṫy Ty.
+  #[export] Instance persist_lift_ty : PersistLift OTy Ty.
   Proof. intros Θ w0 w1 t θ. induction t; cbn; f_equal; auto. Qed.
 
-  #[export] Instance persist_lift_env : PersistLift Ėnv Env.
+  #[export] Instance persist_lift_env : PersistLift OEnv Env.
   Proof.
-    intros Θ w0 w1 E θ. unfold persist, lift, persist_env, lift_env, Ėnv.
+    intros Θ w0 w1 E θ. unfold persist, lift, persist_env, lift_env, OEnv.
     rewrite <- map_fmap_compose. apply map_fmap_ext.
     intros x t Hlk. apply persist_lift.
   Qed.
@@ -203,7 +203,7 @@ Proof.
 Qed.
 
 Lemma inst_thick {Θ} {thickΘ : Thick Θ} {lkthickΘ : LkThick Θ} :
-  forall {w} {x} (xIn : x ∈ w) (t : Ṫy (w - x)) (ι : Assignment (w - x)),
+  forall {w} {x} (xIn : x ∈ w) (t : OTy (w - x)) (ι : Assignment (w - x)),
     inst (thick (Θ := Θ) x t) ι = env.insert xIn ι (inst t ι).
 Proof.
   intros. apply env.lookup_extensional. intros β βIn. unfold inst, inst_acc.
@@ -220,13 +220,13 @@ Proof.
   now rewrite !env.lookup_tabulate, lk_hmap.
 Qed.
 
-Lemma inst_direct_subterm {w} (t1 t2 : Ṫy w) (ι : Assignment w) :
-  ṫy.Ṫy_direct_subterm t1 t2 ->
+Lemma inst_direct_subterm {w} (t1 t2 : OTy w) (ι : Assignment w) :
+  oty.OTy_direct_subterm t1 t2 ->
   ty.Ty_direct_subterm (inst t1 ι) (inst t2 ι).
 Proof. intros []; constructor. Qed.
 
-Lemma inst_subterm {w} (ι : Assignment w) (t1 t2 : Ṫy w) :
-  ṫy.Ṫy_subterm t1 t2 -> ty.Ty_subterm (inst t1 ι) (inst t2 ι).
+Lemma inst_subterm {w} (ι : Assignment w) (t1 t2 : OTy w) :
+  oty.OTy_subterm t1 t2 -> ty.Ty_subterm (inst t1 ι) (inst t2 ι).
 Proof.
   induction 1.
   - constructor 1. now apply inst_direct_subterm.
@@ -237,20 +237,20 @@ Lemma lookup_lift (Γ : Env) (x : string) (w : World) :
   lookup x (lift (w:=w) Γ) = option.map (fun t => lift t) (lookup x Γ).
 Proof. unfold lift, lift_env. now rewrite <- lookup_fmap. Qed.
 
-Lemma lookup_inst (w : World) (Γ : Ėnv w) (x : string) (ι : Assignment w) :
+Lemma lookup_inst (w : World) (Γ : OEnv w) (x : string) (ι : Assignment w) :
   lookup x (inst Γ ι) = inst (lookup x Γ) ι.
 Proof. unfold inst at 1, inst_env. now rewrite lookup_fmap. Qed.
 
-Lemma inst_insert {w} (Γ : Ėnv w) (x : string) (t : Ṫy w) (ι : Assignment w) :
-  inst (insert (M := Ėnv w) x t Γ) ι = inst Γ ι ,, x ∷ inst t ι.
-Proof. cbv [inst inst_env Ėnv]. now rewrite fmap_insert. Qed.
+Lemma inst_insert {w} (Γ : OEnv w) (x : string) (t : OTy w) (ι : Assignment w) :
+  inst (insert (M := OEnv w) x t Γ) ι = inst Γ ι ,, x ∷ inst t ι.
+Proof. cbv [inst inst_env OEnv]. now rewrite fmap_insert. Qed.
 
 Lemma inst_empty {w} (ι : Assignment w) :
-  inst (A := Ėnv) empty ι = empty.
-Proof. cbv [inst inst_env Ėnv]. now rewrite fmap_empty. Qed.
+  inst (A := OEnv) empty ι = empty.
+Proof. cbv [inst inst_env OEnv]. now rewrite fmap_empty. Qed.
 
 Lemma lift_insert {w x t Γ} :
-  lift (insert (M := Env) x t Γ) = insert (M := Ėnv w) x (lift t) (lift Γ).
+  lift (insert (M := Env) x t Γ) = insert (M := OEnv w) x (lift t) (lift Γ).
 Proof. unfold lift, lift_env. now rewrite fmap_insert. Qed.
 
 Fixpoint grounding (w : World) : Assignment w :=

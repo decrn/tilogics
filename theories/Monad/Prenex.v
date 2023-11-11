@@ -38,8 +38,8 @@ Import MonadNotations Pred Pred.Acc Pred.notations Pred.proofmode
 #[export] Instance pure_prenex : Pure Prenex :=
   fun A w a => Some (existT w (refl, (List.nil, a))).
 #[export] Instance bind_prenex : Bind Prefix Prenex :=
-  fun A B w (m : Solved Prefix (List (Ṫy * Ṫy) * A) w)
-      (f : Box Prefix (A ⇢ Solved Prefix (List (Ṫy * Ṫy) * B)) w) =>
+  fun A B w (m : Solved Prefix (List (OTy * OTy) * A) w)
+      (f : Box Prefix (A ⇢ Solved Prefix (List (OTy * OTy) * B)) w) =>
     '(C1,a1) <- m ;;
     '(C2,b2) <- f _ _ a1 ;;
     pure (persist C1 _ ++ C2, b2).
@@ -48,7 +48,7 @@ Import MonadNotations Pred Pred.Acc Pred.notations Pred.proofmode
 #[export] Instance tcm_prenex : TypeCheckM Prenex :=
   {| assert w τ1 τ2 := Some (existT w (refl, ([(τ1,τ2)], tt)));
      pick w := let α := world.fresh w in
-               Some (existT (w ▻ α) (step, (List.nil, ṫy.var world.in_zero)));
+               Some (existT (w ▻ α) (step, (List.nil, oty.var world.in_zero)));
   |}.
 
 #[local] Existing Instance instpred_prod_ty.

@@ -46,46 +46,46 @@ Section Generator.
     {reflTransΘ: ReflTrans Θ}.
   Context `{pureM:Pure M, bindM:Bind Θ M, failM:Fail M, tcM:TypeCheckM M}.
 
-  Definition check : Exp -> ⊧ Ėnv ⇢ Ṫy ⇢ M Ėxp :=
+  Definition check : Exp -> ⊧ OEnv ⇢ OTy ⇢ M OExp :=
     fix gen e {w} Γ τ :=
       match e with
       | exp.var x =>
           match lookup x Γ with
           | Some τ' => _ <- assert τ τ' ;;
-                       pure (ėxp.var x)
+                       pure (oexp.var x)
           | None    => fail
           end
       | exp.true  =>
-          _ <- assert τ ṫy.bool ;;
-          pure ėxp.true
+          _ <- assert τ oty.bool ;;
+          pure oexp.true
       | exp.false =>
-          _ <- assert τ ṫy.bool ;;
-          pure ėxp.false
+          _ <- assert τ oty.bool ;;
+          pure oexp.false
       | exp.ifte e1 e2 e3 =>
-          e1' <- gen e1 Γ ṫy.bool ;;
+          e1' <- gen e1 Γ oty.bool ;;
           e2' <- gen e2 Γ[_] τ[_] ;;
           e3' <- gen e3 Γ[_] τ[_] ;;
-          pure (ėxp.ifte e1'[_] e2'[_] e3')
+          pure (oexp.ifte e1'[_] e2'[_] e3')
       | exp.absu x e =>
           t1  <- pick ;;
           t2  <- pick ;;
           e'  <- gen e (Γ[_] ,, x∷t1[_]) t2 ;;
-          _   <- assert (τ[_]) (ṫy.func t1[_] t2[_]) ;;
-          pure (ėxp.abst x t1[_] e'[_])
+          _   <- assert (τ[_]) (oty.func t1[_] t2[_]) ;;
+          pure (oexp.abst x t1[_] e'[_])
       | exp.abst x t1 e =>
           t2  <- pick ;;
           e'  <- gen e (Γ[_] ,, x∷lift t1) t2 ;;
-          _   <- assert (τ[_]) (ṫy.func (lift t1) t2[_]) ;;
-          pure (ėxp.abst x (lift t1) e'[_])
+          _   <- assert (τ[_]) (oty.func (lift t1) t2[_]) ;;
+          pure (oexp.abst x (lift t1) e'[_])
       | exp.app e1 e2 =>
           t1  <- pick ;;
-          e1' <- gen e1 Γ[_] (ṫy.func t1 τ[_]) ;;
+          e1' <- gen e1 Γ[_] (oty.func t1 τ[_]) ;;
           e2' <- gen e2 Γ[_] t1[_] ;;
-          pure (ėxp.app e1'[_] e2')
+          pure (oexp.app e1'[_] e2')
       end.
 
   Definition synth (e : Exp) :
-    ⊧ Ėnv ⇢ M (Prod Ṫy Ėxp) :=
+    ⊧ OEnv ⇢ M (Prod OTy OExp) :=
     fun w G =>
       τ  <- pick ;;
       e' <- check e G[_] τ ;;
@@ -100,7 +100,7 @@ Section Generator.
   Context {wpM : WeakestPre Θ M} {wlpM : WeakestLiberalPre Θ M}
     {tcLogicM : TypeCheckLogicM Θ M}.
 
-  Definition TPB_algo : ⊧ Ėnv ⇢ Const Exp ⇢ Ṫy ⇢ Ėxp ⇢ Pred :=
+  Definition TPB_algo : ⊧ OEnv ⇢ Const Exp ⇢ OTy ⇢ OExp ⇢ Pred :=
     fun w0 G0 e τ0 e0 => WP (check e G0 τ0) (fun _ θ1 e1 => e0[θ1] =ₚ e1).
 
   Ltac wlpauto := repeat (repeat wpsimpl; try
@@ -115,7 +115,7 @@ Section Generator.
     end).
 
   Lemma sound_aux e :
-    ∀ w (G : Ėnv w) (t : Ṫy w),
+    ∀ w (G : OEnv w) (t : OTy w),
       ⊢ WLP (check e G t) (fun w1 θ ee => G[θ] |--ₚ e; t[θ] ~> ee).
   Proof.
     induction e; cbn; intros w G τ; iStartProof; wlpauto.
@@ -123,7 +123,7 @@ Section Generator.
     intros ->. constructor. now rewrite lookup_inst HGx.
   Qed.
 
-  Lemma sound (e : Exp) (w0 : World) (G0 : Ėnv w0) t0 e0 :
+  Lemma sound (e : Exp) (w0 : World) (G0 : OEnv w0) t0 e0 :
     TPB_algo G0 e t0 e0 ⊢ₚ G0 |--ₚ e; t0 ~> e0.
   Proof.
     iStartProof. rewrite wand_is_impl. rewrite -wp_impl.
@@ -134,7 +134,7 @@ Section Generator.
 
   Ltac wpauto := repeat (repeat wpsimpl; try
     match goal with
-    | IH: ∀ w (G : Ėnv w) (t : Ṫy w),
+    | IH: ∀ w (G : OEnv w) (t : OTy w),
         bi_emp_valid (bi_impl _ (bi_impl _ (WP (check ?e G t) _)))
         |- environments.envs_entails _ (WP (check ?e ?G ?t) _) =>
         iPoseProof (IH _ G t with "[] []") as "-#IH"; clear IH;
@@ -144,7 +144,7 @@ Section Generator.
     end).
 
   Lemma complete_aux {G e t ee} (T : G |-- e ∷ t ~> ee) :
-    ∀ w0 (G0 : Ėnv w0) (t0 : Ṫy w0),
+    ∀ w0 (G0 : OEnv w0) (t0 : OTy w0),
       ⊢ lift G =ₚ G0 ->ₚ lift t =ₚ t0 ->ₚ
       WP (check e G0 t0) (fun _ _ e' => Open.pure ee =ₚ e')%P.
   Proof.
@@ -158,7 +158,7 @@ Section Generator.
       rewrite lookup_inst HGx in H. now discriminate H.
   Qed.
 
-  Lemma complete (e : Exp) w0 (G0 : Ėnv w0) t0 e0 :
+  Lemma complete (e : Exp) w0 (G0 : OEnv w0) t0 e0 :
     G0 |--ₚ e; t0 ~> e0 ⊢ₚ TPB_algo G0 e t0 e0.
   Proof.
     unfold TPB_algo. pred_unfold. intros ι HT.
@@ -168,7 +168,7 @@ Section Generator.
     revert Hcompl. apply wp_mono. intros w1 θ1 e1 <-. predsimpl.
   Qed.
 
-  Lemma correct {w} (Γ : Ėnv w) (e : Exp) (τ : Ṫy w) (e' : Ėxp w) :
+  Lemma correct {w} (Γ : OEnv w) (e : Exp) (τ : OTy w) (e' : OExp w) :
     Γ |--ₚ e; τ ~> e' ⊣⊢ₚ TPB_algo Γ e τ e'.
   Proof. iSplit. iApply complete. iApply sound. Qed.
 

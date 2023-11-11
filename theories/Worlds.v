@@ -206,33 +206,33 @@ Import world.notations.
 
 Definition OType : Type := World → Type.
 
-Module ṫy.
+Module oty.
 
   #[local] Set Implicit Arguments.
 
-  Inductive Ṫy (w : World) : Type :=
+  Inductive OTy (w : World) : Type :=
   | var {α} (αIn : α ∈ w)
   | bool
-  | func (t1 t2 : Ṫy w).
+  | func (t1 t2 : OTy w).
   #[global] Arguments var {w α}.
   #[global] Arguments bool {w}.
   #[global] Arguments func {w} _ _.
 
   Set Equations With UIP.
-  Derive NoConfusion Subterm EqDec for Ṫy.
+  Derive NoConfusion Subterm EqDec for OTy.
 
-  Lemma no_cycle {w} (t : Ṫy w) : ~ Ṫy_subterm t t.
+  Lemma no_cycle {w} (t : OTy w) : ~ OTy_subterm t t.
   Proof.
-    induction (well_founded_Ṫy_subterm t) as [? _ IH].
+    induction (well_founded_OTy_subterm t) as [? _ IH].
     intros Hx. apply (IH _ Hx Hx).
   Qed.
 
-End ṫy.
-Export ṫy (Ṫy).
-Export (hints) ṫy.
+End oty.
+Export oty (OTy).
+Export (hints) oty.
 
-Definition Ėnv (w : World) :=
-  stdpp.gmap.gmap string (Ṫy w).
+Definition OEnv (w : World) :=
+  stdpp.gmap.gmap string (OTy w).
 
 (* Substitutions types as relations between worlds. Because we work with
    multiple different definitions of substitutions, we abstract many
@@ -240,7 +240,7 @@ Definition Ėnv (w : World) :=
 Structure SUB : Type :=
   MkSub
     { sub :> World → World → Type;
-      #[canonical=no] lk {w0 w1} (θ : sub w0 w1) α (αIn : α ∈ w0) : Ṫy w1;
+      #[canonical=no] lk {w0 w1} (θ : sub w0 w1) α (αIn : α ∈ w0) : OTy w1;
     }.
 #[global] Arguments sub Θ (_ _)%world_scope : rename, simpl never.
 #[global] Arguments lk {Θ} [w0 w1] !θ [α] αIn : rename.
@@ -277,7 +277,7 @@ Class Thin (Θ : SUB) : Type :=
 #[global] Arguments thin {Θ _} [w] α {αIn}.
 
 Class Thick (Θ : SUB) : Type :=
-  thick w α {αIn : α ∈ w} (t : Ṫy (w - α)) : Θ w (w - α).
+  thick w α {αIn : α ∈ w} (t : OTy (w - α)) : Θ w (w - α).
 #[global] Arguments thick {Θ _} [w] α {αIn} t.
 
 Definition Valid (A : OType) : Type := ∀ w, A w.
@@ -326,11 +326,11 @@ Definition _4 {Θ} {transΘ : Trans Θ} {A} : ⊧ Box Θ A ⇢ Box Θ (Box Θ A)
   fun w0 a w1 θ1 w2 θ2 => a w2 (trans θ1 θ2).
 #[global] Arguments _4 {Θ _ A} [_] _ [_] _ [_] _.
 
-Definition thickIn [w x] (xIn : x ∈ w) (s : Ṫy (w - x)) :
-  ∀ y, y ∈ w → Ṫy (w - x) :=
+Definition thickIn [w x] (xIn : x ∈ w) (s : OTy (w - x)) :
+  ∀ y, y ∈ w → OTy (w - x) :=
   fun y yIn =>
     match world.occurs_check_view xIn yIn with
     | world.Same _     => s
-    | world.Diff _ yIn => ṫy.var yIn
+    | world.Diff _ yIn => oty.var yIn
     end.
 #[global] Arguments thickIn [w x] xIn s [y] yIn.
