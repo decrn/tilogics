@@ -51,15 +51,15 @@ Section Generator.
       match e with
       | exp.var x =>
           match lookup x Γ with
-          | Some τ' => _ <- assert τ τ' ;;
+          | Some τ' => _ <- equals τ τ' ;;
                        pure (oexp.var x)
           | None    => fail
           end
       | exp.true  =>
-          _ <- assert τ oty.bool ;;
+          _ <- equals τ oty.bool ;;
           pure oexp.true
       | exp.false =>
-          _ <- assert τ oty.bool ;;
+          _ <- equals τ oty.bool ;;
           pure oexp.false
       | exp.ifte e1 e2 e3 =>
           e1' <- gen e1 Γ oty.bool ;;
@@ -70,12 +70,12 @@ Section Generator.
           t1  <- pick ;;
           t2  <- pick ;;
           e'  <- gen e (Γ[_] ,, x∷t1[_]) t2 ;;
-          _   <- assert (τ[_]) (oty.func t1[_] t2[_]) ;;
+          _   <- equals (τ[_]) (oty.func t1[_] t2[_]) ;;
           pure (oexp.abst x t1[_] e'[_])
       | exp.abst x t1 e =>
           t2  <- pick ;;
           e'  <- gen e (Γ[_] ,, x∷lift t1) t2 ;;
-          _   <- assert (τ[_]) (oty.func (lift t1) t2[_]) ;;
+          _   <- equals (τ[_]) (oty.func (lift t1) t2[_]) ;;
           pure (oexp.abst x (lift t1) e'[_])
       | exp.app e1 e2 =>
           t1  <- pick ;;
@@ -150,7 +150,7 @@ Section Generator.
   Proof.
     induction T; cbn; intros w0 G0 t0; iStartProof; wpauto.
     destruct (G0 !! _) eqn:HGx; wpauto.
-    + iApply wp_assert. iSplit.
+    + iApply wp_equals. iSplit.
       * iStopProof; pred_unfold. intros ? [-> ->].
         rewrite lookup_inst HGx in H. now injection H.
       * iIntros (?w ?θ) "!>"; wpauto.

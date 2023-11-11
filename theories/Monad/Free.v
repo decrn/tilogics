@@ -37,11 +37,11 @@ Import Pred Pred.notations Pred.Acc Pred.proofmode world.notations.
 Inductive Free (A : OType) (w : World) : Type :=
 | Ret (a : A w)
 | Fail
-| Assertk (t1 t2 : OTy w) (k : Free A w)
-| Choosek α (k : Free A (w ▻ α)).
+| Equalsk (t1 t2 : OTy w) (k : Free A w)
+| Pickk α (k : Free A (w ▻ α)).
 #[global] Arguments Ret {A} [w] a.
 #[global] Arguments Fail {A w}.
-#[global] Arguments Choosek {A} [w] α k.
+#[global] Arguments Pickk {A} [w] α k.
 
 #[export] Instance pure_free : Pure Free :=
   fun A w a => Ret a.
@@ -52,17 +52,17 @@ Inductive Free (A : OType) (w : World) : Type :=
     match m with
     | Ret a           => f _ refl a
     | Fail            => Fail
-    | Assertk t1 t2 k => Assertk t1 t2 (bind k f)
-    | Choosek α k     => Choosek α (bind k (_4 f step))
+    | Equalsk t1 t2 k => Equalsk t1 t2 (bind k f)
+    | Pickk α k     => Pickk α (bind k (_4 f step))
     end.
 
 #[export] Instance fail_free : Interface.Fail Free :=
   fun A w => Fail.
 
 #[export] Instance tcm_free : TypeCheckM Free :=
-  {| assert w τ1 τ2 := Assertk τ1 τ2 (Ret tt);
+  {| equals w τ1 τ2 := Equalsk τ1 τ2 (Ret tt);
      pick w := let α := world.fresh w in
-               Choosek α (Ret (oty.var world.in_zero));
+               Pickk α (Ret (oty.var world.in_zero));
   |}.
 
 #[export] Instance wp_free : WeakestPre Prefix Free :=
@@ -71,8 +71,8 @@ Inductive Free (A : OType) (w : World) : Type :=
     match m with
     | Ret a => POST _ refl a
     | Fail => ⊥ₚ
-    | Assertk t1 t2 k => t1 =ₚ t2 /\ₚ WP k POST
-    | Choosek α k => Acc.wp step (WP k (_4 POST step))
+    | Equalsk t1 t2 k => t1 =ₚ t2 /\ₚ WP k POST
+    | Pickk α k => Acc.wp step (WP k (_4 POST step))
     end%P.
 
 #[export] Instance wlp_free : WeakestLiberalPre Prefix Free :=
@@ -81,8 +81,8 @@ Inductive Free (A : OType) (w : World) : Type :=
     match m with
     | Ret a => POST _ refl a
     | Fail => ⊤ₚ
-    | Assertk t1 t2 k => t1 =ₚ t2 ->ₚ WLP k POST
-    | Choosek α k => Acc.wlp step (WLP k (_4 POST step))
+    | Equalsk t1 t2 k => t1 =ₚ t2 ->ₚ WLP k POST
+    | Pickk α k => Acc.wlp step (WLP k (_4 POST step))
     end%P.
 
 Lemma wp_free_mono [A w0] (m : Free A w0) (P Q : ◻(A ⇢ Pred) w0) :

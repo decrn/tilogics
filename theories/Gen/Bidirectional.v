@@ -51,15 +51,15 @@ Section Generator.
       match e with
       | exp.var x =>
           match lookup x Γ with
-          | Some τ' => _ <- assert τ τ' ;;
+          | Some τ' => _ <- equals τ τ' ;;
                        pure (oexp.var x)
           | None    => fail
           end
       | exp.true  =>
-          _ <- assert τ oty.bool ;;
+          _ <- equals τ oty.bool ;;
           pure oexp.true
       | exp.false =>
-          _ <- assert τ oty.bool ;;
+          _ <- equals τ oty.bool ;;
           pure oexp.false
       | exp.ifte e1 e2 e3 =>
           e1' <- check e1 Γ oty.bool ;;
@@ -69,12 +69,12 @@ Section Generator.
       | exp.absu x e =>
           t1  <- pick ;;
           t2  <- pick ;;
-          _   <- assert τ[_] (oty.func t1[_] t2) ;;
+          _   <- equals τ[_] (oty.func t1[_] t2) ;;
           e'  <- check e (Γ[_] ,, x∷t1[_]) t2[_] ;;
           pure (oexp.abst x t1[_] e')
       | exp.abst x t1 e =>
           τ2  <- pick ;;
-          _   <- assert τ[_] (oty.func (lift t1) τ2) ;;
+          _   <- equals τ[_] (oty.func (lift t1) τ2) ;;
           e'  <- check e (Γ[_] ,, x∷lift t1) τ2[_] ;;
           pure (oexp.abst x (lift t1) e')
       | exp.app e1 e2 =>
@@ -108,7 +108,7 @@ Section Generator.
           '(tf, e1') <- synth e1 Γ ;;
           τ1         <- pick ;;
           τ2         <- pick ;;
-          _          <- assert tf[_] (oty.func τ1[_] τ2) ;;
+          _          <- equals tf[_] (oty.func τ1[_] τ2) ;;
           e2'        <- check e2 Γ[_] τ1[_] ;;
           pure (τ2[_], oexp.app e1'[_] e2')
       end.
@@ -204,7 +204,7 @@ Section Generator.
   Proof.
     induction T; cbn; (split; [intros ? G0 ?|intros ? G0]); iStartProof; wpauto.
     - destruct (G0 !! _) eqn:HGx; wpauto.
-      + iApply wp_assert. iSplit.
+      + iApply wp_equals. iSplit.
         * iStopProof; pred_unfold. intros ? [-> ->].
           rewrite lookup_inst HGx in H. now injection H.
         * iIntros (?w ?θ) "!>"; wpauto.

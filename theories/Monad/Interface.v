@@ -67,8 +67,8 @@ Import Pred Pred.Acc.
 
 
 Class TypeCheckM (M : OType -> OType) : Type :=
-  { assert   : ⊧ OTy ⇢ OTy ⇢ M Unit;
-    pick     : ⊧ M OTy;
+  { equals : ⊧ OTy ⇢ OTy ⇢ M Unit;
+    pick   : ⊧ M OTy;
   }.
 #[global] Arguments fail {_ _ _ w}.
 #[global] Arguments pick {_ _ w}.
@@ -88,8 +88,8 @@ Class AxiomaticSemantics
       WP (pure a) Q ⊣⊢ₚ Q _ refl a;
     ax_wp_bind [A B w0] (m : M A w0) (f : Box Θ (A ⇢ M B) w0) (Q : Box Θ (B ⇢ Pred) w0) :
       WP (bind m f) Q ⊣⊢ₚ WP m (fun w1 θ1 a => WP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2)));
-    ax_wp_assert [w] (σ τ : OTy w) (Q : Box Θ (Unit ⇢ Pred) w) :
-      WP (assert σ τ) Q ⊣⊢ₚ σ =ₚ τ /\ₚ Q _ refl tt;
+    ax_wp_equals [w] (σ τ : OTy w) (Q : Box Θ (Unit ⇢ Pred) w) :
+      WP (equals σ τ) Q ⊣⊢ₚ σ =ₚ τ /\ₚ Q _ refl tt;
     ax_wp_pick [w] (Q : Box Θ (OTy ⇢ Pred) w) :
       let α := world.fresh w in
       WP pick Q ⊣⊢ₚ Acc.wp step (Q (w ▻ α) step (oty.var world.in_zero));
@@ -103,8 +103,8 @@ Class AxiomaticSemantics
       WLP (pure a) Q ⊣⊢ₚ Q _ refl a;
     ax_wlp_bind [A B w0] (m : M A w0) (f : Box Θ (A ⇢ M B) w0) (Q : Box Θ (B ⇢ Pred) w0) :
       WLP (bind m f) Q ⊣⊢ₚ WLP m (fun w1 θ1 a => WLP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2)));
-    ax_wlp_assert [w] (σ τ : OTy w) (Q : Box Θ (Unit ⇢ Pred) w) :
-      WLP (assert σ τ) Q ⊣⊢ₚ σ =ₚ τ ->ₚ Q _ refl tt;
+    ax_wlp_equals [w] (σ τ : OTy w) (Q : Box Θ (Unit ⇢ Pred) w) :
+      WLP (equals σ τ) Q ⊣⊢ₚ σ =ₚ τ ->ₚ Q _ refl tt;
     ax_wlp_pick [w] (Q : Box Θ (OTy ⇢ Pred) w) :
       let α := world.fresh w in
       WLP pick Q ⊣⊢ₚ Acc.wlp step (Q (w ▻ α) step (oty.var world.in_zero));
@@ -149,8 +149,8 @@ Class TypeCheckLogicM
       Q _ refl a ⊢ₚ WP (pure a) Q;
     wp_bind [A B w0] (m : M A w0) (f : Box Θ (A ⇢ M B) w0) (Q : Box Θ (B ⇢ Pred) w0) :
       WP m (fun w1 θ1 a => WP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2))) ⊢ₚ WP (bind m f) Q;
-    wp_assert [w] (σ τ : OTy w) (Q : Box Θ (Unit ⇢ Pred) w) :
-      σ =ₚ τ /\ₚ PBox (fun _ θ => Q _ θ tt) ⊢ₚ WP (assert σ τ) Q;
+    wp_equals [w] (σ τ : OTy w) (Q : Box Θ (Unit ⇢ Pred) w) :
+      σ =ₚ τ /\ₚ PBox (fun _ θ => Q _ θ tt) ⊢ₚ WP (equals σ τ) Q;
     wp_pick [w] [Q : Box Θ (OTy ⇢ Pred) w] (τ : Ty) :
       PBox (fun _ θ => ∀ₚ τ', lift τ =ₚ τ' ->ₚ Q _ θ τ') ⊢ₚ WP pick Q;
     wp_mono [A w] (m : M A w) (P Q : Box Θ (A ⇢ Pred) w) :
@@ -162,8 +162,8 @@ Class TypeCheckLogicM
       Q _ refl a ⊢ₚ WLP (pure a) Q;
     wlp_bind [A B w0] (m : M A w0) (f : Box Θ (A ⇢ M B) w0) (Q : Box Θ (B ⇢ Pred) w0) :
       WLP m (fun w1 θ1 a => WLP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2))) ⊢ₚ WLP (bind m f) Q;
-    wlp_assert [w] (σ τ : OTy w) (Q : Box Θ (Unit ⇢ Pred) w) :
-      σ =ₚ τ ->ₚ PBox (fun _ θ => Q _ θ tt) ⊢ₚ WLP (assert σ τ) Q;
+    wlp_equals [w] (σ τ : OTy w) (Q : Box Θ (Unit ⇢ Pred) w) :
+      σ =ₚ τ ->ₚ PBox (fun _ θ => Q _ θ tt) ⊢ₚ WLP (equals σ τ) Q;
     wlp_pick [w] (Q : Box Θ (OTy ⇢ Pred) w) :
       PBox (fun _ θ => ∀ₚ (τ : OTy _), Q _ θ τ) ⊢ₚ WLP pick Q;
     wlp_fail [A w] (Q : Box Θ (A ⇢ Pred) w) :
@@ -184,7 +184,7 @@ Proof.
   constructor; intros.
   - now rewrite ax_wp_pure.
   - now rewrite ax_wp_bind.
-  - rewrite ax_wp_assert. iIntros "[#Heq >HQ]". now iSplit.
+  - rewrite ax_wp_equals. iIntros "[#Heq >HQ]". now iSplit.
   - rewrite ax_wp_pick. rewrite <- (Acc.intro_wp_step τ).
     iIntros "#H !> #Heq". iMod "H".
     iSpecialize ("H" $! (oty.var world.in_zero) with "Heq").
@@ -192,7 +192,7 @@ Proof.
   - apply ax_wp_mono.
   - now rewrite ax_wlp_pure.
   - now rewrite ax_wlp_bind.
-  - rewrite ax_wlp_assert. iIntros "#HQ #Heq".
+  - rewrite ax_wlp_equals. iIntros "#HQ #Heq".
     iSpecialize ("HQ" with "Heq"). now iMod "HQ".
   - rewrite ax_wlp_pick. iIntros "#HQ !>". iMod "HQ".
     iSpecialize ("HQ" $! (oty.var world.in_zero)).
@@ -389,8 +389,8 @@ Ltac wpsimpl :=
       iApply wp_bind
   | |- environments.envs_entails _ (WP pick _) =>
       rewrite -wp_pick; iIntros (?w ?θ) "!>"; iIntros (?τ) "#?"
-  | |- environments.envs_entails _ (WP (assert _ _) _) =>
-      rewrite -wp_assert; iSplit;
+  | |- environments.envs_entails _ (WP (equals _ _) _) =>
+      rewrite -wp_equals; iSplit;
       [ iStopProof; pred_unfold; intuition (subst; auto; fail)
       | iIntros (?w ?θ) "!>"
       ]
@@ -403,8 +403,8 @@ Ltac wpsimpl :=
       rewrite -wlp_bind
   | |- environments.envs_entails _ (WLP pick _) =>
       rewrite -wlp_pick; iIntros (?w ?θ) "!>"; iIntros (?τ)
-  | |- environments.envs_entails _ (WLP (assert _ _) _) =>
-      rewrite -wlp_assert; iIntros "#?" (?w ?θ) "!>"
+  | |- environments.envs_entails _ (WLP (equals _ _) _) =>
+      rewrite -wlp_equals; iIntros "#?" (?w ?θ) "!>"
   | |- environments.envs_entails _ (WLP fail _) =>
       rewrite -wlp_fail
   end.

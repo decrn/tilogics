@@ -46,7 +46,7 @@ Import MonadNotations Pred Pred.Acc Pred.notations Pred.proofmode
 #[export] Instance fail_prenex : Fail Prenex :=
   fun A w => None.
 #[export] Instance tcm_prenex : TypeCheckM Prenex :=
-  {| assert w τ1 τ2 := Some (existT w (refl, ([(τ1,τ2)], tt)));
+  {| equals w τ1 τ2 := Some (existT w (refl, ([(τ1,τ2)], tt)));
      pick w := let α := world.fresh w in
                Some (existT (w ▻ α) (step, (List.nil, oty.var world.in_zero)));
   |}.

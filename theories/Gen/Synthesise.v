@@ -60,8 +60,8 @@ Section Generator.
           '(t1,e1') <- gen e1 Γ ;;
           '(t2,e2') <- gen e2 Γ[_] ;;
           '(t3,e3') <- gen e3 Γ[_] ;;
-          _         <- assert oty.bool t1[_] ;;
-          _         <- assert t2[_] t3[_] ;;
+          _         <- equals oty.bool t1[_] ;;
+          _         <- equals t2[_] t3[_] ;;
           pure (t3[_], oexp.ifte e1'[_] e2'[_] e3'[_])
       | exp.absu x e =>
           t1       <- pick ;;
@@ -74,7 +74,7 @@ Section Generator.
           '(tf, e1') <- gen e1 Γ ;;
           '(t1, e2') <- gen e2 Γ[_] ;;
           t2 <- pick ;;
-          _  <- assert tf[_] (oty.func t1[_] t2) ;;
+          _  <- equals tf[_] (oty.func t1[_] t2) ;;
           pure (t2[_], oexp.app e1'[_] e2'[_])
       end.
 
