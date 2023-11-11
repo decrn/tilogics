@@ -28,7 +28,7 @@
 
 Require Import Coq.Classes.RelationClasses.
 From iris Require Import proofmode.tactics.
-From Em Require Import Monad.Interface.
+From Em Require Import Monad.Interface Prefix.
 
 Import Pred Pred.notations Pred.Acc Pred.proofmode world.notations.
 
@@ -46,7 +46,7 @@ Inductive Free (A : TYPE) (w : World) : Type :=
 #[export] Instance pure_free : Pure Free :=
   fun A w a => Ret a.
 
-#[export] Instance bind_free `{Refl Θ, Trans Θ, Step Θ} : Bind Θ Free :=
+#[export] Instance bind_free : Bind Prefix Free :=
   fun A B =>
     fix bind {w} m f {struct m} :=
     match m with
@@ -56,123 +56,116 @@ Inductive Free (A : TYPE) (w : World) : Type :=
     | Choosek α k     => Choosek α (bind k (_4 f step))
     end.
 
+#[export] Instance fail_free : Interface.Fail Free :=
+  fun A w => Fail.
+
 #[export] Instance tcm_free : TypeCheckM Free :=
   {| assert w τ1 τ2 := Assertk τ1 τ2 (Ret tt);
      pick w := let α := world.fresh w in
                Choosek α (Ret (ṫy.var world.in_zero));
-     fail A w := Fail;
   |}.
 
-Section Logic.
+#[export] Instance wp_free : WeakestPre Prefix Free :=
+  fun A =>
+    fix WP {w} (m : Free A w) (POST : ◻(A ⇢ Pred) w) {struct m} :=
+    match m with
+    | Ret a => POST _ refl a
+    | Fail => ⊥ₚ
+    | Assertk t1 t2 k => t1 =ₚ t2 /\ₚ WP k POST
+    | Choosek α k => Acc.wp step (WP k (_4 POST step))
+    end%P.
 
-  Context {Θ} {reflΘ : Refl Θ} {lkreflΘ : LkRefl Θ} {transΘ : Trans Θ}
-    {lktransΘ : LkTrans Θ} {stepΘ : Step Θ} {lkstepΘ : LkStep Θ}
-    {refltransθ : ReflTrans Θ}.
+#[export] Instance wlp_free : WeakestLiberalPre Prefix Free :=
+  fun A =>
+    fix WLP {w} (m : Free A w) (POST : ◻(A ⇢ Pred) w) {struct m} :=
+    match m with
+    | Ret a => POST _ refl a
+    | Fail => ⊤ₚ
+    | Assertk t1 t2 k => t1 =ₚ t2 ->ₚ WLP k POST
+    | Choosek α k => Acc.wlp step (WLP k (_4 POST step))
+    end%P.
 
-  #[export] Instance wp_free : WeakestPre Θ Free :=
-    fun A =>
-      fix WP {w} (m : Free A w) (POST : Box Θ (A ⇢ Pred) w) {struct m} :=
-      match m with
-      | Ret a => POST _ refl a
-      | Fail => ⊥ₚ
-      | Assertk t1 t2 k => t1 =ₚ t2 /\ₚ WP k POST
-      | Choosek α k =>
-          Acc.wp step (WP k (fun w1 r01 => _4 POST step r01))
-      end%P.
-
-  #[export] Instance wlp_free : WeakestLiberalPre Θ Free :=
-    fun A =>
-      fix WLP {w} (m : Free A w) (POST : Box Θ (A ⇢ Pred) w) {struct m} :=
-      match m with
-      | Ret a => POST _ refl a
-      | Fail => ⊤ₚ
-      | Assertk t1 t2 k => t1 =ₚ t2 ->ₚ WLP k POST
-      | Choosek α k =>
-          Acc.wlp step (WLP k (fun w1 r01 => _4 POST step r01))
-      end%P.
-
-  Lemma wp_free_mono [A w0] (m : Free A w0) (P Q : Box Θ (A ⇢ Pred) w0) :
-    PBox (fun w1 θ1 => ∀ₚ a, P w1 θ1 a -∗ Q w1 θ1 a)%P ⊢
+Lemma wp_free_mono [A w0] (m : Free A w0) (P Q : ◻(A ⇢ Pred) w0) :
+  PBox (fun w1 θ1 => ∀ₚ a, P w1 θ1 a -∗ Q w1 θ1 a)%P ⊢
     (WP m P -∗ WP m Q).
-  Proof.
-    induction m; cbn; iIntros "#PQ".
-    - now iMod "PQ".
-    - easy.
-    - iIntros "[#Heq HP]". iSplit; [auto|]. iRevert "HP". now iApply IHm.
-    - iApply Acc.wp_mono. iModIntro. iApply IHm. iIntros "%w1 %θ1 !> %a1".
-      iMod "PQ". iSpecialize ("PQ" $! a1). now rewrite trans_refl_r.
-  Qed.
+Proof.
+  induction m; cbn; iIntros "#PQ".
+  - now iMod "PQ".
+  - easy.
+  - iIntros "[#Heq HP]". iSplit; [auto|]. iRevert "HP". now iApply IHm.
+  - iApply Acc.wp_mono. iModIntro. iApply IHm. iIntros "%w1 %θ1 !> %a1".
+    iMod "PQ". iSpecialize ("PQ" $! a1). now rewrite trans_refl_r.
+Qed.
 
-  Lemma wlp_free_mono [A w0] (m : Free A w0) (P Q : Box Θ (A ⇢ Pred) w0) :
-    PBox (fun w1 θ1 => ∀ₚ a, P w1 θ1 a -∗ Q w1 θ1 a)%P ⊢
+Lemma wlp_free_mono [A w0] (m : Free A w0) (P Q : ◻(A ⇢ Pred) w0) :
+  PBox (fun w1 θ1 => ∀ₚ a, P w1 θ1 a -∗ Q w1 θ1 a)%P ⊢
     (WLP m P -∗ WLP m Q).
-  Proof.
-    induction m; cbn; iIntros "#PQ".
-    - now iMod "PQ".
-    - easy.
-    - iIntros "HP #Heq". rewrite <- wand_is_impl.
-      iSpecialize ("HP" with "Heq"). iRevert "HP". now iApply IHm.
-    - iApply Acc.wlp_mono. iModIntro. iApply IHm. iIntros "%w1 %θ1 !> %a1".
-      iMod "PQ". iSpecialize ("PQ" $! a1). now rewrite trans_refl_r.
-  Qed.
+Proof.
+  induction m; cbn; iIntros "#PQ".
+  - now iMod "PQ".
+  - easy.
+  - iIntros "HP #Heq". rewrite <- wand_is_impl.
+    iSpecialize ("HP" with "Heq"). iRevert "HP". now iApply IHm.
+  - iApply Acc.wlp_mono. iModIntro. iApply IHm. iIntros "%w1 %θ1 !> %a1".
+    iMod "PQ". iSpecialize ("PQ" $! a1). now rewrite trans_refl_r.
+Qed.
 
-  #[local] Notation "∀ x , P" :=
-    (@forall_relation _ _ (fun x => P%signature))
-      (at level 200, x binder, right associativity) : signature_scope.
-  #[local] Notation "A → P" :=
-    (@pointwise_relation A _ P%signature) : signature_scope.
+#[local] Notation "∀ x , P" :=
+  (@forall_relation _ _ (fun x => P%signature))
+    (at level 200, x binder, right associativity) : signature_scope.
+#[local] Notation "A → P" :=
+  (@pointwise_relation A%type _ P%signature) : signature_scope.
 
-  #[export] Instance proper_wp_entails {A w} (m : Free A w) :
-    Proper ((∀ w1, Θ w w1 → A w1 → (⊢ₚ)) ==> (⊢ₚ)) (WP m).
-  Proof.
-    intros P Q PQ. iApply wp_free_mono.
-    iIntros "%w1 %θ1 !> %a1". iApply PQ.
-  Qed.
+#[export] Instance proper_wp_entails {A w} (m : Free A w) :
+  Proper ((∀ w1, w ⊑⁺ w1 → A w1 → (⊢ₚ)) ==> (⊢ₚ)) (WP m).
+Proof.
+  intros P Q PQ. iApply wp_free_mono.
+  iIntros "%w1 %θ1 !> %a1". iApply PQ.
+Qed.
 
-  #[export] Instance proper_wp_bientails {A w} (m : Free A w) :
-    Proper ((∀ w1, Θ w w1 → A w1 → (⊣⊢ₚ)) ==> (⊣⊢ₚ)) (WP m).
-  Proof.
-    intros P Q PQ; iSplit; iApply proper_wp_entails;
-      intros w1 θ1 a1; now rewrite (PQ w1 θ1 a1).
-  Qed.
+#[export] Instance proper_wp_bientails {A w} (m : Free A w) :
+  Proper ((∀ w1, w ⊑⁺ w1 → A w1 → (⊣⊢ₚ)) ==> (⊣⊢ₚ)) (WP m).
+Proof.
+  intros P Q PQ; iSplit; iApply proper_wp_entails;
+    intros w1 θ1 a1; now rewrite (PQ w1 θ1 a1).
+Qed.
 
-  #[export] Instance proper_wlp_entails {A w} (m : Free A w) :
-    Proper ((∀ w1, Θ w w1 → A w1 → (⊢ₚ)) ==> (⊢ₚ)) (WLP m).
-  Proof.
-    intros P Q PQ. iApply wlp_free_mono.
-    iIntros "%w1 %θ1 !> %a1". iApply PQ.
-  Qed.
+#[export] Instance proper_wlp_entails {A w} (m : Free A w) :
+  Proper ((∀ w1, w ⊑⁺ w1 → A w1 → (⊢ₚ)) ==> (⊢ₚ)) (WLP m).
+Proof.
+  intros P Q PQ. iApply wlp_free_mono.
+  iIntros "%w1 %θ1 !> %a1". iApply PQ.
+Qed.
 
-  #[export] Instance proper_wlp_bientails {A w} (m : Free A w):
-    Proper ((∀ w1, Θ w w1 → A w1 → (⊣⊢ₚ)) ==> (⊣⊢ₚ)) (WLP m).
-  Proof.
-    intros P Q PQ; iSplit; iApply proper_wlp_entails;
-      intros w1 θ1 a1; now rewrite (PQ w1 θ1 a1).
-  Qed.
+#[export] Instance proper_wlp_bientails {A w} (m : Free A w):
+  Proper ((∀ w1, w ⊑⁺ w1 → A w1 → (⊣⊢ₚ)) ==> (⊣⊢ₚ)) (WLP m).
+Proof.
+  intros P Q PQ; iSplit; iApply proper_wlp_entails;
+    intros w1 θ1 a1; now rewrite (PQ w1 θ1 a1).
+Qed.
 
-  #[export] Instance axiomatic_free : AxiomaticSemantics Θ Free.
-  Proof.
-    constructor; intros; predsimpl; auto using wp_free_mono, wlp_free_mono.
-    - induction m; cbn; try (firstorder; fail).
-      + apply proper_wp_bientails. intros w1 θ1 b1.
-        now rewrite trans_refl_l.
-      + apply Acc.proper_wp_bientails. rewrite IHm.
-        apply proper_wp_bientails. intros w1 θ1 a1.
-        apply proper_wp_bientails. intros w2 θ2 b2.
-        now rewrite trans_assoc.
-    - induction m; predsimpl; try (firstorder; fail).
-      + apply proper_wlp_bientails. intros w1 θ1 b1. now rewrite trans_refl_l.
-      + rewrite IHm.
-        apply proper_wlp_bientails. intros w1 θ1 a1.
-        apply proper_wlp_bientails. intros w2 θ2 b2.
-        now rewrite trans_assoc.
-    - induction m.
-      + predsimpl.
-      + predsimpl.
-      + predsimpl. now rewrite IHm.
-      + rewrite Acc.wp_impl. apply Acc.proper_wlp_bientails. rewrite IHm.
-        apply proper_wlp_bientails. intros w1 θ1 a1.
-        now rewrite <- persist_pred_trans.
-  Qed.
-
-End Logic.
+#[export] Instance axiomatic_free : AxiomaticSemantics Prefix Free.
+Proof.
+  constructor; intros; predsimpl; auto using wp_free_mono, wlp_free_mono.
+  - induction m; cbn; try (firstorder; fail).
+    + apply proper_wp_bientails. intros w1 θ1 b1.
+      now rewrite trans_refl_l.
+    + apply Acc.proper_wp_bientails. rewrite IHm.
+      apply proper_wp_bientails. intros w1 θ1 a1.
+      apply proper_wp_bientails. intros w2 θ2 b2.
+      now rewrite trans_assoc.
+  - induction m; predsimpl; try (firstorder; fail).
+    + apply proper_wlp_bientails. intros w1 θ1 b1.
+      now rewrite trans_refl_l.
+    + rewrite IHm.
+      apply proper_wlp_bientails. intros w1 θ1 a1.
+      apply proper_wlp_bientails. intros w2 θ2 b2.
+      now rewrite trans_assoc.
+  - induction m.
+    + predsimpl.
+    + predsimpl.
+    + predsimpl. now rewrite IHm.
+    + rewrite Acc.wp_impl. apply Acc.proper_wlp_bientails.
+      rewrite IHm. apply proper_wlp_bientails.
+      intros w1 θ1 a1. now rewrite <- persist_pred_trans.
+Qed.

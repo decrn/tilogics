@@ -64,6 +64,11 @@ Class LkTrans (Θ : SUB) (transΘ : Trans Θ) : Prop :=
 #[global] Arguments LkRefl Θ {_}.
 #[global] Arguments LkTrans Θ {_}.
 
+Class LkHMap (Θ1 Θ2 : SUB) (hmapΘ : HMap Θ1 Θ2) : Prop :=
+  lk_hmap [w1 w2] (θ : Θ1 w1 w2) :
+    ∀ α (αIn : α ∈ w1), lk (hmap θ) αIn = lk θ αIn.
+#[global] Arguments LkHMap Θ1 Θ2 {_}.
+
 Class PersistLaws A {persA : Persistent A} : Type :=
   { persist_refl {Θ} {reflΘ : Refl Θ} {lkreflΘ : LkRefl Θ} :
       forall w (a : A w),

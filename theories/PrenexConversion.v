@@ -34,15 +34,15 @@ Import option.notations Pred Pred.Acc Pred.notations.
 Definition prenex {A} : ⊧ Free A ⇢ Prenex A :=
   fix pr {w} m {struct m} :=
     match m with
-    | Ret a => pure a
-    | Fail => None
-    | Assertk t1 t2 m =>
+    | Free.Ret a => pure a
+    | Free.Fail => None
+    | Free.Assertk t1 t2 m =>
         '(existT w1 (r1, (cs, a))) <- pr m;;
         let t1' := persist t1 r1 in
         let t2' := persist t2 r1 in
         let c   := (t1', t2') in
         Some (existT w1 (r1, (cons c cs, a)))
-    | Choosek α m =>
+    | Free.Choosek α m =>
         '(existT w1 (r1, csa)) <- pr m ;;
         Some (existT w1 (step ⊙ r1, csa))
     end.

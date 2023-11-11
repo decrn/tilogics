@@ -29,6 +29,7 @@
 From iris Require Import proofmode.tactics.
 From Em Require Export
   BaseLogic Environment Prelude Instantiation Persistence Spec Worlds.
+From Em Require Import Sub.Parallel Sub.Prefix.
 
 Import world.notations Pred Pred.notations Pred.proofmode.
 
@@ -44,6 +45,9 @@ Class Pure (M : TYPE → TYPE) : Type :=
 Class Bind (Θ : SUB) (M : TYPE → TYPE) : Type :=
   bind : ∀ A B, ⊧ M A ⇢ Box Θ (A ⇢ M B) ⇢ M B.
 #[global] Arguments bind {Θ M _ A B} [w].
+Class Fail (M : TYPE → TYPE) : Type :=
+  fail : ∀ A, ⊧ M A.
+#[global] Arguments fail {M _ A w}.
 
 Module MonadNotations.
   Notation "' x <- ma ;; mb" :=
@@ -65,7 +69,6 @@ Import Pred Pred.Acc.
 Class TypeCheckM (M : TYPE -> TYPE) : Type :=
   { assert   : ⊧ Ṫy ⇢ Ṫy ⇢ M Unit;
     pick     : ⊧ M Ṫy;
-    fail {A} : ⊧ M A;
   }.
 #[global] Arguments fail {_ _ _ w}.
 #[global] Arguments pick {_ _ w}.
@@ -78,7 +81,7 @@ Class WeakestLiberalPre (Θ : SUB) (M : TYPE -> TYPE) : Type :=
 Class AxiomaticSemantics
   Θ {reflΘ : Refl Θ} {stepΘ : Step Θ} {transΘ : Trans Θ } {reflTransΘ : ReflTrans Θ}
     {lkreflΘ : LkRefl Θ} {lkStepθ : LkStep Θ} {lktransΘ : LkTrans Θ}
-  M {pureM : Pure M} {bindM : Bind Θ M} {tcM : TypeCheckM M}
+  M {pureM : Pure M} {bindM : Bind Θ M} {failM : Fail M} {tcM : TypeCheckM M}
     {wpM : WeakestPre Θ M} {wlpM : WeakestLiberalPre Θ M} : Type :=
 
   { ax_wp_pure [A w] (a : A w) (Q : Box Θ (A ⇢ Pred) w) :
@@ -114,7 +117,7 @@ Class AxiomaticSemantics
     ax_wp_impl [A w] (m : M A w) (P : Box Θ (A ⇢ Pred) w) (Q : Pred w) :
       (WP m P ->ₚ Q) ⊣⊢ₚ WLP m (fun w1 θ1 a1 => P w1 θ1 a1 ->ₚ Q[θ1]);
   }.
-#[global] Arguments AxiomaticSemantics Θ {_ _ _ _ _ _ _} _ {_ _ _ _ _}.
+#[global] Arguments AxiomaticSemantics Θ {_ _ _ _ _ _ _} _ {_ _ _ _ _ _}.
 
 
 (* Alternative rule for pick which substitutes the last variable away
@@ -138,7 +141,7 @@ Qed.
 Class TypeCheckLogicM
   Θ {reflΘ : Refl Θ} {stepΘ : Step Θ} {transΘ : Trans Θ }
     {lkreflΘ : LkRefl Θ} {lkStepθ : LkStep Θ}
-  M {pureM : Pure M} {bindM : Bind Θ M} {tcM : TypeCheckM M}
+  M {pureM : Pure M} {bindM : Bind Θ M} {failM : Fail M} {tcM : TypeCheckM M}
     {wpM : WeakestPre Θ M} {wlpM : WeakestLiberalPre Θ M} : Type :=
 
   { wp_pure [A] {persA : Persistent A}
@@ -173,7 +176,7 @@ Class TypeCheckLogicM
       WLP m (fun w1 θ1 a1 => P w1 θ1 a1 ->ₚ Q[θ1]) ⊢ₚ (WP m P ->ₚ Q);
 
   }.
-#[global] Arguments TypeCheckLogicM Θ {_ _ _ _ _} _ {_ _ _ _ _}.
+#[global] Arguments TypeCheckLogicM Θ {_ _ _ _ _} _ {_ _ _ _ _ _}.
 
 #[export] Instance axiomatic_tcmlogic `{AxiomaticSemantics Θ M} :
   TypeCheckLogicM Θ M.
@@ -235,55 +238,58 @@ Definition wlp_option {A w1 w2} :
     | None => ⊤ₚ
     end%P.
 
-Section OptionDiamond.
+Definition Solved (Θ : SUB) (A : TYPE) : TYPE := Option (Diamond Θ A).
+Definition Prenex (A : TYPE) : TYPE := Solved Prefix (List (Ṫy * Ṫy) * A).
 
-  Definition OptionDiamond (Θ : SUB) (A : TYPE) : TYPE :=
-    Option (Diamond Θ A).
+Section Solved.
 
-  #[export] Instance wp_optiondiamond {Θ : SUB} : WeakestPre Θ (OptionDiamond Θ) :=
+  #[export] Instance wp_solved {Θ : SUB} : WeakestPre Θ (Solved Θ) :=
     fun A w m Q => wp_option m (fun d => wp_diamond d Q).
-  #[global] Arguments wp_optiondiamond {Θ} {A}%indexed_scope [w] _ _%B _.
-  #[global] Instance params_wp_optiondiamond : Params (@wp_optiondiamond) 5 := {}.
+  #[global] Arguments wp_solved {Θ} {A}%indexed_scope [w] _ _%B _.
+  #[export] Instance wlp_solved {Θ : SUB} : WeakestLiberalPre Θ (Solved Θ) :=
+    fun A w m Q => wlp_option m (fun d => wlp_diamond d Q).
+  #[global] Arguments wlp_solved {Θ} {A}%indexed_scope [w] _ _%B _.
 
-  #[export] Instance proper_wp_optiondiamond_bientails {Θ A w} :
+  #[global] Instance params_wp_solved : Params (@wp_solved) 3 := {}.
+  #[export] Instance proper_wp_solved_bientails {Θ A w} :
     Proper
       (pointwise_relation _
          (forall_relation
             (fun _ => pointwise_relation _
                         (pointwise_relation _ (⊣⊢ₚ))) ==> (⊣⊢ₚ)))
-      (@wp_optiondiamond Θ A w).
+      (@wp_solved Θ A w).
   Proof.
     intros d p q pq. destruct d as [(w1 & r01 & a)|]; cbn; [|easy].
     apply Acc.proper_wp_bientails. apply pq.
   Qed.
 
-  #[export] Instance proper_wp_optiondiamond_entails {Θ A w} :
+  #[export] Instance proper_wp_solved_entails {Θ A w} :
     Proper
       (pointwise_relation _
          (forall_relation
             (fun _ => pointwise_relation _
                         (pointwise_relation _ entails)) ==> entails))
-      (@wp_optiondiamond Θ A w).
+      (@wp_solved Θ A w).
   Proof.
     intros d p q pq. destruct d as [(w1 & r01 & a)|]; cbn; [|easy].
     apply Acc.proper_wp_entails. apply pq.
   Qed.
 
-  Lemma wp_optiondiamond_and {Θ A w} (d : OptionDiamond Θ A w)
+  Lemma wp_solved_frame {Θ A w} (m : Solved Θ A w)
     (P : Box Θ (A ⇢ Pred) w) (Q : Pred w) :
-    WP d P /\ₚ Q ⊣⊢ₚ WP d (fun w1 θ1 a1 => P w1 θ1 a1 /\ₚ persist Q θ1).
+    WP m P /\ₚ Q ⊣⊢ₚ WP m (fun w1 θ1 a1 => P w1 θ1 a1 /\ₚ persist Q θ1).
   Proof.
-    destruct d as [(w1 & θ1 & a1)|]; cbn.
+    destruct m as [(w1 & θ1 & a1)|]; cbn.
     - now rewrite Acc.and_wp_l.
     - now rewrite bi.False_and.
   Qed.
 
-  #[export] Instance pure_optiondiaomd {Θ} {reflΘ : Refl Θ} :
-    Pure (OptionDiamond Θ) :=
+  #[export] Instance pure_solved {Θ} {reflΘ : Refl Θ} :
+    Pure (Solved Θ) :=
     fun A w a => Some (existT w (refl, a)).
 
-  #[export] Instance bind_optiondiamond {Θ} {transΘ : Trans Θ} :
-    Bind Θ (OptionDiamond Θ) :=
+  #[export] Instance bind_solved {Θ} {transΘ : Trans Θ} :
+    Bind Θ (Solved Θ) :=
     fun A B w m f =>
       option.bind m
         (fun '(existT w1 (θ1,a1)) =>
@@ -291,30 +297,40 @@ Section OptionDiamond.
              (fun '(existT w2 (θ2,b2)) =>
                 Some (existT w2 (trans θ1 θ2, b2)))).
 
-  (* Lemma wp_optiondiamond_pure {Θ} {reflΘ : Refl Θ} {lkreflΘ : LkRefl Θ} *)
-  (*   {A w0} (a : A w0) (Q : Box Θ (A ⇢ Pred) w0) : *)
-  (*   wp_optiondiamond (pure (M := DiamondT Θ Option) a) Q ⊣⊢ₚ Q _ refl a. *)
-  (* Proof. cbn. now rewrite Acc.wp_refl. Qed. *)
+  #[export] Instance fail_solved {Θ} : Fail (Solved Θ) :=
+    fun A w => None.
 
-  Lemma wp_optiondiamond_bind {Θ} {transΘ : Trans Θ} {lkTransΘ : LkTrans Θ}
-    {A B w0} (d : OptionDiamond Θ A w0) (f : Box Θ (A ⇢ OptionDiamond Θ B) w0)
+  Lemma wp_optiondiamond_pure {Θ} {reflΘ : Refl Θ} {lkreflΘ : LkRefl Θ}
+    {A w0} (a : A w0) (Q : Box Θ (A ⇢ Pred) w0) :
+    wp_solved (pure (M := Solved Θ) a) Q ⊣⊢ₚ Q _ refl a.
+  Proof. cbn. now rewrite Acc.wp_refl. Qed.
+
+  Lemma wp_solved_bind {Θ} {transΘ : Trans Θ} {lkTransΘ : LkTrans Θ}
+    {A B w0} (m : Solved Θ A w0) (f : Box Θ (A ⇢ Solved Θ B) w0)
     (Q : Box Θ (B  ⇢ Pred) w0) :
-    WP (bind d f) Q ⊣⊢ₚ WP d (fun w1 ζ1 a1 => WP (f w1 ζ1 a1) (_4 Q ζ1)).
+    WP (bind m f) Q ⊣⊢ₚ WP m (fun w1 ζ1 a1 => WP (f w1 ζ1 a1) (_4 Q ζ1)).
   Proof.
-    destruct d as [(w1 & r01 & a)|]; cbn; [|reflexivity].
+    destruct m as [(w1 & r01 & a)|]; cbn; [|reflexivity].
     destruct (f w1 r01 a) as [(w2 & r12 & b2)|]; cbn;
       now rewrite ?Acc.wp_trans ?Acc.wp_false.
   Qed.
 
-End OptionDiamond.
+End Solved.
 
 #[export] Instance instpred_diamond {Θ A} `{ipA : InstPred A} :
   InstPred (Diamond Θ A) :=
   fun w m => wp_diamond m (fun _ _ a => instpred a).
-#[export] Instance instpred_optiondiamond {Θ A} `{ipA : InstPred A} :
-  InstPred (OptionDiamond Θ A) :=
+#[export] Instance instpred_solved {Θ A} `{ipA : InstPred A} :
+  InstPred (Solved Θ A) :=
   fun w m => WP m (fun _ _ a => instpred a).
 
+Definition solved_hmap `{HMap Θ1 Θ2} {A} : ⊧ Solved Θ1 A ⇢ Solved Θ2 A :=
+  fun w => option.map (fun '(existT w (θ, a)) => existT w (hmap θ, a)).
+
+Lemma instpred_solved_hmap `{LkHMap Θ1 Θ2} {A} `{ipA : InstPred A}
+  {w} (m : Solved Θ1 A w) :
+  instpred (solved_hmap m) ⊣⊢ₚ instpred m.
+Proof. destruct m as [(w' & θ & a)|]; cbn; now rewrite ?Acc.wp_hmap. Qed.
 
 (* Create HintDb wpeq. *)
 (* #[export] Hint Rewrite *)

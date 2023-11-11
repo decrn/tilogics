@@ -263,6 +263,11 @@ Class ReflTrans Θ {reflΘ : Refl Θ} {transΘ : Trans Θ} : Prop :=
   }.
 #[global] Arguments ReflTrans Θ {_ _}.
 
+Class HMap (Θ1 Θ2 : SUB) : Type :=
+  hmap [w1 w2] : Θ1 w1 w2 → Θ2 w1 w2.
+#[export] Instance hmap_refl {Θ} : HMap Θ Θ | 0 :=
+  fun w1 w2 θ => θ.
+
 Class Step (Θ : SUB) : Type :=
   step w α : Θ w (w ▻ α).
 #[global] Arguments step {Θ _ w α}.
@@ -302,21 +307,20 @@ Declare Scope box_scope.
 Bind    Scope box_scope with Box.
 Delimit Scope box_scope with B.
 
-#[local] Notation "⊧ A" :=
-  (Valid A)
-    (at level 200, right associativity) : type_scope.
-#[local] Notation "A ⇢ B" := (Impl A B)
-  (at level 99, B at level 200, right associativity) :
-    indexed_scope.
+Notation "⊧ A" := (Valid A%W) (at level 200, right associativity) : type_scope.
+Notation "A ⇢ B" := (Impl A B)
+  (at level 99, B at level 200, right associativity) : indexed_scope.
 
-Notation "⊧ A" := (Valid A) (at level 200, right associativity) : type_scope.
-Notation "A ⇢ B" := (Impl A B) : indexed_scope.
-
-Notation "A * B" := (Prod A B) : indexed_scope.
+Notation "A * B" := (Prod A%W B%W) : indexed_scope.
 Notation "'∀' x .. y , P " :=
   (Forall (fun x => .. (Forall (fun y => P%W)) ..))
     (at level 200, x binder, y binder, right associativity) : indexed_scope.
 Notation "( α ∈)" := (world.In α) (format "( α  ∈)") : indexed_scope.
+
+Notation "◻ A" := (Box _ A%W)
+  (at level 9, right associativity, format "◻ A").
+(* Notation "◇ A" := (Diamond _ A) *)
+(*   (at level 9, right associativity, format "◇ A") : indexed_scope. *)
 
 Definition _4 {Θ} {transΘ : Trans Θ} {A} : ⊧ Box Θ A ⇢ Box Θ (Box Θ A) :=
   fun w0 a w1 θ1 w2 θ2 => a w2 (trans θ1 θ2).

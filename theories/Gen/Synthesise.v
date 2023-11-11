@@ -42,10 +42,9 @@ Set Implicit Arguments.
 Section Generator.
   Import MonadNotations.
 
-  Context {Θ} {reflΘ : Refl Θ} {stepΘ : Step Θ} {transΘ : Trans Θ}
-    {reflTransΘ : ReflTrans Θ} {lkReflΘ : LkRefl Θ} {lkTransΘ : LkTrans Θ}
-    {lkStepΘ : LkStep Θ}.
-  Context {M} {pureM : Pure M} {bindM : Bind Θ M} {tcM : TypeCheckM M} .
+  Context `{lkReflΘ: LkRefl Θ, lkTransΘ: LkTrans Θ, lkStepΘ: LkStep Θ}
+    {reflTransΘ: ReflTrans Θ}.
+  Context `{pureM:Pure M, bindM:Bind Θ M, failM:Fail M, tcM:TypeCheckM M}.
 
   Definition generate : Exp -> ⊧ Ėnv ⇢ M (Ṫy * Ėxp) :=
     fix gen e {w} Γ :=

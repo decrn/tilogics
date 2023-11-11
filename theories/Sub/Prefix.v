@@ -94,7 +94,7 @@ Export prefix (Prefix).
 Export (hints) prefix.
 Notation "w1 ⊑⁺ w2" := (sub Prefix w1 w2) (at level 80).
 Infix "⊙⁺" := (trans (Θ := Prefix)) (at level 60, right associativity).
-Notation "□⁺ A" := (Box Prefix A)
-  (at level 9, right associativity, format "□⁺ A") : indexed_scope.
+Notation "◻⁺ A" := (Box Prefix A)
+  (at level 9, right associativity, format "◻⁺ A") : indexed_scope.
 Notation "◇⁺ A" := (Diamond Prefix A)
   (at level 9, right associativity, format "◇⁺ A") : indexed_scope.

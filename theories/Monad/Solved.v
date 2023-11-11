@@ -27,66 +27,48 @@
 (******************************************************************************)
 
 From iris Require Import proofmode.tactics.
-From Em Require Import Monad.Interface Unification.
+From Em Require Import Monad.Interface Triangular Unification.
 
-Import Pred Pred.Acc Pred.proofmode Par world.notations.
+Import Pred Pred.Acc Pred.proofmode world.notations.
 
-Definition Solved A :=
-  Option (Diamond Par A).
+Section WithSub.
 
-#[export] Instance pure_solved : Pure Solved :=
-  fun A w a => Some (existT w (refl, a)).
+  Context {Θ} {reflΘ : Refl Θ} {transΘ : Trans Θ}
+    {hmapΘ : HMap Tri Θ} {stepΘ : Step Θ}.
 
-#[export] Instance bind_solved : Bind Par Solved :=
-  fun A B w m f =>
-    match m with
-    | Some (existT w1 (θ1, a1)) =>
-        match f w1 θ1 a1 with
-        | Some (existT w2 (θ2, b2)) =>
-            Some (existT w2 (θ1 ⊙ θ2, b2))
-        | None => None
-        end
-    | None => None
-    end.
+  #[export] Instance tcm_solved : TypeCheckM (Solved Θ) :=
+    {| assert w τ1 τ2 := mgu τ1 τ2;
+       pick w := let α := world.fresh w in
+                 Some (existT (w ▻ α) (step, ṫy.var world.in_zero));
+    |}.
 
-#[export] Instance tcm_solved : TypeCheckM Solved :=
-  {| assert w τ1 τ2 :=
-      match mgu τ1 τ2 with
-      | Some (existT x (a0, _)) => Some (existT x (Par.of a0, ()))
-      | None => None
-      end;
-     pick w := let α := world.fresh w in
-               Some (existT (w ▻ α) (step, ṫy.var world.in_zero));
-     Interface.fail A w := None;
-  |}.
+  Context {reflTransΘ : ReflTrans Θ} {lkreflΘ : LkRefl Θ} {lkTransΘ : LkTrans Θ}
+    {lkhmapΘ : LkHMap Tri Θ} {lkStepθ : LkStep Θ}.
 
-#[export] Instance wp_solved : WeakestPre Par Solved :=
-  fun A w o Q => wp_option o (fun d => wp_diamond d Q).
-#[export] Instance wlp_solved : WeakestLiberalPre Par Solved :=
-  fun A w o Q => wlp_option o (fun d => wlp_diamond d Q).
+  #[export] Instance tcmlogic_solved : TypeCheckLogicM Θ (Solved Θ).
+  Proof.
+    constructor; intros; predsimpl.
+    - destruct m as [(w1 & θ1 & a1)|]; predsimpl.
+      destruct f as [(w2 & θ2 & b2)|]; predsimpl.
+    - rewrite <- mgu_correct. destruct mgu as [(w1 & θ1 & [])|]; predsimpl.
+      iIntros "[Hwp #HQ]". iApply (Acc.wp_mono with "[] Hwp").
+      iIntros "!> _". iMod "HQ". now rewrite trans_refl_r.
+    - rewrite <- (intro_wp_step τ). iIntros "#HQ !> #Heq". iMod "HQ".
+      rewrite trans_refl_r. iApply "HQ". now iModIntro.
+    - destruct m as [(w1 & θ1 & a1)|]; predsimpl.
+      iIntros "PQ". iApply Acc.wp_mono. iModIntro.
+      iMod "PQ". now rewrite trans_refl_r.
+    - destruct m as [(w1 & θ1 & a1)|]; predsimpl.
+      destruct f as [(w2 & θ2 & b2)|]; predsimpl.
+    - rewrite <- mgu_correct. destruct mgu as [(w1 & θ1 & [])|]; predsimpl.
+      rewrite Acc.wp_impl. predsimpl. iIntros "HQ !>".
+      rewrite persist_update. iMod "HQ". now rewrite trans_refl_r.
+    - iIntros "HQ !>". iMod "HQ". rewrite trans_refl_r. iApply "HQ".
+    - destruct m as [(w1 & θ1 & a1)|]; predsimpl.
+      iIntros "PQ". iApply Acc.wlp_mono. iModIntro.
+      iMod "PQ". now rewrite trans_refl_r.
+    - destruct m as [(w1 & θ1 & a1)|]; predsimpl.
+      rewrite Acc.wp_impl. predsimpl.
+  Qed.
 
-#[export] Instance tcmlogic_solved : TypeCheckLogicM Par Solved.
-Proof.
-  constructor; intros; predsimpl.
-  - destruct m as [(w1 & θ1 & a1)|]; predsimpl.
-    destruct f as [(w2 & θ2 & b2)|]; predsimpl.
-  - rewrite <- mgu_correct. destruct mgu as [(w1 & θ1 & [])|]; predsimpl.
-    rewrite -Acc.wp_par_of. iIntros "[Hwp HQ]". iRevert "Hwp".
-    iApply Acc.wp_mono. iIntros "!> _". iMod "HQ". now rewrite trans_refl_r.
-  - rewrite <- (intro_wp_step τ). iIntros "#HQ !> #Heq". iMod "HQ".
-    rewrite trans_refl_r. iApply "HQ". now iModIntro.
-  - destruct m as [(w1 & θ1 & a1)|]; predsimpl.
-    iIntros "PQ". iApply Acc.wp_mono. iModIntro.
-    iMod "PQ". now rewrite trans_refl_r.
-  - destruct m as [(w1 & θ1 & a1)|]; predsimpl.
-    destruct f as [(w2 & θ2 & b2)|]; predsimpl.
-  - rewrite <- mgu_correct. destruct mgu as [(w1 & θ1 & [])|]; predsimpl.
-    rewrite -Acc.wp_par_of Acc.wp_impl. predsimpl. iIntros "HQ !>".
-    rewrite persist_update. iMod "HQ". now rewrite trans_refl_r.
-  - iIntros "HQ !>". iMod "HQ". rewrite trans_refl_r. iApply "HQ".
-  - destruct m as [(w1 & θ1 & a1)|]; predsimpl.
-    iIntros "PQ". iApply Acc.wlp_mono. iModIntro.
-    iMod "PQ". now rewrite trans_refl_r.
-  - destruct m as [(w1 & θ1 & a1)|]; predsimpl.
-    rewrite Acc.wp_impl. predsimpl.
-Qed.
+End WithSub.

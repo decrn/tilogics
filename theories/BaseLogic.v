@@ -31,9 +31,8 @@ From Coq Require Import Classes.Morphisms Classes.Morphisms_Prop
 From iris Require bi.derived_connectives bi.interface proofmode.tactics.
 From stdpp Require Import base.
 
-From Em Require Export Environment Open Prelude Instantiation Persistence
-  Sub.Parallel Worlds.
-From Em Require Import Prefix Spec.
+From Em Require Export Environment Open Prelude Instantiation Persistence Worlds.
+From Em Require Import Prefix Spec Sub.Parallel.
 
 Import world.notations.
 
@@ -637,22 +636,18 @@ Module Pred.
       wp θ ⊤ₚ /\ₚ wlp θ P ⊢ₚ wp θ P.
     Proof. now rewrite and_wp_l, persist_wlp, and_true_l. Qed.
 
-    Lemma wp_par_of {Θ : SUB} [w0 w1] (θ : Θ w0 w1) P :
-      wp (Par.of θ) P ⊣⊢ₚ wp θ P.
+    Lemma wp_hmap `{LkHMap Θ1 Θ2} [w0 w1] (θ : Θ1 w0 w1) P :
+      wp (hmap θ) P ⊣⊢ₚ wp θ P.
     Proof.
-      constructor. intros ι0; cbn. apply ex_iff_morphism; intro ι1.
-      apply and_iff_compat_r.
-      split; intros; subst; apply env.lookup_extensional; intros α αIn;
-        unfold Par.of, inst, inst_acc, lk; cbn; now rewrite !env.lookup_tabulate.
+      constructor. intros ι0; cbn. apply ex_iff_morphism.
+      intro ι1. now rewrite inst_hmap.
     Qed.
 
-    Lemma wlp_par_of {Θ : SUB} [w0 w1] (θ : Θ w0 w1) P :
-      wlp (Par.of θ) P ⊣⊢ₚ wlp θ P.
+    Lemma wlp_hmap `{LkHMap Θ1 Θ2} [w0 w1] (θ : Θ1 w0 w1) P :
+      wlp (hmap θ) P ⊣⊢ₚ wlp θ P.
     Proof.
-      constructor. intros ι0; cbn. apply all_iff_morphism; intro ι1.
-      apply imp_iff_compat_r.
-      split; intros; subst; apply env.lookup_extensional; intros α αIn;
-        unfold Par.of, inst, inst_acc, lk; cbn; now rewrite !env.lookup_tabulate.
+      constructor. intros ι0; cbn. apply all_iff_morphism.
+      intro ι1. now rewrite inst_hmap.
     Qed.
 
   End Acc.
@@ -836,7 +831,7 @@ Module Pred.
       rewrite !inst_persist in Hxy1, Hxy2. congruence.
     Qed.
 
-    #[export] Instance into_wlp_wlp `{InstPersist T V} (P : Pred w1) :
+    #[export] Instance into_wlp_wlp (P : Pred w1) :
       IntoWlp (Acc.wlp θ P) P | 0.
     Proof. unfold IntoWlp. reflexivity. Qed.
 

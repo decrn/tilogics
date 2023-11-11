@@ -213,6 +213,13 @@ Proof.
   - now rewrite env.lookup_thin, env.remove_insert.
 Qed.
 
+Lemma inst_hmap `{LkHMap Θ1 Θ2} {w1 w2} (θ : Θ1 w1 w2) (ι : Assignment w2) :
+  inst (hmap θ) ι = inst θ ι.
+Proof.
+  intros. apply env.lookup_extensional. intros β βIn. unfold inst, inst_acc.
+  now rewrite !env.lookup_tabulate, lk_hmap.
+Qed.
+
 Lemma inst_direct_subterm {w} (t1 t2 : Ṫy w) (ι : Assignment w) :
   ṫy.Ṫy_direct_subterm t1 t2 ->
   ty.Ty_direct_subterm (inst t1 ι) (inst t2 ι).

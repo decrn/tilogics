@@ -157,7 +157,7 @@ Module Tri.
 
 End Tri.
 Export Tri (Tri).
-Notation "w1 ⊒⁻ w2" := (sub Tri w1 w2) (at level 80).
+Notation "w1 ⊑⁻ w2" := (sub Tri w1 w2) (at level 80).
 Infix "⊙⁻" := (trans (Θ := Tri)) (at level 60, right associativity).
 Notation "□⁻ A" := (Box Tri A)
   (at level 9, right associativity, format "□⁻ A") : indexed_scope.

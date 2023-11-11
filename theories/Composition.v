@@ -31,49 +31,45 @@ From Coq Require Import
   extraction.ExtrHaskellNatInt
   extraction.ExtrHaskellString
   Lists.List
+  Logic.Decidable
   Strings.String.
 From iris Require Import bi.interface bi.derived_laws proofmode.tactics.
 From Em Require Import BaseLogic Gen.Synthesise PrenexConversion Spec Unification
-  Prefix
-  Environment
   Gen.Synthesise
-  Instantiation
   Monad.Free
-  Monad.Interface
-  Persistence
-  Prelude
+  Monad.Solved
+  Sub.Parallel
   Open
-  Spec
-  Worlds.
+  Spec.
 
-Import option.notations.
 Import Pred Pred.Acc.
 Import ListNotations.
+Import (hints) Par.
 
-Definition run {A} `{Persistent A} (m : Free A world.nil) :
-  option { w & A w } :=
-  '(existT w1 (θ1 , (xs , a))) <- (prenex m) ;;
-  '(existT w2 (θ2 , _))        <- solve xs ;;
-  Some (existT w2 (persist a θ2)).
+Section Run.
+  Import MonadNotations.
+  Definition run {A} `{Persistent A} : ⊧ Free A ⇢ Solved Par A :=
+    fun w m =>
+      '(cs,a) <- solved_hmap (prenex m) ;;
+      _       <- solve cs ;;
+      pure (persist a _).
+End Run.
 
-Definition reconstruct (Γ : Env) (e : Exp) :
-  option { w & Ṫy w * Ėxp w }%type :=
-  run (generate e (lift Γ)).
+Section Reconstruct.
+  Import option.notations.
 
-Definition infer (e : Exp) :
-  option { w & Ṫy w }%type :=
-  match reconstruct empty e with
-  | Some (existT w (t,e)) => Some (existT w t)
-  | None => None
-  end.
+  Definition reconstruct (Γ : Env) (e : Exp) : option { w & Ṫy w * Ėxp w }%type :=
+    '(existT w (_ , te)) <- run _ (generate (w := world.nil) e (lift Γ)) ;;
+    Some (existT w te).
 
-Definition reconstruct_grounded (Γ : Env) (e : Exp) : option (Ty * Exp) :=
-  '(existT w te) <- reconstruct Γ e ;;
-  Some (inst te (grounding w)).
+  Definition reconstruct_grounded (e : Exp) : option (Ty * Exp) :=
+    '(existT w te) <- reconstruct empty e ;;
+    Some (inst te (grounding w)).
 
-Definition reconstruct_closed (e : Exp) : option (Ty * Exp) :=
-  '(existT w te) <- reconstruct empty e ;;
-  Some (inst te (grounding w)).
+  Definition infer (e : Exp) : option { w & Ṫy w }%type :=
+    '(existT w (t,e)) <- reconstruct empty e ;;
+    Some (existT w t).
+End Reconstruct.
 
 Section Examples.
   Definition examples :=
@@ -123,7 +119,7 @@ Extraction "Infer" examples.
 Definition algorithmic_typing (Γ : Env) (e : Exp) (τ : Ty) (e' : Exp) : Prop :=
   match reconstruct Γ e with
   | Some (existT w1 (τ1, e1)) =>
-      exists ι : Assignment w1, inst τ1 ι = τ /\ inst e1 ι = e'
+      exists ι : Assignment w1, τ = inst τ1 ι /\ e' = inst e1 ι
   | None => False
   end.
 
@@ -145,4 +141,29 @@ Proof.
         exists ι2. now subst.
     + pred_unfold. intros HE. now specialize (HE env.nil).
   - pred_unfold. intros HE. now specialize (HE env.nil).
+Qed.
+
+Lemma decidable_type_instantiation (τ : Ty) {w} (oτ : Ṫy w) :
+  decidable (∃ ι : Assignment w, τ = inst oτ ι).
+Proof.
+  pose proof (mgu_correct (lift τ) oτ) as [H].
+  destruct (mgu (lift τ) oτ) as [(w' & θ & [])|]; cbn in H.
+  - pose (inst θ (grounding _)) as ι.
+    specialize (H ι). rewrite inst_lift in H.
+    left. exists ι. apply H. now exists (grounding w').
+  - right. intros (ι & Heq). specialize (H ι).
+    rewrite inst_lift in H. intuition auto.
+Qed.
+
+Lemma decidability Γ e τ :
+  decidable (exists e', Γ |-- e ∷ τ ~> e').
+Proof.
+  pose proof (correctness Γ e τ) as Hcorr.
+  unfold algorithmic_typing in Hcorr.
+  destruct reconstruct as [(w & oτ & oe')|].
+  - destruct (decidable_type_instantiation τ oτ) as [(ι & Heq)|].
+    + left. exists (inst oe' ι). apply Hcorr. now exists ι.
+    + right. intros (e' & HT). apply Hcorr in HT.
+      destruct HT as (ι & Heq1 & Heq2). apply H. now exists ι.
+  - right. intros (e' & HT). now apply Hcorr in HT.
 Qed.

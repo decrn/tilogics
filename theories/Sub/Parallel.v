@@ -115,12 +115,15 @@ Module Par.
     subst (subst t (thin α)) (thick α s) = t.
   Proof. now rewrite <- persist_trans, comp_thin_thick, persist_refl. Qed.
 
-  Definition of {Θ : SUB} [w0 w1] (θ01 : Θ w0 w1) : Par w0 w1 :=
-    env.tabulate (@lk _ _ _ θ01).
+  #[export] Instance hmap_par {Θ : SUB} : HMap Θ Par :=
+    fun w0 w1 θ => env.tabulate (@lk _ _ _ θ).
 
-  Lemma lk_of {Θ : SUB} [w0 w1] (θ : Θ w0 w1) α (αIn : α ∈ w0) :
-    lk (of θ) αIn = lk θ αIn.
-  Proof. unfold of, lk at 1; cbn. now rewrite env.lookup_tabulate. Qed.
+  #[export] Instance lk_hmap_par {Θ : SUB} : LkHMap Θ Par.
+  Proof.
+    intros w0 w1 θ a αIn.
+    unfold hmap, hmap_par, lk at 1; cbn.
+    now rewrite env.lookup_tabulate.
+  Qed.
 
   Lemma Ty_subterm_subst {w1 w2} (s t : Ṫy w1) (θ : Par w1 w2) :
     ṫy.Ṫy_subterm s t -> ṫy.Ṫy_subterm (persist s θ) (persist t θ).
@@ -130,26 +133,31 @@ Module Par.
     - econstructor 2; eauto.
   Qed.
 
-  Lemma of_step {Θ} {stepΘ : Step Θ} {lkStepΘ : LkStep Θ} w α :
-    of (@step Θ stepΘ w α) = step (Θ := Par).
+  Lemma hmap_step {Θ} {stepΘ : Step Θ} {lkStepΘ : LkStep Θ} w α :
+    hmap (@step Θ stepΘ w α) = step (Θ := Par).
   Proof.
-    apply env.lookup_extensional. intros β βIn. unfold of.
-    rewrite env.lookup_tabulate. foldlk. now rewrite ?lk_step.
+    apply env.lookup_extensional. intros β βIn.
+    foldlk. now rewrite lk_hmap, !lk_step.
   Qed.
 
-  Lemma of_thick {Θ} {thickΘ : Thick Θ} {lkThickΘ : LkThick Θ}
+  Lemma hmap_thick {Θ} {thickΘ : Thick Θ} {lkThickΘ : LkThick Θ}
     w α (αIn : α ∈ w) t :
-    of (thick (Θ := Θ) α t) = thick (Θ := Par) α t.
+    hmap (thick (Θ := Θ) α t) = thick (Θ := Par) α t.
   Proof.
-    apply env.lookup_extensional. intros β βIn. unfold of, thick at 2, thick_par.
-    now rewrite !env.lookup_tabulate, lk_thick.
+    apply env.lookup_extensional. intros β βIn.
+    foldlk. now rewrite lk_hmap, !lk_thick.
   Qed.
 
-  Lemma persist_par {Θ : SUB} {T} {persT : Persistent T} {persLT : PersistLaws T}
+  Lemma persist_hmap {Θ : SUB} {T} {persT : Persistent T} {persLT : PersistLaws T}
     [w0 w1] (θ : Θ w0 w1) :
-    forall t, persist t (of θ) = persist t θ.
-  Proof. intros. apply persist_simulation. intros. now rewrite lk_of. Qed.
+    forall t, persist t (hmap θ) = persist t θ.
+  Proof. intros. apply persist_simulation. intros. now rewrite lk_hmap. Qed.
 
 End Par.
 Export Par (Par).
 Notation "w0 ⊑ˢ w1" := (sub Par w0 w1).
+Infix "⊙ˢ" := (trans (Θ := Par)) (at level 60, right associativity).
+Notation "□ˢ A" := (Box Par A)
+  (at level 9, right associativity, format "□ˢ A") : indexed_scope.
+Notation "◇ˢ A" := (Diamond Par A)
+  (at level 9, right associativity, format "◇ˢ A") : indexed_scope.

@@ -27,7 +27,7 @@
 (******************************************************************************)
 
 From Equations Require Import Equations.
-From Em Require Import BaseLogic Monad.Interface Triangular.
+From Em Require Import BaseLogic Monad.Interface Parallel Triangular.
 
 Import Pred world.notations Pred.notations.
 Import (hints) Par Tri.
@@ -40,7 +40,7 @@ Set Implicit Arguments.
       format "s [ ζ ]").
 
 #[local] Notation "▷ A" :=
-  (fun (w : World) => ∀ α (αIn : α ∈ w), A (w - α))
+  (fun (w : World) => ∀ α (αIn : α ∈ w), A%W (w - α))
     (at level 9, right associativity).
 
 (* In this section we define a generic Bove-Capretta style accessibility
@@ -51,10 +51,6 @@ Set Implicit Arguments.
    Type Theory.” Mathematical Structures in Computer Science, vol. 15,
    no. 4, 2005, pp. 671–708., doi:10.1017/S0960129505004822. *)
 Section RemoveAcc.
-
-  #[local] Notation "▶ P" :=
-    (fun (d : ▷_ _) => forall α (αIn : α ∈ _), P (_ - α) (d α αIn))
-      (at level 9, right associativity).
 
   (* Coq only generates non-dependent elimination schemes for inductive
      families in Prop. Hence, we disable the automatic generation and
@@ -72,15 +68,6 @@ Section RemoveAcc.
     ⊧ remove_acc ⇢ P :=
     fix F w (d : remove_acc w) {struct d} : P w :=
       f w (fun α αIn => F (w - α) (remove_acc_inv d αIn)).
-
-  (* Define a dependent elimination scheme for Prop. *)
-  Definition remove_acc_ind (P : ∀ [w], remove_acc w → Prop)
-    (f : ∀ [w] (d : ▷remove_acc w), ▶P d → P (remove_acc_intro d)) :
-    ∀ {w} (d : remove_acc w), P d :=
-    fix F {w} (d : remove_acc w) {struct d} : P d :=
-      match d with
-        remove_acc_intro g => f g (fun α αIn => F (g α αIn))
-      end.
 
   Fixpoint remove_acc_step {w α} (r : remove_acc w) {struct r} :
     remove_acc (world.snoc w α) :=
@@ -113,20 +100,23 @@ Section RemoveAcc.
   Definition loeb {A : World → Type} : (⊧ ▷A ⇢ A) → (⊧ A) :=
     fun step w => remove_acc_rect step (remove_acc_all w).
 
+  (* Derive a dependent elimination scheme for Prop. *)
+  Scheme remove_acc_ind := Induction for remove_acc Sort Prop.
+
+  #[local] Notation "▶ P" :=
+    (fun (f : ▷_ _) => forall α (αIn : α ∈ _), P (_ - α) (f α αIn))
+      (at level 9, right associativity).
+
   Definition loeb_elim {A} (step : ⊧ ▷A ⇢ A) (P : ∀ [w], A w → Prop)
     (pstep: ∀ w (f : ▷A w) (IH : ▶P f), P (step w f)) w : P (loeb step w).
-  Proof. unfold loeb. induction (remove_acc_all w). cbn. now apply pstep. Qed.
+  Proof. unfold loeb. induction (remove_acc_all w). eauto. Qed.
 
 End RemoveAcc.
 
 Section Operations.
 
-  Definition fail {A} : ⊧ OptionDiamond Tri A :=
-    fun w => None.
-  #[global] Arguments fail {A w}.
-
   Definition singleton {w x} (xIn : x ∈ w) (t : Ṫy (w - x)) :
-    OptionDiamond Tri Unit w :=
+    Solved Tri Unit w :=
     Some (existT (w - x) (thick (Θ := Tri) x t, tt)).
 
 End Operations.
@@ -192,22 +182,7 @@ End VarView.
 
 Section Implementation.
 
-  Definition C := Box Tri (OptionDiamond Tri Unit).
-
-  Definition ctrue : ⊧ C :=
-    fun w0 w1 r01 => pure tt.
-  Definition cfalse : ⊧ C :=
-    fun w0 w1 r01 => fail.
-  Definition cand : ⊧ C ⇢ C ⇢ C :=
-    fun w0 c1 c2 w1 r01 =>
-      bind (c1 w1 r01) (fun w2 r12 _ => _4 c2 r01 r12).
-  #[global] Arguments cfalse {w} [w1] _.
-  #[global] Arguments ctrue {w} [w1] _.
-
-  Definition BoxUnifier : TYPE :=
-    Ṫy ⇢ Ṫy ⇢ C.
-
-  Definition flex : ⊧ ∀ α, world.In α ⇢ Ṫy ⇢ OptionDiamond Tri Unit :=
+  Definition flex : ⊧ ∀ α, world.In α ⇢ Ṫy ⇢ Solved Tri Unit :=
     fun w α αIn τ =>
       match varview τ with
       | is_var βIn =>
@@ -222,6 +197,21 @@ Section Implementation.
           end
       end.
   #[global] Arguments flex {w} α {αIn} τ : rename.
+
+  Definition C := Box Tri (Solved Tri Unit).
+
+  Definition ctrue : ⊧ C :=
+    fun w0 w1 r01 => pure tt.
+  Definition cfalse : ⊧ C :=
+    fun w0 w1 r01 => fail.
+  Definition cand : ⊧ C ⇢ C ⇢ C :=
+    fun w0 c1 c2 w1 r01 =>
+      bind (c1 w1 r01) (fun w2 r12 _ => _4 c2 r01 r12).
+  #[global] Arguments cfalse {w} [w1] _.
+  #[global] Arguments ctrue {w} [w1] _.
+
+  Definition BoxUnifier : TYPE :=
+    Ṫy ⇢ Ṫy ⇢ C.
 
   Section MguO.
 
@@ -270,8 +260,8 @@ Section Implementation.
   Definition amgu : ⊧ BoxUnifier :=
     fun w => loeb atrav w.
 
-  Definition mgu : ⊧ Ṫy ⇢ Ṫy ⇢ OptionDiamond Tri Unit :=
-    fun w s t => @amgu w s t _ refl.
+  Definition mgu `{HMap Tri Θ} : ⊧ Ṫy ⇢ Ṫy ⇢ Solved Θ Unit :=
+    fun w s t => solved_hmap (@amgu w s t _ refl).
 
   Definition asolve : ⊧ List (Prod Ṫy Ṫy) ⇢ C :=
     fix asolve {w} cs {struct cs} :=
@@ -280,8 +270,8 @@ Section Implementation.
       | List.cons (t1,t2) cs => cand (amgu t1 t2) (asolve cs)
       end.
 
-  Definition solve : ⊧ List (Prod Ṫy Ṫy) ⇢ OptionDiamond Tri Unit :=
-    fun w cs => asolve cs refl.
+  Definition solve `{HMap Tri Θ} : ⊧ List (Prod Ṫy Ṫy) ⇢ Solved Θ Unit :=
+    fun w cs => solved_hmap (asolve cs refl).
 
 End Implementation.
 
@@ -301,15 +291,15 @@ Section Correctness.
     (∀ w1 (θ1 : Tri w0 w1), instpred (c2 w1 θ1) ⊣⊢ₚ Q[θ1]) →
     (∀ w1 (θ1 : Tri w0 w1), instpred (cand c1 c2 θ1) ⊣⊢ₚ (P /\ₚ Q)[θ1]).
   Proof.
-    unfold instpred, instpred_optiondiamond, cand. intros H1 H2 w1 θ1.
-    rewrite wp_optiondiamond_bind, persist_and, <- H1, wp_optiondiamond_and.
-    unfold _4. apply proper_wp_optiondiamond_bientails. intros w2 θ2 [].
+    unfold instpred, instpred_solved, cand. intros H1 H2 w1 θ1.
+    rewrite wp_solved_bind, persist_and, <- H1, wp_solved_frame.
+    unfold _4. apply proper_wp_solved_bientails. intros w2 θ2 [].
     cbn. rewrite and_true_l, <- persist_pred_trans. apply H2.
   Qed.
 
   Definition BoxUnifierCorrect : ⊧ BoxUnifier ⇢ PROP :=
     fun w0 bu =>
-      ∀ (t1 t2 : Ṫy w0) w1 (θ1 : w0 ⊒⁻ w1),
+      ∀ (t1 t2 : Ṫy w0) w1 (θ1 : w0 ⊑⁻ w1),
         instpred (bu t1 t2 w1 θ1) ⊣⊢ₚ (t1 =ₚ t2)[θ1].
 
   Lemma flex_correct {w α} (αIn : α ∈ w) (t : Ṫy w) :
@@ -331,7 +321,7 @@ Section Correctness.
     Context (lamgu_correct : ∀ x (xIn : x ∈ w),
                 BoxUnifierCorrect (lamgu xIn)).
 
-    Lemma aflex_correct {α} (αIn : α ∈ w) (t : Ṫy w) w1 (θ1 : w ⊒⁻ w1) :
+    Lemma aflex_correct {α} (αIn : α ∈ w) (t : Ṫy w) w1 (θ1 : w ⊑⁻ w1) :
       instpred (aflex lamgu α t θ1) ⊣⊢ₚ (ṫy.var αIn =ₚ t)[θ1].
     Proof.
       destruct θ1; cbn; Tri.folddefs.
@@ -357,14 +347,17 @@ Section Correctness.
   Lemma amgu_correct : ∀ w, BoxUnifierCorrect (@amgu w).
   Proof. apply loeb_elim, atrav_correct. Qed.
 
-  Definition mgu_correct w (t1 t2 : Ṫy w) :
-    instpred (mgu t1 t2) ⊣⊢ₚ t1 =ₚ t2.
-  Proof. unfold mgu. now rewrite amgu_correct, persist_pred_refl. Qed.
+  Definition mgu_correct `{LkHMap Tri Θ} w (t1 t2 : Ṫy w) :
+    instpred (mgu (Θ := Θ) t1 t2) ⊣⊢ₚ t1 =ₚ t2.
+  Proof.
+    unfold mgu. rewrite instpred_solved_hmap.
+    now rewrite amgu_correct, persist_pred_refl.
+  Qed.
 
   #[local] Existing Instance instpred_prod_ty.
 
   Lemma asolve_correct {w0} (C : List (Ṫy * Ṫy) w0) :
-    ∀ w1 (θ1 : w0 ⊒⁻ w1),
+    ∀ w1 (θ1 : w0 ⊑⁻ w1),
       instpred (asolve C θ1) ⊣⊢ₚ (instpred C)[θ1].
   Proof.
     induction C as [|[t1 t2]]; cbn - [ctrue cand]; intros.
@@ -372,8 +365,11 @@ Section Correctness.
     - apply instpred_cand_intro; auto. intros. apply amgu_correct.
   Qed.
 
-  Lemma solve_correct {w} (C : List (Ṫy * Ṫy) w) :
-    instpred (solve C) ⊣⊢ₚ instpred C.
-  Proof. unfold solve. now rewrite asolve_correct, persist_pred_refl. Qed.
+  Lemma solve_correct `{LkHMap Tri Θ} {w} (C : List (Ṫy * Ṫy) w) :
+    instpred (solve (Θ := Θ) C) ⊣⊢ₚ instpred C.
+  Proof.
+    unfold solve. rewrite instpred_solved_hmap.
+    now rewrite asolve_correct, persist_pred_refl.
+  Qed.
 
 End Correctness.
