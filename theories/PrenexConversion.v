@@ -27,7 +27,7 @@
 (******************************************************************************)
 
 From Em Require Export Monad.Free Monad.Prenex.
-Import option.notations Pred Pred.Acc Pred.notations.
+Import option.notations Pred Pred.Sub Pred.notations.
 
 #[local] Set Implicit Arguments.
 
@@ -53,7 +53,7 @@ Proof.
   induction m; predsimpl.
   - rewrite <- IHm. clear IHm.
     destruct (prenex m) as [(w1 & θ1 & C1 & a1)|]; predsimpl.
-    rewrite Acc.and_wp_r. apply Acc.proper_wp_bientails. predsimpl.
+    rewrite Sub.and_wp_r. apply Sub.proper_wp_bientails. predsimpl.
     now rewrite and_assoc.
   - rewrite <- IHm. clear IHm.
     destruct (prenex m) as [(w1 & θ1 & C1 & a1)|]; predsimpl.

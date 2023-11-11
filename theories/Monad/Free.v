@@ -30,7 +30,7 @@ Require Import Coq.Classes.RelationClasses.
 From iris Require Import proofmode.tactics.
 From Em Require Import Monad.Interface Prefix.
 
-Import Pred Pred.notations Pred.Acc Pred.proofmode world.notations.
+Import Pred Pred.notations Pred.Sub Pred.proofmode world.notations.
 
 #[local] Set Implicit Arguments.
 
@@ -72,7 +72,7 @@ Inductive Free (A : OType) (w : World) : Type :=
     | Ret a => POST _ refl a
     | Fail => ⊥ₚ
     | Equalsk t1 t2 k => t1 =ₚ t2 /\ₚ WP k POST
-    | Pickk α k => Acc.wp step (WP k (_4 POST step))
+    | Pickk α k => Sub.wp step (WP k (_4 POST step))
     end%P.
 
 #[export] Instance wlp_free : WeakestLiberalPre Prefix Free :=
@@ -82,7 +82,7 @@ Inductive Free (A : OType) (w : World) : Type :=
     | Ret a => POST _ refl a
     | Fail => ⊤ₚ
     | Equalsk t1 t2 k => t1 =ₚ t2 ->ₚ WLP k POST
-    | Pickk α k => Acc.wlp step (WLP k (_4 POST step))
+    | Pickk α k => Sub.wlp step (WLP k (_4 POST step))
     end%P.
 
 Lemma wp_free_mono [A w0] (m : Free A w0) (P Q : ◻(A ⇢ Pred) w0) :
@@ -93,7 +93,7 @@ Proof.
   - now iMod "PQ".
   - easy.
   - iIntros "[#Heq HP]". iSplit; [auto|]. iRevert "HP". now iApply IHm.
-  - iApply Acc.wp_mono. iModIntro. iApply IHm. iIntros "%w1 %θ1 !> %a1".
+  - iApply Sub.wp_mono. iModIntro. iApply IHm. iIntros "%w1 %θ1 !> %a1".
     iMod "PQ". iSpecialize ("PQ" $! a1). now rewrite trans_refl_r.
 Qed.
 
@@ -106,7 +106,7 @@ Proof.
   - easy.
   - iIntros "HP #Heq". rewrite <- wand_is_impl.
     iSpecialize ("HP" with "Heq"). iRevert "HP". now iApply IHm.
-  - iApply Acc.wlp_mono. iModIntro. iApply IHm. iIntros "%w1 %θ1 !> %a1".
+  - iApply Sub.wlp_mono. iModIntro. iApply IHm. iIntros "%w1 %θ1 !> %a1".
     iMod "PQ". iSpecialize ("PQ" $! a1). now rewrite trans_refl_r.
 Qed.
 
@@ -150,7 +150,7 @@ Proof.
   - induction m; cbn; try (firstorder; fail).
     + apply proper_wp_bientails. intros w1 θ1 b1.
       now rewrite trans_refl_l.
-    + apply Acc.proper_wp_bientails. rewrite IHm.
+    + apply Sub.proper_wp_bientails. rewrite IHm.
       apply proper_wp_bientails. intros w1 θ1 a1.
       apply proper_wp_bientails. intros w2 θ2 b2.
       now rewrite trans_assoc.
@@ -165,7 +165,7 @@ Proof.
     + predsimpl.
     + predsimpl.
     + predsimpl. now rewrite IHm.
-    + rewrite Acc.wp_impl. apply Acc.proper_wlp_bientails.
+    + rewrite Sub.wp_impl. apply Sub.proper_wlp_bientails.
       rewrite IHm. apply proper_wlp_bientails.
       intros w1 θ1 a1. now rewrite <- persist_pred_trans.
 Qed.

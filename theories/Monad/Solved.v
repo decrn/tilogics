@@ -29,7 +29,7 @@
 From iris Require Import proofmode.tactics.
 From Em Require Import Monad.Interface Triangular Unification.
 
-Import Pred Pred.Acc Pred.proofmode world.notations.
+Import Pred Pred.Sub Pred.proofmode world.notations.
 
 Section WithSub.
 
@@ -51,24 +51,24 @@ Section WithSub.
     - destruct m as [(w1 & θ1 & a1)|]; predsimpl.
       destruct f as [(w2 & θ2 & b2)|]; predsimpl.
     - rewrite <- mgu_correct. destruct mgu as [(w1 & θ1 & [])|]; predsimpl.
-      iIntros "[Hwp #HQ]". iApply (Acc.wp_mono with "[] Hwp").
+      iIntros "[Hwp #HQ]". iApply (Sub.wp_mono with "[] Hwp").
       iIntros "!> _". iMod "HQ". now rewrite trans_refl_r.
     - rewrite <- (intro_wp_step τ). iIntros "#HQ !> #Heq". iMod "HQ".
       rewrite trans_refl_r. iApply "HQ". now iModIntro.
     - destruct m as [(w1 & θ1 & a1)|]; predsimpl.
-      iIntros "PQ". iApply Acc.wp_mono. iModIntro.
+      iIntros "PQ". iApply Sub.wp_mono. iModIntro.
       iMod "PQ". now rewrite trans_refl_r.
     - destruct m as [(w1 & θ1 & a1)|]; predsimpl.
       destruct f as [(w2 & θ2 & b2)|]; predsimpl.
     - rewrite <- mgu_correct. destruct mgu as [(w1 & θ1 & [])|]; predsimpl.
-      rewrite Acc.wp_impl. predsimpl. iIntros "HQ !>".
+      rewrite Sub.wp_impl. predsimpl. iIntros "HQ !>".
       rewrite persist_update. iMod "HQ". now rewrite trans_refl_r.
     - iIntros "HQ !>". iMod "HQ". rewrite trans_refl_r. iApply "HQ".
     - destruct m as [(w1 & θ1 & a1)|]; predsimpl.
-      iIntros "PQ". iApply Acc.wlp_mono. iModIntro.
+      iIntros "PQ". iApply Sub.wlp_mono. iModIntro.
       iMod "PQ". now rewrite trans_refl_r.
     - destruct m as [(w1 & θ1 & a1)|]; predsimpl.
-      rewrite Acc.wp_impl. predsimpl.
+      rewrite Sub.wp_impl. predsimpl.
   Qed.
 
 End WithSub.

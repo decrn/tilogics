@@ -30,7 +30,7 @@ From iris Require Import proofmode.tactics.
 From Em Require Export Monad.Interface Prefix.
 From Em Require Import BaseLogic Spec.
 
-Import MonadNotations Pred Pred.Acc Pred.notations Pred.proofmode
+Import MonadNotations Pred Pred.Sub Pred.notations Pred.proofmode
   world.notations.
 
 #[local] Set Implicit Arguments.
@@ -74,22 +74,22 @@ Proof.
   constructor; intros; predsimpl.
   - destruct m as [(w1 & θ1 & C1 & a1)|]; predsimpl.
     destruct f as [(w2 & θ2 & C2 & b2)|]; predsimpl.
-    rewrite Acc.and_wp_r. apply Acc.proper_wp_bientails.
+    rewrite Sub.and_wp_r. apply Sub.proper_wp_bientails.
     rewrite bi.and_assoc. apply bi.and_proper; auto.
     rewrite instpred_list_app. apply bi.and_proper; auto.
     now rewrite instpred_persist.
   - destruct m as [(w1 & θ1 & C1 & a1)|]; predsimpl.
-    iIntros "PQ". iApply Acc.wp_mono. iIntros "!> [HC HP]".
+    iIntros "PQ". iApply Sub.wp_mono. iIntros "!> [HC HP]".
     iMod "PQ". iSplit; auto. iApply "PQ"; auto.
   - destruct m as [(w1 & θ1 & C1 & a1)|]; predsimpl.
     destruct f as [(w2 & θ2 & C2 & b2)|]; predsimpl.
-    rewrite Acc.wlp_frame. apply Acc.proper_wlp_bientails.
+    rewrite Sub.wlp_frame. apply Sub.proper_wlp_bientails.
     rewrite <- impl_and. apply bi.impl_proper; auto.
     rewrite instpred_list_app. apply bi.and_proper; auto.
     now rewrite instpred_persist_list.
   - destruct m as [(w1 & θ1 & C1 & a1)|]; predsimpl.
-    iIntros "#PQ". iApply Acc.wlp_mono. iIntros "!> #HP #HC".
+    iIntros "#PQ". iApply Sub.wlp_mono. iIntros "!> #HP #HC".
     iMod "PQ". iApply "PQ". now iApply "HP".
   - destruct m as [(w1 & θ1 & C1 & a1)|]; predsimpl.
-    rewrite Acc.wp_impl. predsimpl.
+    rewrite Sub.wp_impl. predsimpl.
 Qed.

@@ -70,7 +70,7 @@ Section Inst.
   #[export] Instance inst_env : Inst OEnv Env :=
     fun w Γ ι => base.fmap (fun t : OTy w => inst t ι) Γ.
 
-  #[export] Instance inst_acc {Θ : SUB} :
+  #[export] Instance inst_sub {Θ : SUB} :
     forall w, Inst (Θ w) (Assignment w) :=
     fun w0 w1 θ ι => env.tabulate (fun α αIn => inst (lk θ αIn) ι).
 End Inst.
@@ -131,7 +131,7 @@ Section InstPersist.
   #[export] Instance inst_persist_ty : InstPersist OTy Ty.
   Proof.
     intros Θ w0 w1 θ t ι. induction t; cbn; f_equal; auto.
-    unfold inst at 2, inst_acc. now rewrite env.lookup_tabulate.
+    unfold inst at 2, inst_sub. now rewrite env.lookup_tabulate.
   Qed.
 
   #[export] Instance inst_persist_env : InstPersist OEnv Env.
@@ -168,7 +168,7 @@ End PersistLift.
 Lemma inst_refl {Θ} {reflΘ : Refl Θ} {lkreflΘ : LkRefl Θ} :
   forall w (ι : Assignment w), inst (refl (Θ := Θ)) ι = ι.
 Proof.
-  intros. apply env.lookup_extensional. intros α αIn. unfold inst, inst_acc.
+  intros. apply env.lookup_extensional. intros α αIn. unfold inst, inst_sub.
   now rewrite env.lookup_tabulate, lk_refl.
 Qed.
 
@@ -176,7 +176,7 @@ Lemma inst_trans {Θ} {transΘ : Trans Θ} {lktransΘ : LkTrans Θ} :
   forall w0 w1 w2 (θ1 : Θ w0 w1) (θ2 : Θ w1 w2) (ι : Assignment w2),
     inst (trans θ1 θ2) ι = inst θ1 (inst θ2 ι).
 Proof.
-  intros. apply env.lookup_extensional. intros α αIn. unfold inst, inst_acc.
+  intros. apply env.lookup_extensional. intros α αIn. unfold inst, inst_sub.
   now rewrite ?env.lookup_tabulate, lk_trans, inst_persist.
 Qed.
 
@@ -184,7 +184,7 @@ Lemma inst_step_snoc {Θ} {stepΘ : Step Θ} {lkStepΘ : LkStep Θ}
   {w x} (ι : Assignment w) (t : Ty) :
   inst (step (Θ := Θ)) (env.snoc ι x t) = ι.
 Proof.
-  apply env.lookup_extensional. intros α αIn. unfold inst, inst_acc.
+  apply env.lookup_extensional. intros α αIn. unfold inst, inst_sub.
   rewrite env.lookup_tabulate. rewrite lk_step. reflexivity.
 Qed.
 
@@ -197,7 +197,7 @@ Lemma inst_thin {Θ} {thinΘ : Thin Θ} {lkthinΘ : LkThin Θ}
   {w} (ι : Assignment w) {α} (αIn : α ∈ w) :
   inst (thin α) ι = env.remove α ι αIn.
 Proof.
-  apply env.lookup_extensional. intros β βIn. unfold inst, inst_acc.
+  apply env.lookup_extensional. intros β βIn. unfold inst, inst_sub.
   rewrite env.lookup_tabulate. rewrite lk_thin. cbn.
   now rewrite env.lookup_thin.
 Qed.
@@ -206,7 +206,7 @@ Lemma inst_thick {Θ} {thickΘ : Thick Θ} {lkthickΘ : LkThick Θ} :
   forall {w} {x} (xIn : x ∈ w) (t : OTy (w - x)) (ι : Assignment (w - x)),
     inst (thick (Θ := Θ) x t) ι = env.insert xIn ι (inst t ι).
 Proof.
-  intros. apply env.lookup_extensional. intros β βIn. unfold inst, inst_acc.
+  intros. apply env.lookup_extensional. intros β βIn. unfold inst, inst_sub.
   rewrite env.lookup_tabulate, lk_thick. unfold thickIn.
   destruct world.occurs_check_view; cbn.
   - now rewrite env.lookup_insert.
@@ -216,7 +216,7 @@ Qed.
 Lemma inst_hmap `{LkHMap Θ1 Θ2} {w1 w2} (θ : Θ1 w1 w2) (ι : Assignment w2) :
   inst (hmap θ) ι = inst θ ι.
 Proof.
-  intros. apply env.lookup_extensional. intros β βIn. unfold inst, inst_acc.
+  intros. apply env.lookup_extensional. intros β βIn. unfold inst, inst_sub.
   now rewrite !env.lookup_tabulate, lk_hmap.
 Qed.
 

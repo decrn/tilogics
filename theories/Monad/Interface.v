@@ -63,7 +63,7 @@ Module MonadNotations.
   #[export] Hint Mode sub - + - : typeclass_instances.
 End MonadNotations.
 
-Import Pred Pred.Acc.
+Import Pred Pred.Sub.
 
 
 Class TypeCheckM (M : OType -> OType) : Type :=
@@ -92,7 +92,7 @@ Class AxiomaticSemantics
       WP (equals σ τ) Q ⊣⊢ₚ σ =ₚ τ /\ₚ Q _ refl tt;
     ax_wp_pick [w] (Q : Box Θ (OTy ⇢ Pred) w) :
       let α := world.fresh w in
-      WP pick Q ⊣⊢ₚ Acc.wp step (Q (w ▻ α) step (oty.var world.in_zero));
+      WP pick Q ⊣⊢ₚ Sub.wp step (Q (w ▻ α) step (oty.var world.in_zero));
     ax_wp_fail [A w] (Q : Box Θ (A ⇢ Pred) w) :
       WP fail Q ⊣⊢ₚ ⊥ₚ;
     ax_wp_mono [A w] (m : M A w) (P Q : Box Θ (A ⇢ Pred) w) :
@@ -107,7 +107,7 @@ Class AxiomaticSemantics
       WLP (equals σ τ) Q ⊣⊢ₚ σ =ₚ τ ->ₚ Q _ refl tt;
     ax_wlp_pick [w] (Q : Box Θ (OTy ⇢ Pred) w) :
       let α := world.fresh w in
-      WLP pick Q ⊣⊢ₚ Acc.wlp step (Q (w ▻ α) step (oty.var world.in_zero));
+      WLP pick Q ⊣⊢ₚ Sub.wlp step (Q (w ▻ α) step (oty.var world.in_zero));
     ax_wlp_fail [A w] (Q : Box Θ (A ⇢ Pred) w) :
       WLP fail Q ⊣⊢ₚ ⊤ₚ;
     ax_wlp_mono [A w] (m : M A w) (P Q : Box Θ (A ⇢ Pred) w) :
@@ -129,7 +129,7 @@ Lemma ax_wp_pick_substitute `{AxiomaticSemantics Θ M, Thick Θ} {lkThickΘ : Lk
     (∃ₚ τ : OTy w, (Q (w ▻ α) step (oty.var world.in_zero))[thick α (αIn := world.in_zero) τ]).
 Proof.
   rewrite ax_wp_pick; cbn. constructor; intros ι.
-  unfold Acc.wp; pred_unfold. split.
+  unfold Sub.wp; pred_unfold. split.
   - intros (ι' & Heq & HQ). destruct (env.view ι') as [ι' τ].
     erewrite inst_step_snoc in Heq. subst.
     exists (lift τ). now rewrite inst_thick inst_lift.
@@ -185,7 +185,7 @@ Proof.
   - now rewrite ax_wp_pure.
   - now rewrite ax_wp_bind.
   - rewrite ax_wp_equals. iIntros "[#Heq >HQ]". now iSplit.
-  - rewrite ax_wp_pick. rewrite <- (Acc.intro_wp_step τ).
+  - rewrite ax_wp_pick. rewrite <- (Sub.intro_wp_step τ).
     iIntros "#H !> #Heq". iMod "H".
     iSpecialize ("H" $! (oty.var world.in_zero) with "Heq").
     now rewrite trans_refl_r.
@@ -216,11 +216,11 @@ Proof. iIntros "WP PQ". iRevert "WP". now rewrite -wlp_mono. Qed.
 
 Definition wp_diamond {Θ : SUB} {A} :
   ⊧ Diamond Θ A ⇢ Box Θ (A ⇢ Pred) ⇢ Pred :=
-  fun w '(existT w1 (θ, a)) Q => Acc.wp θ (Q w1 θ a).
+  fun w '(existT w1 (θ, a)) Q => Sub.wp θ (Q w1 θ a).
 
 Definition wlp_diamond {Θ : SUB} {A} :
   ⊧ Diamond Θ A ⇢ Box Θ (A ⇢ Pred) ⇢ Pred :=
-  fun w '(existT w1 (θ, a)) Q => Acc.wlp θ (Q w1 θ a).
+  fun w '(existT w1 (θ, a)) Q => Sub.wlp θ (Q w1 θ a).
 
 Definition wp_option {A w1 w2} :
   Option A w1 -> (A w1 -> Pred w2) -> Pred w2 :=
@@ -260,7 +260,7 @@ Section Solved.
       (@wp_solved Θ A w).
   Proof.
     intros d p q pq. destruct d as [(w1 & r01 & a)|]; cbn; [|easy].
-    apply Acc.proper_wp_bientails. apply pq.
+    apply Sub.proper_wp_bientails. apply pq.
   Qed.
 
   #[export] Instance proper_wp_solved_entails {Θ A w} :
@@ -272,7 +272,7 @@ Section Solved.
       (@wp_solved Θ A w).
   Proof.
     intros d p q pq. destruct d as [(w1 & r01 & a)|]; cbn; [|easy].
-    apply Acc.proper_wp_entails. apply pq.
+    apply Sub.proper_wp_entails. apply pq.
   Qed.
 
   Lemma wp_solved_frame {Θ A w} (m : Solved Θ A w)
@@ -280,7 +280,7 @@ Section Solved.
     WP m P /\ₚ Q ⊣⊢ₚ WP m (fun w1 θ1 a1 => P w1 θ1 a1 /\ₚ persist Q θ1).
   Proof.
     destruct m as [(w1 & θ1 & a1)|]; cbn.
-    - now rewrite Acc.and_wp_l.
+    - now rewrite Sub.and_wp_l.
     - now rewrite bi.False_and.
   Qed.
 
@@ -303,7 +303,7 @@ Section Solved.
   Lemma wp_optiondiamond_pure {Θ} {reflΘ : Refl Θ} {lkreflΘ : LkRefl Θ}
     {A w0} (a : A w0) (Q : Box Θ (A ⇢ Pred) w0) :
     wp_solved (pure (M := Solved Θ) a) Q ⊣⊢ₚ Q _ refl a.
-  Proof. cbn. now rewrite Acc.wp_refl. Qed.
+  Proof. cbn. now rewrite Sub.wp_refl. Qed.
 
   Lemma wp_solved_bind {Θ} {transΘ : Trans Θ} {lkTransΘ : LkTrans Θ}
     {A B w0} (m : Solved Θ A w0) (f : Box Θ (A ⇢ Solved Θ B) w0)
@@ -312,7 +312,7 @@ Section Solved.
   Proof.
     destruct m as [(w1 & r01 & a)|]; cbn; [|reflexivity].
     destruct (f w1 r01 a) as [(w2 & r12 & b2)|]; cbn;
-      now rewrite ?Acc.wp_trans ?Acc.wp_false.
+      now rewrite ?Sub.wp_trans ?Sub.wp_false.
   Qed.
 
 End Solved.
@@ -330,7 +330,7 @@ Definition solved_hmap `{HMap Θ1 Θ2} {A} : ⊧ Solved Θ1 A ⇢ Solved Θ2 A :
 Lemma instpred_solved_hmap `{LkHMap Θ1 Θ2} {A} `{ipA : InstPred A}
   {w} (m : Solved Θ1 A w) :
   instpred (solved_hmap m) ⊣⊢ₚ instpred m.
-Proof. destruct m as [(w' & θ & a)|]; cbn; now rewrite ?Acc.wp_hmap. Qed.
+Proof. destruct m as [(w' & θ & a)|]; cbn; now rewrite ?Sub.wp_hmap. Qed.
 
 (* Create HintDb wpeq. *)
 (* #[export] Hint Rewrite *)

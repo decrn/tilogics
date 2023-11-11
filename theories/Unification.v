@@ -280,7 +280,7 @@ Section Correctness.
   Local Existing Instance proper_persist_bientails.
   Lemma instpred_ctrue {w0 w1} (θ1 : Tri w0 w1) :
     instpred (ctrue θ1) ⊣⊢ₚ ⊤ₚ.
-  Proof. cbn. now rewrite Acc.wp_refl. Qed.
+  Proof. cbn. now rewrite Sub.wp_refl. Qed.
 
   Lemma instpred_cfalse {w0 w1} (θ1 : Tri w0 w1) :
     instpred (cfalse θ1) ⊣⊢ₚ ⊥ₚ.
@@ -307,9 +307,9 @@ Section Correctness.
   Proof.
     unfold flex. destruct varview; cbn.
     - destruct world.occurs_check_view; predsimpl.
-      rewrite Acc.wp_thick; predsimpl. now rewrite lk_thin.
+      rewrite Sub.wp_thick; predsimpl. now rewrite lk_thin.
     - pose proof (occurs_check_spec αIn t) as HOC. destruct occurs_check; cbn.
-      + subst. now rewrite Acc.wp_thick; predsimpl.
+      + subst. now rewrite Sub.wp_thick; predsimpl.
       + destruct HOC as [HOC|HOC].
         * subst. now contradiction (H α αIn).
         * apply pno_cycle in HOC. apply split_bientails. now split.

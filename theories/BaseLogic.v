@@ -451,9 +451,9 @@ Module Pred.
 
   End Lemmas.
 
-  Module Acc.
+  Module Sub.
     Import (hints) Par.
-    Section WithAccessibilityRelation.
+    Section WithSubstitution.
       Context {Θ : SUB}.
 
       Definition wp {w0 w1} (θ : Θ w0 w1) (Q : Pred w1) : Pred w0 :=
@@ -602,7 +602,7 @@ Module Pred.
         - intros H HP ι1 <-. apply H; auto.
       Qed.
 
-    End WithAccessibilityRelation.
+    End WithSubstitution.
     (* #[global] Opaque wp. *)
     (* #[global] Opaque wlp. *)
 
@@ -650,7 +650,7 @@ Module Pred.
       intro ι1. now rewrite inst_hmap.
     Qed.
 
-  End Acc.
+  End Sub.
 
   Section InstPred.
     Import iris.bi.derived_laws.
@@ -727,7 +727,7 @@ Module Pred.
     Import iris.proofmode.tactics.
 
     Definition PBox {Θ} : ⊧ Box Θ Pred ⇢ Pred :=
-      fun w Q => (∀ₚ w' (θ : Θ w w'), Acc.wlp θ (Q w' θ))%P.
+      fun w Q => (∀ₚ w' (θ : Θ w w'), Sub.wlp θ (Q w' θ))%P.
 
     #[export] Instance elimupdate `{LkRefl Θ} (p : bool)
       {w} (P : Box Θ Pred w) (Q : Pred w) :
@@ -735,7 +735,7 @@ Module Pred.
     Proof.
       intros _. unfold PBox. cbn. iIntros "[#H1 H2]". iApply "H2".
       destruct p; cbn; iSpecialize ("H1" $! w (refl (Refl := reflΘ)));
-        now erewrite Acc.wlp_refl.
+        now erewrite Sub.wlp_refl.
     Qed.
 
     Lemma persist_update `{LkTrans Θ} [w] (Q : Box Θ Pred w) [w1] (θ1 : Θ w w1) :
@@ -789,14 +789,14 @@ Module Pred.
     Context {Θ : SUB} [w0 w1] (θ : Θ w0 w1).
 
     Class IntoWlp (P : Pred w0) (Q : Pred w1) :=
-      into_wlp : P ⊢ Acc.wlp θ Q.
+      into_wlp : P ⊢ Sub.wlp θ Q.
 
     #[export] Instance into_wlp_default (P : Pred w0) :
       IntoWlp P (persist P θ) | 10.
-    Proof. unfold IntoWlp. now apply Acc.entails_wlp. Qed.
+    Proof. unfold IntoWlp. now apply Sub.entails_wlp. Qed.
 
     Definition modality_wlp_mixin :
-      modality_mixin (Acc.wlp θ)
+      modality_mixin (Sub.wlp θ)
         (MIEnvTransform IntoWlp)
         (MIEnvTransform IntoWlp).
     Proof. firstorder. Qed.
@@ -805,7 +805,7 @@ Module Pred.
       Modality _ (modality_wlp_mixin).
 
     #[export] Instance from_modal_wlp P :
-      FromModal True modality_wlp (Acc.wlp θ P) (Acc.wlp θ P) P.
+      FromModal True modality_wlp (Sub.wlp θ P) (Sub.wlp θ P) P.
     Proof. firstorder. Qed.
 
     #[export] Instance into_wlp_update `{LkTrans Θ} (P : Box Θ Pred w0) :
@@ -832,7 +832,7 @@ Module Pred.
     Qed.
 
     #[export] Instance into_wlp_wlp (P : Pred w1) :
-      IntoWlp (Acc.wlp θ P) P | 0.
+      IntoWlp (Sub.wlp θ P) P | 0.
     Proof. unfold IntoWlp. reflexivity. Qed.
 
   End WlpModality.
@@ -851,12 +851,12 @@ Module Pred.
     (@persist_refl OTy _ _)
     (@persist_trans OEnv _ _)
     (@persist_trans OTy _ _)
-    @Acc.wlp_refl
-    @Acc.wlp_trans
-    @Acc.wlp_true
-    @Acc.wp_false
-    @Acc.wp_refl
-    @Acc.wp_trans
+    @Sub.wlp_refl
+    @Sub.wlp_trans
+    @Sub.wlp_true
+    @Sub.wp_false
+    @Sub.wp_refl
+    @Sub.wp_trans
     @and_false_l
     @and_false_r
     @and_true_l
@@ -885,10 +885,10 @@ Module Pred.
        change_no_check (@gmap.gmap string _ _ (OTy ?w)) with (OEnv w) in *;
        repeat
          match goal with
-         | |- Acc.wp ?θ _ ⊣⊢ₚ Acc.wp ?θ _ =>
-             apply Acc.proper_wp_bientails
-         | |- Acc.wlp ?θ _ ⊣⊢ₚ Acc.wlp ?θ _ =>
-             apply Acc.proper_wlp_bientails
+         | |- Sub.wp ?θ _ ⊣⊢ₚ Sub.wp ?θ _ =>
+             apply Sub.proper_wp_bientails
+         | |- Sub.wlp ?θ _ ⊣⊢ₚ Sub.wlp ?θ _ =>
+             apply Sub.proper_wlp_bientails
          end;
        try easy;
        repeat rewrite_db predsimpl;

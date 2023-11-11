@@ -42,7 +42,7 @@ From Em Require Import BaseLogic Gen.Synthesise PrenexConversion Spec Unificatio
   Open
   Spec.
 
-Import Pred Pred.Acc.
+Import Pred Pred.Sub.
 Import ListNotations.
 Import (hints) Par.
 
@@ -132,7 +132,7 @@ Proof.
   rewrite <- prenex_correct. destruct prenex as [(w1 & θ1 & C & t1 & e1)|]; cbn.
   - rewrite <- (solve_correct C).
     destruct (solve C) as [(w2 & θ2 & [])|]; predsimpl.
-    + rewrite Acc.and_wp_l. predsimpl. unfold Acc.wp; pred_unfold.
+    + rewrite Sub.and_wp_l. predsimpl. unfold Sub.wp; pred_unfold.
       intros HG. rewrite (HG env.nil). clear HG. split.
       * intros (ι2 & Heq1 & Heq2). exists (inst θ2 ι2).
         split; [now destruct (env.view (inst θ1 (inst θ2 ι2)))|].
