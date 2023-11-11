@@ -62,7 +62,7 @@ Section WithSub.
       destruct f as [(w2 & θ2 & b2)|]; predsimpl.
     - rewrite <- mgu_correct. destruct mgu as [(w1 & θ1 & [])|]; predsimpl.
       rewrite Sub.wp_impl. predsimpl. iIntros "HQ !>".
-      rewrite persist_update. iMod "HQ". now rewrite trans_refl_r.
+      rewrite persist_pbox. iMod "HQ". now rewrite trans_refl_r.
     - iIntros "HQ !>". iMod "HQ". rewrite trans_refl_r. iApply "HQ".
     - destruct m as [(w1 & θ1 & a1)|]; predsimpl.
       iIntros "PQ". iApply Sub.wlp_mono. iModIntro.

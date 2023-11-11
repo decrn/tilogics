@@ -84,37 +84,37 @@ Class AxiomaticSemantics
   M {pureM : Pure M} {bindM : Bind Θ M} {failM : Fail M} {tcM : TypeCheckM M}
     {wpM : WeakestPre Θ M} {wlpM : WeakestLiberalPre Θ M} : Type :=
 
-  { ax_wp_pure [A w] (a : A w) (Q : Box Θ (A ⇢ Pred) w) :
+  { ax_wp_pure [A w] (a : A w) (Q : ◻(A ⇢ Pred) w) :
       WP (pure a) Q ⊣⊢ₚ Q _ refl a;
-    ax_wp_bind [A B w0] (m : M A w0) (f : Box Θ (A ⇢ M B) w0) (Q : Box Θ (B ⇢ Pred) w0) :
-      WP (bind m f) Q ⊣⊢ₚ WP m (fun w1 θ1 a => WP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2)));
-    ax_wp_equals [w] (σ τ : OTy w) (Q : Box Θ (Unit ⇢ Pred) w) :
+    ax_wp_bind [A B w0] (m : M A w0) (f : ◻(A ⇢ M B) w0) (Q : ◻(B ⇢ Pred) w0) :
+      WP (bind m f) Q ⊣⊢ₚ WP m (fun _ θ1 a => WP (f _ θ1 a) (fun _ θ2 => Q _ (θ1⊙θ2)));
+    ax_wp_equals [w] (σ τ : OTy w) (Q : ◻(Unit ⇢ Pred) w) :
       WP (equals σ τ) Q ⊣⊢ₚ σ =ₚ τ /\ₚ Q _ refl tt;
-    ax_wp_pick [w] (Q : Box Θ (OTy ⇢ Pred) w) :
+    ax_wp_pick [w] (Q : ◻(OTy ⇢ Pred) w) :
       let α := world.fresh w in
       WP pick Q ⊣⊢ₚ Sub.wp step (Q (w ▻ α) step (oty.var world.in_zero));
-    ax_wp_fail [A w] (Q : Box Θ (A ⇢ Pred) w) :
+    ax_wp_fail [A w] (Q : ◻(A ⇢ Pred) w) :
       WP fail Q ⊣⊢ₚ ⊥ₚ;
-    ax_wp_mono [A w] (m : M A w) (P Q : Box Θ (A ⇢ Pred) w) :
-      PBox (fun w1 θ1 => ∀ (a : A w1), P w1 θ1 a -∗ Q w1 θ1 a) ⊢
+    ax_wp_mono [A w] (m : M A w) (P Q : ◻(A ⇢ Pred) w) :
+      ◼(fun _ θ1 => ∀ a, P _ θ1 a -∗ Q _ θ1 a) ⊢
       (WP m P -∗ WP m Q);
 
-    ax_wlp_pure [A w] (a : A w) (Q : Box Θ (A ⇢ Pred) w) :
+    ax_wlp_pure [A w] (a : A w) (Q : ◻(A ⇢ Pred) w) :
       WLP (pure a) Q ⊣⊢ₚ Q _ refl a;
-    ax_wlp_bind [A B w0] (m : M A w0) (f : Box Θ (A ⇢ M B) w0) (Q : Box Θ (B ⇢ Pred) w0) :
+    ax_wlp_bind [A B w0] (m : M A w0) (f : ◻(A ⇢ M B) w0) (Q : ◻(B ⇢ Pred) w0) :
       WLP (bind m f) Q ⊣⊢ₚ WLP m (fun w1 θ1 a => WLP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2)));
-    ax_wlp_equals [w] (σ τ : OTy w) (Q : Box Θ (Unit ⇢ Pred) w) :
+    ax_wlp_equals [w] (σ τ : OTy w) (Q : ◻(Unit ⇢ Pred) w) :
       WLP (equals σ τ) Q ⊣⊢ₚ σ =ₚ τ ->ₚ Q _ refl tt;
-    ax_wlp_pick [w] (Q : Box Θ (OTy ⇢ Pred) w) :
+    ax_wlp_pick [w] (Q : ◻(OTy ⇢ Pred) w) :
       let α := world.fresh w in
       WLP pick Q ⊣⊢ₚ Sub.wlp step (Q (w ▻ α) step (oty.var world.in_zero));
-    ax_wlp_fail [A w] (Q : Box Θ (A ⇢ Pred) w) :
+    ax_wlp_fail [A w] (Q : ◻(A ⇢ Pred) w) :
       WLP fail Q ⊣⊢ₚ ⊤ₚ;
-    ax_wlp_mono [A w] (m : M A w) (P Q : Box Θ (A ⇢ Pred) w) :
-      PBox (fun w1 θ1 => ∀ (a : A w1), P w1 θ1 a -∗ Q w1 θ1 a) ⊢
+    ax_wlp_mono [A w] (m : M A w) (P Q : ◻(A ⇢ Pred) w) :
+      ◼(fun _ θ1 => ∀ a, P _ θ1 a -∗ Q _ θ1 a) ⊢
       (WLP m P -∗ WLP m Q);
 
-    ax_wp_impl [A w] (m : M A w) (P : Box Θ (A ⇢ Pred) w) (Q : Pred w) :
+    ax_wp_impl [A w] (m : M A w) (P : ◻(A ⇢ Pred) w) (Q : Pred w) :
       (WP m P ->ₚ Q) ⊣⊢ₚ WLP m (fun w1 θ1 a1 => P w1 θ1 a1 ->ₚ Q[θ1]);
   }.
 #[global] Arguments AxiomaticSemantics Θ {_ _ _ _ _ _ _} _ {_ _ _ _ _ _}.
@@ -123,7 +123,7 @@ Class AxiomaticSemantics
 (* Alternative rule for pick which substitutes the last variable away
  as discussed in the papter. *)
 Lemma ax_wp_pick_substitute `{AxiomaticSemantics Θ M, Thick Θ} {lkThickΘ : LkThick Θ}
-  [w] (Q : Box Θ (OTy ⇢ Pred) w) :
+  [w] (Q : ◻(OTy ⇢ Pred) w) :
   WP pick Q ⊣⊢ₚ
     let α := world.fresh w in
     (∃ₚ τ : OTy w, (Q (w ▻ α) step (oty.var world.in_zero))[thick α (αIn := world.in_zero) τ]).
@@ -145,34 +145,34 @@ Class TypeCheckLogicM
     {wpM : WeakestPre Θ M} {wlpM : WeakestLiberalPre Θ M} : Type :=
 
   { wp_pure [A] {persA : Persistent A}
-      [w] (a : A w) (Q : Box Θ (A ⇢ Pred) w) :
+      [w] (a : A w) (Q : ◻(A ⇢ Pred) w) :
       Q _ refl a ⊢ₚ WP (pure a) Q;
-    wp_bind [A B w0] (m : M A w0) (f : Box Θ (A ⇢ M B) w0) (Q : Box Θ (B ⇢ Pred) w0) :
+    wp_bind [A B w0] (m : M A w0) (f : ◻(A ⇢ M B) w0) (Q : ◻(B ⇢ Pred) w0) :
       WP m (fun w1 θ1 a => WP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2))) ⊢ₚ WP (bind m f) Q;
-    wp_equals [w] (σ τ : OTy w) (Q : Box Θ (Unit ⇢ Pred) w) :
-      σ =ₚ τ /\ₚ PBox (fun _ θ => Q _ θ tt) ⊢ₚ WP (equals σ τ) Q;
-    wp_pick [w] [Q : Box Θ (OTy ⇢ Pred) w] (τ : Ty) :
-      PBox (fun _ θ => ∀ₚ τ', lift τ =ₚ τ' ->ₚ Q _ θ τ') ⊢ₚ WP pick Q;
-    wp_mono [A w] (m : M A w) (P Q : Box Θ (A ⇢ Pred) w) :
-      PBox (fun _ θ => ∀ₚ (a : A _), P _ θ a -∗ Q _ θ a)%I ⊢ₚ
+    wp_equals [w] (σ τ : OTy w) (Q : ◻(Unit ⇢ Pred) w) :
+      σ =ₚ τ /\ₚ ◼(fun _ θ => Q _ θ tt) ⊢ₚ WP (equals σ τ) Q;
+    wp_pick [w] [Q : ◻(OTy ⇢ Pred) w] (τ : Ty) :
+      ◼(fun _ θ => ∀ₚ τ', lift τ =ₚ τ' ->ₚ Q _ θ τ') ⊢ₚ WP pick Q;
+    wp_mono [A w] (m : M A w) (P Q : ◻(A ⇢ Pred) w) :
+      ◼(fun _ θ => ∀ₚ a, P _ θ a -∗ Q _ θ a)%I ⊢ₚ
       (WP m P -∗ WP m Q)%I;
 
     wlp_pure [A] {persA : Persistent A}
-      [w] (a : A w) (Q : Box Θ (A ⇢ Pred) w) :
+      [w] (a : A w) (Q : ◻(A ⇢ Pred) w) :
       Q _ refl a ⊢ₚ WLP (pure a) Q;
-    wlp_bind [A B w0] (m : M A w0) (f : Box Θ (A ⇢ M B) w0) (Q : Box Θ (B ⇢ Pred) w0) :
+    wlp_bind [A B w0] (m : M A w0) (f : ◻(A ⇢ M B) w0) (Q : ◻(B ⇢ Pred) w0) :
       WLP m (fun w1 θ1 a => WLP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2))) ⊢ₚ WLP (bind m f) Q;
-    wlp_equals [w] (σ τ : OTy w) (Q : Box Θ (Unit ⇢ Pred) w) :
-      σ =ₚ τ ->ₚ PBox (fun _ θ => Q _ θ tt) ⊢ₚ WLP (equals σ τ) Q;
-    wlp_pick [w] (Q : Box Θ (OTy ⇢ Pred) w) :
-      PBox (fun _ θ => ∀ₚ (τ : OTy _), Q _ θ τ) ⊢ₚ WLP pick Q;
-    wlp_fail [A w] (Q : Box Θ (A ⇢ Pred) w) :
+    wlp_equals [w] (σ τ : OTy w) (Q : ◻(Unit ⇢ Pred) w) :
+      σ =ₚ τ ->ₚ ◼(fun _ θ => Q _ θ tt) ⊢ₚ WLP (equals σ τ) Q;
+    wlp_pick [w] (Q : ◻(OTy ⇢ Pred) w) :
+      ◼(fun _ θ => ∀ₚ τ, Q _ θ τ) ⊢ₚ WLP pick Q;
+    wlp_fail [A w] (Q : ◻(A ⇢ Pred) w) :
       ⊤ₚ ⊢ₚ WLP fail Q;
-    wlp_mono [A w] (m : M A w) (P Q : Box Θ (A ⇢ Pred) w) :
-      PBox (fun _ θ => ∀ₚ (a : A _), P _ θ a -∗ Q _ θ a)%I ⊢ₚ
+    wlp_mono [A w] (m : M A w) (P Q : ◻(A ⇢ Pred) w) :
+      ◼(fun _ θ => ∀ₚ a, P _ θ a -∗ Q _ θ a)%I ⊢ₚ
       (WLP m P -∗ WLP m Q)%I;
 
-    wp_impl [A w] (m : M A w) (P : Box Θ (A ⇢ Pred) w) (Q : Pred w) :
+    wp_impl [A w] (m : M A w) (P : ◻(A ⇢ Pred) w) (Q : Pred w) :
       WLP m (fun w1 θ1 a1 => P w1 θ1 a1 ->ₚ Q[θ1]) ⊢ₚ (WP m P ->ₚ Q);
 
   }.
@@ -202,24 +202,24 @@ Proof.
   - now rewrite ax_wp_impl.
 Qed.
 
-Lemma wp_fail `{TypeCheckLogicM Θ M} [A w] (Q : Box Θ (A ⇢ Pred) w) :
+Lemma wp_fail `{TypeCheckLogicM Θ M} [A w] (Q : ◻(A ⇢ Pred) w) :
   ⊥ₚ ⊢ₚ WP fail Q.
 Proof. easy. Qed.
 
-Lemma wp_mono' `{TypeCheckLogicM Θ M} {A w} (m : M A w) (P Q : Box Θ (A ⇢ Pred) w) :
-  (WP m P -∗ PBox (fun w1 θ1 => ∀ₚ a1, P w1 θ1 a1 -∗ Q w1 θ1 a1) -∗ WP m Q)%P.
+Lemma wp_mono' `{TypeCheckLogicM Θ M} {A w} (m : M A w) (P Q : ◻(A ⇢ Pred) w) :
+  (WP m P -∗ ◼(fun _ θ1 => ∀ₚ a1, P _ θ1 a1 -∗ Q _ θ1 a1) -∗ WP m Q)%P.
 Proof. iIntros "WP PQ". iRevert "WP". now rewrite -wp_mono. Qed.
 
-Lemma wlp_mono' `{TypeCheckLogicM Θ M} {A w} (m : M A w) (P Q : Box Θ (A ⇢ Pred) w) :
-  (WLP m P -∗ PBox (fun w1 θ1 => ∀ₚ a1, P w1 θ1 a1 -∗ Q w1 θ1 a1) -∗ WLP m Q)%P.
+Lemma wlp_mono' `{TypeCheckLogicM Θ M} {A w} (m : M A w) (P Q : ◻(A ⇢ Pred) w) :
+  (WLP m P -∗ ◼(fun _ θ1 => ∀ₚ a1, P _ θ1 a1 -∗ Q _ θ1 a1) -∗ WLP m Q)%P.
 Proof. iIntros "WP PQ". iRevert "WP". now rewrite -wlp_mono. Qed.
 
 Definition wp_diamond {Θ : SUB} {A} :
-  ⊧ Diamond Θ A ⇢ Box Θ (A ⇢ Pred) ⇢ Pred :=
+  ⊧ Diamond Θ A ⇢ ◻(A ⇢ Pred) ⇢ Pred :=
   fun w '(existT w1 (θ, a)) Q => Sub.wp θ (Q w1 θ a).
 
 Definition wlp_diamond {Θ : SUB} {A} :
-  ⊧ Diamond Θ A ⇢ Box Θ (A ⇢ Pred) ⇢ Pred :=
+  ⊧ Diamond Θ A ⇢ ◻(A ⇢ Pred) ⇢ Pred :=
   fun w '(existT w1 (θ, a)) Q => Sub.wlp θ (Q w1 θ a).
 
 Definition wp_option {A w1 w2} :
@@ -276,7 +276,7 @@ Section Solved.
   Qed.
 
   Lemma wp_solved_frame {Θ A w} (m : Solved Θ A w)
-    (P : Box Θ (A ⇢ Pred) w) (Q : Pred w) :
+    (P : ◻(A ⇢ Pred) w) (Q : Pred w) :
     WP m P /\ₚ Q ⊣⊢ₚ WP m (fun w1 θ1 a1 => P w1 θ1 a1 /\ₚ persist Q θ1).
   Proof.
     destruct m as [(w1 & θ1 & a1)|]; cbn.
@@ -300,14 +300,14 @@ Section Solved.
   #[export] Instance fail_solved {Θ} : Fail (Solved Θ) :=
     fun A w => None.
 
-  Lemma wp_optiondiamond_pure {Θ} {reflΘ : Refl Θ} {lkreflΘ : LkRefl Θ}
-    {A w0} (a : A w0) (Q : Box Θ (A ⇢ Pred) w0) :
+  Lemma wp_solved_pure {Θ} {reflΘ : Refl Θ} {lkreflΘ : LkRefl Θ}
+    {A w0} (a : A w0) (Q : ◻(A ⇢ Pred) w0) :
     wp_solved (pure (M := Solved Θ) a) Q ⊣⊢ₚ Q _ refl a.
   Proof. cbn. now rewrite Sub.wp_refl. Qed.
 
   Lemma wp_solved_bind {Θ} {transΘ : Trans Θ} {lkTransΘ : LkTrans Θ}
-    {A B w0} (m : Solved Θ A w0) (f : Box Θ (A ⇢ Solved Θ B) w0)
-    (Q : Box Θ (B  ⇢ Pred) w0) :
+    {A B w0} (m : Solved Θ A w0) (f : ◻(A ⇢ Solved Θ B) w0)
+    (Q : ◻(B  ⇢ Pred) w0) :
     WP (bind m f) Q ⊣⊢ₚ WP m (fun w1 ζ1 a1 => WP (f w1 ζ1 a1) (_4 Q ζ1)).
   Proof.
     destruct m as [(w1 & r01 & a)|]; cbn; [|reflexivity].

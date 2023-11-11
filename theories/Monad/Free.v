@@ -86,8 +86,7 @@ Inductive Free (A : OType) (w : World) : Type :=
     end%P.
 
 Lemma wp_free_mono [A w0] (m : Free A w0) (P Q : ◻(A ⇢ Pred) w0) :
-  PBox (fun w1 θ1 => ∀ₚ a, P w1 θ1 a -∗ Q w1 θ1 a)%P ⊢
-    (WP m P -∗ WP m Q).
+  ◼(fun _ θ1 => ∀ₚ a, P _ θ1 a -∗ Q _ θ1 a)%P ⊢ (WP m P -∗ WP m Q).
 Proof.
   induction m; cbn; iIntros "#PQ".
   - now iMod "PQ".
@@ -98,8 +97,7 @@ Proof.
 Qed.
 
 Lemma wlp_free_mono [A w0] (m : Free A w0) (P Q : ◻(A ⇢ Pred) w0) :
-  PBox (fun w1 θ1 => ∀ₚ a, P w1 θ1 a -∗ Q w1 θ1 a)%P ⊢
-    (WLP m P -∗ WLP m Q).
+  ◼(fun _ θ1 => ∀ₚ a, P _ θ1 a -∗ Q _ θ1 a)%P ⊢ (WLP m P -∗ WLP m Q).
 Proof.
   induction m; cbn; iIntros "#PQ".
   - now iMod "PQ".

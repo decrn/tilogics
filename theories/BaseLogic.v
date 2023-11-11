@@ -40,15 +40,21 @@ Import world.notations.
 #[local] Arguments step : simpl never.
 #[local] Arguments thick : simpl never.
 
-(* #[local] Notation "Q [ ζ ]" := *)
-(*   (_4 Q ζ) *)
-(*     (at level 8, left associativity, *)
-(*       format "Q [ ζ ]") : box_scope. *)
+#[local] Notation "Q [ θ ]" :=
+  (fun _ θ' => Q _ (θ ⊙ θ'))
+    (at level 8, left associativity,
+      format "Q [ θ ]") : box_scope.
+
+Declare Scope pred_scope.
+Delimit Scope pred_scope with P.
+
+#[local] Notation "P [ θ ]" :=
+  (persist P θ)
+    (at level 8, left associativity,
+      format "P [ θ ]") : pred_scope.
 
 Module Pred.
 
-  Declare Scope pred_scope.
-  Delimit Scope pred_scope with P.
 
   Definition Pred (w : World) : Type :=
     Assignment w -> Prop.
@@ -652,6 +658,12 @@ Module Pred.
 
   End Sub.
 
+  Definition PBox {Θ} : ⊧ Box Θ Pred ⇢ Pred :=
+    fun w Q => (∀ₚ w' (θ : Θ w w'), Sub.wlp θ (Q w' θ))%P.
+  Notation "◼ Q" :=
+    (PBox Q%B)
+      (at level 9, right associativity, format "◼ Q").
+
   Section InstPred.
     Import iris.bi.derived_laws.
     Import iris.bi.interface.
@@ -726,20 +738,17 @@ Module Pred.
   Section PBoxModality.
     Import iris.proofmode.tactics.
 
-    Definition PBox {Θ} : ⊧ Box Θ Pred ⇢ Pred :=
-      fun w Q => (∀ₚ w' (θ : Θ w w'), Sub.wlp θ (Q w' θ))%P.
-
-    #[export] Instance elimupdate `{LkRefl Θ} (p : bool)
-      {w} (P : Box Θ Pred w) (Q : Pred w) :
-      ElimModal True p true (PBox P) (P w refl) Q Q.
+    #[export] Instance elimpbox `{LkRefl Θ} (p : bool)
+      {w} (P : ◻Pred w) (Q : Pred w) :
+      ElimModal True p true ◼P (P w refl) Q Q.
     Proof.
       intros _. unfold PBox. cbn. iIntros "[#H1 H2]". iApply "H2".
       destruct p; cbn; iSpecialize ("H1" $! w (refl (Refl := reflΘ)));
         now erewrite Sub.wlp_refl.
     Qed.
 
-    Lemma persist_update `{LkTrans Θ} [w] (Q : Box Θ Pred w) [w1] (θ1 : Θ w w1) :
-      persist (PBox Q) θ1 ⊢ₚ PBox (fun _ θ2 => Q _ (θ1 ⊙ θ2)).
+    Lemma persist_pbox `{LkTrans Θ} [w] (Q : ◻Pred w) [w1] (θ1 : Θ w w1) :
+      (◼Q)[θ1] ⊢ₚ ◼(Q[θ1]).
     Proof.
       constructor; intros ι1 HQ w2 θ2 ι2 <-.
       apply HQ. now rewrite inst_trans.
@@ -808,9 +817,9 @@ Module Pred.
       FromModal True modality_wlp (Sub.wlp θ P) (Sub.wlp θ P) P.
     Proof. firstorder. Qed.
 
-    #[export] Instance into_wlp_update `{LkTrans Θ} (P : Box Θ Pred w0) :
-      IntoWlp (PBox P) (PBox (fun _ θ2 => P _ (θ ⊙ θ2))) | 0.
-    Proof. unfold IntoWlp. iIntros "H !>". now rewrite persist_update. Qed.
+    #[export] Instance into_wlp_pbox `{LkTrans Θ} (P : ◻Pred w0) :
+      IntoWlp ◼P ◼(fun _ θ2 => P _ (θ ⊙ θ2)) | 0.
+    Proof. unfold IntoWlp. iIntros "H !>". now rewrite persist_pbox. Qed.
 
     #[export] Instance into_wlp_tpb (G1 : OEnv w0) (e : Exp) (τ1 : OTy w0)
       (ee1 : OExp w0) G2 τ2 ee2 (HG : IntoPersist θ G1 G2)
