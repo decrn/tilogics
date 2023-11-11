@@ -30,7 +30,7 @@ From Em Require Import Prelude Instantiation Spec Persistence Worlds.
 
 Module Open.
 
-  Definition Open (A : Type) : TYPE :=
+  Definition Open (A : Type) : OType :=
     fun w => Assignment w → A.
 
   (* pure  :: a -> f a *)

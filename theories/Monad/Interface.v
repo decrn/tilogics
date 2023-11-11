@@ -39,13 +39,13 @@ Import world.notations Pred Pred.notations Pred.proofmode.
       format "s [ ζ ]").
 #[local] Set Implicit Arguments.
 
-Class Pure (M : TYPE → TYPE) : Type :=
+Class Pure (M : OType → OType) : Type :=
   pure : ∀ A, ⊧ A ⇢ M A.
 #[global] Arguments pure {M _ A} [w].
-Class Bind (Θ : SUB) (M : TYPE → TYPE) : Type :=
+Class Bind (Θ : SUB) (M : OType → OType) : Type :=
   bind : ∀ A B, ⊧ M A ⇢ Box Θ (A ⇢ M B) ⇢ M B.
 #[global] Arguments bind {Θ M _ A B} [w].
-Class Fail (M : TYPE → TYPE) : Type :=
+Class Fail (M : OType → OType) : Type :=
   fail : ∀ A, ⊧ M A.
 #[global] Arguments fail {M _ A w}.
 
@@ -66,16 +66,16 @@ End MonadNotations.
 Import Pred Pred.Acc.
 
 
-Class TypeCheckM (M : TYPE -> TYPE) : Type :=
+Class TypeCheckM (M : OType -> OType) : Type :=
   { assert   : ⊧ Ṫy ⇢ Ṫy ⇢ M Unit;
     pick     : ⊧ M Ṫy;
   }.
 #[global] Arguments fail {_ _ _ w}.
 #[global] Arguments pick {_ _ w}.
 
-Class WeakestPre (Θ : SUB) (M : TYPE -> TYPE) : Type :=
+Class WeakestPre (Θ : SUB) (M : OType -> OType) : Type :=
   WP [A] : ⊧ M A ⇢ Box Θ (A ⇢ Pred) ⇢ Pred.
-Class WeakestLiberalPre (Θ : SUB) (M : TYPE -> TYPE) : Type :=
+Class WeakestLiberalPre (Θ : SUB) (M : OType -> OType) : Type :=
   WLP [A] : ⊧ M A ⇢ Box Θ (A ⇢ Pred) ⇢ Pred.
 
 Class AxiomaticSemantics
@@ -238,8 +238,8 @@ Definition wlp_option {A w1 w2} :
     | None => ⊤ₚ
     end%P.
 
-Definition Solved (Θ : SUB) (A : TYPE) : TYPE := Option (Diamond Θ A).
-Definition Prenex (A : TYPE) : TYPE := Solved Prefix (List (Ṫy * Ṫy) * A).
+Definition Solved (Θ : SUB) (A : OType) : OType := Option (Diamond Θ A).
+Definition Prenex (A : OType) : OType := Solved Prefix (List (Ṫy * Ṫy) * A).
 
 Section Solved.
 

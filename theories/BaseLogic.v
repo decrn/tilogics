@@ -56,7 +56,7 @@ Module Pred.
 
   Section Definitions.
 
-    Definition eqₚ {T : TYPE} {A : Type} {instTA : Inst T A} :
+    Definition eqₚ {T : OType} {A : Type} {instTA : Inst T A} :
       ⊧ T ⇢ T ⇢ Pred :=
       fun w t1 t2 ι => inst t1 ι = inst t2 ι.
     #[global] Arguments eqₚ {T A _} [w] _ _ _/.
@@ -387,7 +387,7 @@ Module Pred.
     Proof. destruct t1, t2; obligation. Qed.
 
     Lemma eq_pair
-      {AT BT : TYPE} {A B : Type} {instA : Inst AT A} {instB : Inst BT B}
+      {AT BT : OType} {A B : Type} {instA : Inst AT A} {instB : Inst BT B}
       [w] (a1 a2 : AT w) (b1 b2 : BT w) :
       (a1,b1) =ₚ (a2,b2) ⊣⊢ₚ ((a1 =ₚ a2) /\ₚ (b1 =ₚ b2)).
     Proof.
@@ -398,7 +398,7 @@ Module Pred.
 
     Section Persist.
 
-      Lemma persist_eq {T : TYPE} {persR : Persistence.Persistent T}
+      Lemma persist_eq {T : OType} {persR : Persistence.Persistent T}
         {A : Type} {instTA : Inst T A} {instPersistTA : InstPersist T A}
         {Θ : SUB} {w0 w1} (θ : Θ w0 w1) (t1 t2 : T w0) :
         persist (t1 =ₚ t2) θ ⊣⊢ₚ persist t1 θ =ₚ persist t2 θ.
@@ -657,7 +657,7 @@ Module Pred.
     Import iris.bi.interface.
     Import Persistence.
     (* A type class for things that can be interpreted as a predicate. *)
-    Class InstPred (A : TYPE) :=
+    Class InstPred (A : OType) :=
       instpred : ⊧ A ⇢ Pred.
     #[global] Arguments instpred {_ _ _}.
 

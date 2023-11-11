@@ -64,7 +64,7 @@ Section RemoveAcc.
     fun w d => match d with remove_acc_intro f => f end.
 
   (* We only define a non-dependent elimination scheme for Type. *)
-  Definition remove_acc_rect (P : TYPE) (f : ⊧ ▷P ⇢ P) :
+  Definition remove_acc_rect (P : OType) (f : ⊧ ▷P ⇢ P) :
     ⊧ remove_acc ⇢ P :=
     fix F w (d : remove_acc w) {struct d} : P w :=
       f w (fun α αIn => F (w - α) (remove_acc_inv d αIn)).
@@ -210,12 +210,12 @@ Section Implementation.
   #[global] Arguments cfalse {w} [w1] _.
   #[global] Arguments ctrue {w} [w1] _.
 
-  Definition BoxUnifier : TYPE :=
+  Definition AUnifier : OType :=
     Ṫy ⇢ Ṫy ⇢ C.
 
   Section MguO.
 
-    Context [w] (lamgu : ▷BoxUnifier w).
+    Context [w] (lamgu : ▷AUnifier w).
     Arguments lamgu {_ _} _ _ {_} _.
 
     Definition aflex α {αIn : α ∈ w} (τ : Ṫy w) : C w :=
@@ -257,7 +257,7 @@ Section Implementation.
 
   End MguO.
 
-  Definition amgu : ⊧ BoxUnifier :=
+  Definition amgu : ⊧ AUnifier :=
     fun w => loeb atrav w.
 
   Definition mgu `{HMap Tri Θ} : ⊧ Ṫy ⇢ Ṫy ⇢ Solved Θ Unit :=
@@ -297,7 +297,7 @@ Section Correctness.
     cbn. rewrite and_true_l, <- persist_pred_trans. apply H2.
   Qed.
 
-  Definition BoxUnifierCorrect : ⊧ BoxUnifier ⇢ PROP :=
+  Definition AUnifierCorrect : ⊧ AUnifier ⇢ PROP :=
     fun w0 bu =>
       ∀ (t1 t2 : Ṫy w0) w1 (θ1 : w0 ⊑⁻ w1),
         instpred (bu t1 t2 w1 θ1) ⊣⊢ₚ (t1 =ₚ t2)[θ1].
@@ -317,9 +317,9 @@ Section Correctness.
 
   Section InnerRecursion.
 
-    Context [w] (lamgu : ▷BoxUnifier w).
+    Context [w] (lamgu : ▷AUnifier w).
     Context (lamgu_correct : ∀ x (xIn : x ∈ w),
-                BoxUnifierCorrect (lamgu xIn)).
+                AUnifierCorrect (lamgu xIn)).
 
     Lemma aflex_correct {α} (αIn : α ∈ w) (t : Ṫy w) w1 (θ1 : w ⊑⁻ w1) :
       instpred (aflex lamgu α t θ1) ⊣⊢ₚ (ṫy.var αIn =ₚ t)[θ1].
@@ -330,7 +330,7 @@ Section Correctness.
       - now rewrite lamgu_correct, !persist_eq, !persist_trans.
     Qed.
 
-    Lemma atrav_correct : BoxUnifierCorrect (atrav lamgu).
+    Lemma atrav_correct : AUnifierCorrect (atrav lamgu).
     Proof.
       intros t1 t2. pattern (atrav lamgu t1 t2). apply atrav_elim; clear t1 t2.
       - intros α αIn t w1 θ1. now rewrite aflex_correct.
@@ -344,7 +344,7 @@ Section Correctness.
 
   End InnerRecursion.
 
-  Lemma amgu_correct : ∀ w, BoxUnifierCorrect (@amgu w).
+  Lemma amgu_correct : ∀ w, AUnifierCorrect (@amgu w).
   Proof. apply loeb_elim, atrav_correct. Qed.
 
   Definition mgu_correct `{LkHMap Tri Θ} w (t1 t2 : Ṫy w) :

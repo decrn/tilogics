@@ -34,7 +34,7 @@ Import Pred Pred.notations Pred.Acc Pred.proofmode world.notations.
 
 #[local] Set Implicit Arguments.
 
-Inductive Free (A : TYPE) (w : World) : Type :=
+Inductive Free (A : OType) (w : World) : Type :=
 | Ret (a : A w)
 | Fail
 | Assertk (t1 t2 : Ṫy w) (k : Free A w)

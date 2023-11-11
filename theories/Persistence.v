@@ -34,7 +34,7 @@ Import world.notations.
 
 #[local] Set Implicit Arguments.
 
-Class Persistent (A : TYPE) : Type :=
+Class Persistent (A : OType) : Type :=
   persist : forall {Θ}, ⊧ A ⇢ Box Θ A.
 #[global] Arguments persist {_ _ _} [w] _ [_] _.
 

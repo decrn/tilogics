@@ -38,10 +38,10 @@ Notation Assignment := (env.Env Ty).
 
 Section Inst.
 
-  Class Inst (A : TYPE) (a : Type) : Type :=
+  Class Inst (A : OType) (a : Type) : Type :=
     inst : forall {w}, A w -> Assignment w -> a.
 
-  #[export] Instance inst_list {A : TYPE} {a : Type} `{Inst A a} :
+  #[export] Instance inst_list {A : OType} {a : Type} `{Inst A a} :
     Inst (List A) (list a) :=
     fun w xs ass => List.map (fun x => inst x ass) xs.
 
@@ -77,7 +77,7 @@ End Inst.
 
 Section Lift.
 
-  Class Lift (AT : TYPE) (A : Type) : Type :=
+  Class Lift (AT : OType) (A : Type) : Type :=
     lift : A -> ⊧ AT.
   #[global] Arguments lift {_ _ _} _ {_}.
 

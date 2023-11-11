@@ -204,7 +204,7 @@ Bind Scope world_scope with World.
 
 Import world.notations.
 
-Definition TYPE : Type := World → Type.
+Definition OType : Type := World → Type.
 
 Module ṫy.
 
@@ -280,27 +280,27 @@ Class Thick (Θ : SUB) : Type :=
   thick w α {αIn : α ∈ w} (t : Ṫy (w - α)) : Θ w (w - α).
 #[global] Arguments thick {Θ _} [w] α {αIn} t.
 
-Definition Valid (A : TYPE) : Type := ∀ w, A w.
-Polymorphic Definition Impl (A B : TYPE) : TYPE :=
+Definition Valid (A : OType) : Type := ∀ w, A w.
+Polymorphic Definition Impl (A B : OType) : OType :=
   fun w => A w → B w.
-Definition Forall {I : Type} (A : I → TYPE) : TYPE :=
+Definition Forall {I : Type} (A : I → OType) : OType :=
   fun w => ∀ i : I, A i w.
 
 Declare Scope indexed_scope.
-Bind    Scope indexed_scope with TYPE.
+Bind    Scope indexed_scope with OType.
 Delimit Scope indexed_scope with W.
 
-Definition Const (A : Type) : TYPE := fun _ => A.
-Definition PROP : TYPE := fun _ => Prop.
-Definition Unit : TYPE := fun _ => unit.
-Definition Option (A : TYPE) : TYPE := fun w => option (A w).
-Definition List (A : TYPE) : TYPE := fun w => list (A w).
-Definition Prod (A B : TYPE) : TYPE := fun w => prod (A w) (B w).
+Definition Const (A : Type) : OType := fun _ => A.
+Definition PROP : OType := fun _ => Prop.
+Definition Unit : OType := fun _ => unit.
+Definition Option (A : OType) : OType := fun w => option (A w).
+Definition List (A : OType) : OType := fun w => list (A w).
+Definition Prod (A B : OType) : OType := fun w => prod (A w) (B w).
 
-Definition Box (Θ : SUB) (A : TYPE) : TYPE :=
+Definition Box (Θ : SUB) (A : OType) : OType :=
   fun w0 => ∀ w1, Θ w0 w1 → A w1.
 
-Definition Diamond (Θ : SUB) (A : TYPE) : TYPE :=
+Definition Diamond (Θ : SUB) (A : OType) : OType :=
   fun w0 => {w1 & Θ w0 w1 * A w1}%type.
 
 Declare Scope box_scope.

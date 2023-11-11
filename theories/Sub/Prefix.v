@@ -34,7 +34,7 @@ Import world.notations.
 
 Module prefix.
 
-  Inductive Rel (w : World) : TYPE :=
+  Inductive Rel (w : World) : OType :=
   | refl        : Rel w w
   | snoc {w' α} : Rel w w' → Rel w (w' ▻ α).
   #[global] Arguments refl {_}.
