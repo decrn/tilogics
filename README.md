@@ -43,5 +43,16 @@ make   # or make -j <number-of-cores-on-your-machine>
 make install
 ```
 
+## Extraction
+
+Using `make extract`, it is possible to extract the machinery for STLCB to Haskell. We provide a minimal parser and pretty printer (see the `src` directory), along with some example programs in STLCB (`examples/`) for this functionality.
+
+Example usage:
+```shell
+make extract
+
+cabal run em example/full-adder.stlcb
+```
+
 
 
