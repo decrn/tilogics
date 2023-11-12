@@ -1,0 +1,3 @@
+let and = \x. \y. if x then y else false in
+let not = \x. if x then false else true in
+\x. \y. not (and x y)

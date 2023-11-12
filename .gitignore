@@ -307,3 +307,7 @@ Makefile.coq.conf
 .nia.cache
 .coq-native/
 _build/
+
+# Extracted files
+Extract.hs
+src/Infer.hs

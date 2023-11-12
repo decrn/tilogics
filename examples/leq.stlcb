@@ -1,0 +1,5 @@
+let and  = \x. \y. if x then y else false in
+let not  = \x. if x then false else true in
+let nand = \x. \y. not (and x y) in
+\x. \y.
+  nand (nand x (nand y y)) (nand y y)

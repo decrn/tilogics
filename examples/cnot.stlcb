@@ -1,0 +1,3 @@
+let not = \x. if x then false else true in
+\control. \target. \k.
+  k control (if control then not target else target)
