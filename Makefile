@@ -15,11 +15,14 @@ endif
 SRCS := $(shell egrep '^.*\.v$$' _CoqProject | grep -v '^#')
 AUXS := $(join $(dir $(SRCS)), $(addprefix ., $(notdir $(SRCS:.v=.aux))))
 
-.PHONY: coq clean summaxlen install uninstall pretty-timed make-pretty-timed-before make-pretty-timed-after print-pretty-timed-diff
+.PHONY: coq clean extract install uninstall pretty-timed make-pretty-timed-before make-pretty-timed-after print-pretty-timed-diff
 
 coq: Makefile.coq
 	$(E) "MAKE Makefile.coq"
 	$(Q)$(MAKE) -f Makefile.coq
+
+extract: coq
+	$(Q)patch -Np1 -o src/Infer.hs -i Extract.patch
 
 Makefile.coq: _CoqProject Makefile $(SRCS)
 	$(E) "COQ_MAKEFILE Makefile.coq"
@@ -28,7 +31,7 @@ Makefile.coq: _CoqProject Makefile $(SRCS)
 clean: Makefile.coq
 	$(Q)$(MAKE) -f Makefile.coq clean
 	$(Q)rm -f $(AUXS)
-	$(Q)rm -f Makefile.coq *.bak *.d *~ result*
+	$(Q)rm -f Makefile.coq *.bak *.d *~ result* Extract.hs src/Infer.hs
 	$(Q)find theories \( -name "*.vo" -o -name "*.vo[sk]" \
 		-o -name ".*.aux" -o -name ".*.cache" -o -name "*.glob" \) -delete
 

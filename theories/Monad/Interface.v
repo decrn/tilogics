@@ -92,7 +92,7 @@ Class AxiomaticSemantics
       WP (equals σ τ) Q ⊣⊢ₚ σ =ₚ τ /\ₚ Q _ refl tt;
     ax_wp_pick [w] (Q : ◻(OTy ⇢ Pred) w) :
       let α := world.fresh w in
-      WP pick Q ⊣⊢ₚ Sub.wp step (Q (w ▻ α) step (oty.var world.in_zero));
+      WP pick Q ⊣⊢ₚ Sub.wp step (Q (w ▻ α) step (oty.evar world.in_zero));
     ax_wp_fail [A w] (Q : ◻(A ⇢ Pred) w) :
       WP fail Q ⊣⊢ₚ ⊥ₚ;
     ax_wp_mono [A w] (m : M A w) (P Q : ◻(A ⇢ Pred) w) :
@@ -107,7 +107,7 @@ Class AxiomaticSemantics
       WLP (equals σ τ) Q ⊣⊢ₚ σ =ₚ τ ->ₚ Q _ refl tt;
     ax_wlp_pick [w] (Q : ◻(OTy ⇢ Pred) w) :
       let α := world.fresh w in
-      WLP pick Q ⊣⊢ₚ Sub.wlp step (Q (w ▻ α) step (oty.var world.in_zero));
+      WLP pick Q ⊣⊢ₚ Sub.wlp step (Q (w ▻ α) step (oty.evar world.in_zero));
     ax_wlp_fail [A w] (Q : ◻(A ⇢ Pred) w) :
       WLP fail Q ⊣⊢ₚ ⊤ₚ;
     ax_wlp_mono [A w] (m : M A w) (P Q : ◻(A ⇢ Pred) w) :
@@ -126,7 +126,7 @@ Lemma ax_wp_pick_substitute `{AxiomaticSemantics Θ M, Thick Θ} {lkThickΘ : Lk
   [w] (Q : ◻(OTy ⇢ Pred) w) :
   WP pick Q ⊣⊢ₚ
     let α := world.fresh w in
-    (∃ₚ τ : OTy w, (Q (w ▻ α) step (oty.var world.in_zero))[thick α (αIn := world.in_zero) τ]).
+    (∃ₚ τ : OTy w, (Q (w ▻ α) step (oty.evar world.in_zero))[thick α (αIn := world.in_zero) τ]).
 Proof.
   rewrite ax_wp_pick; cbn. constructor; intros ι.
   unfold Sub.wp; pred_unfold. split.
@@ -153,6 +153,8 @@ Class TypeCheckLogicM
       σ =ₚ τ /\ₚ ◼(fun _ θ => Q _ θ tt) ⊢ₚ WP (equals σ τ) Q;
     wp_pick [w] [Q : ◻(OTy ⇢ Pred) w] (τ : Ty) :
       ◼(fun _ θ => ∀ₚ τ', lift τ =ₚ τ' ->ₚ Q _ θ τ') ⊢ₚ WP pick Q;
+    wp_fail [A w] (Q : ◻(A ⇢ Pred) w) :
+      ⊥ₚ ⊢ₚ WP fail Q;
     wp_mono [A w] (m : M A w) (P Q : ◻(A ⇢ Pred) w) :
       ◼(fun _ θ => ∀ₚ a, P _ θ a -∗ Q _ θ a)%I ⊢ₚ
       (WP m P -∗ WP m Q)%I;
@@ -187,24 +189,21 @@ Proof.
   - rewrite ax_wp_equals. iIntros "[#Heq >HQ]". now iSplit.
   - rewrite ax_wp_pick. rewrite <- (Sub.intro_wp_step τ).
     iIntros "#H !> #Heq". iMod "H".
-    iSpecialize ("H" $! (oty.var world.in_zero) with "Heq").
+    iSpecialize ("H" $! (oty.evar world.in_zero) with "Heq").
     now rewrite trans_refl_r.
+  - now rewrite ax_wp_fail.
   - apply ax_wp_mono.
   - now rewrite ax_wlp_pure.
   - now rewrite ax_wlp_bind.
   - rewrite ax_wlp_equals. iIntros "#HQ #Heq".
     iSpecialize ("HQ" with "Heq"). now iMod "HQ".
   - rewrite ax_wlp_pick. iIntros "#HQ !>". iMod "HQ".
-    iSpecialize ("HQ" $! (oty.var world.in_zero)).
+    iSpecialize ("HQ" $! (oty.evar world.in_zero)).
     now rewrite trans_refl_r.
   - now rewrite ax_wlp_fail.
   - apply ax_wlp_mono.
   - now rewrite ax_wp_impl.
 Qed.
-
-Lemma wp_fail `{TypeCheckLogicM Θ M} [A w] (Q : ◻(A ⇢ Pred) w) :
-  ⊥ₚ ⊢ₚ WP fail Q.
-Proof. easy. Qed.
 
 Lemma wp_mono' `{TypeCheckLogicM Θ M} {A w} (m : M A w) (P Q : ◻(A ⇢ Pred) w) :
   (WP m P -∗ ◼(fun _ θ1 => ∀ₚ a1, P _ θ1 a1 -∗ Q _ θ1 a1) -∗ WP m Q)%P.

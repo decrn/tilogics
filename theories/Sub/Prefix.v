@@ -48,7 +48,7 @@ Module prefix.
 
   Canonical Structure Prefix : SUB :=
     {| sub              := Rel;
-       lk w0 w1 θ α αIn := oty.var (persist_in θ αIn)
+       lk w0 w1 θ α αIn := oty.evar (persist_in θ αIn)
     |}.
 
   #[export] Instance refl_prefix : Refl Prefix :=

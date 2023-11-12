@@ -49,7 +49,7 @@ Module Tri.
 
     Fixpoint persist_inner (t : OTy w) : OTy w' :=
       match t with
-      | oty.var xIn    => rec xIn
+      | oty.evar xIn   => rec xIn
       | oty.bool       => oty.bool
       | oty.func t1 t2 => oty.func (persist_inner t1) (persist_inner t2)
       end.
@@ -71,7 +71,7 @@ Module Tri.
 
   Canonical Structure Tri : SUB :=
     {| sub              := Rel;
-       lk w1 w2 θ α αIn := persist_outer (oty.var αIn) θ;
+       lk w1 w2 θ α αIn := persist_outer (oty.evar αIn) θ;
     |}.
 
   #[export] Instance thick_tri : Thick Tri :=
@@ -99,7 +99,7 @@ Module Tri.
   Lemma persist_outer_fix {w0 w1} (θ : w0 ⊒⁻ w1) (t : OTy w0) :
      persist_outer t θ =
      match t with
-     | oty.var αIn    => lk θ αIn
+     | oty.evar αIn   => lk θ αIn
      | oty.bool       => oty.bool
      | oty.func t1 t2 => oty.func (persist_outer t1 θ) (persist_outer t2 θ)
      end.

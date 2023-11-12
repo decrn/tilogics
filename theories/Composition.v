@@ -55,35 +55,31 @@ Section Run.
       pure (persist a _).
 End Run.
 
+Record Result :=
+  MkResult
+    { unconstrained : World;
+      inferred_type : OTy unconstrained;
+      inferred_expr : OExp unconstrained;
+    }.
+
+Definition ground_type (r : Result) : Ty :=
+  let (w,t,_) := r in inst t (grounding w).
+
+Definition ground_expr (r : Result) : Exp :=
+  let (w,_,e) := r in inst e (grounding w).
+
 Section Reconstruct.
   Import option.notations.
 
-  Definition reconstruct (Γ : Env) (e : Exp) : option { w & OTy w * OExp w }%type :=
-    '(existT w (_ , te)) <- run _ (generate (w := world.nil) e (lift Γ)) ;;
-    Some (existT w te).
+  Definition reconstruct (Γ : Env) (e : Exp) : option Result :=
+    '(existT w (_ , (t,e))) <- run _ (generate (w := world.nil) e (lift Γ)) ;;
+    Some (MkResult w t e).
 
-  Definition reconstruct_grounded (e : Exp) : option (Ty * Exp) :=
-    '(existT w te) <- reconstruct empty e ;;
-    Some (inst te (grounding w)).
+  Definition infer (e : Exp) : option Result :=
+    reconstruct empty e.
 
-  Definition infer (e : Exp) : option { w & OTy w }%type :=
-    '(existT w (t,e)) <- reconstruct empty e ;;
-    Some (existT w t).
 End Reconstruct.
 
-Section Examples.
-  Definition examples :=
-    List.map infer
-      [ exp.absu "x" (exp.var "x");
-        exp.absu "x" (exp.absu "y" (exp.var "x"))
-      ].
-
-  Arguments oty.var {w}%world_scope α%string_scope {αIn}.
-  Import world.notations.
-  Notation "( x , .. , y )" := (snoc .. (snoc nil x) .. y) : world_scope.
-End Examples.
-
-(* Extraction Inline world.view. *)
 Extraction Language Haskell.
 Extraction Inline
   Bool.Bool.iff_reflect
@@ -93,6 +89,8 @@ Extraction Inline
   Init.Logic.and_rec
   Init.Logic.and_rect
   Init.Logic.eq_rec_r
+  Init.Specif.sumbool_rec
+  Init.Specif.sumbool_rect
   Unification.atrav
   Unification.flex
   Unification.loeb
@@ -105,7 +103,10 @@ Extraction Inline
   Worlds.lk
   Worlds._4
   Worlds.world.view
+  stdpp.base.empty
+  stdpp.base.insert
   stdpp.base.fmap
+  stdpp.base.decide_rel
   stdpp.gmap.gmap_fmap
   stdpp.option.option_fmap.
 
@@ -114,11 +115,11 @@ Extract Inductive reflect => "Prelude.Bool" [ "Prelude.True" "Prelude.False" ].
 Extract Inlined Constant Init.Datatypes.fst => "Prelude.fst".
 Extract Inlined Constant Init.Datatypes.snd => "Prelude.snd".
 
-Extraction "Infer" examples.
+Extraction "Extract" ground_type ground_expr infer.
 
 Definition algorithmic_typing (Γ : Env) (e : Exp) (τ : Ty) (e' : Exp) : Prop :=
   match reconstruct Γ e with
-  | Some (existT w1 (τ1, e1)) =>
+  | Some (MkResult w1 τ1 e1) =>
       exists ι : Assignment w1, τ = inst τ1 ι /\ e' = inst e1 ι
   | None => False
   end.
@@ -160,7 +161,7 @@ Lemma decidability Γ e τ :
 Proof.
   pose proof (correctness Γ e τ) as Hcorr.
   unfold algorithmic_typing in Hcorr.
-  destruct reconstruct as [(w & oτ & oe')|].
+  destruct reconstruct as [[w oτ oe']|].
   - destruct (decidable_type_instantiation τ oτ) as [(ι & Heq)|].
     + left. exists (inst oe' ι). apply Hcorr. now exists ι.
     + right. intros (e' & HT). apply Hcorr in HT.

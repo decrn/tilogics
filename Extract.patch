@@ -1,0 +1,13 @@
+diff --git a/Extract.hs b/Extract.hs
+index e0f8db9..36d96a8 100644
+--- a/Extract.hs
++++ b/Extract.hs
+@@ -3,5 +3,7 @@
+ 
+-module Extract where
++module Infer where
+ 
+ import qualified Prelude
++import qualified Data.Bits
++import qualified Data.Char
+ 

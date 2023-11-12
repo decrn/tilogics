@@ -136,7 +136,7 @@ Section OccursCheck.
     fun w =>
       fix oc (t : OTy w) β (βIn : β ∈ w) {struct t} :=
       match t with
-      | oty.var αIn    => oty.var <$> occurs_check_in αIn βIn
+      | oty.evar αIn   => oty.evar <$> occurs_check_in αIn βIn
       | oty.bool       => Some oty.bool
       | oty.func t1 t2 => oty.func <$> oc t1 β βIn <*> oc t2 β βIn
       end.
@@ -144,7 +144,7 @@ Section OccursCheck.
   Lemma occurs_check_spec {w α} (αIn : α ∈ w) (t : OTy w) :
     match occurs_check t αIn with
     | Some t' => t = t'[thin α]
-    | None => t = oty.var αIn \/ oty.OTy_subterm (oty.var αIn) t
+    | None => t = oty.evar αIn \/ oty.OTy_subterm (oty.evar αIn) t
     end.
   Proof.
     induction t; cbn.
@@ -168,14 +168,14 @@ End OccursCheck.
 Section VarView.
 
   Inductive VarView {w} : OTy w → Type :=
-  | is_var {x} (xIn : x ∈ w) : VarView (oty.var xIn)
-  | not_var {t} (H: ∀ x (xIn : x ∈ w), t <> oty.var xIn) : VarView t.
+  | is_var {x} (xIn : x ∈ w) : VarView (oty.evar xIn)
+  | not_var {t} (H: ∀ x (xIn : x ∈ w), t <> oty.evar xIn) : VarView t.
   #[global] Arguments not_var {w t} &.
 
   Definition varview {w} (t : OTy w) : VarView t :=
     match t with
-    | oty.var xIn => is_var xIn
-    | _         => not_var (fun _ _ e => noConfusion_inv e)
+    | oty.evar xIn => is_var xIn
+    | _            => not_var (fun _ _ e => noConfusion_inv e)
     end.
 
 End VarView.
@@ -188,7 +188,7 @@ Section Implementation.
       | is_var βIn =>
           match world.occurs_check_view αIn βIn with
           | world.Same _      => pure tt
-          | world.Diff _ βIn' => singleton αIn (oty.var βIn')
+          | world.Diff _ βIn' => singleton αIn (oty.evar βIn')
           end
       | not_var _ =>
           match occurs_check τ αIn with
@@ -227,20 +227,20 @@ Section Implementation.
     #[global] Arguments aflex α {αIn} τ [w1] _.
 
     Definition atrav : (OTy ⇢ OTy ⇢ C)%W w :=
-      fix bmgu s t {struct s} :=
+      fix atrav s t {struct s} :=
         match s , t with
-        | @oty.var _ α _  , t             => aflex α t
-        | s             , @oty.var _ β _  => aflex β s
-        | oty.bool       , oty.bool       => ctrue
-        | oty.func s1 s2 , oty.func t1 t2 => cand (bmgu s1 t1) (bmgu s2 t2)
-        | _             , _             => cfalse
+        | @oty.evar _ α _  , t               => aflex α t
+        | s                , @oty.evar _ β _ => aflex β s
+        | oty.bool         , oty.bool        => ctrue
+        | oty.func s1 s2   , oty.func t1 t2  => cand (atrav s1 t1) (atrav s2 t2)
+        | _                , _               => cfalse
         end.
 
     Section atrav_elim.
 
       Context (P : OTy w → OTy w → C w → Type).
-      Context (fflex1 : ∀ α (αIn : α ∈ w) (t : OTy w), P (oty.var αIn) t (aflex α t)).
-      Context (fflex2 : ∀ α (αIn : α ∈ w) (t : OTy w), P t (oty.var αIn) (aflex α t)).
+      Context (fflex1 : ∀ α (αIn : α ∈ w) (t : OTy w), P (oty.evar αIn) t (aflex α t)).
+      Context (fflex2 : ∀ α (αIn : α ∈ w) (t : OTy w), P t (oty.evar αIn) (aflex α t)).
       Context (fbool : P oty.bool oty.bool ctrue).
       Context (fbool_func : ∀ T1 T2 : OTy w, P oty.bool (oty.func T1 T2) cfalse).
       Context (ffunc_bool : ∀ T1 T2 : OTy w, P (oty.func T1 T2) oty.bool cfalse).
@@ -303,13 +303,16 @@ Section Correctness.
         instpred (bu t1 t2 w1 θ1) ⊣⊢ₚ (t1 =ₚ t2)[θ1].
 
   Lemma flex_correct {w α} (αIn : α ∈ w) (t : OTy w) :
-    instpred (flex α t) ⊣⊢ₚ oty.var αIn =ₚ t.
+    instpred (flex α t) ⊣⊢ₚ oty.evar αIn =ₚ t.
   Proof.
     unfold flex. destruct varview; cbn.
     - destruct world.occurs_check_view; predsimpl.
-      rewrite Sub.wp_thick; predsimpl. now rewrite lk_thin.
+      unfold instpred, instpred_unit.
+      rewrite Sub.wp_thick; predsimpl.
+      now rewrite lk_thin.
     - pose proof (occurs_check_spec αIn t) as HOC. destruct occurs_check; cbn.
-      + subst. now rewrite Sub.wp_thick; predsimpl.
+      + subst. unfold instpred, instpred_unit.
+        now rewrite Sub.wp_thick; predsimpl.
       + destruct HOC as [HOC|HOC].
         * subst. now contradiction (H α αIn).
         * apply pno_cycle in HOC. apply split_bientails. now split.
@@ -322,7 +325,7 @@ Section Correctness.
                 AUnifierCorrect (lamgu xIn)).
 
     Lemma aflex_correct {α} (αIn : α ∈ w) (t : OTy w) w1 (θ1 : w ⊑⁻ w1) :
-      instpred (aflex lamgu α t θ1) ⊣⊢ₚ (oty.var αIn =ₚ t)[θ1].
+      instpred (aflex lamgu α t θ1) ⊣⊢ₚ (oty.evar αIn =ₚ t)[θ1].
     Proof.
       destruct θ1; cbn; Tri.folddefs.
       Tri.folddefs.
@@ -366,8 +369,9 @@ Section Correctness.
   Qed.
 
   Lemma solve_correct `{LkHMap Tri Θ} {w} (C : List (OTy * OTy) w) :
-    instpred (solve (Θ := Θ) C) ⊣⊢ₚ instpred C.
+    WP (solve (Θ := Θ) C) (fun _ _ _ => ⊤ₚ)%P ⊣⊢ₚ instpred C.
   Proof.
+    change (instpred (solve (Θ := Θ) C) ⊣⊢ₚ instpred C).
     unfold solve. rewrite instpred_solved_hmap.
     now rewrite asolve_correct, persist_pred_refl.
   Qed.

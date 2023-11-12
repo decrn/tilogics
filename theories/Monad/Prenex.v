@@ -48,7 +48,7 @@ Import MonadNotations Pred Pred.Sub Pred.notations Pred.proofmode
 #[export] Instance tcm_prenex : TypeCheckM Prenex :=
   {| equals w τ1 τ2 := Some (existT w (refl, ([(τ1,τ2)], tt)));
      pick w := let α := world.fresh w in
-               Some (existT (w ▻ α) (step, (List.nil, oty.var world.in_zero)));
+               Some (existT (w ▻ α) (step, (List.nil, oty.evar world.in_zero)));
   |}.
 
 #[local] Existing Instance instpred_prod_ty.

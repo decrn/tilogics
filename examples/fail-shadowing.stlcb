@@ -1,0 +1,1 @@
+\x : bool -> bool. \x : bool. x true

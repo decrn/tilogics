@@ -62,7 +62,7 @@ Inductive Free (A : OType) (w : World) : Type :=
 #[export] Instance tcm_free : TypeCheckM Free :=
   {| equals w τ1 τ2 := Equalsk τ1 τ2 (Ret tt);
      pick w := let α := world.fresh w in
-               Pickk α (Ret (oty.var world.in_zero));
+               Pickk α (Ret (oty.evar world.in_zero));
   |}.
 
 #[export] Instance wp_free : WeakestPre Prefix Free :=

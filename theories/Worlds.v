@@ -211,10 +211,10 @@ Module oty.
   #[local] Set Implicit Arguments.
 
   Inductive OTy (w : World) : Type :=
-  | var {α} (αIn : α ∈ w)
+  | evar {α} (αIn : α ∈ w)
   | bool
   | func (t1 t2 : OTy w).
-  #[global] Arguments var {w α}.
+  #[global] Arguments evar {w α}.
   #[global] Arguments bool {w}.
   #[global] Arguments func {w} _ _.
 
@@ -331,6 +331,6 @@ Definition thickIn [w x] (xIn : x ∈ w) (s : OTy (w - x)) :
   fun y yIn =>
     match world.occurs_check_view xIn yIn with
     | world.Same _     => s
-    | world.Diff _ yIn => oty.var yIn
+    | world.Diff _ yIn => oty.evar yIn
     end.
 #[global] Arguments thickIn [w x] xIn s [y] yIn.

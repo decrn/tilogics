@@ -383,13 +383,13 @@ Module Pred.
 
     Lemma peq_ty_noconfusion {w} (t1 t2 : OTy w) :
       t1 =ₚ t2 ⊣⊢ₚ
-            match t1 , t2 with
-            | oty.var  _       , _               => t1 =ₚ t2
-            | _               , oty.var _        => t1 =ₚ t2
-            | oty.bool         , oty.bool         => ⊤ₚ
-            | oty.func t11 t12 , oty.func t21 t22 => t11 =ₚ t21 /\ₚ t12 =ₚ t22
-            | _               , _               => ⊥ₚ
-            end.
+      match t1 , t2 with
+      | oty.evar  _      , _                => t1 =ₚ t2
+      | _                , oty.evar _       => t1 =ₚ t2
+      | oty.bool         , oty.bool         => ⊤ₚ
+      | oty.func t11 t12 , oty.func t21 t22 => t11 =ₚ t21 /\ₚ t12 =ₚ t22
+      | _                , _                => ⊥ₚ
+      end.
     Proof. destruct t1, t2; obligation. Qed.
 
     Lemma eq_pair
@@ -521,7 +521,7 @@ Module Pred.
 
       Lemma wp_thick {thickΘ : Thick Θ} {lkThickΘ : LkThick Θ}
         {w α} (αIn : world.In α w) (t : OTy (w - α)) (Q : Pred (w - α)) :
-        wp (thick α t) Q ⊣⊢ₚ oty.var αIn =ₚ persist t (thin (Θ := Par) α) /\ₚ persist Q (thin (Θ := Par) α).
+        wp (thick α t) Q ⊣⊢ₚ oty.evar αIn =ₚ persist t (thin (Θ := Par) α) /\ₚ persist Q (thin (Θ := Par) α).
       Proof.
         unfold wp; pred_unfold. intros ι. split.
         - intros (ι1 & Heq & HQ). subst.
@@ -624,7 +624,7 @@ Module Pred.
 
     Lemma intro_wp_step' {Θ} {stepΘ : Step Θ} {lkStepΘ : LkStep Θ}
       {w α} (P : Pred w) (Q : Pred (world.snoc w α)) (t : Ty) :
-      (persist P step ⊢ₚ lift t =ₚ @oty.var _ α world.in_zero ->ₚ Q) ->
+      (persist P step ⊢ₚ lift t =ₚ @oty.evar _ α world.in_zero ->ₚ Q) ->
       (P ⊢ₚ wp (step (Θ := Θ)) Q).
     Proof.
       pred_unfold. intros H ι HP. set (ι1 := env.snoc ι α t).
@@ -635,7 +635,7 @@ Module Pred.
     (* Better for iris proof mode. *)
     Lemma intro_wp_step {Θ} {stepΘ : Step Θ} {lkStepΘ : LkStep Θ}
       t {w α} (Q : Pred (world.snoc w α)) :
-      wlp step (lift t =ₚ oty.var world.in_zero ->ₚ Q) ⊢ₚ wp (step (Θ := Θ)) Q.
+      wlp step (lift t =ₚ oty.evar world.in_zero ->ₚ Q) ⊢ₚ wp (step (Θ := Θ)) Q.
     Proof. apply (intro_wp_step' t). now rewrite persist_wlp. Qed.
 
     Lemma wp_split  {Θ : SUB} [w0 w1] (θ : Θ w0 w1) P :
@@ -687,7 +687,8 @@ Module Pred.
     #[local] Instance instpred_prod_ty : InstPred (OTy * OTy) :=
       fun w '(t1,t2) => eqₚ t1 t2.
     #[export] Instance instpred_unit : InstPred Unit :=
-      fun w 'tt => ⊤ₚ%P.
+      fun w _ => ⊤ₚ%P.
+    #[global] Arguments instpred_unit [w] _ /.
 
     Lemma instpred_list_app {A} `{ipA : InstPred A} [w] (xs ys : List A w) :
       instpred (xs ++ ys) ⊣⊢ₚ instpred xs /\ₚ instpred ys.

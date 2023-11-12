@@ -44,7 +44,7 @@ Module Par.
   #[local] Notation subst t θ := (persist t θ) (only parsing).
 
   #[export] Instance refl_par : Refl Par :=
-    fun w => env.tabulate (@oty.var w).
+    fun w => env.tabulate (@oty.evar w).
   #[export] Instance trans_par : Trans Par :=
     fix trans {w0 w1 w2} θ1 θ2 {struct θ1} :=
       match θ1 with
@@ -54,9 +54,9 @@ Module Par.
   #[export] Instance thick_par : Thick Par :=
     fun w x xIn s => env.tabulate (thickIn xIn s).
   #[export] Instance thin_par : Thin Par :=
-    fun w α αIn => env.tabulate (fun β βIn => oty.var (world.in_thin αIn βIn)).
+    fun w α αIn => env.tabulate (fun β βIn => oty.evar (world.in_thin αIn βIn)).
   #[export] Instance step_par : Step Par :=
-    fun w α => env.tabulate (fun β βIn => oty.var (world.in_succ βIn)).
+    fun w α => env.tabulate (fun β βIn => oty.evar (world.in_succ βIn)).
 
   Ltac foldlk :=
     change (env.lookup ?θ ?αIn) with (@lk Par _ _ θ _ αIn).
@@ -64,7 +64,7 @@ Module Par.
   #[export] Instance lk_refl_par : LkRefl Par.
   Proof.
     intros w α αIn.
-    apply (env.lookup_tabulate (fun _ βIn => oty.var βIn)).
+    apply (env.lookup_tabulate (fun _ βIn => oty.evar βIn)).
   Qed.
 
   #[export] Instance lk_trans_par : LkTrans Par.

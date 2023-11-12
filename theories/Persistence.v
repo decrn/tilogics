@@ -42,7 +42,7 @@ Class Persistent (A : OType) : Type :=
   fun Θ =>
     fix pers {w0} (t : OTy w0) {w1} θ : OTy w1 :=
       match t with
-      | oty.var αIn    => lk θ αIn
+      | oty.evar αIn   => lk θ αIn
       | oty.bool       => oty.bool
       | oty.func t1 t2 => oty.func (pers t1 θ) (pers t2 θ)
       end.
@@ -56,7 +56,7 @@ Defined.
 
 Class LkRefl (Θ : SUB) (reflΘ : Refl Θ) : Prop :=
   lk_refl w α (αIn : α ∈ w) :
-    lk refl αIn = oty.var αIn.
+    lk refl αIn = oty.evar αIn.
 #[global] Arguments LkRefl Θ {_}.
 Class LkTrans (Θ : SUB) (transΘ : Trans Θ) : Prop :=
   lk_trans w0 w1 w2 (θ1 : Θ w0 w1) (θ2 : Θ w1 w2) α (αIn : α ∈ w0) :
@@ -179,12 +179,12 @@ Proof. unfold persist, persist_env, OEnv. now rewrite fmap_insert. Qed.
 
 Class LkStep (Θ : SUB) (stepΘ : Step Θ) : Prop :=
   lk_step w α (αIn : α ∈ w) β :
-    lk (step (α := β)) αIn = oty.var (world.in_succ αIn).
+    lk (step (α := β)) αIn = oty.evar (world.in_succ αIn).
 #[global] Arguments LkStep Θ {_}.
 
 Class LkThin (Θ : SUB) (thinΘ : Thin Θ) : Prop :=
   lk_thin w α (αIn : α ∈ w) β (βIn : β ∈ w - α) :
-    lk (thin α) βIn = oty.var (world.in_thin αIn βIn).
+    lk (thin α) βIn = oty.evar (world.in_thin αIn βIn).
 #[global] Arguments LkThin Θ {_}.
 
 Class LkThick (Θ : SUB) (thickΘ : Thick Θ) : Prop :=

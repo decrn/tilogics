@@ -62,7 +62,7 @@ Section Inst.
   #[export] Instance inst_ty : Inst OTy Ty :=
     fix inst_ty {w} t ι :=
       match t with
-      | oty.var αIn    => env.lookup ι αIn
+      | oty.evar αIn   => env.lookup ι αIn
       | oty.bool       => ty.bool
       | oty.func t1 t2 => ty.func (inst_ty t1 ι) (inst_ty t2 ι)
       end.
