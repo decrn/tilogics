@@ -38,8 +38,8 @@ Definition prenex {A} : ⊧ Free A ⇢ Prenex A :=
     | Free.Fail => None
     | Free.Equalsk t1 t2 m =>
         '(existT w1 (r1, (cs, a))) <- pr m;;
-        let t1' := persist t1 r1 in
-        let t2' := persist t2 r1 in
+        let t1' := subst t1 r1 in
+        let t2' := subst t2 r1 in
         let c   := (t1', t2') in
         Some (existT w1 (r1, (cons c cs, a)))
     | Free.Pickk α m =>

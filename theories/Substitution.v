@@ -34,24 +34,24 @@ Import world.notations.
 
 #[local] Set Implicit Arguments.
 
-Class Persistent (A : OType) : Type :=
-  persist : forall {Θ}, ⊧ A ⇢ Box Θ A.
-#[global] Arguments persist {_ _ _} [w] _ [_] _.
+Class Subst (A : OType) : Type :=
+  subst : forall {Θ}, ⊧ A ⇢ Box Θ A.
+#[global] Arguments subst {_ _ _} [w] _ [_] _.
 
-#[export] Instance persist_ty : Persistent OTy :=
+#[export] Instance subst_ty : Subst OTy :=
   fun Θ =>
-    fix pers {w0} (t : OTy w0) {w1} θ : OTy w1 :=
+    fix subst {w0} (t : OTy w0) {w1} θ : OTy w1 :=
       match t with
       | oty.evar αIn   => lk θ αIn
       | oty.bool       => oty.bool
-      | oty.func t1 t2 => oty.func (pers t1 θ) (pers t2 θ)
+      | oty.func t1 t2 => oty.func (subst t1 θ) (subst t2 θ)
       end.
 
-#[export] Instance persist_env : Persistent OEnv.
+#[export] Instance subst_env : Subst OEnv.
 Proof.
   intros Θ w0 Γ w1 θ. revert Γ.
   unfold OEnv. eapply base.fmap.
-  intros t. apply (persist t θ).
+  intros t. apply (subst t θ).
 Defined.
 
 Class LkRefl (Θ : SUB) (reflΘ : Refl Θ) : Prop :=
@@ -60,7 +60,7 @@ Class LkRefl (Θ : SUB) (reflΘ : Refl Θ) : Prop :=
 #[global] Arguments LkRefl Θ {_}.
 Class LkTrans (Θ : SUB) (transΘ : Trans Θ) : Prop :=
   lk_trans w0 w1 w2 (θ1 : Θ w0 w1) (θ2 : Θ w1 w2) α (αIn : α ∈ w0) :
-    lk (trans θ1 θ2) αIn = persist (lk θ1 αIn) θ2.
+    lk (trans θ1 θ2) αIn = subst (lk θ1 αIn) θ2.
 #[global] Arguments LkRefl Θ {_}.
 #[global] Arguments LkTrans Θ {_}.
 
@@ -69,21 +69,21 @@ Class LkHMap (Θ1 Θ2 : SUB) (hmapΘ : HMap Θ1 Θ2) : Prop :=
     ∀ α (αIn : α ∈ w1), lk (hmap θ) αIn = lk θ αIn.
 #[global] Arguments LkHMap Θ1 Θ2 {_}.
 
-Class PersistLaws A {persA : Persistent A} : Type :=
-  { persist_refl {Θ} {reflΘ : Refl Θ} {lkreflΘ : LkRefl Θ} :
+Class SubstLaws A {subA : Subst A} : Type :=
+  { subst_refl {Θ} {reflΘ : Refl Θ} {lkreflΘ : LkRefl Θ} :
       forall w (a : A w),
-        persist a (refl (Θ := Θ)) = a;
-    persist_trans {Θ : SUB} {transΘ : Trans Θ} {lktransΘ : LkTrans Θ} :
+        subst a (refl (Θ := Θ)) = a;
+    subst_trans {Θ : SUB} {transΘ : Trans Θ} {lktransΘ : LkTrans Θ} :
       forall w0 (a : A w0) w1 (θ1 : Θ w0 w1) w2 (θ2 : Θ w1 w2),
-        persist a (trans θ1 θ2) = persist (persist a θ1) θ2;
-    persist_simulation {Θ1 Θ2 : SUB} :
+        subst a (trans θ1 θ2) = subst (subst a θ1) θ2;
+    subst_simulation {Θ1 Θ2 : SUB} :
       forall w0 a w1 (θ1 : Θ1 w0 w1) (θ2 : Θ2 w0 w1),
         (forall α (αIn : α ∈ w0), lk θ1 αIn = lk θ2 αIn) ->
-        persist a θ1 = persist a θ2;
+        subst a θ1 = subst a θ2;
   }.
-#[global] Arguments PersistLaws A {_}.
+#[global] Arguments SubstLaws A {_}.
 
-#[export] Instance persistlaws_ty : PersistLaws OTy.
+#[export] Instance substlaws_ty : SubstLaws OTy.
 Proof.
   constructor.
   - intros * ? w t. induction t; cbn.
@@ -97,85 +97,85 @@ Proof.
   - intros ? ? ? t * Heq. induction t; cbn; f_equal; auto.
 Qed.
 
-#[export] Instance persistent_unit : Persistent Unit :=
+#[export] Instance subst_unit : Subst Unit :=
   fun Θ w1 u w2 r => u.
-#[export] Instance persistent_prod {A B}
-  {pRA : Persistent A} {pRB : Persistent B} : Persistent (Prod A B) :=
-  fun Θ w1 '(a,b) w2 r => (persist a r, persist b r).
-#[export] Instance persistent_option {A} {pRA : Persistent A} :
-  Persistent (Option A) :=
-  fun Θ w1 oa w2 r => option.map (fun a => persist a r) oa.
-#[export] Instance persistent_list {A} {pRA : Persistent A} :
-  Persistent (List A) :=
-  fun Θ w1 la w2 r => List.map (fun a => persist a r) la.
+#[export] Instance subst_prod {A B}
+  {pRA : Subst A} {pRB : Subst B} : Subst (Prod A B) :=
+  fun Θ w1 '(a,b) w2 r => (subst a r, subst b r).
+#[export] Instance subst_option {A} {pRA : Subst A} :
+  Subst (Option A) :=
+  fun Θ w1 oa w2 r => option.map (fun a => subst a r) oa.
+#[export] Instance subst_list {A} {pRA : Subst A} :
+  Subst (List A) :=
+  fun Θ w1 la w2 r => List.map (fun a => subst a r) la.
 
-#[export] Instance persistlaws_option {A} `{persLawsA : PersistLaws A} :
-  PersistLaws (Option A).
+#[export] Instance substlaws_option {A} `{subLawsA : SubstLaws A} :
+  SubstLaws (Option A).
 Proof.
   constructor.
-  - intros. destruct a; cbn; f_equal. apply persist_refl.
-  - intros. destruct a; cbn; f_equal. apply persist_trans.
-  - intros. destruct a; cbn; f_equal. now apply persist_simulation.
+  - intros. destruct a; cbn; f_equal. apply subst_refl.
+  - intros. destruct a; cbn; f_equal. apply subst_trans.
+  - intros. destruct a; cbn; f_equal. now apply subst_simulation.
 Qed.
 
-#[export] Instance persistlaws_prod {A B} `{PersistLaws A, PersistLaws B} :
-  PersistLaws (Prod A B).
+#[export] Instance substlaws_prod {A B} `{SubstLaws A, SubstLaws B} :
+  SubstLaws (Prod A B).
 Proof.
   constructor.
-  - intros. destruct a; cbn; f_equal; apply persist_refl.
-  - intros. destruct a; cbn; f_equal; apply persist_trans.
-  - intros. destruct a; cbn; f_equal; now apply persist_simulation.
+  - intros. destruct a; cbn; f_equal; apply subst_refl.
+  - intros. destruct a; cbn; f_equal; apply subst_trans.
+  - intros. destruct a; cbn; f_equal; now apply subst_simulation.
 Qed.
 
-#[export] Instance persistlaws_env : PersistLaws OEnv.
+#[export] Instance substlaws_env : SubstLaws OEnv.
 Proof.
   constructor.
-  - intros * ? w Γ. unfold persist, persist_env, OEnv.
+  - intros * ? w Γ. unfold subst, subst_env, OEnv.
     apply map_eq. intros x. rewrite lookup_fmap.
     destruct lookup as [t|]; cbn; f_equal.
-    apply persist_refl.
-  - intros * ? w0 Γ *. unfold persist, persist_env, OEnv.
+    apply subst_refl.
+  - intros * ? w0 Γ *. unfold subst, subst_env, OEnv.
     apply map_eq. intros x. rewrite !lookup_fmap.
     destruct lookup as [t|]; cbn; f_equal.
-    apply persist_trans.
-  - intros ? ? ? t * Heq. unfold persist, persist_env.
+    apply subst_trans.
+  - intros ? ? ? t * Heq. unfold subst, subst_env.
     apply (map_fmap_ext _ _ t). intros x s _. clear - Heq.
-    now apply persist_simulation.
+    now apply subst_simulation.
 Qed.
 
-(* #[export] Instance Persistent_In {x} : *)
-(*   Persistent Alloc (ctx.In x) := *)
+(* #[export] Instance Subst_In {x} : *)
+(*   Subst Alloc (ctx.In x) := *)
 (*   fix transient {w} (xIn : x ∈ w) {w'} (r : Alloc w w') {struct r} := *)
 (*     match r with *)
 (*     | alloc.refl _        => xIn *)
 (*     | alloc.fresh _ α _ r => transient (in_succ xIn) r *)
 (*     end. *)
 
-(* #[export] Instance PersistLaws_In {x} : PersistLaws (ctx.In x). *)
+(* #[export] Instance SubstLaws_In {x} : SubstLaws (ctx.In x). *)
 (* Proof. constructor; [easy|induction r12; cbn; auto]. Qed. *)
 
-#[export] Instance persistent_const {A} : Persistent (Const A) :=
+#[export] Instance subst_const {A} : Subst (Const A) :=
   fun _ _ a _ _ => a.
 
-Lemma lookup_persist {Θ : SUB}
+Lemma lookup_subst {Θ : SUB}
   {w0 w1} (θ : Θ w0 w1) (G : OEnv w0) (x : string) :
-  lookup x (persist G θ) = persist (lookup x G) θ.
+  lookup x (subst G θ) = subst (lookup x G) θ.
 Proof.
-  unfold persist at 1, persist_env, OEnv.
+  unfold subst at 1, subst_env, OEnv.
   now rewrite lookup_fmap.
 Qed.
 
-Lemma persist_empty {Θ : SUB}
+Lemma subst_empty {Θ : SUB}
   {w0 w1} (θ : Θ w0 w1) :
-  persist (empty (A := OEnv w0)) θ = empty.
+  subst (empty (A := OEnv w0)) θ = empty.
 Proof.
   apply (fmap_empty (M := gmap string)).
 Qed.
 
-Lemma persist_insert {Θ : SUB}
+Lemma subst_insert {Θ : SUB}
   {w0 w1} (θ : Θ w0 w1) (G : OEnv w0) (x : string) (t : OTy w0) :
-  persist (insert x t G) θ = insert x (persist t θ) (persist G θ).
-Proof. unfold persist, persist_env, OEnv. now rewrite fmap_insert. Qed.
+  subst (insert x t G) θ = insert x (subst t θ) (subst G θ).
+Proof. unfold subst, subst_env, OEnv. now rewrite fmap_insert. Qed.
 
 Class LkStep (Θ : SUB) (stepΘ : Step Θ) : Prop :=
   lk_step w α (αIn : α ∈ w) β :

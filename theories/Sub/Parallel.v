@@ -26,7 +26,7 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Em Require Import Environment Instantiation Persistence Prelude Spec Worlds.
+From Em Require Import Environment Instantiation Substitution Spec Worlds.
 
 Import world.notations.
 
@@ -41,7 +41,7 @@ Module Par.
 
   #[local] Notation "w0 ⊑ˢ w1" := (sub Par w0 w1).
   #[local] Notation "□ˢ A" := (Box Par A) (at level 9, format "□ˢ A", right associativity).
-  #[local] Notation subst t θ := (persist t θ) (only parsing).
+  #[local] Notation subst t θ := (subst t θ) (only parsing).
 
   #[export] Instance refl_par : Refl Par :=
     fun w => env.tabulate (@oty.evar w).
@@ -49,7 +49,7 @@ Module Par.
     fix trans {w0 w1 w2} θ1 θ2 {struct θ1} :=
       match θ1 with
       | env.nil         => env.nil
-      | env.snoc θ1 x t => env.snoc (trans θ1 θ2) x (persist t θ2)
+      | env.snoc θ1 x t => env.snoc (trans θ1 θ2) x (subst t θ2)
       end.
   #[export] Instance thick_par : Thick Par :=
     fun w x xIn s => env.tabulate (thickIn xIn s).
@@ -97,9 +97,9 @@ Module Par.
     - intros. apply env.lookup_extensional. intros. foldlk.
       now rewrite lk_trans, lk_refl.
     - intros. apply env.lookup_extensional. intros. foldlk.
-      now rewrite lk_trans, persist_refl.
+      now rewrite lk_trans, subst_refl.
     - intros. apply env.lookup_extensional. intros. foldlk.
-      now rewrite ?lk_trans, persist_trans.
+      now rewrite ?lk_trans, subst_trans.
   Qed.
 
   Lemma comp_thin_thick {w α} (αIn : α ∈ w) (s : OTy (w - α)) :
@@ -113,7 +113,7 @@ Module Par.
 
   Lemma thin_thick_pointful {w α} (αIn : α ∈ w) (s : OTy (w - α)) (t : OTy (w - α)) :
     subst (subst t (thin α)) (thick α s) = t.
-  Proof. now rewrite <- persist_trans, comp_thin_thick, persist_refl. Qed.
+  Proof. now rewrite <- subst_trans, comp_thin_thick, subst_refl. Qed.
 
   #[export] Instance hmap_par {Θ : SUB} : HMap Θ Par :=
     fun w0 w1 θ => env.tabulate (@lk _ _ _ θ).
@@ -126,7 +126,7 @@ Module Par.
   Qed.
 
   Lemma Ty_subterm_subst {w1 w2} (s t : OTy w1) (θ : Par w1 w2) :
-    oty.OTy_subterm s t -> oty.OTy_subterm (persist s θ) (persist t θ).
+    oty.OTy_subterm s t -> oty.OTy_subterm (subst s θ) (subst t θ).
   Proof.
     unfold oty.OTy_subterm. induction 1; cbn.
     - constructor 1; destruct H; constructor.
@@ -148,10 +148,10 @@ Module Par.
     foldlk. now rewrite lk_hmap, !lk_thick.
   Qed.
 
-  Lemma persist_hmap {Θ : SUB} {T} {persT : Persistent T} {persLT : PersistLaws T}
+  Lemma subst_hmap {Θ : SUB} {T} {subT : Subst T} {subLT : SubstLaws T}
     [w0 w1] (θ : Θ w0 w1) :
-    forall t, persist t (hmap θ) = persist t θ.
-  Proof. intros. apply persist_simulation. intros. now rewrite lk_hmap. Qed.
+    forall t, subst t (hmap θ) = subst t θ.
+  Proof. intros. apply subst_simulation. intros. now rewrite lk_hmap. Qed.
 
 End Par.
 Export Par (Par).

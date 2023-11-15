@@ -48,11 +48,11 @@ Import (hints) Par.
 
 Section Run.
   Import MonadNotations.
-  Definition run {A} `{Persistent A} : ⊧ Free A ⇢ Solved Par A :=
+  Definition run {A} `{Subst A} : ⊧ Free A ⇢ Solved Par A :=
     fun w m =>
       '(cs,a) <- solved_hmap (prenex m) ;;
       _       <- solve cs ;;
-      pure (persist a _).
+      pure (subst a _).
 End Run.
 
 Record Result :=

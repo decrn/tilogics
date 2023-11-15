@@ -28,7 +28,7 @@
 
 From Coq Require Import Relations.Relation_Operators Strings.String.
 From stdpp Require Import base gmap.
-From Em Require Import Environment Prelude Persistence Spec Worlds.
+From Em Require Import Environment Substitution Spec Worlds.
 
 Import world.notations.
 
@@ -121,49 +121,49 @@ Section InstLift.
 
 End InstLift.
 
-Section InstPersist.
+Section InstSubst.
 
-  Class InstPersist AT A `{Persistent AT, Inst AT A} : Prop :=
-    inst_persist [Θ : SUB] {w0 w1} (θ : Θ w0 w1) (t : AT w0) (ι : Assignment w1) :
-      inst (persist t θ) ι = inst t (inst θ ι).
-  #[global] Arguments InstPersist _ _ {_ _}.
+  Class InstSubst AT A `{Subst AT, Inst AT A} : Prop :=
+    inst_subst [Θ : SUB] {w0 w1} (θ : Θ w0 w1) (t : AT w0) (ι : Assignment w1) :
+      inst (subst t θ) ι = inst t (inst θ ι).
+  #[global] Arguments InstSubst _ _ {_ _}.
 
-  #[export] Instance inst_persist_ty : InstPersist OTy Ty.
+  #[export] Instance inst_subst_ty : InstSubst OTy Ty.
   Proof.
     intros Θ w0 w1 θ t ι. induction t; cbn; f_equal; auto.
     unfold inst at 2, inst_sub. now rewrite env.lookup_tabulate.
   Qed.
 
-  #[export] Instance inst_persist_env : InstPersist OEnv Env.
+  #[export] Instance inst_subst_env : InstSubst OEnv Env.
   Proof.
-    intros Θ w0 w1 θ E ι. unfold persist, persist_env, inst at 1 2, inst_env.
+    intros Θ w0 w1 θ E ι. unfold subst, subst_env, inst at 1 2, inst_env.
     rewrite <- map_fmap_compose. apply map_fmap_ext.
-    intros x t Hlk. apply inst_persist.
+    intros x t Hlk. apply inst_subst.
   Qed.
 
-  #[export] Instance inst_persist_prod {AT A BT B}
-    `{InstPersist AT A, InstPersist BT B} : InstPersist (Prod AT BT) (A * B).
-  Proof. intros Θ w0 w1 θ [a b] ι. cbn. f_equal; apply inst_persist. Qed.
+  #[export] Instance inst_subst_prod {AT A BT B}
+    `{InstSubst AT A, InstSubst BT B} : InstSubst (Prod AT BT) (A * B).
+  Proof. intros Θ w0 w1 θ [a b] ι. cbn. f_equal; apply inst_subst. Qed.
 
-End InstPersist.
+End InstSubst.
 
-Section PersistLift.
-  Class PersistLift AT A {liftA : Lift AT A} {persA: Persistent AT} : Prop :=
-    persist_lift [Θ : SUB] {w0 w1} (a : A) (θ : Θ w0 w1) :
-      persist (lift a) θ = lift a.
-  #[global] Arguments PersistLift _ _ {_ _}.
+Section SubstLift.
+  Class SubstLift AT A {liftA : Lift AT A} {subA: Subst AT} : Prop :=
+    subst_lift [Θ : SUB] {w0 w1} (a : A) (θ : Θ w0 w1) :
+      subst (lift a) θ = lift a.
+  #[global] Arguments SubstLift _ _ {_ _}.
 
-  #[export] Instance persist_lift_ty : PersistLift OTy Ty.
+  #[export] Instance subst_lift_ty : SubstLift OTy Ty.
   Proof. intros Θ w0 w1 t θ. induction t; cbn; f_equal; auto. Qed.
 
-  #[export] Instance persist_lift_env : PersistLift OEnv Env.
+  #[export] Instance subst_lift_env : SubstLift OEnv Env.
   Proof.
-    intros Θ w0 w1 E θ. unfold persist, lift, persist_env, lift_env, OEnv.
+    intros Θ w0 w1 E θ. unfold subst, lift, subst_env, lift_env, OEnv.
     rewrite <- map_fmap_compose. apply map_fmap_ext.
-    intros x t Hlk. apply persist_lift.
+    intros x t Hlk. apply subst_lift.
   Qed.
 
-End PersistLift.
+End SubstLift.
 
 Lemma inst_refl {Θ} {reflΘ : Refl Θ} {lkreflΘ : LkRefl Θ} :
   forall w (ι : Assignment w), inst (refl (Θ := Θ)) ι = ι.
@@ -177,7 +177,7 @@ Lemma inst_trans {Θ} {transΘ : Trans Θ} {lktransΘ : LkTrans Θ} :
     inst (trans θ1 θ2) ι = inst θ1 (inst θ2 ι).
 Proof.
   intros. apply env.lookup_extensional. intros α αIn. unfold inst, inst_sub.
-  now rewrite ?env.lookup_tabulate, lk_trans, inst_persist.
+  now rewrite ?env.lookup_tabulate, lk_trans, inst_subst.
 Qed.
 
 Lemma inst_step_snoc {Θ} {stepΘ : Step Θ} {lkStepΘ : LkStep Θ}
@@ -189,7 +189,7 @@ Proof.
 Qed.
 
 Lemma inst_step {Θ} {stepΘ : Step Θ} {lkStepΘ : LkStep Θ}
-  {w x} (ι : Assignment (w ▻ x)) :
+  {w x} (ι : Assignment (w ، x)) :
   inst (step (Θ := Θ)) ι = let (ι',_) := env.view ι in ι'.
 Proof. destruct env.view. apply inst_step_snoc. Qed.
 

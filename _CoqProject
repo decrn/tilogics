@@ -14,12 +14,12 @@ theories/Monad/Interface.v
 theories/Monad/Prenex.v
 theories/Monad/Solved.v
 theories/Open.v
-theories/Persistence.v
 theories/Prelude.v
 theories/PrenexConversion.v
 theories/Spec.v
 theories/Sub/Parallel.v
 theories/Sub/Prefix.v
 theories/Sub/Triangular.v
+theories/Substitution.v
 theories/Unification.v
 theories/Worlds.v

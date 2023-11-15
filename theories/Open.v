@@ -26,7 +26,7 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Em Require Import Prelude Instantiation Spec Persistence Worlds.
+From Em Require Import Instantiation Spec Substitution Worlds.
 
 Module Open.
 
@@ -53,16 +53,16 @@ Module Open.
   #[export] Instance lift_sem {A} : Lift (Open A) A :=
     pure.
 
-  #[export] Instance persistent_sem {A} : Persistent (Open A) :=
+  #[export] Instance subst_sem {A} : Subst (Open A) :=
     fun Θ w0 t w1 θ ι => t (inst θ ι).
 
   #[export] Instance inst_lift_sem {A} : InstLift (Open A) A.
   Proof. easy. Qed.
 
-  #[export] Instance inst_persist_sem {A} : InstPersist (Open A) A.
+  #[export] Instance inst_subst_sem {A} : InstSubst (Open A) A.
   Proof. easy. Qed.
 
-  #[export] Instance persist_lift_sem {A} : PersistLift (Open A) A.
+  #[export] Instance subst_lift_sem {A} : SubstLift (Open A) A.
   Proof. easy. Qed.
 
   Section InstLemmas.
@@ -84,24 +84,24 @@ Module Open.
   Section PersistLemmas.
     Context {Θ : SUB}.
 
-    Lemma persist_pure {A} (a : A) [w0 w1] (θ : Θ w0 w1) :
-      persist (pure a) θ = pure a.
+    Lemma subst_pure {A} (a : A) [w0 w1] (θ : Θ w0 w1) :
+      subst (pure a) θ = pure a.
     Proof. reflexivity. Qed.
 
-    Lemma persist_fmap {A B} (f : A -> B) [w0] (a : Open A w0) [w1] (θ : Θ w0 w1) :
-      persist (fmap f a) θ = fmap f (persist a θ).
+    Lemma subst_fmap {A B} (f : A -> B) [w0] (a : Open A w0) [w1] (θ : Θ w0 w1) :
+      subst (fmap f a) θ = fmap f (subst a θ).
     Proof. reflexivity. Qed.
 
-    Lemma persist_app {A B} [w0] (f : Open (A -> B) w0) (a : Open A w0) [w1] (θ : Θ w0 w1) :
-      persist (ap f a) θ = ap (persist f θ) (persist a θ).
+    Lemma subst_app {A B} [w0] (f : Open (A -> B) w0) (a : Open A w0) [w1] (θ : Θ w0 w1) :
+      subst (ap f a) θ = ap (subst f θ) (subst a θ).
     Proof. reflexivity. Qed.
 
   End PersistLemmas.
 
-  Definition decode_ty : ⊧ OTy ⇢ Open Ty := fun w t => inst t.
-  #[global] Arguments decode_ty [w] _.
-  (* Definition decode_env : ⊧ OEnv ⇢ Open Env := fun w G => inst G. *)
-  (* #[global] Arguments decode_env [w] _. *)
+  Definition close_ty : ⊧ OTy ⇢ Open Ty := fun w t => inst t.
+  #[global] Arguments close_ty [w] _.
+  (* Definition close_env : ⊧ OEnv ⇢ Open Env := fun w G => inst G. *)
+  (* #[global] Arguments close_env [w] _. *)
 
   Module notations.
 
@@ -132,7 +132,7 @@ Module oexp.
   Definition absu : ⊧ Const string ⇢ OExp ⇢ OExp :=
     fun _ x e => exp.absu x <$> e.
   Definition abst : ⊧ Const string ⇢ OTy ⇢ OExp ⇢ OExp :=
-    fun _ x t e => exp.abst x <$> decode_ty t <*> e.
+    fun _ x t e => exp.abst x <$> close_ty t <*> e.
   Definition app : ⊧ OExp ⇢ OExp ⇢ OExp :=
     fun _ e1 e2 => exp.app <$> e1 <*> e2.
 

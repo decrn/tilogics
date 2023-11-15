@@ -26,7 +26,7 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Em Require Import Prelude Persistence Worlds.
+From Em Require Import Prelude Substitution Worlds.
 
 Import world.notations.
 
@@ -47,31 +47,31 @@ Module Tri.
 
     Context [w w' : World] (rec : ∀ y (yIn : y ∈ w), OTy w').
 
-    Fixpoint persist_inner (t : OTy w) : OTy w' :=
+    Fixpoint subst_inner (t : OTy w) : OTy w' :=
       match t with
       | oty.evar xIn   => rec xIn
       | oty.bool       => oty.bool
-      | oty.func t1 t2 => oty.func (persist_inner t1) (persist_inner t2)
+      | oty.func t1 t2 => oty.func (subst_inner t1) (subst_inner t2)
       end.
 
   End InnerRecursion.
 
-  Lemma proper_persist_inner {w0 w1} (rec1 rec2 : ∀ α, α ∈ w0 → OTy w1)
+  Lemma proper_subst_inner {w0 w1} (rec1 rec2 : ∀ α, α ∈ w0 → OTy w1)
     (Hrec : ∀ α (αIn : α ∈ w0), rec1 α αIn = rec2 α αIn) :
-    ∀ τ, persist_inner rec1 τ = persist_inner rec2 τ.
+    ∀ τ, subst_inner rec1 τ = subst_inner rec2 τ.
   Proof. induction τ; cbn; now f_equal; auto. Qed.
 
-  Fixpoint persist_outer {w0} t {w1} (r : w0 ⊒⁻ w1) {struct r} : OTy w1 :=
+  Fixpoint subst_outer {w0} t {w1} (r : w0 ⊒⁻ w1) {struct r} : OTy w1 :=
     match r with
     | nil        => t
-    | cons α s r => persist_inner
-                      (fun b βIn => persist_outer (thickIn _ s βIn) r)
+    | cons α s r => subst_inner
+                      (fun b βIn => subst_outer (thickIn _ s βIn) r)
                       t
     end.
 
   Canonical Structure Tri : SUB :=
     {| sub              := Rel;
-       lk w1 w2 θ α αIn := persist_outer (oty.evar αIn) θ;
+       lk w1 w2 θ α αIn := subst_outer (oty.evar αIn) θ;
     |}.
 
   #[export] Instance thick_tri : Thick Tri :=
@@ -96,49 +96,49 @@ Module Tri.
   #[export] Instance lkrefl_tri : LkRefl Tri.
   Proof. easy. Qed.
 
-  Lemma persist_outer_fix {w0 w1} (θ : w0 ⊒⁻ w1) (t : OTy w0) :
-     persist_outer t θ =
+  Lemma subst_outer_fix {w0 w1} (θ : w0 ⊒⁻ w1) (t : OTy w0) :
+     subst_outer t θ =
      match t with
      | oty.evar αIn   => lk θ αIn
      | oty.bool       => oty.bool
-     | oty.func t1 t2 => oty.func (persist_outer t1 θ) (persist_outer t2 θ)
+     | oty.func t1 t2 => oty.func (subst_outer t1 θ) (subst_outer t2 θ)
      end.
   Proof. induction θ; destruct t; cbn; now f_equal. Qed.
 
-  Lemma persist_outer_refl {w} (t : OTy w) : persist_outer t refl = t.
+  Lemma subst_outer_refl {w} (t : OTy w) : subst_outer t refl = t.
   Proof. reflexivity. Qed.
 
-  Lemma persist_persist_inner {w0 w1} (t : OTy w0)
+  Lemma subst_subst_inner {w0 w1} (t : OTy w0)
     (rec : ∀ y (yIn : y ∈ w0), OTy w1) {w2} (r : w1 ⊒⁻ w2) :
-    persist (persist_inner rec t) r =
-    persist_inner (fun y yIn => persist (rec y yIn) r) t.
+    subst (subst_inner rec t) r =
+    subst_inner (fun y yIn => subst (rec y yIn) r) t.
   Proof. induction t; cbn; now f_equal. Qed.
 
-  Lemma persist_outer_persist_inner {w0 w1} (t : OTy w0)
+  Lemma subst_outer_subst_inner {w0 w1} (t : OTy w0)
     (rec : ∀ y (yIn : y ∈ w0), OTy w1) {w2} (r : w1 ⊒⁻ w2) :
-    persist_outer (persist_inner rec t) r =
-    persist_inner (fun y yIn => persist_outer (rec y yIn) r) t.
+    subst_outer (subst_inner rec t) r =
+    subst_inner (fun y yIn => subst_outer (rec y yIn) r) t.
   Proof.
-    induction t; cbn; auto; rewrite persist_outer_fix at 1; f_equal; auto.
+    induction t; cbn; auto; rewrite subst_outer_fix at 1; f_equal; auto.
   Qed.
 
-  Lemma persist_outer_trans {w0 w1 w2 τ} (θ1 : w0 ⊒⁻ w1) (θ2 : w1 ⊒⁻ w2) :
-    persist_outer τ (θ1 ⊙ θ2) = persist_outer (persist_outer τ θ1) θ2.
+  Lemma subst_outer_trans {w0 w1 w2 τ} (θ1 : w0 ⊒⁻ w1) (θ2 : w1 ⊒⁻ w2) :
+    subst_outer τ (θ1 ⊙ θ2) = subst_outer (subst_outer τ θ1) θ2.
   Proof.
     induction θ1; cbn.
     - reflexivity.
-    - rewrite persist_outer_persist_inner.
-      now apply proper_persist_inner.
+    - rewrite subst_outer_subst_inner.
+      now apply proper_subst_inner.
   Qed.
 
-  Lemma persist_outer_persist {w0 w1} (θ : w0 ⊒⁻ w1) (t : OTy w0) :
-    persist_outer t θ = persist t θ.
-  Proof. induction t; cbn; rewrite persist_outer_fix; f_equal; auto. Qed.
+  Lemma subst_outer_subst {w0 w1} (θ : w0 ⊒⁻ w1) (t : OTy w0) :
+    subst_outer t θ = subst t θ.
+  Proof. induction t; cbn; rewrite subst_outer_fix; f_equal; auto. Qed.
 
   #[export] Instance lktrans_tri : LkTrans Tri.
   Proof.
     intros w0 w1 w2 θ1 θ2 α αIn. unfold lk; cbn.
-    now rewrite persist_outer_trans, persist_outer_persist.
+    now rewrite subst_outer_trans, subst_outer_subst.
   Qed.
 
   #[export] Instance lkthick_tri : LkThick Tri.

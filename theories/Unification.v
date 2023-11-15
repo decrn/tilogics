@@ -35,7 +35,7 @@ Import (hints) Par Tri.
 Set Implicit Arguments.
 
 #[local] Notation "s [ ζ ]" :=
-  (persist s ζ)
+  (subst s ζ)
     (at level 8, left associativity,
       format "s [ ζ ]").
 
@@ -277,7 +277,7 @@ End Implementation.
 
 Section Correctness.
 
-  Local Existing Instance proper_persist_bientails.
+  Local Existing Instance proper_subst_bientails.
   Lemma instpred_ctrue {w0 w1} (θ1 : Tri w0 w1) :
     instpred (ctrue θ1) ⊣⊢ₚ ⊤ₚ.
   Proof. cbn. now rewrite Sub.wp_refl. Qed.
@@ -292,9 +292,9 @@ Section Correctness.
     (∀ w1 (θ1 : Tri w0 w1), instpred (cand c1 c2 θ1) ⊣⊢ₚ (P /\ₚ Q)[θ1]).
   Proof.
     unfold instpred, instpred_solved, cand. intros H1 H2 w1 θ1.
-    rewrite wp_solved_bind, persist_and, <- H1, wp_solved_frame.
+    rewrite wp_solved_bind, subst_and, <- H1, wp_solved_frame.
     unfold _4. apply proper_wp_solved_bientails. intros w2 θ2 [].
-    cbn. rewrite and_true_l, <- persist_pred_trans. apply H2.
+    cbn. rewrite and_true_l, <- subst_pred_trans. apply H2.
   Qed.
 
   Definition AUnifierCorrect : ⊧ AUnifier ⇢ PROP :=
@@ -329,8 +329,8 @@ Section Correctness.
     Proof.
       destruct θ1; cbn; Tri.folddefs.
       Tri.folddefs.
-      - now rewrite flex_correct, persist_pred_refl.
-      - now rewrite lamgu_correct, !persist_eq, !persist_trans.
+      - now rewrite flex_correct, subst_pred_refl.
+      - now rewrite lamgu_correct, !subst_eq, !subst_trans.
     Qed.
 
     Lemma atrav_correct : AUnifierCorrect (atrav lamgu).
@@ -354,7 +354,7 @@ Section Correctness.
     instpred (mgu (Θ := Θ) t1 t2) ⊣⊢ₚ t1 =ₚ t2.
   Proof.
     unfold mgu. rewrite instpred_solved_hmap.
-    now rewrite amgu_correct, persist_pred_refl.
+    now rewrite amgu_correct, subst_pred_refl.
   Qed.
 
   #[local] Existing Instance instpred_prod_ty.
@@ -373,7 +373,7 @@ Section Correctness.
   Proof.
     change (instpred (solve (Θ := Θ) C) ⊣⊢ₚ instpred C).
     unfold solve. rewrite instpred_solved_hmap.
-    now rewrite asolve_correct, persist_pred_refl.
+    now rewrite asolve_correct, subst_pred_refl.
   Qed.
 
 End Correctness.

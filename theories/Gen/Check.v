@@ -35,7 +35,7 @@ Import Pred Pred.notations Pred.proofmode world.notations.
 Set Implicit Arguments.
 
 #[local] Notation "s [ ζ ]" :=
-  (persist s ζ)
+  (subst s ζ)
     (at level 7, left associativity,
       format "s [ ζ ]").
 

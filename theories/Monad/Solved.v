@@ -39,7 +39,7 @@ Section WithSub.
   #[export] Instance tcm_solved : TypeCheckM (Solved Θ) :=
     {| equals w τ1 τ2 := mgu τ1 τ2;
        pick w := let α := world.fresh w in
-                 Some (existT (w ▻ α) (step, oty.evar world.in_zero));
+                 Some (existT (w ، α) (step, oty.evar world.in_zero));
     |}.
 
   Context {reflTransΘ : ReflTrans Θ} {lkreflΘ : LkRefl Θ} {lkTransΘ : LkTrans Θ}
@@ -63,7 +63,7 @@ Section WithSub.
     - rewrite <- mgu_correct. destruct mgu as [(w1 & θ1 & [])|]; predsimpl.
       unfold instpred, instpred_unit.
       rewrite Sub.wp_impl. predsimpl. iIntros "HQ !>".
-      rewrite persist_pbox. iMod "HQ". now rewrite trans_refl_r.
+      rewrite subst_pbox. iMod "HQ". now rewrite trans_refl_r.
     - iIntros "HQ !>". iMod "HQ". rewrite trans_refl_r. iApply "HQ".
     - destruct m as [(w1 & θ1 & a1)|]; predsimpl.
       iIntros "PQ". iApply Sub.wlp_mono. iModIntro.

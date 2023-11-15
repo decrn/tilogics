@@ -31,7 +31,7 @@ From Coq Require Import Classes.Morphisms Classes.Morphisms_Prop
 From iris Require bi.derived_connectives bi.interface proofmode.tactics.
 From stdpp Require Import base.
 
-From Em Require Export Environment Open Prelude Instantiation Persistence Worlds.
+From Em Require Export Environment Open Instantiation Substitution Worlds.
 From Em Require Import Prefix Spec Sub.Parallel.
 
 Import world.notations.
@@ -49,7 +49,7 @@ Declare Scope pred_scope.
 Delimit Scope pred_scope with P.
 
 #[local] Notation "P [ θ ]" :=
-  (persist P θ)
+  (subst P θ)
     (at level 8, left associativity,
       format "P [ θ ]") : pred_scope.
 
@@ -71,9 +71,9 @@ Module Pred.
       fun w G e t ee ι => inst G ι |-- e ∷ inst t ι ~> inst ee ι.
     #[global] Arguments TPB [w] G e t ee ι/.
 
-    #[export] Instance persist_pred : Persistent Pred :=
+    #[export] Instance subst_pred : Subst Pred :=
       fun Θ w1 P w2 θ ι2 => P (inst θ ι2).
-    #[global] Arguments persist_pred Θ [w] _ [w1] _ _ /.
+    #[global] Arguments subst_pred Θ [w] _ [w1] _ _ /.
 
   End Definitions.
 
@@ -124,7 +124,7 @@ Module Pred.
     Variant wandₚ {w} (P Q : Pred w) (ι : Assignment w) : Prop :=
       MkWand : (P ι -> Q ι) -> wandₚ P Q ι.
     Variant persistently {w} (P : Pred w) (ι : Assignment w) : Prop :=
-      MkPersistently : P ι -> persistently P ι.
+      MkSubstly : P ι -> persistently P ι.
 
     #[export] Instance ofe_dist_pred {w} : ofe.Dist (Pred w) :=
       ofe.discrete_dist.
@@ -223,9 +223,9 @@ Module Pred.
   Create HintDb punfold.
   #[export] Hint Rewrite bientails_unfold entails_unfold sep_unfold wand_unfold
     intuitionistically_unfold
-    (@inst_persist OEnv Env _ _ _)
-    (@inst_persist OExp Exp _ _ _)
-    (@inst_persist OTy Ty _ _ _)
+    (@inst_subst OEnv Env _ _ _)
+    (@inst_subst OExp Exp _ _ _)
+    (@inst_subst OTy Ty _ _ _)
     (@inst_lift OEnv Env _ _ _)
     (@inst_lift OExp Exp _ _ _)
     (@inst_lift OTy Ty _ _ _)
@@ -243,7 +243,7 @@ Module Pred.
     change (@interface.bi_pure (@bi_pred _) ?P _) with P in *;
     change (@interface.bi_forall (@bi_pred _) ?A ?P) with (fun ι => forall a : A, P a ι) in *;
     change (@interface.bi_exist (@bi_pred _) ?A ?P) with (fun ι => exists a : A, P a ι) in *;
-    change (@persist Pred persist_pred _ _ ?P _ ?θ ?ι) with (P (inst θ ι)) in *;
+    change (@subst Pred subst_pred _ _ ?P _ ?θ ?ι) with (P (inst θ ι)) in *;
     try progress (cbn beta).
 
   Ltac pred_unfold :=
@@ -251,7 +251,7 @@ Module Pred.
       (punfold_connectives;
        try rewrite_db punfold; auto 1 with typeclass_instances;
        cbn [eqₚ TPB inst inst_ty inst_env] in *;
-       (* repeat rewrite ?inst_persist, ?inst_lift, ?inst_refl, ?inst_trans, *)
+       (* repeat rewrite ?inst_subst, ?inst_lift, ?inst_refl, ?inst_trans, *)
        (*   ?inst_insert, ?oexp.inst_var, ?oexp.inst_true, ?oexp.inst_false, *)
        (*   ?oexp.inst_absu, ?oexp.inst_abst, ?oexp.inst_app, ?oexp.inst_ifte in *; *)
        try
@@ -298,9 +298,9 @@ Module Pred.
 
     #[local] Hint Rewrite <- @tactics.forall_and_distr : obligation.
 
-    #[export] Instance proper_persist_bientails {Θ w} :
+    #[export] Instance proper_subst_bientails {Θ w} :
       Proper ((⊣⊢ₚ) ==> forall_relation (fun _ => eq ==> (⊣⊢ₚ)))
-      (@persist Pred persist_pred Θ w).
+      (@subst Pred Pred.subst_pred Θ w).
     Proof. obligation. Qed.
 
     Lemma split_bientails {w} (P Q : Pred w) :
@@ -402,58 +402,58 @@ Module Pred.
       - intros []. now f_equal.
     Qed.
 
-    Section Persist.
+    Section Subst.
 
-      Lemma persist_eq {T : OType} {persR : Persistence.Persistent T}
-        {A : Type} {instTA : Inst T A} {instPersistTA : InstPersist T A}
+      Lemma subst_eq {T : OType} {substT : Subst T}
+        {A : Type} {instTA : Inst T A} {instSubstTA : InstSubst T A}
         {Θ : SUB} {w0 w1} (θ : Θ w0 w1) (t1 t2 : T w0) :
-        persist (t1 =ₚ t2) θ ⊣⊢ₚ persist t1 θ =ₚ persist t2 θ.
+        subst (t1 =ₚ t2) θ ⊣⊢ₚ subst t1 θ =ₚ subst t2 θ.
       Proof.
-        pred_unfold. unfold persist, persist_pred. intros ι.
-        now rewrite !inst_persist.
+        pred_unfold. unfold subst, subst_pred. intros ι.
+        now rewrite !inst_subst.
       Qed.
 
       Context {Θ : SUB}.
 
-      (* We could define a PersistLaws instance for the Pred type, but that's
+      (* We could define a SubstLaws instance for the Pred type, but that's
          requires functional extensionality. Instead, we provide similar
          lemmas that use bientailment instead of Leibniz equality and thus
          avoid functional extensionality. *)
-      Lemma persist_pred_refl `{lkReflΘ : LkRefl Θ} [w] (P : Pred w) :
-        persist P refl ⊣⊢ₚ P.
+      Lemma subst_pred_refl `{lkReflΘ : LkRefl Θ} [w] (P : Pred w) :
+        subst P refl ⊣⊢ₚ P.
       Proof. obligation. Qed.
-      Lemma persist_pred_trans `{lktransΘ : LkTrans Θ}
+      Lemma subst_pred_trans `{lktransΘ : LkTrans Θ}
         {w0 w1 w2} (θ1 : Θ w0 w1) (θ2 : Θ w1 w2) (P : Pred w0) :
-        persist P (θ1 ⊙ θ2) ⊣⊢ₚ persist (persist P θ1) θ2.
+        subst P (θ1 ⊙ θ2) ⊣⊢ₚ subst (subst P θ1) θ2.
       Proof. obligation. Qed.
-      Lemma persist_and {w0 w1} (θ : Θ w0 w1) (P Q : Pred w0) :
-        persist (P /\ₚ Q) θ ⊣⊢ₚ persist P θ /\ₚ persist Q θ.
+      Lemma subst_and {w0 w1} (θ : Θ w0 w1) (P Q : Pred w0) :
+        subst (P /\ₚ Q) θ ⊣⊢ₚ subst P θ /\ₚ subst Q θ.
       Proof. obligation. Qed.
-      Lemma persist_impl {w0 w1} (θ : Θ w0 w1) (P Q : Pred w0) :
-        persist (P ->ₚ Q) θ ⊣⊢ₚ (persist P θ ->ₚ persist Q θ).
+      Lemma subst_impl {w0 w1} (θ : Θ w0 w1) (P Q : Pred w0) :
+        subst (P ->ₚ Q) θ ⊣⊢ₚ (subst P θ ->ₚ subst Q θ).
       Proof. obligation. Qed.
-      Lemma persist_wand {w0 w1} (θ : Θ w0 w1) (P Q : Pred w0) :
-        persist (interface.bi_wand P Q) θ ⊣⊢ₚ interface.bi_wand (persist P θ) (persist Q θ).
+      Lemma subst_wand {w0 w1} (θ : Θ w0 w1) (P Q : Pred w0) :
+        subst (interface.bi_wand P Q) θ ⊣⊢ₚ interface.bi_wand (subst P θ) (subst Q θ).
       Proof. obligation. Qed.
-      Lemma persist_false {w0 w1} (θ : Θ w0 w1) :
-        persist ⊥ₚ θ ⊣⊢ₚ ⊥ₚ.
+      Lemma subst_false {w0 w1} (θ : Θ w0 w1) :
+        subst ⊥ₚ θ ⊣⊢ₚ ⊥ₚ.
       Proof. obligation. Qed.
-      Lemma persist_true {w0 w1} (θ : Θ w0 w1) :
-        persist ⊤ₚ θ ⊣⊢ₚ ⊤ₚ.
+      Lemma subst_true {w0 w1} (θ : Θ w0 w1) :
+        subst ⊤ₚ θ ⊣⊢ₚ ⊤ₚ.
       Proof. obligation. Qed.
-      Lemma persist_forall [A] [w0 w1] (θ : Θ w0 w1) (Q : A -> Pred w0) :
-        persist (∀ₚ a : A, Q a) θ ⊣⊢ₚ (∀ₚ a : A, persist (Q a) θ).
+      Lemma subst_forall [A] [w0 w1] (θ : Θ w0 w1) (Q : A -> Pred w0) :
+        subst (∀ₚ a : A, Q a) θ ⊣⊢ₚ (∀ₚ a : A, subst (Q a) θ).
       Proof. obligation. Qed.
-      Lemma persist_exists [A] [w0 w1] (θ : Θ w0 w1) (Q : A -> Pred w0) :
-        persist (∃ₚ a : A, Q a) θ ⊣⊢ₚ (∃ₚ a : A, persist (Q a) θ).
-      Proof. obligation. Qed.
-
-      Lemma persist_tpb {w0 w1} (θ : Θ w0 w1) G (e : Exp) (t : OTy w0) (ee : OExp w0) :
-        persist (G |--ₚ e; t ~> ee) θ ⊣⊢ₚ
-        persist G θ |--ₚ e; persist t θ ~> persist ee θ.
+      Lemma subst_exists [A] [w0 w1] (θ : Θ w0 w1) (Q : A -> Pred w0) :
+        subst (∃ₚ a : A, Q a) θ ⊣⊢ₚ (∃ₚ a : A, subst (Q a) θ).
       Proof. obligation. Qed.
 
-    End Persist.
+      Lemma subst_tpb {w0 w1} (θ : Θ w0 w1) G (e : Exp) (t : OTy w0) (ee : OExp w0) :
+        subst (G |--ₚ e; t ~> ee) θ ⊣⊢ₚ
+        subst G θ |--ₚ e; subst t θ ~> subst ee θ.
+      Proof. obligation. Qed.
+
+    End Subst.
 
   End Lemmas.
 
@@ -508,7 +508,7 @@ Module Pred.
       Proof. firstorder. Qed.
 
       Lemma and_wp_l {w0 w1} (θ : Θ w0 w1) P Q :
-        wp θ P /\ₚ Q ⊣⊢ₚ wp θ (P /\ₚ persist Q θ).
+        wp θ P /\ₚ Q ⊣⊢ₚ wp θ (P /\ₚ subst Q θ).
       Proof.
         unfold wp; pred_unfold. split.
         - intros [(ι1 & <- & HP) HQ]. eauto.
@@ -516,12 +516,12 @@ Module Pred.
       Qed.
 
       Lemma and_wp_r {w0 w1} (θ : Θ w0 w1) (P : Pred w0) (Q : Pred w1) :
-        P /\ₚ wp θ Q ⊣⊢ₚ wp θ (persist P θ /\ₚ Q).
+        P /\ₚ wp θ Q ⊣⊢ₚ wp θ (subst P θ /\ₚ Q).
       Proof. now rewrite and_comm, and_wp_l, and_comm. Qed.
 
       Lemma wp_thick {thickΘ : Thick Θ} {lkThickΘ : LkThick Θ}
         {w α} (αIn : world.In α w) (t : OTy (w - α)) (Q : Pred (w - α)) :
-        wp (thick α t) Q ⊣⊢ₚ oty.evar αIn =ₚ persist t (thin (Θ := Par) α) /\ₚ persist Q (thin (Θ := Par) α).
+        wp (thick α t) Q ⊣⊢ₚ oty.evar αIn =ₚ subst t (thin (Θ := Par) α) /\ₚ subst Q (thin (Θ := Par) α).
       Proof.
         unfold wp; pred_unfold. intros ι. split.
         - intros (ι1 & Heq & HQ). subst.
@@ -568,7 +568,7 @@ Module Pred.
       Proof. firstorder. Qed.
 
       Lemma entails_wlp {w0 w1} (θ : Θ w0 w1) P Q :
-        (persist P θ ⊢ₚ Q) <-> (P ⊢ₚ wlp θ Q).
+        (subst P θ ⊢ₚ Q) <-> (P ⊢ₚ wlp θ Q).
       Proof.
         unfold wlp; pred_unfold. split; intros HPQ.
         - intros ι0 HP ι1 <-. revert HP. apply HPQ.
@@ -576,7 +576,7 @@ Module Pred.
       Qed.
 
       Lemma entails_wp {w0 w1} (θ : Θ w0 w1) P Q :
-        (P ⊢ₚ persist Q θ) <-> (wp θ P ⊢ₚ Q).
+        (P ⊢ₚ subst Q θ) <-> (wp θ P ⊢ₚ Q).
       Proof.
         unfold wp; pred_unfold. split; intros HPQ.
         - intros ι0 (ι1 & <- & HP). now apply HPQ.
@@ -585,23 +585,23 @@ Module Pred.
       Qed.
 
       Lemma wp_impl {w0 w1} (θ1 : Θ w0 w1) (P : Pred _) (Q : Pred _) :
-        (wp θ1 P ->ₚ Q) ⊣⊢ₚ wlp θ1 (P ->ₚ persist Q θ1).
+        (wp θ1 P ->ₚ Q) ⊣⊢ₚ wlp θ1 (P ->ₚ subst Q θ1).
       Proof.
         unfold wp, wlp; pred_unfold. intros ι0; split.
         - intros H ι1 <- HP. apply H. now exists ι1.
         - intros HPQ (ι1 & <- & HP). now apply HPQ.
       Qed.
 
-      Lemma persist_wlp {w0 w1} {θ : Θ w0 w1} (P : Pred w1) :
-        persist (wlp θ P) θ ⊢ₚ P.
+      Lemma subst_wlp {w0 w1} {θ : Θ w0 w1} (P : Pred w1) :
+        subst (wlp θ P) θ ⊢ₚ P.
       Proof. firstorder. Qed.
 
-      Lemma persist_wp {w0 w1} {θ : Θ w0 w1} (P : Pred w1) :
-        P ⊢ₚ persist (wp θ P) θ.
+      Lemma subst_wp {w0 w1} {θ : Θ w0 w1} (P : Pred w1) :
+        P ⊢ₚ subst (wp θ P) θ.
       Proof. firstorder. Qed.
 
       Lemma wlp_frame {w0 w1} (θ : Θ w0 w1) (P : Pred _) (Q : Pred _) :
-        P ->ₚ wlp θ Q ⊣⊢ₚ wlp θ (persist P θ ->ₚ Q).
+        P ->ₚ wlp θ Q ⊣⊢ₚ wlp θ (subst P θ ->ₚ Q).
       Proof.
         unfold wlp; pred_unfold. intros ι; split.
         - intros H ι1 <- HP. now apply (H HP).
@@ -612,19 +612,9 @@ Module Pred.
     (* #[global] Opaque wp. *)
     (* #[global] Opaque wlp. *)
 
-    (* Lemma proper_wp_step {Θ1 Θ2 : SUB} {stepΘ1 : Step Θ1} {stepΘ2 : Step Θ2} *)
-    (*   {lkStepΘ1 : LkStep Θ1} {lkStepΘ2 : LkStep Θ2} *)
-    (*   {w α} : *)
-    (*   forall P Q : Pred (world.snoc w α), *)
-    (*     P ⊣⊢ₚ Q -> wp (step (Θ := Θ1)) P ⊣⊢ₚ wp (step (Θ := Θ2)) Q. *)
-    (* Proof. *)
-    (*   intros P Q [PQ]. constructor. intros ι. apply base.exist_proper. *)
-    (*   intros ι2. now rewrite !inst_step, PQ. *)
-    (* Qed. *)
-
     Lemma intro_wp_step' {Θ} {stepΘ : Step Θ} {lkStepΘ : LkStep Θ}
-      {w α} (P : Pred w) (Q : Pred (world.snoc w α)) (t : Ty) :
-      (persist P step ⊢ₚ lift t =ₚ @oty.evar _ α world.in_zero ->ₚ Q) ->
+      {w α} (P : Pred w) (Q : Pred (w ، α)) (t : Ty) :
+      (subst P step ⊢ₚ lift t =ₚ @oty.evar _ α world.in_zero ->ₚ Q) ->
       (P ⊢ₚ wp (step (Θ := Θ)) Q).
     Proof.
       pred_unfold. intros H ι HP. set (ι1 := env.snoc ι α t).
@@ -634,13 +624,13 @@ Module Pred.
 
     (* Better for iris proof mode. *)
     Lemma intro_wp_step {Θ} {stepΘ : Step Θ} {lkStepΘ : LkStep Θ}
-      t {w α} (Q : Pred (world.snoc w α)) :
+      t {w α} (Q : Pred (w ، α)) :
       wlp step (lift t =ₚ oty.evar world.in_zero ->ₚ Q) ⊢ₚ wp (step (Θ := Θ)) Q.
-    Proof. apply (intro_wp_step' t). now rewrite persist_wlp. Qed.
+    Proof. apply (intro_wp_step' t). now rewrite subst_wlp. Qed.
 
     Lemma wp_split  {Θ : SUB} [w0 w1] (θ : Θ w0 w1) P :
       wp θ ⊤ₚ /\ₚ wlp θ P ⊢ₚ wp θ P.
-    Proof. now rewrite and_wp_l, persist_wlp, and_true_l. Qed.
+    Proof. now rewrite and_wp_l, subst_wlp, and_true_l. Qed.
 
     Lemma wp_hmap `{LkHMap Θ1 Θ2} [w0 w1] (θ : Θ1 w0 w1) P :
       wp (hmap θ) P ⊣⊢ₚ wp θ P.
@@ -667,7 +657,7 @@ Module Pred.
   Section InstPred.
     Import iris.bi.derived_laws.
     Import iris.bi.interface.
-    Import Persistence.
+
     (* A type class for things that can be interpreted as a predicate. *)
     Class InstPred (A : OType) :=
       instpred : ⊧ A ⇢ Pred.
@@ -698,20 +688,20 @@ Module Pred.
       - rewrite Pred.and_assoc. now apply bi.and_proper.
     Qed.
 
-    Class InstPredPersist A {ipA : InstPred A} {persA : Persistent A} :=
-      instpred_persist [Θ : SUB] {w0 w1} (θ : Θ w0 w1) (a : A w0) :
-        instpred (persist a θ) ⊣⊢ₚ persist (instpred a) θ.
-    #[global] Arguments InstPredPersist _ {_ _}.
+    Class InstPredSubst A {ipA : InstPred A} {subA : Subst A} :=
+      instpred_subst [Θ : SUB] {w0 w1} (θ : Θ w0 w1) (a : A w0) :
+        instpred (subst a θ) ⊣⊢ₚ subst (instpred a) θ.
+    #[global] Arguments InstPredSubst _ {_ _}.
 
-    #[export] Instance instpred_persist_list `{InstPredPersist A} :
-      InstPredPersist (List A).
+    #[export] Instance instpred_subst_list `{InstPredSubst A} :
+      InstPredSubst (List A).
     Proof.
-      intros Θ w0 w1 θ xs. unfold persist, persistent_list.
-      induction xs; cbn; [easy|]. now rewrite instpred_persist IHxs.
+      intros Θ w0 w1 θ xs. unfold subst, subst_list.
+      induction xs; cbn; [easy|]. now rewrite instpred_subst IHxs.
     Qed.
 
-    #[local] Instance instpred_persist_prod_ty : InstPredPersist (OTy * OTy).
-    Proof. intros Θ w0 w1 θ [τ1 τ2]; cbn. now rewrite persist_eq. Qed.
+    #[local] Instance instpred_subst_prod_ty : InstPredSubst (OTy * OTy).
+    Proof. intros Θ w0 w1 θ [τ1 τ2]; cbn. now rewrite subst_eq. Qed.
 
   End InstPred.
 
@@ -734,7 +724,7 @@ Module Pred.
   #[export] Instance params_tpb : Params (@TPB) 1 := {}.
   #[export] Instance params_ifte : Params (@oexp.ifte) 1 := {}.
   #[export] Instance params_eqₚ : Params (@eqₚ) 4 := {}.
-  #[export] Instance params_persist : Params (@persist) 4 := {}.
+  #[export] Instance params_subst : Params (@subst) 4 := {}.
 
   Section PBoxModality.
     Import iris.proofmode.tactics.
@@ -748,7 +738,7 @@ Module Pred.
         now erewrite Sub.wlp_refl.
     Qed.
 
-    Lemma persist_pbox `{LkTrans Θ} [w] (Q : ◻Pred w) [w1] (θ1 : Θ w w1) :
+    Lemma subst_pbox `{LkTrans Θ} [w] (Q : ◻Pred w) [w1] (θ1 : Θ w w1) :
       (◼Q)[θ1] ⊢ₚ ◼(Q[θ1]).
     Proof.
       constructor; intros ι1 HQ w2 θ2 ι2 <-.
@@ -757,40 +747,40 @@ Module Pred.
 
   End PBoxModality.
 
-  Section IntoPersist.
+  Section IntoSubst.
 
     Context {Θ : SUB}.
 
-    Class IntoPersist `{Inst T A, Persistent T}
+    Class IntoSubst `{Inst T A, Subst T}
       [w0 w1] (θ : Θ w0 w1) (x : T w0) (y : T w1) : Prop :=
-      into_persist : forall ι : Assignment w1, inst (persist x θ) ι = inst y ι.
+      into_subst : forall ι : Assignment w1, inst (subst x θ) ι = inst y ι.
 
-    #[export] Instance into_persist_default `{Inst T A, Persistence.Persistent T}
-      [w0 w1] (θ : Θ w0 w1) (t : T w0) : IntoPersist θ t (persist t θ) | 10.
+    #[export] Instance into_subst_default `{Inst T A, Subst T}
+      [w0 w1] (θ : Θ w0 w1) (t : T w0) : IntoSubst θ t (subst t θ) | 10.
     Proof. easy. Qed.
 
-    (* #[export] Instance into_persist_persist `{LkTrans Θ, InstPersist T A} *)
+    (* #[export] Instance into_subst_subst `{LkTrans Θ, InstSubst T A} *)
     (*   [w0 w1 w2] (θ1 : Θ w0 w1) (θ2 : Θ w1 w2) (t : T w0) : *)
-    (*   IntoPersist θ2 (persist t θ1) (persist t (trans θ1 θ2)) | 0. *)
-    (* Proof. intros ι. now rewrite !inst_persist, inst_trans. Qed. *)
+    (*   IntoSubst θ2 (subst t θ1) (subst t (trans θ1 θ2)) | 0. *)
+    (* Proof. intros ι. now rewrite !inst_subst, inst_trans. Qed. *)
 
-    #[export] Instance into_persist_lift {T A} {instTA : Inst T A} {liftTA : Lift T A}
-      {persT : Persistent T} {instLiftTA : InstLift T A} {instPersTA : InstPersist T A}
+    #[export] Instance into_subst_lift {T A} {instTA : Inst T A} {liftTA : Lift T A}
+      {subT : Subst T} {instLiftTA : InstLift T A} {instSubTA : InstSubst T A}
       [w0 w1] (θ : Θ w0 w1) (a : A) :
-      IntoPersist θ (lift a) (lift a) | 0.
-    Proof. intros ι. now rewrite inst_persist, !inst_lift. Qed.
+      IntoSubst θ (lift a) (lift a) | 0.
+    Proof. intros ι. now rewrite inst_subst, !inst_lift. Qed.
 
-    #[export] Instance into_persist_insert
+    #[export] Instance into_subst_insert
       [w0 w1] (θ : Θ w0 w1) (G0 : OEnv w0) x (τ0 : OTy w0) G1 τ1
-      (HG : IntoPersist θ G0 G1) (Hτ : IntoPersist θ τ0 τ1) :
-      IntoPersist θ (G0 ,, x ∷ τ0) (G1 ,, x ∷ τ1) | 0.
+      (HG : IntoSubst θ G0 G1) (Hτ : IntoSubst θ τ0 τ1) :
+      IntoSubst θ (G0 ,, x ∷ τ0) (G1 ,, x ∷ τ1) | 0.
     Proof.
       intros ι1. specialize (HG ι1). specialize (Hτ ι1).
       change_no_check (@gmap.gmap string _ _ (OTy ?w)) with (OEnv w).
-      rewrite persist_insert, !inst_insert. now f_equal.
+      rewrite subst_insert, !inst_insert. now f_equal.
     Qed.
 
-  End IntoPersist.
+  End IntoSubst.
 
   Section WlpModality.
 
@@ -802,7 +792,7 @@ Module Pred.
       into_wlp : P ⊢ Sub.wlp θ Q.
 
     #[export] Instance into_wlp_default (P : Pred w0) :
-      IntoWlp P (persist P θ) | 10.
+      IntoWlp P (subst P θ) | 10.
     Proof. unfold IntoWlp. now apply Sub.entails_wlp. Qed.
 
     Definition modality_wlp_mixin :
@@ -820,25 +810,25 @@ Module Pred.
 
     #[export] Instance into_wlp_pbox `{LkTrans Θ} (P : ◻Pred w0) :
       IntoWlp ◼P ◼(fun _ θ2 => P _ (θ ⊙ θ2)) | 0.
-    Proof. unfold IntoWlp. iIntros "H !>". now rewrite persist_pbox. Qed.
+    Proof. unfold IntoWlp. iIntros "H !>". now rewrite subst_pbox. Qed.
 
     #[export] Instance into_wlp_tpb (G1 : OEnv w0) (e : Exp) (τ1 : OTy w0)
-      (ee1 : OExp w0) G2 τ2 ee2 (HG : IntoPersist θ G1 G2)
-      (Hτ : IntoPersist θ τ1 τ2) (Hee : IntoPersist θ ee1 ee2) :
+      (ee1 : OExp w0) G2 τ2 ee2 (HG : IntoSubst θ G1 G2)
+      (Hτ : IntoSubst θ τ1 τ2) (Hee : IntoSubst θ ee1 ee2) :
       IntoWlp (TPB G1 e τ1 ee1) (TPB G2 e τ2 ee2) | 0.
     Proof.
       constructor. intros ι0 HT ι1 <-. pred_unfold.
       specialize (HG ι1). specialize (Hτ ι1). specialize (Hee ι1).
-      rewrite !inst_persist in HG, Hτ, Hee. congruence.
+      rewrite !inst_subst in HG, Hτ, Hee. congruence.
     Qed.
 
-    #[export] Instance into_wlp_eqp `{InstPersist T A}
-      (x1 x2 : T w0) (y1 y2 : T w1) (Hxy1 : IntoPersist θ x1 y1) (Hxy2 :IntoPersist θ x2 y2) :
+    #[export] Instance into_wlp_eqp `{InstSubst T A}
+      (x1 x2 : T w0) (y1 y2 : T w1) (Hxy1 : IntoSubst θ x1 y1) (Hxy2 :IntoSubst θ x2 y2) :
       IntoWlp (eqₚ x1 x2) (eqₚ y1 y2) | 0.
     Proof.
       constructor. pred_unfold. intros ι0 Heq ι1 ?Heq; cbn.
       specialize (Hxy1 ι1). specialize (Hxy2 ι1).
-      rewrite !inst_persist in Hxy1, Hxy2. congruence.
+      rewrite !inst_subst in Hxy1, Hxy2. congruence.
     Qed.
 
     #[export] Instance into_wlp_wlp (P : Pred w1) :
@@ -855,12 +845,12 @@ Module Pred.
 
   Create HintDb predsimpl.
   #[export] Hint Rewrite
-    (@persist_eq OEnv _ _ _ _)
-    (@persist_eq OTy _ _ _ _)
-    (@persist_refl OEnv _ _)
-    (@persist_refl OTy _ _)
-    (@persist_trans OEnv _ _)
-    (@persist_trans OTy _ _)
+    (@subst_eq OEnv _ _ _ _)
+    (@subst_eq OTy _ _ _ _)
+    (@subst_refl OEnv _ _)
+    (@subst_refl OTy _ _)
+    (@subst_trans OEnv _ _)
+    (@subst_trans OTy _ _)
     @Sub.wlp_refl
     @Sub.wlp_trans
     @Sub.wlp_true
@@ -880,12 +870,12 @@ Module Pred.
     @lk_refl
     @lk_step
     @lk_trans
-    @persist_and
-    @persist_false
-    @persist_pred_refl
-    @persist_pred_trans
-    @persist_tpb
-    @persist_true
+    @subst_and
+    @subst_false
+    @subst_pred_refl
+    @subst_pred_trans
+    @subst_tpb
+    @subst_true
     @trans_refl_r
     : predsimpl.
 
@@ -905,12 +895,12 @@ Module Pred.
        auto 1 with typeclass_instances;
        repeat
          match goal with
-         | |- context[@persist ?A ?I ?Θ ?w0 ?x ?w1 ?θ] =>
-             is_var x; generalize (@persist A I Θ w0 x w1 θ); clear x; intros x;
+         | |- context[@subst ?A ?I ?Θ ?w0 ?x ?w1 ?θ] =>
+             is_var x; generalize (@subst A I Θ w0 x w1 θ); clear x; intros x;
              try (clear w0 θ)
-         | |- context[@lk ?Θ (world.snoc ?w0 ?α) ?w1 ?θ ?α world.in_zero] =>
+         | |- context[@lk ?Θ (?w0 ، ?α) ?w1 ?θ ?α world.in_zero] =>
              is_var θ;
-             generalize (@lk Θ (world.snoc w0 α) w1 θ α world.in_zero);
+             generalize (@lk Θ (w0 ، α) w1 θ α world.in_zero);
              clear θ w0; intros ?t
          end).
 

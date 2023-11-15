@@ -42,17 +42,17 @@ Import MonadNotations Pred Pred.Sub Pred.notations Pred.proofmode
       (f : Box Prefix (A ⇢ Solved Prefix (List (OTy * OTy) * B)) w) =>
     '(C1,a1) <- m ;;
     '(C2,b2) <- f _ _ a1 ;;
-    pure (persist C1 _ ++ C2, b2).
+    pure (subst C1 _ ++ C2, b2).
 #[export] Instance fail_prenex : Fail Prenex :=
   fun A w => None.
 #[export] Instance tcm_prenex : TypeCheckM Prenex :=
   {| equals w τ1 τ2 := Some (existT w (refl, ([(τ1,τ2)], tt)));
      pick w := let α := world.fresh w in
-               Some (existT (w ▻ α) (step, (List.nil, oty.evar world.in_zero)));
+               Some (existT (w ، α) (step, (List.nil, oty.evar world.in_zero)));
   |}.
 
 #[local] Existing Instance instpred_prod_ty.
-#[local] Existing Instance instpred_persist_prod_ty.
+#[local] Existing Instance instpred_subst_prod_ty.
 
 #[export] Instance wp_prenex : WeakestPre Prefix Prenex :=
   fun A w o Q =>
@@ -77,7 +77,7 @@ Proof.
     rewrite Sub.and_wp_r. apply Sub.proper_wp_bientails.
     rewrite bi.and_assoc. apply bi.and_proper; auto.
     rewrite instpred_list_app. apply bi.and_proper; auto.
-    now rewrite instpred_persist.
+    now rewrite instpred_subst.
   - destruct m as [(w1 & θ1 & C1 & a1)|]; predsimpl.
     iIntros "PQ". iApply Sub.wp_mono. iIntros "!> [HC HP]".
     iMod "PQ". iSplit; auto. iApply "PQ"; auto.
@@ -86,7 +86,7 @@ Proof.
     rewrite Sub.wlp_frame. apply Sub.proper_wlp_bientails.
     rewrite <- impl_and. apply bi.impl_proper; auto.
     rewrite instpred_list_app. apply bi.and_proper; auto.
-    now rewrite instpred_persist_list.
+    now rewrite instpred_subst_list.
   - destruct m as [(w1 & θ1 & C1 & a1)|]; predsimpl.
     iIntros "#PQ". iApply Sub.wlp_mono. iIntros "!> #HP #HC".
     iMod "PQ". iApply "PQ". now iApply "HP".

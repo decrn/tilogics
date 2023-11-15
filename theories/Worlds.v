@@ -30,7 +30,7 @@ From Coq Require Import Strings.String.
 From Equations.Prop Require Import
   Equations EqDecInstances.
 From stdpp Require Import base gmap.
-From Em Require Import Prelude.
+From Em Require Export Prelude.
 
 #[local] Unset Equations Derive Equations.
 #[local] Set Transparent Obligations.
@@ -144,7 +144,7 @@ Module Import world.
     Open Scope world_scope.
 
     Notation "'ε'" := nil : world_scope.
-    Infix "▻" := snoc (at level 61, left associativity) : world_scope.
+    Infix "،" := snoc (at level 61, left associativity) : world_scope.
     Notation "α ∈ w" := (In α w%world) : type_scope.
     Notation "w - x" := (remove w x) : world_scope.
 
@@ -190,10 +190,10 @@ Module Import world.
       if b then String "a" s' else s'.
 
     Example fresh_nil : fresh nil = "a" := eq_refl.
-    Example fresh_1   : fresh (ε ▻ "1") = "aa" := eq_refl.
-    Example fresh_a   : fresh (ε ▻ "a") = "b"  := eq_refl.
-    Example fresh_z   : fresh (ε ▻ "z") = "aa" := eq_refl.
-    Example fresh_tld : fresh (ε ▻ "~") = "aa" := eq_refl.
+    Example fresh_1   : fresh (ε ، "1") = "aa" := eq_refl.
+    Example fresh_a   : fresh (ε ، "a") = "b"  := eq_refl.
+    Example fresh_z   : fresh (ε ، "z") = "aa" := eq_refl.
+    Example fresh_tld : fresh (ε ، "~") = "aa" := eq_refl.
 
   End Fresh.
 
@@ -269,7 +269,7 @@ Class HMap (Θ1 Θ2 : SUB) : Type :=
   fun w1 w2 θ => θ.
 
 Class Step (Θ : SUB) : Type :=
-  step w α : Θ w (w ▻ α).
+  step w α : Θ w (w ، α).
 #[global] Arguments step {Θ _ w α}.
 
 Class Thin (Θ : SUB) : Type :=

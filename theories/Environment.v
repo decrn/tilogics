@@ -43,18 +43,18 @@ Section WithBinding.
 
     Inductive Env : World → Set :=
     | nil                              : Env ε
-    | snoc {w} (E : Env w) {α} (d : D) : Env (w ▻ α).
+    | snoc {w} (E : Env w) {α} (d : D) : Env (w ، α).
 
     Variant NilView : Env ε → Set :=
       isNil : NilView nil.
 
-    Variant SnocView {w α} : Env (w ▻ α) → Set :=
+    Variant SnocView {w α} : Env (w ، α) → Set :=
       isSnoc (E : Env w) (v : D) : SnocView (snoc E v).
 
     Definition view (w : World) (E : Env w) :
       match w with
       | ε     => NilView
-      | w ▻ α => SnocView
+      | w ، α => SnocView
       end E :=
       match E with
       | nil      => isNil
@@ -73,7 +73,7 @@ Section WithBinding.
     Fixpoint tabulate {w} : (∀ α, α ∈ w → D) → Env w :=
       match w with
       | ε     => fun _ => nil
-      | w ▻ α => fun Ewα =>
+      | w ، α => fun Ewα =>
                    snoc
                      (tabulate (fun β βIn => Ewα β (world.in_succ βIn)))
                      (Ewα _ world.in_zero)
@@ -162,9 +162,9 @@ Ltac destroy x :=
   try (progress hnf in x);
   lazymatch type of x with
   | Env _ []       => destruct (view x)
-  | Env _ (_ ▻ _)  => destruct (view x) as [x]; destroy x
+  | Env _ (_ ، _)  => destruct (view x) as [x]; destroy x
   | _ ∈ []         => destruct (world.view x)
-  | _ ∈ _ ▻ _      => destruct (world.view x)
+  | _ ∈ _ ، _      => destruct (world.view x)
   | _              => idtac
   end.
 

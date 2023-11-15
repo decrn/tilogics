@@ -26,7 +26,7 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Em Require Import Prelude Persistence Spec Worlds.
+From Em Require Import Substitution Spec Worlds.
 
 Import world.notations.
 
@@ -36,19 +36,19 @@ Module prefix.
 
   Inductive Rel (w : World) : OType :=
   | refl        : Rel w w
-  | snoc {w' α} : Rel w w' → Rel w (w' ▻ α).
+  | snoc {w' α} : Rel w w' → Rel w (w' ، α).
   #[global] Arguments refl {_}.
   #[global] Arguments snoc {_ _ _} _.
 
-  Fixpoint persist_in {w0 w1} (θ : Rel w0 w1) [α] (αIn : α ∈ w0) : α ∈ w1 :=
+  Fixpoint subst_in {w0 w1} (θ : Rel w0 w1) [α] (αIn : α ∈ w0) : α ∈ w1 :=
     match θ with
     | refl    => αIn
-    | snoc θ' => world.in_succ (persist_in θ' αIn)
+    | snoc θ' => world.in_succ (subst_in θ' αIn)
     end.
 
   Canonical Structure Prefix : SUB :=
     {| sub              := Rel;
-       lk w0 w1 θ α αIn := oty.evar (persist_in θ αIn)
+       lk w0 w1 θ α αIn := oty.evar (subst_in θ αIn)
     |}.
 
   #[export] Instance refl_prefix : Refl Prefix :=
@@ -73,7 +73,7 @@ Module prefix.
   Fixpoint nil {w} : Prefix world.nil w :=
     match w with
     | ε      => refl
-    | w' ▻ α => snoc nil
+    | w' ، α => snoc nil
     end.
 
   Lemma nil_unique {w} (θ : Prefix world.nil w) : nil = θ.

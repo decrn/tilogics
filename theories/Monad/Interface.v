@@ -28,15 +28,15 @@
 
 From iris Require Import proofmode.tactics.
 From Em Require Export
-  BaseLogic Environment Prelude Instantiation Persistence Spec Worlds.
+  BaseLogic Environment Prelude Instantiation Substitution Spec Worlds.
 From Em Require Import Sub.Parallel Sub.Prefix.
 
 Import world.notations Pred Pred.notations Pred.proofmode.
 
-#[local] Notation "s [ ζ ]" :=
-  (persist s ζ)
+#[local] Notation "s [ θ ]" :=
+  (subst s θ)
     (at level 7, left associativity,
-      format "s [ ζ ]").
+      format "s [ θ ]").
 #[local] Set Implicit Arguments.
 
 Class Pure (M : OType → OType) : Type :=
@@ -92,7 +92,7 @@ Class AxiomaticSemantics
       WP (equals σ τ) Q ⊣⊢ₚ σ =ₚ τ /\ₚ Q _ refl tt;
     ax_wp_pick [w] (Q : ◻(OTy ⇢ Pred) w) :
       let α := world.fresh w in
-      WP pick Q ⊣⊢ₚ Sub.wp step (Q (w ▻ α) step (oty.evar world.in_zero));
+      WP pick Q ⊣⊢ₚ Sub.wp step (Q (w ، α) step (oty.evar world.in_zero));
     ax_wp_fail [A w] (Q : ◻(A ⇢ Pred) w) :
       WP fail Q ⊣⊢ₚ ⊥ₚ;
     ax_wp_mono [A w] (m : M A w) (P Q : ◻(A ⇢ Pred) w) :
@@ -107,7 +107,7 @@ Class AxiomaticSemantics
       WLP (equals σ τ) Q ⊣⊢ₚ σ =ₚ τ ->ₚ Q _ refl tt;
     ax_wlp_pick [w] (Q : ◻(OTy ⇢ Pred) w) :
       let α := world.fresh w in
-      WLP pick Q ⊣⊢ₚ Sub.wlp step (Q (w ▻ α) step (oty.evar world.in_zero));
+      WLP pick Q ⊣⊢ₚ Sub.wlp step (Q (w ، α) step (oty.evar world.in_zero));
     ax_wlp_fail [A w] (Q : ◻(A ⇢ Pred) w) :
       WLP fail Q ⊣⊢ₚ ⊤ₚ;
     ax_wlp_mono [A w] (m : M A w) (P Q : ◻(A ⇢ Pred) w) :
@@ -126,7 +126,7 @@ Lemma ax_wp_pick_substitute `{AxiomaticSemantics Θ M, Thick Θ} {lkThickΘ : Lk
   [w] (Q : ◻(OTy ⇢ Pred) w) :
   WP pick Q ⊣⊢ₚ
     let α := world.fresh w in
-    (∃ₚ τ : OTy w, (Q (w ▻ α) step (oty.evar world.in_zero))[thick α (αIn := world.in_zero) τ]).
+    (∃ₚ τ : OTy w, (Q (w ، α) step (oty.evar world.in_zero))[thick α (αIn := world.in_zero) τ]).
 Proof.
   rewrite ax_wp_pick; cbn. constructor; intros ι.
   unfold Sub.wp; pred_unfold. split.
@@ -144,7 +144,7 @@ Class TypeCheckLogicM
   M {pureM : Pure M} {bindM : Bind Θ M} {failM : Fail M} {tcM : TypeCheckM M}
     {wpM : WeakestPre Θ M} {wlpM : WeakestLiberalPre Θ M} : Type :=
 
-  { wp_pure [A] {persA : Persistent A}
+  { wp_pure [A] {subA : Subst A}
       [w] (a : A w) (Q : ◻(A ⇢ Pred) w) :
       Q _ refl a ⊢ₚ WP (pure a) Q;
     wp_bind [A B w0] (m : M A w0) (f : ◻(A ⇢ M B) w0) (Q : ◻(B ⇢ Pred) w0) :
@@ -159,7 +159,7 @@ Class TypeCheckLogicM
       ◼(fun _ θ => ∀ₚ a, P _ θ a -∗ Q _ θ a)%I ⊢ₚ
       (WP m P -∗ WP m Q)%I;
 
-    wlp_pure [A] {persA : Persistent A}
+    wlp_pure [A] {subA : Subst A}
       [w] (a : A w) (Q : ◻(A ⇢ Pred) w) :
       Q _ refl a ⊢ₚ WLP (pure a) Q;
     wlp_bind [A B w0] (m : M A w0) (f : ◻(A ⇢ M B) w0) (Q : ◻(B ⇢ Pred) w0) :
@@ -276,7 +276,7 @@ Section Solved.
 
   Lemma wp_solved_frame {Θ A w} (m : Solved Θ A w)
     (P : ◻(A ⇢ Pred) w) (Q : Pred w) :
-    WP m P /\ₚ Q ⊣⊢ₚ WP m (fun w1 θ1 a1 => P w1 θ1 a1 /\ₚ persist Q θ1).
+    WP m P /\ₚ Q ⊣⊢ₚ WP m (fun w1 θ1 a1 => P w1 θ1 a1 /\ₚ subst Q θ1).
   Proof.
     destruct m as [(w1 & θ1 & a1)|]; cbn.
     - now rewrite Sub.and_wp_l.
@@ -333,11 +333,11 @@ Proof. destruct m as [(w' & θ & a)|]; cbn; now rewrite ?Sub.wp_hmap. Qed.
 
 (* Create HintDb wpeq. *)
 (* #[export] Hint Rewrite *)
-(*   (@persist_eq OEnv _ _ _ _) *)
-(*   (@persist_eq OTy _ _ _ _) *)
-(*   (@persist_trans OEnv _ _) *)
-(*   (@persist_trans OTy _ _) *)
-(*   @persist_lift *)
+(*   (@subst_eq OEnv _ _ _ _) *)
+(*   (@subst_eq OTy _ _ _ _) *)
+(*   (@subst_trans OEnv _ _) *)
+(*   (@subst_trans OTy _ _) *)
+(*   @subst_lift *)
 (*   @lift_insert *)
 (*   : wpeq. *)
 
@@ -347,11 +347,11 @@ Ltac wpeq :=
      try progress cbn;
      (* Unfortunately, autorewrite and rewrite strategy blow up with some long
         typeclass searches. Simply use rewrite for now. *)
-     rewrite ?(@persist_eq OEnv _ _ _ _)
-       ?(@persist_eq OTy _ _ _ _)
-       ?(@persist_trans OEnv _ _)
-       ?(@persist_trans OTy _ _)
-       ?@persist_lift
+     rewrite ?(@subst_eq OEnv _ _ _ _)
+       ?(@subst_eq OTy _ _ _ _)
+       ?(@subst_trans OEnv _ _)
+       ?(@subst_trans OTy _ _)
+       ?@subst_lift
        ?@lift_insert;
      try done;
      try match goal with
@@ -382,7 +382,7 @@ Ltac wpsimpl :=
   | |- environments.envs_entails _ (bi_pure True) =>
       done
   | |- environments.envs_entails _ (WP (pure _) _) =>
-      rewrite -wp_pure ?trans_refl_r ?trans_refl_r ?persist_refl
+      rewrite -wp_pure ?trans_refl_r ?trans_refl_r ?subst_refl
       (* try (iStopProof; pred_unfold; intuition (subst; auto; fail)) *)
   | |- environments.envs_entails _ (WP (bind _ _) _) =>
       iApply wp_bind
@@ -397,7 +397,7 @@ Ltac wpsimpl :=
       rewrite -wp_fail
 
   | |- environments.envs_entails _ (WLP (pure _) _) =>
-      rewrite -wlp_pure ?trans_refl_r ?trans_refl_r ?persist_refl
+      rewrite -wlp_pure ?trans_refl_r ?trans_refl_r ?subst_refl
   | |- environments.envs_entails _ (WLP (bind _ _) _) =>
       rewrite -wlp_bind
   | |- environments.envs_entails _ (WLP pick _) =>

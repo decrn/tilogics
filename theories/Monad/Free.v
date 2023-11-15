@@ -38,7 +38,7 @@ Inductive Free (A : OType) (w : World) : Type :=
 | Ret (a : A w)
 | Fail
 | Equalsk (t1 t2 : OTy w) (k : Free A w)
-| Pickk α (k : Free A (w ▻ α)).
+| Pickk α (k : Free A (w ، α)).
 #[global] Arguments Ret {A} [w] a.
 #[global] Arguments Fail {A w}.
 #[global] Arguments Pickk {A} [w] α k.
@@ -165,5 +165,5 @@ Proof.
     + predsimpl. now rewrite IHm.
     + rewrite Sub.wp_impl. apply Sub.proper_wlp_bientails.
       rewrite IHm. apply proper_wlp_bientails.
-      intros w1 θ1 a1. now rewrite <- persist_pred_trans.
+      intros w1 θ1 a1. now rewrite <- subst_pred_trans.
 Qed.
