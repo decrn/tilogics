@@ -1,0 +1,21 @@
+let and = \x. \y. if x then y else false in
+let not = \x. if x then false else true in
+let or  = \x. \y. if x then true else y in
+let xor = \x. \y. if x then not y else y in
+let halfadder =
+      \x. \y. \k.
+        let s = xor x y in
+        let c = and x y in
+        k c s in
+let fulladder =
+      \x. \y. \c. \f.
+        let xy = xor x y in
+        let s  = xor xy c in
+        let c' = or (and x y) (and xy c) in
+        f c' s in
+
+-- We use bool->bool to represent 2-bit vectors
+\x : bool->bool. \y : bool->bool. \k.
+  halfadder (x true)  (y true)       \c0. \z0.
+  fulladder (x false) (y false) c0   \c1. \z1.
+  k c1 \b:bool. if b then z0 else z1

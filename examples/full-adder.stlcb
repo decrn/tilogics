@@ -3,9 +3,9 @@ let not = \x. if x then false else true in
 let or  = \x. \y. if x then true else y in
 let xor = \x. \y. if x then not y else y in
 -- We write the full-adder in CPS style, since we cannot return products.
--- The function f gets the sum and the carry as inputs.
-\a. \b. \c. \f.
-  let ab   = xor a b in
-  let s    = xor ab c in
-  let cout = or (and a b) (and c ab) in
-  f s cout
+-- The function k gets carry and the sum as inputs.
+\x. \y. \c. \k.
+  let xy = xor x y in
+  let s  = xor xy c in
+  let c' = or (and x y) (and xy c) in
+  k c' s

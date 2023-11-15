@@ -1,4 +1,4 @@
 \x. \y. \a. \b. \c. \d.
   if x
-  then (if y then d else c)
-  else (if y then b else a)
+  then if y then d else c
+  else if y then b else a
