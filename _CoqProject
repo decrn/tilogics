@@ -5,6 +5,7 @@
 theories/BaseLogic.v
 theories/Composition.v
 theories/Environment.v
+theories/Extraction.v
 theories/Gen/Bidirectional.v
 theories/Gen/Check.v
 theories/Gen/Synthesise.v
@@ -21,5 +22,6 @@ theories/Sub/Parallel.v
 theories/Sub/Prefix.v
 theories/Sub/Triangular.v
 theories/Substitution.v
+theories/UnificationGeneric.v
 theories/Unification.v
 theories/Worlds.v

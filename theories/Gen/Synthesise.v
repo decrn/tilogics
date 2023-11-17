@@ -92,6 +92,7 @@ Section Generator.
       (fun w1 (θ1 : Θ w0 w1) '(t1,e1) =>
          t0[θ1] =ₚ t1 /\ₚ e0[θ1] =ₚ e1).
 
+  Goal False. Proof.
   Ltac wlpindhyp :=
     match goal with
     | IH: ∀ w G, bi_emp_valid (WLP (generate ?e G) _)
@@ -103,6 +104,7 @@ Section Generator.
         intuition (subst; econstructor; eauto; fail)
     end.
   Ltac wlpauto := repeat (repeat wpsimpl; try wlpindhyp).
+  Abort.
 
   Lemma generate_sound_aux e :
     ∀ w (G : OEnv w),
@@ -122,6 +124,7 @@ Section Generator.
     intros HT [Heq1 Heq2]. now subst.
   Qed.
 
+  Goal False. Proof.
   Ltac wpindhyp :=
     match goal with
     | IH: forall _ G,
@@ -134,6 +137,7 @@ Section Generator.
         ]
     end.
   Ltac wpauto := repeat (repeat wpsimpl; try wpindhyp).
+  Abort.
 
   Lemma generate_complete_aux {G e t ee} (T : G |-- e ∷ t ~> ee) :
     ∀ w0 (G0 : OEnv w0), ⊢ lift G =ₚ G0 →

@@ -127,6 +127,7 @@ Section Generator.
       (fun w1 (θ1 : Θ w0 w1) '(t1,e1) =>
          t0[θ1] =ₚ t1 /\ₚ e0[θ1] =ₚ e1).
 
+  Goal False. Proof.
   Ltac wlpauto :=
     repeat
       (repeat wpsimpl;
@@ -147,6 +148,7 @@ Section Generator.
              pred_unfold;
              intuition (subst; econstructor; eauto; fail)
          end).
+  Abort.
 
   Lemma sound_aux e :
       (∀ w (G : OEnv w) (t : OTy w),
@@ -171,6 +173,7 @@ Section Generator.
     iStopProof; pred_unfold. intros HT Heq1 Heq2. now subst.
   Qed.
 
+  Goal False. Proof.
   Ltac wpauto :=
     repeat
       (repeat wpsimpl;
@@ -193,6 +196,7 @@ Section Generator.
                 iIntros ((?t & ?e')) "(#? & #?)"
              ]
          end).
+  Abort.
 
   Lemma complete_aux {G e t ee} (T : G |-- e ∷ t ~> ee) :
     (∀ w0 (G0 : OEnv w0) (t0 : OTy w0),

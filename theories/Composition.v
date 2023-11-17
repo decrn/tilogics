@@ -26,21 +26,10 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Coq Require Import
-  extraction.ExtrHaskellBasic
-  extraction.ExtrHaskellNatInt
-  extraction.ExtrHaskellString
-  Lists.List
-  Logic.Decidable
-  Strings.String.
+From Coq Require Import Lists.List Logic.Decidable Strings.String.
 From iris Require Import bi.interface bi.derived_laws proofmode.tactics.
 From Em Require Import BaseLogic Gen.Synthesise PrenexConversion Spec Unification
-  Gen.Synthesise
-  Monad.Free
-  Monad.Solved
-  Sub.Parallel
-  Open
-  Spec.
+  Gen.Synthesise Monad.Free Monad.Solved Sub.Parallel Open Spec.
 
 Import Pred Pred.Sub.
 Import ListNotations.
@@ -79,43 +68,6 @@ Section Reconstruct.
     reconstruct empty e.
 
 End Reconstruct.
-
-Extraction Language Haskell.
-Extraction Inline
-  Bool.Bool.iff_reflect
-  Environment.env.view
-  Init.Datatypes.nat_rec
-  Init.Logic.False_rec
-  Init.Logic.and_rec
-  Init.Logic.and_rect
-  Init.Logic.eq_rec_r
-  Init.Specif.sumbool_rec
-  Init.Specif.sumbool_rect
-  Unification.atrav
-  Unification.flex
-  Unification.loeb
-  Unification.remove_acc_rect
-  Unification.varview
-  Worlds.Box
-  Worlds.Impl
-  Worlds.Impl
-  Worlds.Valid
-  Worlds.lk
-  Worlds._4
-  Worlds.world.view
-  stdpp.base.empty
-  stdpp.base.insert
-  stdpp.base.fmap
-  stdpp.base.decide_rel
-  stdpp.gmap.gmap_fmap
-  stdpp.option.option_fmap.
-
-Extract Inductive reflect => "Prelude.Bool" [ "Prelude.True" "Prelude.False" ].
-
-Extract Inlined Constant Init.Datatypes.fst => "Prelude.fst".
-Extract Inlined Constant Init.Datatypes.snd => "Prelude.snd".
-
-Extraction "Extract" ground_type ground_expr infer.
 
 Definition algorithmic_typing (Γ : Env) (e : Exp) (τ : Ty) (e' : Exp) : Prop :=
   match reconstruct Γ e with

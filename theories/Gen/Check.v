@@ -103,6 +103,7 @@ Section Generator.
   Definition TPB_algo : ⊧ OEnv ⇢ Const Exp ⇢ OTy ⇢ OExp ⇢ Pred :=
     fun w0 G0 e τ0 e0 => WP (check e G0 τ0) (fun _ θ1 e1 => e0[θ1] =ₚ e1).
 
+  Goal False. Proof.
   Ltac wlpauto := repeat (repeat wpsimpl; try
     match goal with
     | IH: ∀ w G τ, bi_emp_valid (WLP (check ?e G τ) _)
@@ -113,6 +114,7 @@ Section Generator.
         predsimpl; iStopProof; pred_unfold;
         intuition (subst; econstructor; eauto; fail)
     end).
+  Abort.
 
   Lemma sound_aux e :
     ∀ w (G : OEnv w) (t : OTy w),
@@ -132,6 +134,7 @@ Section Generator.
     intros HT Heq. now subst.
   Qed.
 
+  Goal False. Proof.
   Ltac wpauto := repeat (repeat wpsimpl; try
     match goal with
     | IH: ∀ w (G : OEnv w) (t : OTy w),
@@ -142,6 +145,7 @@ Section Generator.
               iIntros (?w ?θ) "!>"; iIntros (?e') "#?"
         ]
     end).
+  Abort.
 
   Lemma complete_aux {G e t ee} (T : G |-- e ∷ t ~> ee) :
     ∀ w0 (G0 : OEnv w0) (t0 : OTy w0),
