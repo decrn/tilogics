@@ -36,7 +36,7 @@ Inductive Free (A : Type) : Type :=
 | Ret (a : A)
 | Pickk (k : Ty -> Free A).
 
-Definition pure_free : forall a, a -> Free a :=
+#[export] Instance mret_free : MRet Free :=
   fun A a => Ret a.
 
 Definition bind_free : forall a b, Free a -> (a -> Free b) -> Free b :=
