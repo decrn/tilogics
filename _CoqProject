@@ -20,6 +20,7 @@ theories/Monad/Solved.v
 theories/Open.v
 theories/Prelude.v
 theories/PrenexConversion.v
+theories/Related/Interface.v
 theories/Shallow.v
 theories/Shallow/Interface.v
 theories/Spec.v
