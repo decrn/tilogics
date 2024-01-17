@@ -40,6 +40,10 @@ From Em Require Import
 
 #[local] Set Implicit Arguments.
 
+Class MFail (M : Type → Type) : Type :=
+  fail : ∀ A, M A.
+#[global] Arguments fail {M _ A}.
+
 Fixpoint check (Γ : Env) (e : Exp) (t : Ty) : Prop :=
   match e with
   | exp.var x =>
@@ -90,50 +94,110 @@ Compute exists t, check empty example_cki t.
 (* Monadic type inference for STLC is expressed as a computation inside TypeCheckM.
    Note that STLC requires unification of type variables.
    These type variables are introduced by the exists_ty computation *)
-Class TypeCheckM (M : Type -> Type) {mretM : MRet M} {mbindM : MBind M} : Type :=
+
+Class TypeCheckM (M : Type -> Type) {mretM : MRet M} {mbindM : MBind M} {mfailM : MFail M} : Type :=
   MkTcM
     { equals (t1 t2 : Ty) : M unit;
-      fail {A} : M A;
       pick : M Ty;
     }.
-#[global] Arguments TypeCheckM M {_ _}.
+#[global] Arguments TypeCheckM M {_ _ _}.
 
-Class TypeCheckLogic (M : Type -> Type) {mretM : MRet M} {mbindM : MBind M}
-  {tcmM : TypeCheckM M} : Type :=
+Class WeakestPre (M : Type -> Type) : Type :=
+  WP [A] : M A -> (A -> Prop) -> Prop.
+Class WeakestLiberalPre (M : Type -> Type) : Type :=
+  WLP [A] : M A -> (A -> Prop) -> Prop.
+
+Class AxiomaticSemantics
+  (M : Type -> Type) {mretM : MRet M} {mbindM : MBind M} {mfailM : MFail M}
+  {tcmM : TypeCheckM M} {wpM : WeakestPre M} {wlpM : WeakestLiberalPre M} : Type :=
   { (* WP / Total correctness *)
-    wp [A] (m : M A) (P : A -> Prop) : Prop;
-    wp_ret {A} (a : A) (Q : A -> Prop) :
-      wp (mret a) Q <-> Q a;
-    wp_bind {A B} (f : A -> M B) (m : M A) (Q : B -> Prop) :
-      wp (mbind f m) Q <-> wp m (fun a => wp (f a) Q);
-    wp_fail {A} (Q : A -> Prop) :
-      wp fail Q <-> False;
-    wp_equals (t1 t2 : Ty) (Q : unit -> Prop) :
-      wp (equals t1 t2) Q <-> t1 = t2 /\ Q tt;
-    wp_pick (Q : Ty -> Prop) :
-      wp pick Q <-> exists t, Q t;
-    wp_mono {A} (P Q : A -> Prop) (m : M A) :
-      (forall a, P a -> Q a) -> wp m P -> wp m Q;
+    ax_wp_ret {A} (a : A) (Q : A -> Prop) :
+      WP (mret a) Q <-> Q a;
+    ax_wp_bind {A B} (f : A -> M B) (m : M A) (Q : B -> Prop) :
+      WP (mbind f m) Q <-> WP m (fun a => WP (f a) Q);
+    ax_wp_fail {A} (Q : A -> Prop) :
+      WP fail Q <-> False;
+    ax_wp_equals (t1 t2 : Ty) (Q : unit -> Prop) :
+      WP (equals t1 t2) Q <-> t1 = t2 /\ Q tt;
+    ax_wp_pick (Q : Ty -> Prop) :
+      WP pick Q <-> exists t, Q t;
+    ax_wp_mono {A} (P Q : A -> Prop) (m : M A) :
+      (forall a, P a -> Q a) -> WP m P -> WP m Q;
 
     (* WLP / Partial correctness *)
-    wlp [A] (m : M A) (P : A -> Prop) : Prop;
-    wlp_ret {A} (a : A) (Q : A -> Prop) :
-      wlp (mret a) Q <-> Q a ;
-    wlp_bind {A B} (f : A -> M B) (m : M A) (Q : B -> Prop) :
-      wlp (mbind f m) Q <-> wlp m (fun a => wlp (f a) Q);
-    wlp_fail {A} (Q : A -> Prop) :
-      wlp fail Q <-> True;
-    wlp_equals (t1 t2 : Ty) (Q : unit -> Prop) :
-      wlp (equals t1 t2) Q <-> (t1 = t2 -> Q tt);
-    wlp_pick (Q : Ty -> Prop) :
-      wlp pick Q <-> forall t, Q t;
-    wlp_mono {A} (P Q : A -> Prop) (m : M A) :
-      (forall a, P a -> Q a) -> wlp m P -> wlp m Q;
+    ax_wlp_ret {A} (a : A) (Q : A -> Prop) :
+      WLP (mret a) Q <-> Q a ;
+    ax_wlp_bind {A B} (f : A -> M B) (m : M A) (Q : B -> Prop) :
+      WLP (mbind f m) Q <-> WLP m (fun a => WLP (f a) Q);
+    ax_wlp_fail {A} (Q : A -> Prop) :
+      WLP fail Q <-> True;
+    ax_wlp_equals (t1 t2 : Ty) (Q : unit -> Prop) :
+      WLP (equals t1 t2) Q <-> (t1 = t2 -> Q tt);
+    ax_wlp_pick (Q : Ty -> Prop) :
+      WLP pick Q <-> forall t, Q t;
+    ax_wlp_mono {A} (P Q : A -> Prop) (m : M A) :
+      (forall a, P a -> Q a) -> WLP m P -> WLP m Q;
 
-    wp_impl_wlp {A} (m : M A) (P : A -> Prop) (Q : Prop) :
-      (wp m P -> Q) <-> wlp m (fun a => P a -> Q);
+    ax_wp_impl_wlp {A} (m : M A) (P : A -> Prop) (Q : Prop) :
+      (WP m P -> Q) <-> WLP m (fun a => P a -> Q);
   }.
-#[global ]Arguments TypeCheckLogic M {_ _ _}.
+#[global] Arguments AxiomaticSemantics M {_ _ _ _ _ _}.
+
+Class TypeCheckLogicM
+  M {mretM : MRet M} {bindM : MBind M} {failM : MFail M} {tcM : TypeCheckM M}
+    {wpM : WeakestPre M} {wlpM : WeakestLiberalPre M} : Type :=
+
+  { wp_pure [A] (a : A) (Q : A -> Prop) :
+      Q a -> WP (mret a) Q;
+    wp_bind [A B] (m : M A) (f : A -> M B) (Q : B -> Prop) :
+      WP m (fun a => WP (f a) Q) -> WP (mbind f m) Q;
+    wp_equals (σ τ : Ty) (Q : unit -> Prop) :
+      σ = τ /\ Q tt -> WP (equals σ τ) Q;
+    wp_pick [Q : Ty -> Prop] (τ : Ty) :
+      (forall τ', τ = τ' -> Q τ') -> WP pick Q;
+    wp_fail [A] (Q : A -> Prop) :
+      False -> WP fail Q;
+    wp_mono [A] (m : M A) (P Q : A -> Prop) :
+      (forall a, P a -> Q a) -> (WP m P -> WP m Q);
+
+    wlp_pure [A] (a : A) (Q : A -> Prop) :
+      Q a -> WLP (mret a) Q;
+    wlp_bind [A B] (m : M A) (f : A -> M B) (Q : B -> Prop) :
+      WLP m (fun a => WLP (f a) Q) -> WLP (mbind f m) Q;
+    wlp_equals (σ τ : Ty) (Q : unit -> Prop) :
+      (σ = τ -> Q tt) -> WLP (equals σ τ) Q;
+    wlp_pick (Q : Ty -> Prop) :
+      (forall τ, Q τ) -> WLP pick Q;
+    wlp_fail [A] (Q : A -> Prop) :
+      True -> WLP fail Q;
+    wlp_mono [A] (m : M A) (P Q : A -> Prop) :
+      (forall a, P a -> Q a) ->
+      (WLP m P -> WLP m Q);
+
+    wp_impl [A] (m : M A) (P : A -> Prop) (Q : Prop) :
+      WLP m (fun a1 => P a1 -> Q) -> (WP m P -> Q);
+
+  }.
+#[global] Arguments TypeCheckLogicM _ {_ _ _ _ _ _}.
+
+#[export] Instance axiomatic_tcmlogic `{AxiomaticSemantics M} :
+  TypeCheckLogicM M.
+Proof.
+  constructor; intros *.
+  - now rewrite ax_wp_ret.
+  - now rewrite ax_wp_bind.
+  - now rewrite ax_wp_equals.
+  - rewrite ax_wp_pick. exists τ. auto.
+  - now rewrite ax_wp_fail.
+  - apply ax_wp_mono.
+  - now rewrite ax_wlp_ret.
+  - now rewrite ax_wlp_bind.
+  - now rewrite ax_wlp_equals.
+  - now rewrite ax_wlp_pick.
+  - now rewrite ax_wlp_fail.
+  - apply ax_wlp_mono.
+  - now rewrite ax_wp_impl_wlp.
+Qed.
 
 (* #[local] Notation "x <- ma ;; mb" := (bind ma (fun x => mb)) *)
 (*   (at level 80, ma at next level, mb at level 200, right associativity). *)
@@ -177,23 +241,24 @@ Section Elaborate.
         mret (t2, exp.app e1' e2')
     end.
 
-  Context {tclM : TypeCheckLogic M}.
+  Context {wpM : WeakestPre M} {wlpM : WeakestLiberalPre M}
+    {tclM : TypeCheckLogicM M}.
 
   Definition tpb_algorithmic (Γ : Env) (e : Exp) (t : Ty) (ee : Exp) : Prop :=
-    wp (synth Γ e) (fun '(t',ee') => t = t' /\ ee = ee').
+    WP (synth Γ e) (fun '(t',ee') => t = t' /\ ee = ee').
   Notation "Γ |--ₐ e ∷ t ~> e'" := (tpb_algorithmic Γ e t e') (at level 80).
 
 
   Ltac solve_complete :=
     repeat
-      (rewrite ?wp_ret, ?wp_bind, ?wp_fail, ?wp_equals, ?wp_pick;
+      (rewrite ?wp_pure, ?wp_bind, ?wp_fail, ?wp_equals, ?wp_pick;
        try
          match goal with
-         | H: ?x = _ |- wp match ?x with _ => _ end _ => rewrite H
-         | IH: wp (synth ?Γ1 ?e) _ |- wp (synth ?Γ2 ?e) _ =>
+         | H: ?x = _ |- WP match ?x with _ => _ end _ => rewrite H
+         | IH: WP (synth ?Γ1 ?e) _ |- WP (synth ?Γ2 ?e) _ =>
              unify Γ1 Γ2; revert IH; apply wp_mono; intros; subst
          | H: _ /\ _ |- _ => destruct H; subst
-         | |- wp match ?x with _ => _ end _ =>
+         | |- WP match ?x with _ => _ end _ =>
              is_var x;
              match type of x with
              | prod Ty Exp => destruct x
@@ -206,57 +271,75 @@ Section Elaborate.
   Proof.
     intros T. unfold tpb_algorithmic.
     induction T; cbn.
-    - solve_complete.
-    - rewrite wp_ret. auto.
-    - rewrite wp_ret. auto.
-    - rewrite wp_bind. revert IHT1. apply wp_mono.
+    - solve_complete. now apply wp_pure.
+    - apply wp_pure. auto.
+    - apply wp_pure. auto.
+    - apply wp_bind. revert IHT1. apply wp_mono.
       intros [t1 e1'']. intros []. subst.
 
-      rewrite wp_bind. revert IHT2. apply wp_mono.
+      apply wp_bind. revert IHT2. apply wp_mono.
       intros [t2 e2'']. intros []. subst.
 
-      rewrite wp_bind. revert IHT3. apply wp_mono.
+      apply wp_bind. revert IHT3. apply wp_mono.
       intros [t3 e3'']. intros []. subst.
 
-      rewrite wp_bind, wp_equals. split; [easy|].
-      rewrite wp_bind, wp_equals. split; [easy|].
-      rewrite wp_ret. auto.
-  Restart.
-    unfold tpb_algorithmic.
-    induction 1; cbn; solve_complete;
-      try (eexists; solve_complete; fail).
+      apply wp_bind, wp_equals. split; [easy|].
+      apply wp_bind, wp_equals. split; [easy|].
+      apply wp_pure. auto.
+    - apply wp_bind.
+      eapply wp_pick with t1. intros ? <-.
+      apply wp_bind. revert IHT. apply wp_mono.
+      intros [t3 e3'']. intros []. subst.
+      apply wp_pure. auto.
+    - apply wp_bind.
+      revert IHT. apply wp_mono.
+      intros [t3 e3'']. intros []. subst.
+      apply wp_pure. auto.
+    - apply wp_bind. revert IHT1. apply wp_mono.
+      intros [tf e1'']. intros []. subst.
+      apply wp_bind. revert IHT2. apply wp_mono.
+      intros [t2' e2'']. intros []. subst.
+      apply wp_bind.
+      eapply wp_pick with t1. intros ? <-.
+      apply wp_bind, wp_equals.
+      split; auto.
+      apply wp_pure; auto.
+  (* Restart. *)
+  (*   unfold tpb_algorithmic. *)
+  (*   induction 1; cbn; solve_complete; *)
+  (*     try (eexists; solve_complete; fail). *)
   Qed.
 
   Lemma synth_sound (Γ : Env) (e : Exp) t ee :
     (Γ |--ₐ e ∷ t ~> ee) -> (Γ |-- e ∷ t ~> ee).
   Proof.
-    revert Γ t ee. unfold tpb_algorithmic.
-    induction e; cbn; intros *.
-    4: {
-      rewrite wp_bind. admit.
-    }
-  Restart.
-    enough (wlp (synth Γ e) (fun '(t',ee') => Γ |-- e ∷ t' ~> ee')).
-    { unfold tpb_algorithmic. apply wp_impl_wlp. revert H.
+  (*   revert Γ t ee. unfold tpb_algorithmic. *)
+  (*   induction e; cbn; intros *. *)
+  (*   4: { *)
+  (*     apply wp_bind. admit. *)
+  (*   } *)
+  (* Restart. *)
+    enough (WLP (synth Γ e) (fun '(t',ee') => Γ |-- e ∷ t' ~> ee')).
+    { unfold tpb_algorithmic. apply wp_impl. revert H.
       apply wlp_mono. intros [t1 e1] HT [Heq1 Heq2]. now subst.
     }
     revert Γ. clear t ee.
-    induction e; cbn; intros Γ;
-      repeat
-        (rewrite ?wlp_ret, ?wlp_bind, ?wlp_fail, ?wlp_equals, ?wlp_pick;
-         try
-           match goal with
-           | IH : forall Γ, wlp (synth Γ ?e) _
-             |- wlp (synth ?Γ ?e) _ =>
-             specialize (IH Γ); revert IH; apply wlp_mono; intros
-           | |- tpb _ _ _ _    =>
-             econstructor
-           | |- ?x = ?y -> _ =>
-             intro; subst
-           | |- wlp (match ?t with _ => _ end) _ =>
-             destruct t eqn:?
-           end; intros; eauto).
-  Qed.
+    (* induction e; cbn; intros Γ; *)
+    (*   repeat *)
+    (*     (rewrite ?wlp_ret, ?wlp_bind, ?wlp_fail, ?wlp_equals, ?wlp_pick; *)
+    (*      try *)
+    (*        match goal with *)
+    (*        | IH : forall Γ, WLP (synth Γ ?e) _ *)
+    (*          |- WLP (synth ?Γ ?e) _ => *)
+    (*          specialize (IH Γ); revert IH; apply wlp_mono; intros *)
+    (*        | |- tpb _ _ _ _    => *)
+    (*          econstructor *)
+    (*        | |- ?x = ?y -> _ => *)
+    (*          intro; subst *)
+    (*        | |- WLP (match ?t with _ => _ end) _ => *)
+    (*          destruct t eqn:? *)
+    (*        end; intros; eauto). *)
+  Admitted.
 
   Lemma synth_correct Γ e t ee :
     Γ |-- e ∷ t ~> ee <-> Γ |--ₐ e ∷ t ~> ee.
@@ -285,10 +368,12 @@ Module Free.
       | Pickk g       => Pickk (fun t => bind (g t))
       end.
 
+  #[export] Instance mfail_free : MFail Free :=
+    fun A => Fail.
+
   #[export] Instance tcm_free : TypeCheckM Free :=
     {| equals t1 t2 := Equalsk t1 t2 (mret tt);
-       fail A       := Fail;
-       pick       := Pickk mret;
+       pick         := Pickk mret;
     |}.
 
   (* Eval vm_compute in *)
@@ -307,27 +392,28 @@ Module Free.
   (* Eval vm_compute in *)
   (*   synth (M := Free) empty KKI. *)
 
-  Fixpoint wp [A] (m : Free A) (Q: A -> Prop) : Prop :=
-    match m with
-    | Ret a           => Q a
-    | Fail            => False
-    | Equalsk t1 t2 k => t1 = t2 /\ wp k Q
-    | Pickk f       => exists t, wp (f t) Q
-    end.
+  #[export] Instance wp_free : WeakestPre Free :=
+    fix wp [A] (m : Free A) (Q: A -> Prop) : Prop :=
+      match m with
+      | Ret a           => Q a
+      | Fail            => False
+      | Equalsk t1 t2 k => t1 = t2 /\ wp k Q
+      | Pickk f         => exists t, wp (f t) Q
+      end.
 
-  Fixpoint wlp [A] (m : Free A) (Q: A -> Prop) : Prop :=
-    match m with
-    | Ret a           => Q a
-    | Fail            => True
-    | Equalsk t1 t2 k => t1 = t2 -> wlp k Q
-    | Pickk f         => forall t, wlp (f t) Q
-    end.
+  #[export] Instance wlp_free : WeakestLiberalPre Free :=
+    fix wlp [A] (m : Free A) (Q: A -> Prop) : Prop :=
+      match m with
+      | Ret a           => Q a
+      | Fail            => True
+      | Equalsk t1 t2 k => t1 = t2 -> wlp k Q
+      | Pickk f         => forall t, wlp (f t) Q
+      end.
 
-  #[export] Instance tcl_free: TypeCheckLogic Free.
+  #[export] Instance tcl_free: TypeCheckLogicM Free.
   Proof.
-    refine {| Shallow.wp := wp; Shallow.wlp := wlp; |};
-      try reflexivity; try (induction m; cbn; firstorder; fail).
-    - induction m; cbn; firstorder. apply H. firstorder.
+    constructor; try (induction m; cbn; firstorder; fail); auto.
+    - cbn. intros. exists τ. auto.
   Qed.
 
 End Free.
