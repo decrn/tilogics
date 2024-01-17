@@ -44,8 +44,13 @@ Delimit Scope rel_scope with R.
 
 Module logicalrelation.
 
+  (* We define relations between (D)eep and (S)hallow types *)
   Definition RawRel (DA : OType) (SA : Type) : Type :=
     forall (w : World), DA w -> SA -> Pred w.
+
+  (* We use a typeclass as an interface for these relations.
+     These relations are defined using a single constructor MkRel.
+     To get the underlying relation out, you can use the projection RSat. *)
   Class Rel (DA : OType) (SA : Type) : Type :=
     MkRel { RSat : forall (w : World), DA w -> SA -> Pred w }.
 
@@ -53,8 +58,12 @@ Module logicalrelation.
   #[global] Arguments MkRel [DA SA] &.
   #[global] Arguments RSat {_ _} _ {w} ι _ _.
 
+  (* Given a relation between a (D)eep type DA and a (S)hallow type SA, and evidence d that DA holds in all worlds (i.e. DA is Valid),
+     we define a relation between this Valid type DA and its shallow counterpart SA. *)
   Definition RValid {DA SA} (RA : Rel DA SA) (d : Valid DA) (s : SA) : Prop :=
     forall (w : World), (⊢ @RSat DA SA RA w (d w) s).
+
+  (* We use ℛ (\McR) to denote these relations that hold for Valid types *)
   #[local] Notation "ℛ⟦ R ⟧@{ ι }" := (RSat R%R ι) (format "ℛ⟦ R ⟧@{ ι }") .
   #[local] Notation "ℛ⟦ R ⟧" := (RValid R%R) (format "ℛ⟦ R ⟧").
 
@@ -64,6 +73,8 @@ Module logicalrelation.
     MkRel (fun w d s ι => s = inst d ι)%P.
   Arguments RInst _ _ {_}.
 
+  (* Similarly, we can "upgrade" a relation between a (D)eep and (S)hallow type,
+     to also relate values bda of boxed (D)eep types. *)
   #[export] Instance RBox {DA SA} (RA : Rel DA SA) : Rel (Box Prefix DA) SA :=
     MkRel (fun (w : World) (bda : Box Prefix DA w) (sa : SA) =>
              PBox (fun (w' : World) (θ : w ⊑⁺ w') => RSat RA (bda w' θ) sa)).
@@ -125,19 +136,20 @@ Module logicalrelation.
       rpure DA SA (RA : Rel DA SA) :
         ℛ⟦RA ↣ RM RA⟧ D.pure (mret).
 
+    (* Relatedness via RImpl? *)
+    Class RBind `{D.Bind Prefix DM, S.MBind SM} (M : OType → OType) : Type :=
+      rbind DA DB SA SB (RA : Rel DA SA) (RB : Rel DB SB) :
+        ℛ⟦RM RA ↣ □(RA ↣ RM RB) ↣ RM RB⟧ D.bind (S.bind).
+
+    Class Fail (M : OType → OType) : Type :=
+      fail : ∀ A, ⊧ M A.
+    #[global] Arguments fail {M _ A w}.
+
+
   End MonadClasses.
 
 End logicalrelation.
 
-
-(*     Class RBind (DM : OType → OType) (SM : Type -> Type) `{D.Pure DM, MRet SM} *)
-(*     (RM : forall DA SA (RA : Rel DA SA), Rel (DM DA) (SM SA)) *)
-(*     (M : OType → OType) : Type := *)
-(*     bind : ∀ A B, ⊧ M A ⇢ Box Θ (A ⇢ M B) ⇢ M B. *)
-(* #[global] Arguments bind {Θ M _ A B} [w]. *)
-(* Class Fail (M : OType → OType) : Type := *)
-(*   fail : ∀ A, ⊧ M A. *)
-(* #[global] Arguments fail {M _ A w}. *)
 
 (* Module MonadNotations. *)
 (*   Notation "' x <- ma ;; mb" := *)
