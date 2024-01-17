@@ -40,6 +40,7 @@ From Em Require Import
 
 #[local] Set Implicit Arguments.
 
+(* Not using the classes in stdpp.base because of mismatched argument order of MBind. *)
 Section MonadClasses.
   Context (M : Type → Type).
 
