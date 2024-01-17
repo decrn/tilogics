@@ -18,6 +18,7 @@ theories/Open.v
 theories/Prelude.v
 theories/PrenexConversion.v
 theories/Shallow.v
+theories/Shallow/Interface.v
 theories/Spec.v
 theories/Sub/Parallel.v
 theories/Sub/Prefix.v
