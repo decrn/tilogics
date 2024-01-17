@@ -104,42 +104,42 @@ Compute exists t, check empty example_cki t.
 Section Elaborate.
   Context `{tcmM : TypeCheckM M}.
 
-  Fixpoint synth (Γ : Env) (e : Exp) : M (Ty * Exp) :=
+  Fixpoint synth (e : Exp) (Γ : Env) : M (Ty * Exp) :=
     match e with
     | exp.var x =>
         match lookup x Γ with
-        | Some t => mret (t, e)
+        | Some t => pure (t, e)
         | None   => fail
         end
-    | exp.false => mret (ty.bool, e)
-    | exp.true  => mret (ty.bool, e)
+    | exp.false => pure (ty.bool, e)
+    | exp.true  => pure (ty.bool, e)
     | exp.ifte e1 e2 e3 =>
-        '(t1, e1') ← synth Γ e1;
-        '(t2, e2') ← synth Γ e2;
-        '(t3, e3') ← synth Γ e3;
+        '(t1, e1') ← synth e1 Γ;
+        '(t2, e2') ← synth e2 Γ;
+        '(t3, e3') ← synth e3 Γ;
         equals t1 ty.bool;;
         equals t2 t3;;
-        mret (t2, exp.ifte e1' e2' e3')
+        pure (t2, exp.ifte e1' e2' e3')
     | exp.absu x e =>
         t1        ← pick;
-        '(t2, e') ← synth (Γ ,, x∷t1) e;
-        mret (ty.func t1 t2, exp.abst x t1 e')
+        '(t2, e') ← synth e (Γ ,, x∷t1);
+        pure (ty.func t1 t2, exp.abst x t1 e')
     | exp.abst x t1 e =>
-        '(t2, e') ← synth (Γ ,, x∷t1) e;
-        mret (ty.func t1 t2, exp.abst x t1 e')
+        '(t2, e') ← synth e (Γ ,, x∷t1);
+        pure (ty.func t1 t2, exp.abst x t1 e')
     | exp.app e1 e2 =>
-        '(tf, e1') ← synth Γ e1;
-        '(t1, e2') ← synth Γ e2;
+        '(tf, e1') ← synth e1 Γ;
+        '(t1, e2') ← synth e2 Γ;
         t2         ← pick;
         equals tf (ty.func t1 t2);;
-        mret (t2, exp.app e1' e2')
+        pure (t2, exp.app e1' e2')
     end.
 
   Context {wpM : WeakestPre M} {wlpM : WeakestLiberalPre M}
     {tclM : TypeCheckLogicM M}.
 
   Definition tpb_algorithmic (Γ : Env) (e : Exp) (t : Ty) (ee : Exp) : Prop :=
-    WP (synth Γ e) (fun '(t',ee') => t = t' /\ ee = ee').
+    WP (synth e Γ) (fun '(t',ee') => t = t' /\ ee = ee').
   Notation "Γ |--ₐ e ∷ t ~> e'" := (tpb_algorithmic Γ e t e') (at level 80).
 
 
@@ -213,7 +213,7 @@ Section Elaborate.
   (*     apply wp_bind. admit. *)
   (*   } *)
   (* Restart. *)
-    enough (WLP (synth Γ e) (fun '(t',ee') => Γ |-- e ∷ t' ~> ee')).
+    enough (WLP (synth e Γ) (fun '(t',ee') => Γ |-- e ∷ t' ~> ee')).
     { unfold tpb_algorithmic. apply wp_impl. revert H.
       apply wlp_mono. intros [t1 e1] HT [Heq1 Heq2]. now subst.
     }
@@ -249,25 +249,25 @@ Module Free.
   | Pickk (f : Ty -> Free A).
   #[global] Arguments Fail {A}.
 
-  #[export] Instance mret_free : MRet Free :=
+  #[export] Instance mret_free : MPure Free :=
     Ret.
 
   #[export] Instance mbind_free : MBind Free :=
-    fun A B f =>
-      fix bind (m : Free A) : Free B :=
+    fun A B =>
+      fix bind (m : Free A) f : Free B :=
       match m with
       | Ret a           => f a
       | Fail            => Fail
-      | Equalsk t1 t2 k => Equalsk t1 t2 (bind k)
-      | Pickk g       => Pickk (fun t => bind (g t))
+      | Equalsk t1 t2 k => Equalsk t1 t2 (bind k f)
+      | Pickk g       => Pickk (fun t => bind (g t) f)
       end.
 
   #[export] Instance mfail_free : MFail Free :=
     fun A => Fail.
 
   #[export] Instance tcm_free : TypeCheckM Free :=
-    {| equals t1 t2 := Equalsk t1 t2 (mret tt);
-       pick         := Pickk mret;
+    {| equals t1 t2 := Equalsk t1 t2 (pure tt);
+       pick         := Pickk (@pure Free _ _);
     |}.
 
   (* Eval vm_compute in *)
@@ -338,7 +338,7 @@ Module FromWitness.
     let e := exp.app
                (exp.absu "x" (exp.var "x"))
                (exp.absu "y" (exp.var "y")) in
-    gen (synth empty e).
+    gen (synth e empty).
   Proof.
     repeat eexists; eauto.
     Unshelve.

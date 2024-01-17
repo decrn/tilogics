@@ -132,53 +132,78 @@ Module logicalrelation.
     Context (DM : OType → OType) (SM : Type -> Type)
       (RM : forall {DA SA} (RA : Rel DA SA), Rel (DM DA) (SM SA)).
 
-    Class RPure `{D.Pure DM, MRet SM} : Type :=
+    Class RPure `{D.Pure DM, S.MPure SM} : Type :=
       rpure DA SA (RA : Rel DA SA) :
-        ℛ⟦RA ↣ RM RA⟧ D.pure (mret).
+        ℛ⟦RA ↣ RM RA⟧ D.pure (@S.pure SM _ SA).
 
     (* Relatedness via RImpl? *)
-    Class RBind `{D.Bind Prefix DM, S.MBind SM} (M : OType → OType) : Type :=
+    Class RBind `{D.Bind Prefix DM, S.MBind SM} : Type :=
       rbind DA DB SA SB (RA : Rel DA SA) (RB : Rel DB SB) :
         ℛ⟦RM RA ↣ □(RA ↣ RM RB) ↣ RM RB⟧ D.bind (S.bind).
 
-    Class Fail (M : OType → OType) : Type :=
-      fail : ∀ A, ⊧ M A.
-    #[global] Arguments fail {M _ A w}.
+    Class RFail `{D.Fail DM, S.MFail SM} : Type :=
+      rfail DA SA (RA : Rel DA SA) : ℛ⟦RM RA⟧ (@D.fail DM _ DA) (S.fail).
 
+    Class RTypeCheckM `{D.TypeCheckM DM, S.TypeCheckM SM} : Type :=
+      { requals : ℛ⟦RTy ↣ RTy ↣ RM RUnit⟧ D.equals S.equals;
+        rpick : ℛ⟦RM RTy⟧ (@D.pick DM _) S.pick
+      }.
 
+    Class RWeakestPre `{D.WeakestPre Prefix DM, S.WeakestPre SM} : Type :=
+      RWP [DA SA] (RA : Rel DA SA) :
+        ℛ⟦_⟧ (@D.WP Prefix DM _ DA) (@S.WP SM _ SA).
+
+    Class RWeakestLiberalPre `{D.WeakestLiberalPre Prefix DM, S.WeakestLiberalPre SM} : Type :=
+      RWLP [DA SA] (RA : Rel DA SA) :
+        ℛ⟦_⟧ (@D.WLP Prefix DM _ DA) (@S.WLP SM _ SA).
+
+    Class TypeCheckLogicM
+      {dpureM : D.Pure DM} {spureM : S.MPure SM} {rpureM : RPure}
+      {dbindM : D.Bind Prefix DM} {sbindM : S.MBind SM} {rbindM : RBind}
+      {dfailM : D.Fail DM} {sfailM : S.MFail SM} {rfailM : RFail}
+      {dtcM : D.TypeCheckM DM} {stcM : S.TypeCheckM SM} {rtcM : RTypeCheckM}
+      {dwpM : D.WeakestPre Prefix DM} {swpM : S.WeakestPre SM} {rwpM : RWeakestPre}
+      {dwlpM : D.WeakestLiberalPre Prefix DM} {swlpM : S.WeakestLiberalPre SM} {rwlpM : RWeakestLiberalPre}
+      : Type := {}.
+
+  (* { wp_pure [A] {subA : Subst A} *)
+  (*     [w] (a : A w) (Q : ◻(A ⇢ Pred) w) : *)
+  (*     Q _ refl a ⊢ₚ WP (pure a) Q; *)
+  (*   wp_bind [A B w0] (m : M A w0) (f : ◻(A ⇢ M B) w0) (Q : ◻(B ⇢ Pred) w0) : *)
+  (*     WP m (fun w1 θ1 a => WP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2))) ⊢ₚ WP (bind m f) Q; *)
+  (*   wp_equals [w] (σ τ : OTy w) (Q : ◻(Unit ⇢ Pred) w) : *)
+  (*     σ =ₚ τ /\ₚ ◼(fun _ θ => Q _ θ tt) ⊢ₚ WP (equals σ τ) Q; *)
+  (*   wp_pick [w] [Q : ◻(OTy ⇢ Pred) w] (τ : Ty) : *)
+  (*     ◼(fun _ θ => ∀ₚ τ', lift τ =ₚ τ' ->ₚ Q _ θ τ') ⊢ₚ WP pick Q; *)
+  (*   wp_fail [A w] (Q : ◻(A ⇢ Pred) w) : *)
+  (*     ⊥ₚ ⊢ₚ WP fail Q; *)
+  (*   wp_mono [A w] (m : M A w) (P Q : ◻(A ⇢ Pred) w) : *)
+  (*     ◼(fun _ θ => ∀ₚ a, P _ θ a -∗ Q _ θ a)%I ⊢ₚ *)
+  (*     (WP m P -∗ WP m Q)%I; *)
+
+  (*   wlp_pure [A] {subA : Subst A} *)
+  (*     [w] (a : A w) (Q : ◻(A ⇢ Pred) w) : *)
+  (*     Q _ refl a ⊢ₚ WLP (pure a) Q; *)
+  (*   wlp_bind [A B w0] (m : M A w0) (f : ◻(A ⇢ M B) w0) (Q : ◻(B ⇢ Pred) w0) : *)
+  (*     WLP m (fun w1 θ1 a => WLP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2))) ⊢ₚ WLP (bind m f) Q; *)
+  (*   wlp_equals [w] (σ τ : OTy w) (Q : ◻(Unit ⇢ Pred) w) : *)
+  (*     σ =ₚ τ ->ₚ ◼(fun _ θ => Q _ θ tt) ⊢ₚ WLP (equals σ τ) Q; *)
+  (*   wlp_pick [w] (Q : ◻(OTy ⇢ Pred) w) : *)
+  (*     ◼(fun _ θ => ∀ₚ τ, Q _ θ τ) ⊢ₚ WLP pick Q; *)
+  (*   wlp_fail [A w] (Q : ◻(A ⇢ Pred) w) : *)
+  (*     ⊤ₚ ⊢ₚ WLP fail Q; *)
+  (*   wlp_mono [A w] (m : M A w) (P Q : ◻(A ⇢ Pred) w) : *)
+  (*     ◼(fun _ θ => ∀ₚ a, P _ θ a -∗ Q _ θ a)%I ⊢ₚ *)
+  (*     (WLP m P -∗ WLP m Q)%I; *)
+
+  (*   wp_impl [A w] (m : M A w) (P : ◻(A ⇢ Pred) w) (Q : Pred w) : *)
+  (*     WLP m (fun w1 θ1 a1 => P w1 θ1 a1 ->ₚ Q[θ1]) ⊢ₚ (WP m P ->ₚ Q); *)
+
+  (* }. *)
   End MonadClasses.
 
+
 End logicalrelation.
-
-
-(* Module MonadNotations. *)
-(*   Notation "' x <- ma ;; mb" := *)
-(*     (bind ma (fun _ _ x => mb)) *)
-(*       (at level 80, x pattern, ma at next level, mb at level 200, right associativity, *)
-(*         format "' x  <-  ma  ;;  mb"). *)
-(*   Notation "x <- ma ;; mb" := *)
-(*     (bind ma (fun _ _ x => mb)) *)
-(*       (at level 80, ma at next level, mb at level 200, right associativity). *)
-
-(*   Existing Class sub. *)
-(*   #[export] Existing Instance trans. *)
-(*   #[export] Hint Mode sub - + - : typeclass_instances. *)
-(* End MonadNotations. *)
-
-(* Import Pred Pred.Sub. *)
-
-
-(* Class TypeCheckM (M : OType -> OType) : Type := *)
-(*   { equals : ⊧ OTy ⇢ OTy ⇢ M Unit; *)
-(*     pick   : ⊧ M OTy; *)
-(*   }. *)
-(* #[global] Arguments fail {_ _ _ w}. *)
-(* #[global] Arguments pick {_ _ w}. *)
-
-(* Class WeakestPre (Θ : SUB) (M : OType -> OType) : Type := *)
-(*   WP [A] : ⊧ M A ⇢ Box Θ (A ⇢ Pred) ⇢ Pred. *)
-(* Class WeakestLiberalPre (Θ : SUB) (M : OType -> OType) : Type := *)
-(*   WLP [A] : ⊧ M A ⇢ Box Θ (A ⇢ Pred) ⇢ Pred. *)
 
 (* Class AxiomaticSemantics *)
 (*   Θ {reflΘ : Refl Θ} {stepΘ : Step Θ} {transΘ : Trans Θ } {reflTransΘ : ReflTrans Θ} *)
@@ -220,67 +245,6 @@ End logicalrelation.
 (*       (WP m P ->ₚ Q) ⊣⊢ₚ WLP m (fun w1 θ1 a1 => P w1 θ1 a1 ->ₚ Q[θ1]); *)
 (*   }. *)
 (* #[global] Arguments AxiomaticSemantics Θ {_ _ _ _ _ _ _} _ {_ _ _ _ _ _}. *)
-
-
-(* (* Alternative rule for pick which substitutes the last variable away *)
-(*  as discussed in the papter. *) *)
-(* Lemma ax_wp_pick_substitute `{AxiomaticSemantics Θ M, Thick Θ} {lkThickΘ : LkThick Θ} *)
-(*   [w] (Q : ◻(OTy ⇢ Pred) w) : *)
-(*   WP pick Q ⊣⊢ₚ *)
-(*     let α := world.fresh w in *)
-(*     (∃ₚ τ : OTy w, (Q (w ، α) step (oty.evar world.in_zero))[thick α (αIn := world.in_zero) τ]). *)
-(* Proof. *)
-(*   rewrite ax_wp_pick; cbn. constructor; intros ι. *)
-(*   unfold Sub.wp; pred_unfold. split. *)
-(*   - intros (ι' & Heq & HQ). destruct (env.view ι') as [ι' τ]. *)
-(*     erewrite inst_step_snoc in Heq. subst. *)
-(*     exists (lift τ). now rewrite inst_thick inst_lift. *)
-(*   - intros (τ & HQ). rewrite inst_thick in HQ. *)
-(*     exists (env.snoc ι _ (inst τ ι)). *)
-(*     now rewrite inst_step_snoc. *)
-(* Qed. *)
-
-(* Class TypeCheckLogicM *)
-(*   Θ {reflΘ : Refl Θ} {stepΘ : Step Θ} {transΘ : Trans Θ } *)
-(*     {lkreflΘ : LkRefl Θ} {lkStepθ : LkStep Θ} *)
-(*   M {pureM : Pure M} {bindM : Bind Θ M} {failM : Fail M} {tcM : TypeCheckM M} *)
-(*     {wpM : WeakestPre Θ M} {wlpM : WeakestLiberalPre Θ M} : Type := *)
-
-(*   { wp_pure [A] {subA : Subst A} *)
-(*       [w] (a : A w) (Q : ◻(A ⇢ Pred) w) : *)
-(*       Q _ refl a ⊢ₚ WP (pure a) Q; *)
-(*     wp_bind [A B w0] (m : M A w0) (f : ◻(A ⇢ M B) w0) (Q : ◻(B ⇢ Pred) w0) : *)
-(*       WP m (fun w1 θ1 a => WP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2))) ⊢ₚ WP (bind m f) Q; *)
-(*     wp_equals [w] (σ τ : OTy w) (Q : ◻(Unit ⇢ Pred) w) : *)
-(*       σ =ₚ τ /\ₚ ◼(fun _ θ => Q _ θ tt) ⊢ₚ WP (equals σ τ) Q; *)
-(*     wp_pick [w] [Q : ◻(OTy ⇢ Pred) w] (τ : Ty) : *)
-(*       ◼(fun _ θ => ∀ₚ τ', lift τ =ₚ τ' ->ₚ Q _ θ τ') ⊢ₚ WP pick Q; *)
-(*     wp_fail [A w] (Q : ◻(A ⇢ Pred) w) : *)
-(*       ⊥ₚ ⊢ₚ WP fail Q; *)
-(*     wp_mono [A w] (m : M A w) (P Q : ◻(A ⇢ Pred) w) : *)
-(*       ◼(fun _ θ => ∀ₚ a, P _ θ a -∗ Q _ θ a)%I ⊢ₚ *)
-(*       (WP m P -∗ WP m Q)%I; *)
-
-(*     wlp_pure [A] {subA : Subst A} *)
-(*       [w] (a : A w) (Q : ◻(A ⇢ Pred) w) : *)
-(*       Q _ refl a ⊢ₚ WLP (pure a) Q; *)
-(*     wlp_bind [A B w0] (m : M A w0) (f : ◻(A ⇢ M B) w0) (Q : ◻(B ⇢ Pred) w0) : *)
-(*       WLP m (fun w1 θ1 a => WLP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2))) ⊢ₚ WLP (bind m f) Q; *)
-(*     wlp_equals [w] (σ τ : OTy w) (Q : ◻(Unit ⇢ Pred) w) : *)
-(*       σ =ₚ τ ->ₚ ◼(fun _ θ => Q _ θ tt) ⊢ₚ WLP (equals σ τ) Q; *)
-(*     wlp_pick [w] (Q : ◻(OTy ⇢ Pred) w) : *)
-(*       ◼(fun _ θ => ∀ₚ τ, Q _ θ τ) ⊢ₚ WLP pick Q; *)
-(*     wlp_fail [A w] (Q : ◻(A ⇢ Pred) w) : *)
-(*       ⊤ₚ ⊢ₚ WLP fail Q; *)
-(*     wlp_mono [A w] (m : M A w) (P Q : ◻(A ⇢ Pred) w) : *)
-(*       ◼(fun _ θ => ∀ₚ a, P _ θ a -∗ Q _ θ a)%I ⊢ₚ *)
-(*       (WLP m P -∗ WLP m Q)%I; *)
-
-(*     wp_impl [A w] (m : M A w) (P : ◻(A ⇢ Pred) w) (Q : Pred w) : *)
-(*       WLP m (fun w1 θ1 a1 => P w1 θ1 a1 ->ₚ Q[θ1]) ⊢ₚ (WP m P ->ₚ Q); *)
-
-(*   }. *)
-(* #[global] Arguments TypeCheckLogicM Θ {_ _ _ _ _} _ {_ _ _ _ _ _}. *)
 
 (* #[export] Instance axiomatic_tcmlogic `{AxiomaticSemantics Θ M} : *)
 (*   TypeCheckLogicM Θ M. *)

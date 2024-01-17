@@ -52,6 +52,17 @@ End MonadClasses.
 #[global] Arguments fail {M _ A}.
 #[global] Arguments bind {M _ _ _}.
 
+Notation "m ≫= f" := (bind m f) (at level 60, right associativity).
+
+Notation "x ← y ; z" := (y ≫= (λ x : _, z))
+  (at level 20, y at level 100, z at level 200, only parsing).
+
+Notation "' x ← y ; z" := (y ≫= (λ x : _, z))
+  (at level 20, x pattern, y at level 100, z at level 200, only parsing).
+
+Notation "x ;; z" := (x ≫= λ _, z)
+  (at level 100, z at level 200, only parsing, right associativity).
+
 Class TypeCheckM (M : Type -> Type) {mretM : MPure M} {mbindM : MBind M} {mfailM : MFail M} : Type :=
   MkTcM
     { equals (t1 t2 : Ty) : M unit;

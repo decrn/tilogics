@@ -28,7 +28,7 @@
 
 Require Import Coq.Classes.RelationClasses.
 From iris Require Import proofmode.tactics.
-From Em Require Import Monad.Interface Prefix.
+From Em Require Import Monad.Interface Prefix Shallow.Interface.
 
 #[local] Set Implicit Arguments.
 
@@ -36,7 +36,7 @@ Inductive Free (A : Type) : Type :=
 | Ret (a : A)
 | Pickk (k : Ty -> Free A).
 
-#[export] Instance mret_free : MRet Free :=
+#[export] Instance mret_free : MPure Free :=
   fun A a => Ret a.
 
 Definition bind_free : forall a b, Free a -> (a -> Free b) -> Free b :=
