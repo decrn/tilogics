@@ -28,7 +28,7 @@
 
 Require Import Coq.Classes.RelationClasses.
 From iris Require Import proofmode.tactics.
-From Em Require Import BaseLogic Prefix Spec.
+From Em Require Import BaseLogic Prefix Spec Shallow Gen.Synthesise.
 From Em Require Free_Deep Free_Shallow
   Monad.Interface Shallow.Interface.
 
@@ -99,14 +99,20 @@ Module logicalrelation.
   #[export] Instance RTy : Rel OTy Ty :=
     RInst OTy Ty.
 
+  #[export] Instance REnv : Rel OEnv Env :=
+    RInst OEnv Env.
+
+  #[export] Instance RExp : Rel OExp Exp :=
+    RInst OExp Exp.
+
   #[export] Instance RUnit : Rel Unit unit := RInst Unit unit.
 
   #[export] Instance RConst A : Rel (Const A) A := RInst (Const A) A.
 
-  (* #[export] Instance RProd `(RA : Rel AT A, RB : Rel BT B) : *)
-  (*   Rel (WProd AT BT) (A * B)%type := *)
-  (*   MkRel (fun w ι '(ta,tb) '(va,vb) => *)
-  (*            ℛ⟦RA⟧@{ι} ta va /\ ℛ⟦RB⟧@{ι} tb vb). *)
+  #[export] Instance RProd `(RA : Rel AT A, RB : Rel BT B) :
+    Rel (Prod AT BT) (A * B)%type :=
+    MkRel (fun w '(ta,tb) '(va,vb) =>
+             RSat RA ta va ∧ RSat RB tb vb)%I.
 
   Module Import notations.
     Open Scope rel_scope.
@@ -157,7 +163,7 @@ Module logicalrelation.
       RWLP [DA SA] (RA : Rel DA SA) :
         ℛ⟦_⟧ (@D.WLP Prefix DM _ DA) (@S.WLP SM _ SA).
 
-    Class TypeCheckLogicM
+    Class RTypeCheckLogicM
       {dpureM : D.Pure DM} {spureM : S.MPure SM} {rpureM : RPure}
       {dbindM : D.Bind Prefix DM} {sbindM : S.MBind SM} {rbindM : RBind}
       {dfailM : D.Fail DM} {sfailM : S.MFail SM} {rfailM : RFail}
@@ -200,6 +206,11 @@ Module logicalrelation.
   (*     WLP m (fun w1 θ1 a1 => P w1 θ1 a1 ->ₚ Q[θ1]) ⊢ₚ (WP m P ->ₚ Q); *)
 
   (* }. *)
+
+    Lemma relatedness_of_generators `{RPure, RBind, RFail, RTypeCheckM} : forall (e : Exp),
+      ℛ⟦REnv ↣ RM (RProd RTy RExp)⟧ (generate e) (synth e).
+    Admitted.
+
   End MonadClasses.
 
 

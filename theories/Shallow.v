@@ -102,7 +102,7 @@ Compute exists t, check empty example_cki t.
 (*     right associativity, format "' x  <-  ma  ;;  mb"). *)
 
 Section Elaborate.
-  Context `{tcmM : TypeCheckM M}.
+  Context M {mretM : MPure M} {mbindM : MBind M} {mfailM : MFail M} {tcmM : TypeCheckM M}.
 
   Fixpoint synth (e : Exp) (Γ : Env) : M (Ty * Exp) :=
     match e with

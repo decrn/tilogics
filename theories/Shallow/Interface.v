@@ -63,12 +63,11 @@ Notation "' x ← y ; z" := (y ≫= (λ x : _, z))
 Notation "x ;; z" := (x ≫= λ _, z)
   (at level 100, z at level 200, only parsing, right associativity).
 
-Class TypeCheckM (M : Type -> Type) {mretM : MPure M} {mbindM : MBind M} {mfailM : MFail M} : Type :=
+Class TypeCheckM (M : Type -> Type) : Type :=
   MkTcM
     { equals (t1 t2 : Ty) : M unit;
       pick : M Ty;
     }.
-#[global] Arguments TypeCheckM M {_ _ _}.
 
 Class WeakestPre (M : Type -> Type) : Type :=
   WP [A] : M A -> (A -> Prop) -> Prop.
