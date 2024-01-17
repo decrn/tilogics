@@ -221,8 +221,10 @@ Module logicalrelation.
     Proof.
       induction e.
       - admit.
-      - cbn. constructor. (* RSat *) intros ι _ _ _ _. eapply refine_apply.
-        apply rpure. constructor. constructor. constructor. constructor.
+      - cbn. (* need weaker version of RImpl *) constructor. intros ι _ _ _ _.
+        eapply refine_apply.
+        apply rpure. all: repeat constructor.
+      (* Try in Iris proof mode ? *)
     Admitted.
 
     Lemma relatedness_of_algo_typing :
