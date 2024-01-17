@@ -64,7 +64,6 @@ Module logicalrelation.
     forall (w : World), (⊢ @RSat DA SA RA w (d w) s).
 
   (* We use ℛ (\McR) to denote these relations that hold for Valid types *)
-  #[local] Notation "ℛ⟦ R ⟧@{ ι }" := (RSat R%R ι) (format "ℛ⟦ R ⟧@{ ι }") .
   #[local] Notation "ℛ⟦ R ⟧" := (RValid R%R) (format "ℛ⟦ R ⟧").
 
   (* This instance can be used for any (first-class) symbolic data that can be
@@ -207,9 +206,70 @@ Module logicalrelation.
 
   (* }. *)
 
-    Lemma relatedness_of_generators `{RPure, RBind, RFail, RTypeCheckM} : forall (e : Exp),
-      ℛ⟦REnv ↣ RM (RProd RTy RExp)⟧ (generate e) (synth e).
+
+    Context `{RPure, RBind, RFail, RTypeCheckM, RWeakestPre, RWeakestLiberalPre}.
+
+    Lemma refine_apply {DA SA} (RA : Rel DA SA) {DB SB} (RB : Rel DB SB) :
+      forall w df sf da sa (ι : Assignment w)
+             (RF : RSat (RImpl RA RB) df sf ι)
+             (RA : RSat RA da sa ι),
+        RSat RB (df da) (sf sa) ι.
     Admitted.
+
+    Lemma relatedness_of_generators  : forall (e : Exp),
+        ℛ⟦REnv ↣ RM (RProd RTy RExp)⟧ (generate e) (synth e).
+    Proof.
+      induction e.
+      - admit.
+      - cbn. constructor. (* RSat *) intros ι _ _ _ _. eapply refine_apply.
+        apply rpure. constructor. constructor. constructor. constructor.
+    Admitted.
+
+    Lemma relatedness_of_algo_typing :
+      ℛ⟦_ ↣ _ ↣ _ ↣ _ ↣ RPred⟧
+        (TPB_algo (Θ := Prefix) (M := DM))
+        (tpb_algorithmic (M := SM)).
+    Proof. unfold TPB_algo, tpb_algorithmic.
+           constructor. intros ι _ DΓ SΓ RΓ De Se Re Dt St Rt De' Se' Re'.
+           eapply refine_apply.
+           eapply refine_apply.
+           apply RWP.
+           constructor.
+           eapply refine_apply. cbv in Re. subst.
+           eapply relatedness_of_generators.
+           constructor. auto.
+           intros w' θ ι' ?. subst. intros [dτ de'] [sτ se'] [rτ re'].
+           eapply refine_apply.
+           eapply refine_apply.
+           admit.
+           eapply refine_apply.
+           eapply refine_apply.
+           admit.
+           admit.
+           assumption.
+           eapply refine_apply.
+           eapply refine_apply.
+           admit.
+           admit.
+           assumption.
+    Admitted.
+
+    Locate TypeCheckLogicM.
+    Context (stcM : S.TypeCheckLogicM SM).
+
+    Lemma generate_correct_logrel {w} (Γ : OEnv w) (e : Exp) (τ : OTy w) (e' : OExp w) :
+      Γ |--ₚ e; τ ~> e' ⊣⊢ₚ TPB_algo (Θ := Prefix) (M := DM) Γ e τ e'.
+    Proof.
+      constructor.
+      destruct (@relatedness_of_algo_typing w) as [HRel]. intros ι.
+      specialize (HRel ι (MkEmp _)). cbn in HRel. pred_unfold.
+      specialize (HRel Γ (inst Γ ι) eq_refl).
+      specialize (HRel e e eq_refl).
+      specialize (HRel τ (inst τ ι) eq_refl).
+      specialize (HRel e' (inst e' ι) eq_refl).
+      symmetry. rewrite HRel. rewrite <- synth_correct. reflexivity.
+      eauto.
+    Qed.
 
   End MonadClasses.
 
