@@ -95,16 +95,14 @@ Module logicalrelation.
   (*            forall K : 𝑲, *)
   (*              ℛ⟦RA K⟧@{ι} (fs K) (fc K)). *)
 
-  #[export] Instance RTy : Rel OTy Ty :=
-    RInst OTy Ty.
-
-  #[export] Instance REnv : Rel OEnv Env :=
-    RInst OEnv Env.
+  Notation RTy := (RInst OTy Ty).
+  Notation REnv := (RInst OEnv Env).
 
   #[export] Instance RExp : Rel OExp Exp :=
     RInst OExp Exp.
 
-  #[export] Instance RUnit : Rel Unit unit := RInst Unit unit.
+  #[export] Instance RUnit : Rel Unit unit :=
+    MkRel (fun w _ _ => True%I).
 
   #[export] Instance RConst A : Rel (Const A) A :=
     MkRel (fun w a1 a2 => ⌜a1 = a2⌝)%I.
@@ -113,6 +111,15 @@ Module logicalrelation.
     Rel (Prod AT BT) (A * B)%type :=
     MkRel (fun w '(ta,tb) '(va,vb) =>
              RSat RA ta va ∧ RSat RB tb vb)%I.
+
+  #[export] Instance ROption `(RA : Rel DA SA) :
+    Rel (Option DA) (option SA) :=
+    MkRel (fun w do so =>
+             match do , so with
+             | Some d , Some s => RSat RA d s
+             | None   , None   => True%I
+             | _      , _      => False %I
+             end).
 
   Module Import notations.
     Open Scope rel_scope.
@@ -150,6 +157,17 @@ Module logicalrelation.
     intros rτ dΓ sΓ. constructor.
     intros rΓ. rewrite inst_insert.
     now f_equal.
+  Qed.
+
+  Lemma rlift `{InstLift DA SA} {sa : SA} {w : World} :
+    ⊢ RSat (w := w) (RInst DA SA) (lift sa) sa.
+  Proof. constructor. intros ι _. simpl. now rewrite inst_lift. Qed.
+
+  Lemma rlookup x {w} :
+    ⊢ RSat (w := w) (REnv ↣ ROption RTy) (lookup x) (lookup x).
+  Proof.
+    do 2 constructor. intros ->.
+    rewrite lookup_inst. now destruct lookup.
   Qed.
 
   Section MonadClasses.
@@ -242,7 +260,10 @@ Module logicalrelation.
       ℛ⟦REnv ↣ RM (RProd RTy RExp)⟧ (generate e) (synth e).
     Proof.
       induction e; iIntros (w dΓ sΓ) "#rΓ"; cbn.
-      - admit.
+      - iPoseProof (rlookup x with "rΓ") as "rlk".
+        destruct (dΓ !! x), (sΓ !! x); cbn; auto.
+        + iApply rpure. iSplit; auto. iStopProof; now pred_unfold.
+        + iApply rfail.
       - iApply rpure. iSplit; iStopProof; now pred_unfold.
       - iApply rpure. iSplit; iStopProof; now pred_unfold.
       - iApply rbind. iApply IHe1; easy.
@@ -273,7 +294,9 @@ Module logicalrelation.
         iSplit.
         iStopProof; pred_unfold. cbv [RSat RInst RExp RTy]. pred_unfold. now intuition subst.
         iStopProof; pred_unfold. cbv [RSat RInst RExp RTy]. pred_unfold. now intuition subst.
-      - iApply rbind. iApply IHe. iApply rinsert. admit. easy.
+      - iApply rbind. iApply IHe. iApply rinsert.
+        iApply (rlift (DA := OTy)).
+        easy.
         iIntros "%w1 %θ1 !>".
         iIntros ([dτ1 de1] [sτ1 se1]) "[#rτ1 #re]".
         iApply rpure. cbn.
@@ -293,7 +316,7 @@ Module logicalrelation.
         iApply rpure. cbn.
         iSplit; auto.
         iStopProof; pred_unfold. cbv [RSat RInst RExp RTy]. pred_unfold. now intuition subst.
-    Admitted.
+    Qed.
 
     Lemma relatedness_of_algo_typing :
       ℛ⟦REnv ↣ RConst Exp ↣ RTy ↣ RExp ↣ RPred⟧
