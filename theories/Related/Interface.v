@@ -48,9 +48,10 @@ Module logicalrelation.
   Definition RawRel (DA : OType) (SA : Type) : Type :=
     forall (w : World), DA w -> SA -> Pred w.
 
-  (* We use a typeclass as an interface for these relations.
-     These relations are defined using a single constructor MkRel.
-     To get the underlying relation out, you can use the projection RSat. *)
+  (* We define relations between (D)eep and (S)hallow types for which we use a
+     typeclass as an interface. These relations are defined using a single
+     constructor MkRel. To get the underlying relation out, you can use the
+     projection RSat. *)
   Class Rel (DA : OType) (SA : Type) : Type :=
     MkRel { RSat : forall (w : World), DA w -> SA -> Pred w }.
 
@@ -68,9 +69,9 @@ Module logicalrelation.
 
   (* This instance can be used for any (first-class) symbolic data that can be
        instantiated with a valuation, i.e. symbolic terms, stores, heaps etc. *)
-  Definition RInst AT A {instA : Inst AT A} : Rel AT A :=
+  Definition RInst DA SA {instA : Inst DA SA} : Rel DA SA :=
     MkRel (fun w d s ι => s = inst d ι)%P.
-  Arguments RInst _ _ {_}.
+  #[global] Arguments RInst _ _ {_} : simpl never.
 
   (* Similarly, we can "upgrade" a relation between a (D)eep and (S)hallow type,
      to also relate values bda of boxed (D)eep types. *)
@@ -78,14 +79,13 @@ Module logicalrelation.
     MkRel (fun (w : World) (bda : Box Prefix DA w) (sa : SA) =>
              PBox (fun (w' : World) (θ : w ⊑⁺ w') => RSat RA (bda w' θ) sa)).
 
-
   (* For functions/impl: related inputs go to related outputs *)
   #[export] Instance RImpl {DA SA DB SB} (RA : Rel DA SA) (RB : Rel DB SB) :
     Rel (DA ⇢ DB) (SA -> SB) :=
     MkRel
       (fun w df sf =>
          ∀ (da : DA w) (sa : SA),
-           RSat RA da sa → RSat RB (df da) (sf sa))%I.
+           RSat RA da sa -∗ RSat RB (df da) (sf sa))%I.
 
   (* #[export] Instance RForall {𝑲} *)
   (*   {AT : forall K : 𝑲, TYPE} {A : forall K : 𝑲, Type} *)
@@ -106,7 +106,8 @@ Module logicalrelation.
 
   #[export] Instance RUnit : Rel Unit unit := RInst Unit unit.
 
-  #[export] Instance RConst A : Rel (Const A) A := RInst (Const A) A.
+  #[export] Instance RConst A : Rel (Const A) A :=
+    MkRel (fun w a1 a2 => ⌜a1 = a2⌝)%I.
 
   #[export] Instance RProd `(RA : Rel AT A, RB : Rel BT B) :
     Rel (Prod AT BT) (A * B)%type :=
@@ -131,6 +132,25 @@ Module logicalrelation.
 
   #[export] Instance RPred : Rel Pred Prop :=
     MkRel (fun w DP SP ι => DP ι <-> SP ).
+  #[global] Arguments RPred : simpl never.
+
+  Lemma rand w :
+    ⊢ RSat (RPred ↣ RPred ↣ RPred) (@bi_and (@bi_pred w)) and.
+  Proof. firstorder. Qed.
+
+  Lemma req [DA SA] {instA : Inst DA SA} w :
+    ⊢ RSat (RInst DA SA ↣ RInst DA SA ↣ RPred) (eqₚ (w:=w)) eq.
+  Proof. simpl; do 3 (constructor; intros ?); now subst.  Qed.
+
+  Lemma rinsert x w :
+    ⊢ RSat (w:=w) (RTy ↣ REnv ↣ REnv) (insert x) (insert x).
+  Proof.
+    constructor. simpl.
+    intros ι _ dτ sτ. constructor.
+    intros rτ dΓ sΓ. constructor.
+    intros rΓ. rewrite inst_insert.
+    now f_equal.
+  Qed.
 
   Section MonadClasses.
 
@@ -209,72 +229,101 @@ Module logicalrelation.
 
     Context `{RPure, RBind, RFail, RTypeCheckM, RWeakestPre, RWeakestLiberalPre}.
 
-    Lemma refine_apply {DA SA} (RA : Rel DA SA) {DB SB} (RB : Rel DB SB) :
-      forall w df sf da sa (ι : Assignment w)
-             (RF : RSat (RImpl RA RB) df sf ι)
-             (RA : RSat RA da sa ι),
-        RSat RB (df da) (sf sa) ι.
-    Admitted.
-
-    Lemma relatedness_of_generators  : forall (e : Exp),
-        ℛ⟦REnv ↣ RM (RProd RTy RExp)⟧ (generate e) (synth e).
+    #[export] Instance into_rsat_wlp [Θ : SUB] [w0 w1 : World] (θ : Θ w0 w1)
+       DA SA `{InstSubst DA SA} (da0 : DA w0) (da1 : DA w1) (sa : SA) :
+      IntoSubst θ da0 da1 ->
+      IntoWlp θ (RSat (RInst DA SA) da0 sa) (RSat (RInst DA SA) da1 sa).
     Proof.
-      induction e.
+      intros Hsubst. constructor. intros ι -> ? <-.
+      simpl. now rewrite <- Hsubst, inst_subst.
+    Qed.
+
+    Lemma relatedness_of_generators (e : Exp) :
+      ℛ⟦REnv ↣ RM (RProd RTy RExp)⟧ (generate e) (synth e).
+    Proof.
+      induction e; iIntros (w dΓ sΓ) "#rΓ"; cbn.
       - admit.
-      - cbn. (* need weaker version of RImpl *) constructor. intros ι _ _ _ _.
-        eapply refine_apply.
-        apply rpure. all: repeat constructor.
-      (* Try in Iris proof mode ? *)
+      - iApply rpure. iSplit; iStopProof; now pred_unfold.
+      - iApply rpure. iSplit; iStopProof; now pred_unfold.
+      - iApply rbind. iApply IHe1; easy.
+        iIntros "%w1 %θ1 !>". iIntros ([dτ1 de1] [sτ1 se1]) "[#rτ1 #re1]".
+        iApply rbind. iApply IHe2; easy.
+        iIntros "%w2 %θ2 !>". iIntros ([dτ2 de2] [sτ2 se2]) "[#rτ2 #re2]".
+        iApply rbind. iApply IHe3; now rewrite subst_trans.
+        iIntros "%w3 %θ3 !>". iIntros ([dτ3 de3] [sτ3 se3]) "[#rτ3 #re3]".
+        iApply rbind. iApply requals.
+        predsimpl.
+        iStopProof; now pred_unfold.
+        now rewrite subst_trans.
+        iIntros "%w4 %θ4 !> %u1 %u2 _".
+        iApply rbind. iApply requals.
+        now rewrite subst_trans.
+        auto.
+        iIntros "%w5 %θ5 !> %u3 %u4 _".
+        iApply rpure.
+        iSplit.
+        now rewrite subst_trans.
+        iStopProof; pred_unfold. cbv [RSat RInst RExp RTy]. pred_unfold. now intuition subst.
+      - iApply rbind. iApply rpick. iIntros "%w1 %θ1 !>".
+        iIntros "%dτ1 %sτ1 #rτ1".
+        iApply rbind. iApply IHe; now iApply rinsert.
+        iIntros "%w2 %θ2 !>".
+        iIntros ([dτ2 de2] [sτ2 se2]) "[#rτ2 #re2]".
+        iApply rpure. cbn.
+        iSplit.
+        iStopProof; pred_unfold. cbv [RSat RInst RExp RTy]. pred_unfold. now intuition subst.
+        iStopProof; pred_unfold. cbv [RSat RInst RExp RTy]. pred_unfold. now intuition subst.
+      - iApply rbind. iApply IHe. iApply rinsert. admit. easy.
+        iIntros "%w1 %θ1 !>".
+        iIntros ([dτ1 de1] [sτ1 se1]) "[#rτ1 #re]".
+        iApply rpure. cbn.
+        iSplit.
+        iStopProof; pred_unfold. cbv [RSat RInst RExp RTy]. pred_unfold. now intuition subst.
+        iStopProof; pred_unfold. cbv [RSat RInst RExp RTy]. pred_unfold. now intuition subst.
+      - iApply rbind. iApply IHe1; easy.
+        iIntros "%w1 %θ1 !>". iIntros ([dτ1 de1] [sτ1 se1]) "[#rτ1 #re1]".
+        iApply rbind. iApply IHe2; easy.
+        iIntros "%w2 %θ2 !>". iIntros ([dτ2 de2] [sτ2 se2]) "[#rτ2 #re2]".
+        iApply rbind. iApply rpick. iIntros "%w3 %θ3 !>".
+        iIntros "%dτ3 %sτ3 #rτ3".
+        iApply rbind. iApply requals.
+        now rewrite subst_trans.
+        iStopProof; pred_unfold. cbv [RSat RInst RExp RTy]. pred_unfold. now intuition subst.
+        iIntros "%w4 %θ4 !> %u1 %u2 _".
+        iApply rpure. cbn.
+        iSplit; auto.
+        iStopProof; pred_unfold. cbv [RSat RInst RExp RTy]. pred_unfold. now intuition subst.
     Admitted.
 
     Lemma relatedness_of_algo_typing :
-      ℛ⟦_ ↣ _ ↣ _ ↣ _ ↣ RPred⟧
-        (TPB_algo (Θ := Prefix) (M := DM))
+      ℛ⟦REnv ↣ RConst Exp ↣ RTy ↣ RExp ↣ RPred⟧
+        (TPB_algo (M := DM))
         (tpb_algorithmic (M := SM)).
-    Proof. unfold TPB_algo, tpb_algorithmic.
-           constructor. intros ι _ DΓ SΓ RΓ De Se Re Dt St Rt De' Se' Re'.
-           eapply refine_apply.
-           eapply refine_apply.
-           apply RWP.
-           constructor.
-           eapply refine_apply. cbv in Re. subst.
-           eapply relatedness_of_generators.
-           constructor. auto.
-           intros w' θ ι' ?. subst. intros [dτ de'] [sτ se'] [rτ re'].
-           eapply refine_apply.
-           eapply refine_apply.
-           admit.
-           eapply refine_apply.
-           eapply refine_apply.
-           admit.
-           admit.
-           assumption.
-           eapply refine_apply.
-           eapply refine_apply.
-           admit.
-           admit.
-           assumption.
-    Admitted.
+    Proof.
+      intros w. cbn.
+      iIntros "%dΓ %sΓ #rΓ %e %se %re %dτ %sτ #rτ %de1 %se1 #re2". subst se.
+      iApply RWP. iApply relatedness_of_generators; auto.
+      iIntros "%w1 %θ1 !>". iIntros ([dτ'' de'] [sτ' se']) "[#rτ' #re']".
+      iApply rand; iApply req; auto.
+    Qed.
 
-    Locate TypeCheckLogicM.
-    Context (stcM : S.TypeCheckLogicM SM).
-
-    Lemma generate_correct_logrel {w} (Γ : OEnv w) (e : Exp) (τ : OTy w) (e' : OExp w) :
+    Lemma generate_correct_logrel `{!Shallow.Interface.TypeCheckLogicM SM}
+      {w} (Γ : OEnv w) (e : Exp) (τ : OTy w) (e' : OExp w) :
       Γ |--ₚ e; τ ~> e' ⊣⊢ₚ TPB_algo (Θ := Prefix) (M := DM) Γ e τ e'.
     Proof.
       constructor.
       destruct (@relatedness_of_algo_typing w) as [HRel]. intros ι.
       specialize (HRel ι (MkEmp _)). cbn in HRel. pred_unfold.
-      specialize (HRel Γ (inst Γ ι) eq_refl).
-      specialize (HRel e e eq_refl).
-      specialize (HRel τ (inst τ ι) eq_refl).
-      specialize (HRel e' (inst e' ι) eq_refl).
-      symmetry. rewrite HRel. rewrite <- synth_correct. reflexivity.
-      eauto.
+      specialize (HRel Γ (inst Γ ι)). destruct HRel as [HRel].
+      specialize (HRel eq_refl e e). destruct HRel as [HRel].
+      specialize (HRel eq_refl τ (inst τ ι)). destruct HRel as [HRel].
+      specialize (HRel eq_refl e' (inst e' ι)). destruct HRel as [HRel].
+      specialize (HRel eq_refl).
+      symmetry. cbv [RPred RSat] in HRel.
+      rewrite HRel. rewrite <- synth_correct; eauto.
     Qed.
 
   End MonadClasses.
-
 
 End logicalrelation.
 

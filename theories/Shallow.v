@@ -117,9 +117,9 @@ Section Elaborate.
         '(t1, e1') ← synth e1 Γ;
         '(t2, e2') ← synth e2 Γ;
         '(t3, e3') ← synth e3 Γ;
-        equals t1 ty.bool;;
+        equals ty.bool t1 ;;
         equals t2 t3;;
-        pure (t2, exp.ifte e1' e2' e3')
+        pure (t3, exp.ifte e1' e2' e3')
     | exp.absu x e =>
         t1        ← pick;
         '(t2, e') ← synth e (Γ ,, x∷t1);

@@ -65,7 +65,8 @@ Proof.
   intros w.
   cbn.
   constructor.
-  intros ι _ da sa ra.
+  intros ι _ da sa.
+  constructor. intros ra.
   now constructor.
 Qed.
 
