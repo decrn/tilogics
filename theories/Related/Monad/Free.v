@@ -28,58 +28,57 @@
 
 Require Import Coq.Classes.RelationClasses.
 From iris Require Import proofmode.tactics.
-From Em Require Import
-  Monad.Interface
-  Shallow.Interface
-  Related.Interface
-  Prefix.
-From Em Require Free_Shallow Free_Deep.
-Import (hints) Free_Shallow Free_Deep.
+From Em Require Import BaseLogic Prefix Spec.
+From Em Require Import Related.Monad.Interface.
 
-Module S := Free_Shallow.
-Module D := Free_Deep.
+Require Em.Monad.Free Em.Shallow.Monad.Free.
+
+Module D := Em.Monad.Free.
+Module S := Em.Shallow.Monad.Free.
+
+Import (hints) D S.
 
 Import Pred Pred.notations Pred.Sub Pred.proofmode world.notations.
 
 #[local] Set Implicit Arguments.
 
-Import logicalrelation.
+Import lr lr.notations.
 
-Inductive RawFree (DA : OType) (SA : Type) (RA : Rel DA SA) : RawRel (D.Free DA) (S.Free SA) :=
-  | ret : forall w da sa ass, RSat RA da sa ass -> @RawFree DA SA RA w (D.Ret da) (S.Ret sa) ass
-  | pickk w α (dk : D.Free DA (w ، α)) (sk : Ty -> S.Free SA) ass
-          (rk : forall st, @RawFree DA SA RA (w ، α) dk (sk st) (env.snoc ass α st))
-    : @RawFree DA SA RA w (D.Pickk α dk) (S.Pickk sk) ass.
+Print S.Free.
+Print Pred.Sub.
 
-Goal False. match type of @pickk with ?t => let t' := eval cbv [RTy] in t in idtac t' end. Abort.
+Section Relation.
+  Context (DA : OType) (SA : Type) (RA : Rel DA SA).
 
-Definition RFree (DA : OType) (SA : Type) (RA : Rel DA SA) : Rel (D.Free DA) (S.Free SA) :=
-  MkRel (RawFree RA).
+  Fixpoint RawFree [w] (d : D.Free DA w) (s : S.Free SA) {struct d} : Pred w :=
+    match d , s with
+    | D.Ret d            , S.Ret s            =>
+        RSat RA d s
+    | D.Fail             , S.Fail             =>
+        True
+    | D.Equalsk d1 d2 dk , S.Equalsk s1 s2 sk =>
+        RSat RTy d1 s1 ∧ RSat RTy d2 s2 ∧ RawFree dk sk
+    | D.Pickk α k        , S.Pickk f          =>
+        wlp step (∀ τ : Ty, eqₚ (lift τ) (oty.evar world.in_zero) -∗ RawFree k (f τ))
+    | _           , _         => False
+    end%I.
 
-Definition rwp {DA SA} (RA : Rel DA SA) : Rel (D.Free DA ⇢ Box Prefix (DA ⇢ Pred) ⇢ Pred) (S.Free SA -> (SA -> Prop) -> Prop).
-apply RImpl. apply RFree. apply RA. apply RImpl. apply RBox. apply RImpl. apply RA. all: apply RPred. Defined.
+  #[export] Instance RFree : Rel (D.Free DA) (S.Free SA) :=
+    MkRel RawFree.
 
-#[export] Instance rpure_free : RPure RFree.
+End Relation.
+
+#[export] Instance rtcmfree : RTypeCheckM D.Free S.Free RFree.
 Proof.
-  intros DA SA RA.
-  intros w.
-  cbn.
-  constructor.
-  intros ι _ da sa.
-  constructor. intros ra.
-  now constructor.
+  constructor; try easy.
+  - intros DA DB SA SB RA RB w.
+    apply bi.forall_intro. intros da.
+    induction da; iIntros "_ %sa ra %df %sf #rf";
+      destruct sa; cbn - [thick]; auto.
+    + iMod "rf". now iApply "rf".
+    + iDestruct "ra" as "(#r1 & #r2 & #rk)". repeat iSplit; auto.
+      iApply IHda; auto.
+    + iApply (wlp_mono with "[] ra"). iIntros "!> #ra %t #Heq".
+      iApply IHda; auto. now iApply "ra".
+  - constructor; cbn. pred_unfold.
 Qed.
-
-(* Lemma wlps_are_related : Prop. *)
-(*   eapply rwp. exact RTy. apply D.wp_free. apply S.wp_free. apply env.nil. Abort. *)
-(* (* Generalizing *) *)
-(* Lemma wlps_are_related : forall w ass, rwp RTy (@D.wp_free OTy w) (S.wp_free (A:=Ty)) ass. *)
-(*   intros w ass. unfold rwp. *)
-(*   intros dm sm rm. induction rm; cbn; intros dpost spost rpost. *)
-(*   - apply rpost. apply inst_refl. auto. *)
-(*   - unfold RPred. unfold wp. setoid_rewrite inst_step. split. *)
-(*     + intros. destruct H0. destruct env.view. exists v. specialize rk with v. destruct H0. unfold RArr, RBox in *. *)
-(*       specialize (H v (_4 dpost step) spost). subst. eapply H in H1. auto. intros w' θ ass' eq. *)
-(*       unfold _4. apply rpost. rewrite inst_trans inst_step eq. now simpl. *)
-(*     + intros. destruct H0. exists (env.snoc ass α x). cbn. split. auto. eapply H; eauto. intros w' θ ass' eq. apply rpost. rewrite inst_trans inst_step eq. now simpl. *)
-(* Qed. *)
