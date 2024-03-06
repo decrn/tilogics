@@ -17,11 +17,16 @@ theories/Monad/Solved.v
 theories/Open.v
 theories/Prelude.v
 theories/PrenexConversion.v
+theories/Related/Monad/Interface.v
+theories/Related/Gen/Synthesise.v
+theories/Shallow/Gen/Synthesise.v
+theories/Shallow/Monad/Free.v
+theories/Shallow/Monad/Interface.v
 theories/Spec.v
 theories/Sub/Parallel.v
 theories/Sub/Prefix.v
-theories/Sub/Triangular.v
 theories/Substitution.v
+theories/Sub/Triangular.v
 theories/UnificationGeneric.v
 theories/Unification.v
 theories/Worlds.v

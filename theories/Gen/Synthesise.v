@@ -109,7 +109,80 @@ Section Generator.
   Lemma generate_sound_aux e :
     ∀ w (G : OEnv w),
       ⊢ WLP (generate e G) (fun _ θ '(t,ee) => G[θ] |--ₚ e; t ~> ee).
-  Proof.
+  Proof with
+    iStopProof; pred_unfold; intuition (subst; econstructor; eauto; fail).
+
+    induction e; cbn; intros w G; iStartProof.
+    - destruct lookup eqn:HGx; wlpauto.
+      iStopProof; pred_unfold. constructor. now rewrite lookup_inst HGx.
+    - iApply wlp_pure...
+    - iApply wlp_pure...
+    - iApply wlp_bind.
+      wlpindhyp.
+      iApply wlp_bind.
+      wlpindhyp.
+      iApply wlp_bind.
+      wlpindhyp.
+      iApply wlp_bind.
+      iApply wlp_equals.
+      (* Assume that the equality holds on the ghost state (assignment). *)
+      iIntros "#?".
+      (* The rule for equality is generalized with the ◼ modality to
+         allow different behaviour from the monad. The Free monad implementation
+         of equals always calls the continuation with the identity substitution.
+         However, the solved monad calls the unifier and hence the continuation
+         is called with some substitution that we cannot know upfront. Of course,
+         we do not want to make the unifier part of the semantics of the wlp rule
+         for equals either. Hence the use of the ◼ modality that requires us to
+         show the postcondition for any substitution. *)
+      unfold PBox.  (* PBox is defined using Sub.wlp. *)
+      iIntros (?w ?θ).
+      (* Introduce the wlp from the head by running the substitution
+         over the context. *)
+      iModIntro.
+      (* The modality introduction uses typeclass-based logic programming to
+         perform some rewrites. For instance, the barebones modality introduction
+         of the wlp would result in the last assumption to be the constraint
+           (oty.bool =ₚ t[θ0 ⊙ θ1])[θ2]
+         but the typeclass machinery automatically "rewrote" it to
+           oty.bool[θ2] =ₚ t[θ0 ⊙ θ1][θ2]
+         Similarly, for the typing judgements.
+       *)
+      iApply wlp_bind.
+      iApply wlp_equals. iIntros "#?". iIntros (?w ?θ) "!>".
+      iApply wlp_pure...
+    - iApply wlp_bind.
+      iApply wlp_pick. iIntros (?w ?θ) "!>". iIntros (?τ).
+      iApply wlp_bind.
+      wlpindhyp.
+      iApply wlp_pure...
+    - iApply wlp_bind.
+      wlpindhyp.
+      iApply wlp_pure...
+    - iApply wlp_bind.
+      wlpindhyp.
+      iApply wlp_bind.
+      wlpindhyp.
+      iApply wlp_bind.
+      iApply wlp_pick. iIntros (?w ?θ) "!>". iIntros (?τ).
+      iApply wlp_bind.
+      iApply wlp_equals. iIntros "#?". iIntros (?w ?θ) "!>".
+      iApply wlp_pure.
+      (* Unfortunately, we are accumulating a lot of substitutions in the goal.
+         We can make the output nicer through generalizations. *)
+      rewrite ?subst_trans; predsimpl.
+      (* The subst_trans doesn't work for the elaboration because that would
+         need either functional extensionality or a generalized rewrite *)
+      (* At this point we would like to apply the typing relation for the
+         application case. However, we did not define it for the open typing
+         relation. So at this point we the "base logic" abstraction and go to
+         the underlying definition of predicates and also to the closed typing
+         relation that underlies the open typing relation. We can generalize
+         the result further to get rid of more substitutions. *)
+      iStopProof. pred_unfold.
+      (* Use the typing rule of the closed typing relation. *)
+      intuition (subst; econstructor; eauto; fail).
+  Restart.
     induction e; cbn; intros w G; iStartProof; wlpauto.
     destruct lookup eqn:HGx; wlpauto. iStopProof; pred_unfold.
     constructor. now rewrite lookup_inst HGx.
