@@ -37,8 +37,35 @@ Import Pred Pred.notations Pred.proofmode lr lr.notations.
 
 Section Relatedness.
 
+  (* Show that the deep and shallow constraint generators are logically related.
+     Relations in this context are predicate-valued. They are binary and relate
+     something that can contain variables, i.e. an [OType], with something that
+     does not, i.e. a normal [Type]. We also wrap everything in a record:
+
+       Record Rel (DA : OType) (SA : Type) : Type :=
+         { RSat : ∀ w : World, DA w → SA → Pred w }.
+
+     Note we do not define a universe of types first on which we then define a
+     deep, shallow and relational semantics by recursion. We could carve out a
+     subset that is contains everything that we use in the definition of the
+     constraint generator, but there are some technical usability issues.
+     Instead, we always quantify over these three pieces of information:
+       ∀ (DA : OType) (SA : Type) (RA : Rel DA SA)
+   *)
+   (* The [Context] command below introduces multiple variables:
+       - DM : OType → OType
+         A monad that implements our constraint interface using deep embeddings
+         (de Bruijn variables + string decorations) for existentials.
+       - SM : Type → Type
+         A monad that implements the shallow constraint interface which uses
+         HOAS for existentials.
+       - RM : ∀ (DA : OType) (SA : Type) (RA : Rel DA SA), Rel (DM DA) (SM SA)
+         A predicate valued relation for the monads.
+
+      The [RTypeCheckLogicM] type class requires then that all monadic operations
+      (pure, bind, fail, equals, pick) and the wp and wlp semantics of DM and SM
+      are logically related. *)
   Context `{RTypeCheckLogicM DM SM}.
-  Local Set Printing Depth 16.
 
   Lemma relatedness_of_generators (e : Exp) :
     ℛ⟦REnv ↣ RM (RProd RTy RExp)⟧ (generate e) (synth e).
@@ -46,7 +73,7 @@ Section Relatedness.
     iStopProof; pred_unfold; cbv [RSat RInst RExp RTy];
       pred_unfold; now intuition subst.
 
-    induction e; iIntros (w dΓ sΓ) "#rΓ"; cbn.
+    induction e; iIntros (w dΓ sΓ) "#rΓ"; cbn [generate synth].
     - iPoseProof (rlookup x with "rΓ") as "rlk".
       destruct (dΓ !! x), (sΓ !! x); cbn; auto.
       + iApply rpure. iSplit...
@@ -66,7 +93,7 @@ Section Relatedness.
       iApply rpure. iSplit...
     - iApply rbind. iApply rpick.
       iIntros "%w1 %θ1 !> %dτ1 %sτ1 #rτ1".
-      iApply rbind. iApply IHe; now iApply rinsert.
+      iApply rbind. iApply IHe. now iApply rinsert.
       iIntros "%w2 %θ2 !>".
       iIntros ([dτ2 de2] [sτ2 se2]) "[#rτ2 #re2]".
       iApply rpure. iSplit...
