@@ -182,6 +182,24 @@ Module lr.
     rewrite lookup_inst. now destruct lookup.
   Qed.
 
+  Lemma rwpstep {w α} (SP : Ty → Prop) (DP : Pred (w ، α)) :
+    (wlp step (∀ₚ τ : Ty, lift τ =ₚ oty.evar world.in_zero -∗ RSat RPred DP (SP τ)))%I ⊢ₚ
+      RSat RPred (wp step DP) (∃ t : Ty, SP t).
+  Proof.
+    constructor; simpl; intros ? ?. split.
+    - intros (ι' & Heq & HP). specialize (H _ Heq).
+      destruct (env.view ι') as [ι' τ]. exists τ.
+      rewrite inst_step_snoc in Heq. subst ι'.
+      specialize (H τ). destruct H as [H]. simpl in H.
+      rewrite inst_lift in H. specialize (H eq_refl).
+      now apply H.
+    - intros (τ & HP). pose (env.snoc ι α τ) as ι'.
+      specialize (H ι'). rewrite inst_step_snoc in H. specialize (H eq_refl τ).
+      destruct H as [H]. simpl in H. rewrite inst_lift in H. specialize (H eq_refl).
+      exists ι'. rewrite inst_step_snoc. split. easy.
+      now apply H.
+  Qed.
+
   Section MonadClasses.
 
     Context (DM : OType → OType) (SM : Type -> Type)
@@ -207,13 +225,13 @@ Module lr.
           ℛ⟦RM RA ↣ □(RA ↣ RPred) ↣ RPred⟧
             (@D.WP Prefix DM _ DA)
             (@S.WP SM _ SA);
-        RWLP [DA SA] (RA : Rel DA SA) :
-          ℛ⟦RM RA ↣ □(RA ↣ RPred) ↣ RPred⟧
-            (@D.WLP Prefix DM _ DA) (@S.WLP SM _ SA);
+        (* RWLP [DA SA] (RA : Rel DA SA) : *)
+        (*   ℛ⟦RM RA ↣ □(RA ↣ RPred) ↣ RPred⟧ *)
+        (*     (@D.WLP Prefix DM _ DA) (@S.WLP SM _ SA); *)
       }.
 
   End MonadClasses.
   #[global] Arguments RTypeCheckM DM SM RM {_ _ _ _ _ _ _ _}.
-  #[global] Arguments RTypeCheckLogicM DM SM RM {_ _ _ _ _ _ _ _ _ _ _ _ _}.
+  #[global] Arguments RTypeCheckLogicM DM SM RM {_ _ _ _ _ _ _ _ _ _ _ _ (* _ *)}.
 
 End lr.

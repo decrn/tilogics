@@ -82,3 +82,21 @@ Proof.
       iApply IHda; auto. now iApply "ra".
   - constructor; cbn. pred_unfold.
 Qed.
+
+#[export] Instance rtclogicmfree : RTypeCheckLogicM D.Free S.Free RFree rtcmfree.
+Proof.
+  constructor.
+  - intros DA SA RA w. cbn.
+    apply bi.forall_intro; intros da.
+    apply bi.forall_intro; intros sa. revert w da.
+    induction sa; intros w []; cbn; try easy.
+    + iIntros "_ ra %DQ %SQ RQ". iMod "RQ". now iApply "RQ".
+    + iIntros "_ (#r1 & #r2 & #rk) %DQ %SQ RQ".
+      iApply rand; [ by iApply req | by iApply IHsa ].
+    + iIntros "_ #rk %DQ %SQ RQ".
+      iApply rwpstep. iIntros "!> %τ #Heq".
+      iApply H. auto. now iApply "rk".
+      iIntros (? ?) "!> %da %sa #ra". iMod "RQ".
+      iSpecialize ("RQ" $! da sa with "ra").
+      now rewrite trans_refl_r.
+Qed.
