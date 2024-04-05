@@ -85,13 +85,15 @@ Section Elaborate.
 
   Ltac solve_complete :=
     repeat
-      (rewrite ?wp_pure, ?wp_bind, ?wp_fail, ?wp_equals, ?wp_pick;
+      (try apply wp_pure; try apply wp_fail; try apply wp_bind;
+       try apply wp_equals; try (eapply wp_pick; intros; subst);
        try
          match goal with
          | H: ?x = _ |- WP match ?x with _ => _ end _ => rewrite H
-         | IH: WP (synth ?Γ1 ?e) _ |- WP (synth ?Γ2 ?e) _ =>
+         | IH: WP (synth ?e ?Γ1) _ |- WP (synth ?e ?Γ2) _ =>
              unify Γ1 Γ2; revert IH; apply wp_mono; intros; subst
          | H: _ /\ _ |- _ => destruct H; subst
+         | |- _ /\ _ => split
          | |- WP match ?x with _ => _ end _ =>
              is_var x;
              match type of x with
@@ -103,77 +105,38 @@ Section Elaborate.
   Lemma synth_complete (Γ : Env) (e ee : Exp) (t : Ty) :
     Γ |-- e ∷ t ~> ee -> Γ |--ₐ e ∷ t ~> ee.
   Proof.
-    intros T. unfold tpb_algorithmic.
-    induction T; cbn.
-    - solve_complete. now apply wp_pure.
-    - apply wp_pure. auto.
-    - apply wp_pure. auto.
-    - apply wp_bind. revert IHT1. apply wp_mono.
-      intros [t1 e1'']. intros []. subst.
-
-      apply wp_bind. revert IHT2. apply wp_mono.
-      intros [t2 e2'']. intros []. subst.
-
-      apply wp_bind. revert IHT3. apply wp_mono.
-      intros [t3 e3'']. intros []. subst.
-
-      apply wp_bind, wp_equals. split; [easy|].
-      apply wp_bind, wp_equals. split; [easy|].
-      apply wp_pure. auto.
-    - apply wp_bind.
-      eapply wp_pick with t1. intros ? <-.
-      apply wp_bind. revert IHT. apply wp_mono.
-      intros [t3 e3'']. intros []. subst.
-      apply wp_pure. auto.
-    - apply wp_bind.
-      revert IHT. apply wp_mono.
-      intros [t3 e3'']. intros []. subst.
-      apply wp_pure. auto.
-    - apply wp_bind. revert IHT1. apply wp_mono.
-      intros [tf e1'']. intros []. subst.
-      apply wp_bind. revert IHT2. apply wp_mono.
-      intros [t2' e2'']. intros []. subst.
-      apply wp_bind.
-      eapply wp_pick with t1. intros ? <-.
-      apply wp_bind, wp_equals.
-      split; auto.
-      apply wp_pure; auto.
-  (* Restart. *)
-  (*   unfold tpb_algorithmic. *)
-  (*   induction 1; cbn; solve_complete; *)
-  (*     try (eexists; solve_complete; fail). *)
+    unfold tpb_algorithmic.
+    induction 1; cbn; solve_complete;
+      try (eexists; solve_complete; fail).
   Qed.
+
+  Ltac solve_sound :=
+    repeat
+      (try apply wlp_pure; try apply wlp_fail; try apply wlp_bind;
+       try (apply wlp_equals; intros; subst); try (apply wlp_pick; intro);
+       try
+         match goal with
+         | IH : forall Γ, WLP (synth ?e Γ) _
+                          |- WLP (synth ?e ?Γ) _ =>
+             specialize (IH Γ); revert IH; apply wlp_mono; intros
+         | |- tpb _ _ _ _    =>
+             econstructor
+           | |- WLP (match ?t with _ => _ end) _ =>
+             destruct t eqn:?
+         end;
+       intros; eauto).
+
 
   Lemma synth_sound (Γ : Env) (e : Exp) t ee :
     (Γ |--ₐ e ∷ t ~> ee) -> (Γ |-- e ∷ t ~> ee).
   Proof.
-  (*   revert Γ t ee. unfold tpb_algorithmic. *)
-  (*   induction e; cbn; intros *. *)
-  (*   4: { *)
-  (*     apply wp_bind. admit. *)
-  (*   } *)
-  (* Restart. *)
     enough (WLP (synth e Γ) (fun '(t',ee') => Γ |-- e ∷ t' ~> ee')).
     { unfold tpb_algorithmic. apply wp_impl. revert H.
       apply wlp_mono. intros [t1 e1] HT [Heq1 Heq2]. now subst.
     }
     revert Γ. clear t ee.
-    (* induction e; cbn; intros Γ; *)
-    (*   repeat *)
-    (*     (rewrite ?wlp_ret, ?wlp_bind, ?wlp_fail, ?wlp_equals, ?wlp_pick; *)
-    (*      try *)
-    (*        match goal with *)
-    (*        | IH : forall Γ, WLP (synth Γ ?e) _ *)
-    (*          |- WLP (synth ?Γ ?e) _ => *)
-    (*          specialize (IH Γ); revert IH; apply wlp_mono; intros *)
-    (*        | |- tpb _ _ _ _    => *)
-    (*          econstructor *)
-    (*        | |- ?x = ?y -> _ => *)
-    (*          intro; subst *)
-    (*        | |- WLP (match ?t with _ => _ end) _ => *)
-    (*          destruct t eqn:? *)
-    (*        end; intros; eauto). *)
-  Admitted.
+    induction e; cbn; intros Γ; solve_sound.
+  Qed.
 
   Lemma synth_correct Γ e t ee :
     Γ |-- e ∷ t ~> ee <-> Γ |--ₐ e ∷ t ~> ee.
