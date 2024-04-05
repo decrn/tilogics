@@ -127,18 +127,10 @@ Section Relatedness.
 
   Lemma generate_correct_logrel `{!Shallow.Monad.Interface.TypeCheckLogicM SM}
     {w} (Γ : OEnv w) (e : Exp) (τ : OTy w) (e' : OExp w) :
-    Γ |--ₚ e; τ ~> e' ⊣⊢ₚ TPB_algo (Θ := Prefix) (M := DM) Γ e τ e'.
+    TPB_algo (Θ := Prefix) (M := DM) Γ e τ e' ⊣⊢ₚ Γ |--ₚ e; τ ~> e'.
   Proof.
-    constructor.
-    destruct (@relatedness_of_algo_typing w) as [HRel]. intros ι.
-    specialize (HRel ι (MkEmp _)). cbn in HRel. pred_unfold.
-    specialize (HRel Γ (inst Γ ι)). destruct HRel as [HRel].
-    specialize (HRel eq_refl e e). destruct HRel as [HRel].
-    specialize (HRel eq_refl τ (inst τ ι)). destruct HRel as [HRel].
-    specialize (HRel eq_refl e' (inst e' ι)). destruct HRel as [HRel].
-    specialize (HRel eq_refl).
-    symmetry. cbv [RPred RSat] in HRel.
-    rewrite HRel. rewrite <- synth_correct; eauto.
+    constructor. intros ι. simpl. rewrite synth_correct.
+    now apply relatedness_of_algo_typing.
   Qed.
 
 End Relatedness.

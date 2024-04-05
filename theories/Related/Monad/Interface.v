@@ -96,9 +96,7 @@ Module lr.
 
   Notation RTy := (RInst OTy Ty).
   Notation REnv := (RInst OEnv Env).
-
-  #[export] Instance RExp : Rel OExp Exp :=
-    RInst OExp Exp.
+  Notation RExp := (RInst OExp Exp).
 
   #[export] Instance RUnit : Rel Unit unit :=
     MkRel (fun w _ _ => True%I).
@@ -120,17 +118,13 @@ Module lr.
              | _      , _      => False %I
              end).
 
-  (* #[export] Instance RPred : Rel Pred Prop := *)
-  (*   MkRel (fun w DP SP => DP ↔ ⌜SP⌝)%I. *)
-  (*   MkRel (fun w DP SP => DP ∗-∗ ⌜SP⌝)%I. *)
-
   #[export] Instance RPred : Rel Pred Prop :=
-    MkRel (fun w DP SP ι => DP ι <-> SP ).
+    MkRel (fun w DP SP => DP ↔ ⌜SP⌝)%I.
   #[global] Arguments RPred : simpl never.
 
   Module Import notations.
     Open Scope rel_scope.
-    (* Notation "ℛ⟦ R ⟧@{ ι }" := (RSat R%R ι) (format "ℛ⟦ R ⟧@{ ι }"). *)
+    Notation "ℛ⟦ R ⟧" := (RSat R%R) (format "ℛ⟦ R ⟧", only printing).
     Notation "ℛ⟦ R ⟧" := (RValid R%R) (format "ℛ⟦ R ⟧").
     Notation "A ↣ B" :=
       (RImpl A%R B%R)
