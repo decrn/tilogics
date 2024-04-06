@@ -54,7 +54,7 @@ Proof.
   - rewrite <- IHm. clear IHm.
     destruct (prenex m) as [(w1 & θ1 & C1 & a1)|]; predsimpl.
     rewrite Sub.and_wp_r. apply Sub.proper_wp_bientails. predsimpl.
-    now rewrite and_assoc.
+    now rewrite <- derived_laws.bi.and_assoc.
   - rewrite <- IHm. clear IHm.
     destruct (prenex m) as [(w1 & θ1 & C1 & a1)|]; predsimpl.
 Qed.

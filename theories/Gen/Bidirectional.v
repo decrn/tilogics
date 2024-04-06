@@ -29,15 +29,12 @@
 From stdpp Require Import base gmap.
 From iris Require Import proofmode.tactics.
 From Em Require Import BaseLogic Monad.Interface.
-
 Import Pred Pred.notations Pred.proofmode world.notations.
 
 Set Implicit Arguments.
 
-#[local] Notation "s [ ζ ]" :=
-  (subst s ζ)
-    (at level 7, left associativity,
-      format "s [ ζ ]").
+#[local] Notation "s [ ζ ]" := (subst s ζ)
+  (at level 7, left associativity, format "s [ ζ ]").
 
 Section Generator.
   Import MonadNotations.
@@ -114,9 +111,7 @@ Section Generator.
           pure (τ2[_], oexp.app e1'[_] e2')
       end.
 
-  Import Pred Pred.notations.
-  Import Pred.proofmode.
-  Import iris.proofmode.tactics.
+  Import Pred Pred.notations Pred.proofmode iris.proofmode.tactics.
   Open Scope pred_scope.
 
   Context `{lkReflΘ: LkRefl Θ, lkTransΘ: LkTrans Θ, lkStepΘ: LkStep Θ} {reflTransΘ: ReflTrans Θ}.
@@ -151,32 +146,6 @@ Section Generator.
              pred_unfold;
              intuition (subst; econstructor; eauto; fail)
          end).
-  Abort.
-
-  Lemma sound_aux e :
-      (∀ w (G : OEnv w) (t : OTy w),
-          ⊢ WLP (check e G t) (fun _ θ ee => G[θ] |--ₚ e; t[θ] ~> ee)) /\
-      (∀ w (G : OEnv w),
-          ⊢ WLP (synth e G) (fun _ θ '(t,ee) => G[θ] |--ₚ e; t ~> ee)).
-  Proof.
-    induction e; cbn; (split; [intros w G τ|intros w G]); iStartProof; wlpauto.
-    - destruct lookup eqn:HGx; wlpauto. iStopProof; pred_unfold.
-      intros ->. constructor. now rewrite lookup_inst HGx.
-    - destruct lookup eqn:HGx; wlpauto. iStopProof; pred_unfold.
-      constructor. now rewrite lookup_inst HGx.
-  Qed.
-
-  Lemma sound (e : Exp) (w0 : World) (G0 : OEnv w0) t0 e0 :
-    TPB_algo G0 e t0 e0 ⊢ₚ G0 |--ₚ e; t0 ~> e0.
-  Proof.
-    iStartProof. rewrite wand_is_impl. iApply wp_impl.
-    destruct (@sound_aux e) as [_ Hsound].
-    iApply (wlp_mono' $! (@Hsound w0 G0)).
-    iIntros "%w1 %θ1 !>" ([t e']) "HT". predsimpl.
-    iStopProof; pred_unfold. intros HT Heq1 Heq2. now subst.
-  Qed.
-
-  Goal False. Proof.
   Ltac wpauto :=
     repeat
       (repeat wpsimpl;
@@ -201,6 +170,29 @@ Section Generator.
          end).
   Abort.
 
+  Lemma sound_aux e :
+    (∀ w (G : OEnv w) (t : OTy w),
+        ⊢ WLP (check e G t) (fun _ θ ee => G[θ] |--ₚ e; t[θ] ~> ee)) /\
+    (∀ w (G : OEnv w),
+        ⊢ WLP (synth e G) (fun _ θ '(t,ee) => G[θ] |--ₚ e; t ~> ee)).
+  Proof.
+    induction e; cbn; (split; [intros w G τ|intros w G]); iStartProof; wlpauto.
+    - destruct lookup eqn:HGx; wlpauto. iStopProof; pred_unfold.
+      intros ->. constructor. now rewrite lookup_inst HGx.
+    - destruct lookup eqn:HGx; wlpauto. iStopProof; pred_unfold.
+      constructor. now rewrite lookup_inst HGx.
+  Qed.
+
+  Lemma sound (e : Exp) (w0 : World) (G0 : OEnv w0) t0 e0 :
+    TPB_algo G0 e t0 e0 ⊢ₚ G0 |--ₚ e; t0 ~> e0.
+  Proof.
+    iStartProof. rewrite wand_is_impl. iApply wp_impl.
+    destruct (@sound_aux e) as [_ Hsound].
+    iApply (wlp_mono' $! (@Hsound w0 G0)).
+    iIntros "%w1 %θ1 !>" ([t e']) "HT". predsimpl.
+    iStopProof; pred_unfold. intros HT Heq1 Heq2. now subst.
+  Qed.
+
   Lemma complete_aux {G e t ee} (T : G |-- e ∷ t ~> ee) :
     (∀ w0 (G0 : OEnv w0) (t0 : OTy w0),
       ⊢ lift G =ₚ G0 ->ₚ lift t =ₚ t0 ->ₚ
@@ -224,14 +216,11 @@ Section Generator.
   Lemma complete (e : Exp) (w0 : World) (G0 : OEnv w0) t0 e0 :
     G0 |--ₚ e; t0 ~> e0 ⊢ₚ TPB_algo G0 e t0 e0.
   Proof.
-    pred_unfold. intros ι HT.
-    destruct (complete_aux HT) as [_ Hcompl].
+    pred_unfold. intros ι HT. destruct (complete_aux HT) as [_ Hcompl].
     specialize (Hcompl _ G0). destruct Hcompl as [Hcompl].
-    specialize (Hcompl ι (MkEmp _)). pred_unfold.
-    rewrite inst_lift in Hcompl.
-    specialize (Hcompl eq_refl). revert Hcompl.
-    apply wp_mono. intros w1 θ1 ι1 <- [τ1 e1].
-    pred_unfold.
+    specialize (Hcompl ι (MkEmp _)). pred_unfold. rewrite inst_lift in Hcompl.
+    specialize (Hcompl eq_refl). revert Hcompl. apply wp_mono.
+    intros w1 θ1 ι1 <- [τ1 e1]. pred_unfold.
   Qed.
 
   Lemma correct {w} (Γ : OEnv w) (e : Exp) (τ : OTy w) (e' : OExp w) :

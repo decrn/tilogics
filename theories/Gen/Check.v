@@ -34,10 +34,8 @@ Import Pred Pred.notations Pred.proofmode world.notations.
 
 Set Implicit Arguments.
 
-#[local] Notation "s [ ζ ]" :=
-  (subst s ζ)
-    (at level 7, left associativity,
-      format "s [ ζ ]").
+#[local] Notation "s [ ζ ]" := (subst s ζ)
+  (at level 7, left associativity, format "s [ ζ ]").
 
 Section Generator.
   Import MonadNotations.
@@ -91,10 +89,8 @@ Section Generator.
       e' <- check e G[_] τ ;;
       pure (τ[_] , e').
 
-  Import Pred.proofmode.
-  Import iris.proofmode.tactics.
+  Import Pred.proofmode iris.proofmode.tactics Pred Pred.notations.
   Open Scope pred_scope.
-  Import Pred Pred.notations.
   (* Import (notations) Open. *)
 
   Context {wpM : WeakestPre Θ M} {wlpM : WeakestLiberalPre Θ M}
@@ -113,6 +109,16 @@ Section Generator.
     | |- environments.envs_entails _ (TPB _ _ _ _) =>
         predsimpl; iStopProof; pred_unfold;
         intuition (subst; econstructor; eauto; fail)
+    end).
+  Ltac wpauto := repeat (repeat wpsimpl; try
+    match goal with
+    | IH: ∀ w (G : OEnv w) (t : OTy w),
+        bi_emp_valid (bi_impl _ (bi_impl _ (WP (check ?e G t) _)))
+        |- environments.envs_entails _ (WP (check ?e ?G ?t) _) =>
+        iPoseProof (IH _ G t with "[] []") as "-#IH"; clear IH;
+        [ | | iApply (wp_mono' with "IH");
+              iIntros (?w ?θ) "!>"; iIntros (?e') "#?"
+        ]
     end).
   Abort.
 
@@ -133,19 +139,6 @@ Section Generator.
     iIntros "%w1 %θ1 !>" (e') "HT". iStopProof. pred_unfold.
     intros HT Heq. now subst.
   Qed.
-
-  Goal False. Proof.
-  Ltac wpauto := repeat (repeat wpsimpl; try
-    match goal with
-    | IH: ∀ w (G : OEnv w) (t : OTy w),
-        bi_emp_valid (bi_impl _ (bi_impl _ (WP (check ?e G t) _)))
-        |- environments.envs_entails _ (WP (check ?e ?G ?t) _) =>
-        iPoseProof (IH _ G t with "[] []") as "-#IH"; clear IH;
-        [ | | iApply (wp_mono' with "IH");
-              iIntros (?w ?θ) "!>"; iIntros (?e') "#?"
-        ]
-    end).
-  Abort.
 
   Lemma complete_aux {G e t ee} (T : G |-- e ∷ t ~> ee) :
     ∀ w0 (G0 : OEnv w0) (t0 : OTy w0),

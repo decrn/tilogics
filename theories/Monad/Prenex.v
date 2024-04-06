@@ -55,19 +55,12 @@ Import MonadNotations Pred Pred.Sub Pred.notations Pred.proofmode
 #[local] Existing Instance instpred_subst_prod_ty.
 
 #[export] Instance wp_prenex : WeakestPre Prefix Prenex :=
-  fun A w o Q =>
-    wp_option o
-      (fun d =>
-         wp_diamond d
-           (fun w1 θ1 '(C,a) => instpred C /\ₚ Q w1 θ1 a))%P.
+  fun A w o Q => wp_option o (fun d =>
+    wp_diamond d (fun w1 θ1 '(C,a) => instpred C /\ₚ Q w1 θ1 a))%P.
 
 #[export] Instance wlp_prenex : WeakestLiberalPre Prefix Prenex :=
-  fun A w o Q =>
-    wlp_option o
-      (fun d =>
-         wlp_diamond d
-           (fun w1 θ1 '(C,a) => instpred C ->ₚ Q w1 θ1 a))%P.
-
+  fun A w o Q => wlp_option o (fun d =>
+    wlp_diamond d (fun w1 θ1 '(C,a) => instpred C ->ₚ Q w1 θ1 a))%P.
 
 #[export] Instance axiomatic_prenex : AxiomaticSemantics Prefix Prenex.
 Proof.
