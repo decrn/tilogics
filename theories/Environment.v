@@ -158,16 +158,6 @@ End WithBinding.
 #[global] Arguments nil {D}.
 #[global] Arguments snoc {D w%world} E%env α & d.
 
-Ltac destroy x :=
-  try (progress hnf in x);
-  lazymatch type of x with
-  | Env _ []       => destruct (view x)
-  | Env _ (_ ، _)  => destruct (view x) as [x]; destroy x
-  | _ ∈ []         => destruct (world.view x)
-  | _ ∈ _ ، _      => destruct (world.view x)
-  | _              => idtac
-  end.
-
 End env.
 Export env (Env).
 Bind Scope env_scope with Env.

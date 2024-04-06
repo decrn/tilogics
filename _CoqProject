@@ -1,5 +1,6 @@
 -arg "-w all"
 -arg "-w -disj-pattern-notation"
+-arg "-w -notation-overridden"
 -Q theories Em
 
 theories/BaseLogic.v
@@ -17,8 +18,13 @@ theories/Monad/Solved.v
 theories/Open.v
 theories/Prelude.v
 theories/PrenexConversion.v
-theories/Related/Monad/Interface.v
+theories/Related/Gen/Bidirectional.v
+theories/Related/Gen/Check.v
 theories/Related/Gen/Synthesise.v
+theories/Related/Monad/Free.v
+theories/Related/Monad/Interface.v
+theories/Shallow/Gen/Bidirectional.v
+theories/Shallow/Gen/Check.v
 theories/Shallow/Gen/Synthesise.v
 theories/Shallow/Monad/Free.v
 theories/Shallow/Monad/Interface.v

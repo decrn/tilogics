@@ -33,8 +33,7 @@ Import Pred Pred.Sub Pred.proofmode world.notations.
 
 Section WithSub.
 
-  Context {Θ} {reflΘ : Refl Θ} {transΘ : Trans Θ}
-    {hmapΘ : HMap Tri Θ} {stepΘ : Step Θ}.
+  Context `{Refl Θ, !Trans Θ, !HMap Tri Θ, !Step Θ}.
 
   #[export] Instance tcm_solved : TypeCheckM (Solved Θ) :=
     {| equals w τ1 τ2 := mgu τ1 τ2;
@@ -55,21 +54,17 @@ Section WithSub.
       iIntros "!> _". iMod "HQ". now rewrite trans_refl_r.
     - rewrite <- (intro_wp_step τ). iIntros "#HQ !> #Heq". iMod "HQ".
       rewrite trans_refl_r. iApply "HQ". now iModIntro.
-    - destruct m as [(w1 & θ1 & a1)|]; predsimpl.
-      iIntros "PQ". iApply Sub.wp_mono. iModIntro.
-      iMod "PQ". now rewrite trans_refl_r.
+    - destruct m as [(w1 & θ1 & a1)|]; predsimpl. iIntros "PQ".
+      iApply Sub.wp_mono. iModIntro. iMod "PQ". now rewrite trans_refl_r.
     - destruct m as [(w1 & θ1 & a1)|]; predsimpl.
       destruct f as [(w2 & θ2 & b2)|]; predsimpl.
     - rewrite <- mgu_correct. destruct mgu as [(w1 & θ1 & [])|]; predsimpl.
-      unfold instpred, instpred_unit.
-      rewrite Sub.wp_impl. predsimpl. iIntros "HQ !>".
-      rewrite subst_pbox. iMod "HQ". now rewrite trans_refl_r.
+      unfold instpred, instpred_unit. rewrite Sub.wp_impl. predsimpl.
+      iIntros "HQ !>". rewrite subst_pbox. iMod "HQ". now rewrite trans_refl_r.
     - iIntros "HQ !>". iMod "HQ". rewrite trans_refl_r. iApply "HQ".
-    - destruct m as [(w1 & θ1 & a1)|]; predsimpl.
-      iIntros "PQ". iApply Sub.wlp_mono. iModIntro.
-      iMod "PQ". now rewrite trans_refl_r.
-    - destruct m as [(w1 & θ1 & a1)|]; predsimpl.
-      rewrite Sub.wp_impl. predsimpl.
+    - destruct m as [(w1 & θ1 & a1)|]; predsimpl. iIntros "PQ".
+      iApply Sub.wlp_mono. iModIntro. iMod "PQ". now rewrite trans_refl_r.
+    - destruct m as [(w1 & θ1 & a1)|]; predsimpl. rewrite Sub.wp_impl. predsimpl.
   Qed.
 
 End WithSub.

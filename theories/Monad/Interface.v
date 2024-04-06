@@ -33,10 +33,8 @@ From Em Require Import Sub.Parallel Sub.Prefix.
 
 Import world.notations Pred Pred.notations Pred.proofmode.
 
-#[local] Notation "s [ θ ]" :=
-  (subst s θ)
-    (at level 7, left associativity,
-      format "s [ θ ]").
+#[local] Notation "s [ θ ]" := (subst s θ)
+  (at level 7, left associativity, format "s [ θ ]").
 #[local] Set Implicit Arguments.
 
 Class Pure (M : OType → OType) : Type :=
@@ -50,13 +48,11 @@ Class Fail (M : OType → OType) : Type :=
 #[global] Arguments fail {M _ A w}.
 
 Module MonadNotations.
-  Notation "' x <- ma ;; mb" :=
-    (bind ma (fun _ _ x => mb))
-      (at level 80, x pattern, ma at next level, mb at level 200, right associativity,
+  Notation "' x <- ma ;; mb" := (bind ma (fun _ _ x => mb))
+    (at level 80, x pattern, ma at next level, mb at level 200, right associativity,
         format "' x  <-  ma  ;;  mb").
-  Notation "x <- ma ;; mb" :=
-    (bind ma (fun _ _ x => mb))
-      (at level 80, ma at next level, mb at level 200, right associativity).
+  Notation "x <- ma ;; mb" := (bind ma (fun _ _ x => mb))
+    (at level 80, ma at next level, mb at level 200, right associativity).
 
   Existing Class sub.
   #[export] Existing Instance trans.
@@ -128,13 +124,11 @@ Lemma ax_wp_pick_substitute `{AxiomaticSemantics Θ M, Thick Θ} {lkThickΘ : Lk
     let α := world.fresh w in
     (∃ₚ τ : OTy w, (Q (w ، α) step (oty.evar world.in_zero))[thick α (αIn := world.in_zero) τ]).
 Proof.
-  rewrite ax_wp_pick; cbn. constructor; intros ι.
-  unfold Sub.wp; pred_unfold. split.
+  rewrite ax_wp_pick. constructor; intros ι. unfold Sub.wp; pred_unfold. split.
   - intros (ι' & Heq & HQ). destruct (env.view ι') as [ι' τ].
-    erewrite inst_step_snoc in Heq. subst.
-    exists (lift τ). now rewrite inst_thick inst_lift.
-  - intros (τ & HQ). rewrite inst_thick in HQ.
-    exists (env.snoc ι _ (inst τ ι)).
+    erewrite inst_step_snoc in Heq. subst. exists (lift τ).
+    now rewrite inst_thick inst_lift.
+  - intros (τ & HQ). rewrite inst_thick in HQ. exists (env.snoc ι _ (inst τ ι)).
     now rewrite inst_step_snoc.
 Qed.
 
@@ -187,9 +181,8 @@ Proof.
   - now rewrite ax_wp_pure.
   - now rewrite ax_wp_bind.
   - rewrite ax_wp_equals. iIntros "[#Heq >HQ]". now iSplit.
-  - rewrite ax_wp_pick. rewrite <- (Sub.intro_wp_step τ).
-    iIntros "#H !> #Heq". iMod "H".
-    iSpecialize ("H" $! (oty.evar world.in_zero) with "Heq").
+  - rewrite ax_wp_pick. rewrite <- (Sub.intro_wp_step τ). iIntros "#H !> #Heq".
+    iMod "H". iSpecialize ("H" $! (oty.evar world.in_zero) with "Heq").
     now rewrite trans_refl_r.
   - now rewrite ax_wp_fail.
   - apply ax_wp_mono.
@@ -213,29 +206,17 @@ Lemma wlp_mono' `{TypeCheckLogicM Θ M} {A w} (m : M A w) (P Q : ◻(A ⇢ Pred)
   (WLP m P -∗ ◼(fun _ θ1 => ∀ₚ a1, P _ θ1 a1 -∗ Q _ θ1 a1) -∗ WLP m Q)%P.
 Proof. iIntros "WP PQ". iRevert "WP". now rewrite -wlp_mono. Qed.
 
-Definition wp_diamond {Θ : SUB} {A} :
-  ⊧ Diamond Θ A ⇢ ◻(A ⇢ Pred) ⇢ Pred :=
+Definition wp_diamond {Θ : SUB} {A} : ⊧ Diamond Θ A ⇢ ◻(A ⇢ Pred) ⇢ Pred :=
   fun w '(existT w1 (θ, a)) Q => Sub.wp θ (Q w1 θ a).
 
-Definition wlp_diamond {Θ : SUB} {A} :
-  ⊧ Diamond Θ A ⇢ ◻(A ⇢ Pred) ⇢ Pred :=
+Definition wlp_diamond {Θ : SUB} {A} : ⊧ Diamond Θ A ⇢ ◻(A ⇢ Pred) ⇢ Pred :=
   fun w '(existT w1 (θ, a)) Q => Sub.wlp θ (Q w1 θ a).
 
-Definition wp_option {A w1 w2} :
-  Option A w1 -> (A w1 -> Pred w2) -> Pred w2 :=
-  fun o Q =>
-    match o with
-    | Some a => Q a
-    | None => ⊥ₚ
-    end%P.
+Definition wp_option {A w1 w2} : Option A w1 -> (A w1 -> Pred w2) -> Pred w2 :=
+  fun o Q => match o with Some a => Q a | None => ⊥ₚ end%P.
 
-Definition wlp_option {A w1 w2} :
-  Option A w1 -> (A w1 -> Pred w2) -> Pred w2 :=
-  fun o Q =>
-    match o with
-    | Some a => Q a
-    | None => ⊤ₚ
-    end%P.
+Definition wlp_option {A w1 w2} : Option A w1 -> (A w1 -> Pred w2) -> Pred w2 :=
+  fun o Q => match o with Some a => Q a | None => ⊤ₚ end%P.
 
 Definition Solved (Θ : SUB) (A : OType) : OType := Option (Diamond Θ A).
 Definition Prenex (A : OType) : OType := Solved Prefix (List (OTy * OTy) * A).
@@ -251,11 +232,8 @@ Section Solved.
 
   #[global] Instance params_wp_solved : Params (@wp_solved) 3 := {}.
   #[export] Instance proper_wp_solved_bientails {Θ A w} :
-    Proper
-      (pointwise_relation _
-         (forall_relation
-            (fun _ => pointwise_relation _
-                        (pointwise_relation _ (⊣⊢ₚ))) ==> (⊣⊢ₚ)))
+    Proper (pointwise_relation _ (forall_relation
+      (fun _ => pointwise_relation _ (pointwise_relation _ (⊣⊢ₚ))) ==> (⊣⊢ₚ)))
       (@wp_solved Θ A w).
   Proof.
     intros d p q pq. destruct d as [(w1 & r01 & a)|]; cbn; [|easy].
@@ -263,11 +241,8 @@ Section Solved.
   Qed.
 
   #[export] Instance proper_wp_solved_entails {Θ A w} :
-    Proper
-      (pointwise_relation _
-         (forall_relation
-            (fun _ => pointwise_relation _
-                        (pointwise_relation _ entails)) ==> entails))
+    Proper (pointwise_relation _ (forall_relation
+     (fun _ => pointwise_relation _ (pointwise_relation _ entails)) ==> entails))
       (@wp_solved Θ A w).
   Proof.
     intros d p q pq. destruct d as [(w1 & r01 & a)|]; cbn; [|easy].
@@ -278,23 +253,18 @@ Section Solved.
     (P : ◻(A ⇢ Pred) w) (Q : Pred w) :
     WP m P /\ₚ Q ⊣⊢ₚ WP m (fun w1 θ1 a1 => P w1 θ1 a1 /\ₚ subst Q θ1).
   Proof.
-    destruct m as [(w1 & θ1 & a1)|]; cbn.
-    - now rewrite Sub.and_wp_l.
-    - now rewrite bi.False_and.
+    destruct m as [(w1 & θ1 & a1)|]; cbn;
+      [ rewrite Sub.and_wp_l | rewrite bi.False_and ]; easy.
   Qed.
 
-  #[export] Instance pure_solved {Θ} {reflΘ : Refl Θ} :
-    Pure (Solved Θ) :=
+  #[export] Instance pure_solved {Θ} {reflΘ : Refl Θ} : Pure (Solved Θ) :=
     fun A w a => Some (existT w (refl, a)).
 
-  #[export] Instance bind_solved {Θ} {transΘ : Trans Θ} :
-    Bind Θ (Solved Θ) :=
+  #[export] Instance bind_solved {Θ} {transΘ : Trans Θ} : Bind Θ (Solved Θ) :=
     fun A B w m f =>
-      option.bind m
-        (fun '(existT w1 (θ1,a1)) =>
-           option.bind (f w1 θ1 a1)
-             (fun '(existT w2 (θ2,b2)) =>
-                Some (existT w2 (trans θ1 θ2, b2)))).
+      option.bind m (fun '(existT w1 (θ1,a1)) =>
+      option.bind (f w1 θ1 a1) (fun '(existT w2 (θ2,b2)) =>
+      Some (existT w2 (trans θ1 θ2, b2)))).
 
   #[export] Instance fail_solved {Θ} : Fail (Solved Θ) :=
     fun A w => None.
@@ -341,28 +311,21 @@ Proof. destruct m as [(w' & θ & a)|]; cbn; now rewrite ?Sub.wp_hmap. Qed.
 (*   @lift_insert *)
 (*   : wpeq. *)
 
+Goal False. Proof.
 Ltac wpeq :=
   progress
-    (try done;
-     try progress cbn;
+    (try done; try progress cbn;
      (* Unfortunately, autorewrite and rewrite strategy blow up with some long
         typeclass searches. Simply use rewrite for now. *)
-     rewrite ?(@subst_eq OEnv _ _ _ _)
-       ?(@subst_eq OTy _ _ _ _)
-       ?(@subst_trans OEnv _ _)
-       ?(@subst_trans OTy _ _)
-       ?@subst_lift
-       ?@lift_insert;
+     rewrite ?@subst_lift ?@lift_insert ?(@subst_eq OEnv _ _ _ _)
+       ?(@subst_eq OTy _ _ _ _) ?(@subst_trans OEnv _ _) ?(@subst_trans OTy _ _);
      try done;
      try match goal with
-       | |- environments.envs_entails _
-              (eqₚ ?x ?x) =>
+       | |- environments.envs_entails _ (eqₚ ?x ?x) =>
            iApply eqₚ_intro
-       | |- environments.envs_entails _
-              (eqₚ (insert ?x _ _) (insert ?x _ _)) =>
+       | |- environments.envs_entails _ (eqₚ (insert ?x _ _) (insert ?x _ _)) =>
            iApply eqₚ_insert; iSplit
-       end;
-     auto 1 with typeclass_instances;
+       end; auto 1 with typeclass_instances;
      try (iStopProof; pred_unfold;
           intuition (subst; auto; fail))).
 
@@ -371,39 +334,29 @@ Ltac wpsimpl :=
   | |- context[fun w : World => prod (?A w) (?B w)] =>
       change_no_check (fun w : World => prod (A w) (B w)) with (Prod A B)
 
-  | |- environments.envs_entails _ (bi_impl _ _) =>
-      iIntros "#?"
-  | |- environments.envs_entails _ (bi_affinely _) =>
-      iModIntro
-  | |- environments.envs_entails _ (bi_and _ _) =>
-      iSplit
-  | |- environments.envs_entails _ (eqₚ _ _) =>
-      wpeq
-  | |- environments.envs_entails _ (bi_pure True) =>
-      done
+  | |- environments.envs_entails _ (bi_impl _ _) => iIntros "#?"
+  | |- environments.envs_entails _ (bi_affinely _) => iModIntro
+  | |- environments.envs_entails _ (bi_and _ _) => iSplit
+  | |- environments.envs_entails _ (eqₚ _ _) => wpeq
+  | |- environments.envs_entails _ (bi_pure True) => done
   | |- environments.envs_entails _ (WP (pure _) _) =>
       rewrite -wp_pure ?trans_refl_r ?trans_refl_r ?subst_refl
       (* try (iStopProof; pred_unfold; intuition (subst; auto; fail)) *)
-  | |- environments.envs_entails _ (WP (bind _ _) _) =>
-      iApply wp_bind
+  | |- environments.envs_entails _ (WP (bind _ _) _) => iApply wp_bind
   | |- environments.envs_entails _ (WP pick _) =>
       rewrite -wp_pick; iIntros (?w ?θ) "!>"; iIntros (?τ) "#?"
   | |- environments.envs_entails _ (WP (equals _ _) _) =>
       rewrite -wp_equals; iSplit;
       [ iStopProof; pred_unfold; intuition (subst; auto; fail)
-      | iIntros (?w ?θ) "!>"
-      ]
-  | |- environments.envs_entails _ (WP fail _) =>
-      rewrite -wp_fail
-
+      | iIntros (?w ?θ) "!>" ]
+  | |- environments.envs_entails _ (WP fail _) => rewrite -wp_fail
   | |- environments.envs_entails _ (WLP (pure _) _) =>
       rewrite -wlp_pure ?trans_refl_r ?trans_refl_r ?subst_refl
-  | |- environments.envs_entails _ (WLP (bind _ _) _) =>
-      rewrite -wlp_bind
+  | |- environments.envs_entails _ (WLP (bind _ _) _) => rewrite -wlp_bind
   | |- environments.envs_entails _ (WLP pick _) =>
       rewrite -wlp_pick; iIntros (?w ?θ) "!>"; iIntros (?τ)
   | |- environments.envs_entails _ (WLP (equals _ _) _) =>
       rewrite -wlp_equals; iIntros "#?" (?w ?θ) "!>"
-  | |- environments.envs_entails _ (WLP fail _) =>
-      rewrite -wlp_fail
+  | |- environments.envs_entails _ (WLP fail _) => rewrite -wlp_fail
   end.
+Abort.

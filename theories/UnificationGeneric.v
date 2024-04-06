@@ -88,15 +88,6 @@ Section RemoveAcc.
       | world.snoc w b => remove_acc_step (all w)
       end.
 
-  (* Calculating the full predicate is costly. It has quadratic running
-     time in the size of the context. It's better to keep this opaque and
-     not unfold it. To prevent computation from being blocked, clients of
-     this code should never pattern match on a witness of the predicate
-     directly and instead use [remove_acc_inv] in the recursive call. The
-     standard library uses the same style and for examples defines [Fix_F]
-     for well-founded induction using [Acc_inv] for recursive calls. *)
-  #[global] Opaque remove_acc_all.
-
   Definition loeb {A : World → Type} : (⊧ ▷A ⇢ A) → (⊧ A) :=
     fun step w => remove_acc_rect step (remove_acc_all w).
 

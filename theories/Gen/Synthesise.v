@@ -34,10 +34,8 @@ Import Pred Pred.notations Pred.proofmode world.notations.
 
 Set Implicit Arguments.
 
-#[local] Notation "s [ ζ ]" :=
-  (subst s ζ)
-    (at level 7, left associativity,
-      format "s [ ζ ]").
+#[local] Notation "s [ ζ ]" := (subst s ζ)
+  (at level 7, left associativity, format "s [ ζ ]").
 
 Section Generator.
   Import MonadNotations.
@@ -78,9 +76,7 @@ Section Generator.
           pure (t2[_], oexp.app e1'[_] e2'[_])
       end.
 
-  Import Pred Pred.notations.
-  Import Pred.proofmode.
-  Import iris.proofmode.tactics.
+  Import Pred Pred.notations Pred.proofmode iris.proofmode.tactics.
   Open Scope pred_scope.
 
   Context {wpM : WeakestPre Θ M} {wlpM : WeakestLiberalPre Θ M}
@@ -104,14 +100,26 @@ Section Generator.
         intuition (subst; econstructor; eauto; fail)
     end.
   Ltac wlpauto := repeat (repeat wpsimpl; try wlpindhyp).
+  Ltac wpindhyp :=
+    match goal with
+    | IH: forall _ G,
+        bi_emp_valid (bi_impl _ (WP (generate ?e G) _))
+      |- environments.envs_entails _ (WP (generate ?e ?G) _) =>
+        iPoseProof (IH _ G with "[]") as "-#IH"; clear IH;
+        [| iApply (wp_mono' with "IH");
+           iIntros (?w ?θ) "!>";
+           iIntros ((?t & ?e')) "(#? & #?)"
+        ]
+    end.
+  Ltac wpauto := repeat (repeat wpsimpl; try wpindhyp).
   Abort.
 
   Lemma generate_sound_aux e :
     ∀ w (G : OEnv w),
       ⊢ WLP (generate e G) (fun _ θ '(t,ee) => G[θ] |--ₚ e; t ~> ee).
+    (*
   Proof with
     iStopProof; pred_unfold; intuition (subst; econstructor; eauto; fail).
-
     induction e; cbn; intros w G; iStartProof.
     - destruct lookup eqn:HGx; wlpauto.
       iStopProof; pred_unfold. constructor. now rewrite lookup_inst HGx.
@@ -182,7 +190,8 @@ Section Generator.
       iStopProof. pred_unfold.
       (* Use the typing rule of the closed typing relation. *)
       intuition (subst; econstructor; eauto; fail).
-  Restart.
+  *)
+  Proof.
     induction e; cbn; intros w G; iStartProof; wlpauto.
     destruct lookup eqn:HGx; wlpauto. iStopProof; pred_unfold.
     constructor. now rewrite lookup_inst HGx.
@@ -196,21 +205,6 @@ Section Generator.
     iIntros "%w1 %θ1 !>" ([t e']) "HT". iStopProof; pred_unfold.
     intros HT [Heq1 Heq2]. now subst.
   Qed.
-
-  Goal False. Proof.
-  Ltac wpindhyp :=
-    match goal with
-    | IH: forall _ G,
-        bi_emp_valid (bi_impl _ (WP (generate ?e G) _))
-      |- environments.envs_entails _ (WP (generate ?e ?G) _) =>
-        iPoseProof (IH _ G with "[]") as "-#IH"; clear IH;
-        [| iApply (wp_mono' with "IH");
-           iIntros (?w ?θ) "!>";
-           iIntros ((?t & ?e')) "(#? & #?)"
-        ]
-    end.
-  Ltac wpauto := repeat (repeat wpsimpl; try wpindhyp).
-  Abort.
 
   Lemma generate_complete_aux {G e t ee} (T : G |-- e ∷ t ~> ee) :
     ∀ w0 (G0 : OEnv w0), ⊢ lift G =ₚ G0 →

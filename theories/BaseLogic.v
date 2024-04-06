@@ -40,33 +40,25 @@ Import world.notations.
 #[local] Arguments step : simpl never.
 #[local] Arguments thick : simpl never.
 
-#[local] Notation "Q [ θ ]" :=
-  (fun _ θ' => Q _ (θ ⊙ θ'))
-    (at level 8, left associativity,
-      format "Q [ θ ]") : box_scope.
+#[local] Notation "Q [ θ ]" := (fun _ θ' => Q _ (θ ⊙ θ'))
+  (at level 8, left associativity, format "Q [ θ ]") : box_scope.
 
 Declare Scope pred_scope.
 Delimit Scope pred_scope with P.
 
-#[local] Notation "P [ θ ]" :=
-  (subst P θ)
-    (at level 8, left associativity,
-      format "P [ θ ]") : pred_scope.
+#[local] Notation "P [ θ ]" := (subst P θ)
+  (at level 8, left associativity, format "P [ θ ]") : pred_scope.
 
 Module Pred.
 
-
-  Definition Pred (w : World) : Type :=
-    Assignment w -> Prop.
+  Definition Pred (w : World) : Type := Assignment w -> Prop.
   Bind Scope pred_scope with Pred.
 
   Section Definitions.
 
-    Definition eqₚ {T : OType} {A : Type} {instTA : Inst T A} :
-      ⊧ T ⇢ T ⇢ Pred :=
+    Definition eqₚ {T : OType} {A : Type} {instTA : Inst T A} : ⊧ T ⇢ T ⇢ Pred :=
       fun w t1 t2 ι => inst t1 ι = inst t2 ι.
     #[global] Arguments eqₚ {T A _} [w] _ _ _/.
-
     Definition TPB : ⊧ OEnv ⇢ Const Exp ⇢ OTy ⇢ OExp ⇢ Pred :=
       fun w G e t ee ι => inst G ι |-- e ∷ inst t ι ~> inst ee ι.
     #[global] Arguments TPB [w] G e t ee ι/.
@@ -168,15 +160,12 @@ Module Pred.
 
   Module Import notations.
 
-    Import iris.bi.interface.
-    Import iris.bi.derived_connectives.
+    Import iris.bi.interface iris.bi.derived_connectives.
 
-    Notation "P ⊣⊢ₚ Q" :=
-      (@equiv (bi_car (@bi_pred _)) (@pred_equiv _) P%P Q%P)
-        (at level 95).
-    Notation "(⊣⊢ₚ)" :=
-      (@equiv (bi_car (@bi_pred _)) (@pred_equiv _))
-        (only parsing).
+    Notation "P ⊣⊢ₚ Q" := (@equiv (bi_car (@bi_pred _)) (@pred_equiv _) P%P Q%P)
+      (at level 95).
+    Notation "(⊣⊢ₚ)" := (@equiv (bi_car (@bi_pred _)) (@pred_equiv _))
+      (only parsing).
 
     Notation "P ⊢ₚ Q" := (@bi_entails (@bi_pred _) P%P Q%P) (at level 95).
     Notation "(⊢ₚ)" := (@bi_entails (@bi_pred _)) (only parsing).
@@ -222,18 +211,13 @@ Module Pred.
 
   Create HintDb punfold.
   #[export] Hint Rewrite bientails_unfold entails_unfold sep_unfold wand_unfold
-    intuitionistically_unfold
-    (@inst_subst OEnv Env _ _ _)
-    (@inst_subst OExp Exp _ _ _)
-    (@inst_subst OTy Ty _ _ _)
-    (@inst_lift OEnv Env _ _ _)
-    (@inst_lift OExp Exp _ _ _)
-    (@inst_lift OTy Ty _ _ _)
-    (@inst_thin Par _ Par.lk_thin_par)
-    @inst_refl @inst_trans @inst_insert
-    @Open.inst_pure
-    @oexp.inst_var @oexp.inst_true @oexp.inst_false @oexp.inst_ifte @oexp.inst_absu
-    @oexp.inst_abst @oexp.inst_app : punfold.
+    intuitionistically_unfold (@inst_subst OEnv Env _ _ _)
+    (@inst_subst OExp Exp _ _ _) (@inst_subst OTy Ty _ _ _)
+    (@inst_lift OEnv Env _ _ _) (@inst_lift OExp Exp _ _ _)
+    (@inst_lift OTy Ty _ _ _) (@inst_thin Par _ Par.lk_thin_par)
+    @inst_refl @inst_trans @inst_insert @Open.inst_pure
+    @oexp.inst_var @oexp.inst_true @oexp.inst_false @oexp.inst_ifte
+    @oexp.inst_absu @oexp.inst_abst @oexp.inst_app : punfold.
 
   Ltac punfold_connectives :=
     change (@interface.bi_and (@bi_pred _) ?P ?Q ?ι) with (P ι /\ Q ι) in *;
@@ -272,8 +256,7 @@ Module Pred.
 
   Section Lemmas.
 
-    Import iris.bi.interface.
-
+    Import iris.bi.interface iris.bi.derived_laws.bi.
     Create HintDb obligation.
     #[local] Hint Rewrite @inst_refl @inst_trans : obligation.
 
@@ -303,14 +286,9 @@ Module Pred.
       (@subst Pred Pred.subst_pred Θ w).
     Proof. obligation. Qed.
 
-    Lemma split_bientails {w} (P Q : Pred w) :
-      (P ⊣⊢ₚ Q) <-> (P ⊢ₚ Q) /\ (Q ⊢ₚ P).
+    Lemma split_bientails {w} (P Q : Pred w) : (P ⊣⊢ₚ Q) <-> (P ⊢ₚ Q) /\ (Q ⊢ₚ P).
     Proof. obligation. Qed.
     Lemma impl_and_adjoint {w} (P Q R : Pred w) : (P /\ₚ Q ⊢ₚ R) <-> (P ⊢ₚ Q ->ₚ R).
-    Proof. obligation. Qed.
-    Lemma and_comm {w} (P Q : Pred w) : P /\ₚ Q  ⊣⊢ₚ  Q /\ₚ P.
-    Proof. obligation. Qed.
-    Lemma and_assoc {w} (P Q R : Pred w) : (P /\ₚ Q) /\ₚ R  ⊣⊢ₚ  P /\ₚ (Q /\ₚ R).
     Proof. obligation. Qed.
     Lemma and_true_l {w} (P : Pred w) : ⊤ₚ /\ₚ P ⊣⊢ₚ P.
     Proof. obligation. Qed.
@@ -350,16 +328,13 @@ Module Pred.
     Proof. obligation; firstorder. Qed.
     #[global] Arguments exists_r {I w P Q} _.
 
-    Lemma wand_is_impl [w] (P Q : Pred w) :
-      (P -∗ Q)%I ⊣⊢ₚ (P ->ₚ Q).
+    Lemma wand_is_impl [w] (P Q : Pred w) : (P -∗ Q)%I ⊣⊢ₚ (P ->ₚ Q).
     Proof. obligation. Qed.
 
-    Lemma pApply {w} {P Q R : Pred w} :
-      P ⊢ₚ Q -> Q ⊢ₚ R -> P ⊢ₚ R.
+    Lemma pApply {w} {P Q R : Pred w} : P ⊢ₚ Q -> Q ⊢ₚ R -> P ⊢ₚ R.
     Proof. now transitivity Q. Qed.
 
-    Lemma pApply_r {w} {P Q R : Pred w} :
-      Q ⊢ₚ R -> P ⊢ₚ Q -> P ⊢ₚ R.
+    Lemma pApply_r {w} {P Q R : Pred w} : Q ⊢ₚ R -> P ⊢ₚ Q -> P ⊢ₚ R.
     Proof. now transitivity Q. Qed.
 
     Section Eq.
@@ -458,6 +433,7 @@ Module Pred.
   End Lemmas.
 
   Module Sub.
+    Import iris.bi.interface iris.bi.derived_laws.bi.
     Import (hints) Par.
     Section WithSubstitution.
       Context {Θ : SUB}.
@@ -517,7 +493,7 @@ Module Pred.
 
       Lemma and_wp_r {w0 w1} (θ : Θ w0 w1) (P : Pred w0) (Q : Pred w1) :
         P /\ₚ wp θ Q ⊣⊢ₚ wp θ (subst P θ /\ₚ Q).
-      Proof. now rewrite and_comm, and_wp_l, and_comm. Qed.
+      Proof. now rewrite and_comm and_wp_l and_comm. Qed.
 
       Lemma wp_thick {thickΘ : Thick Θ} {lkThickΘ : LkThick Θ}
         {w α} (αIn : world.In α w) (t : OTy (w - α)) (Q : Pred (w - α)) :
@@ -525,9 +501,9 @@ Module Pred.
       Proof.
         unfold wp; pred_unfold. intros ι. split.
         - intros (ι1 & Heq & HQ). subst.
-          now rewrite inst_thick, env.remove_insert, env.lookup_insert.
+          now rewrite inst_thick env.remove_insert env.lookup_insert.
         - intros [Heq HQ]. exists (env.remove α ι αIn).
-          now rewrite inst_thick, <- Heq, env.insert_remove.
+          now rewrite inst_thick -Heq env.insert_remove.
       Qed.
 
       Lemma wlp_refl {reflΘ : Refl Θ} {lkreflΘ : LkRefl Θ}
@@ -551,13 +527,13 @@ Module Pred.
         wlp θ ⊤ₚ ⊣⊢ₚ ⊤ₚ.
       Proof. firstorder. Qed.
 
-      Lemma wlp_and {w0 w1} (θ : Θ w0 w1) P Q :
-        wlp θ P /\ₚ wlp θ Q ⊣⊢ₚ wlp θ (P /\ₚ Q).
-      Proof. firstorder. Qed.
+      (* Lemma wlp_and {w0 w1} (θ : Θ w0 w1) P Q : *)
+      (*   wlp θ P /\ₚ wlp θ Q ⊣⊢ₚ wlp θ (P /\ₚ Q). *)
+      (* Proof. firstorder. Qed. *)
 
-      Lemma wp_or {w0 w1} (θ : Θ w0 w1) P Q :
-        wp θ P \/ₚ wp θ Q ⊣⊢ₚ wp θ (P \/ₚ Q).
-      Proof. firstorder. Qed.
+      (* Lemma wp_or {w0 w1} (θ : Θ w0 w1) P Q : *)
+      (*   wp θ P \/ₚ wp θ Q ⊣⊢ₚ wp θ (P \/ₚ Q). *)
+      (* Proof. firstorder. Qed. *)
 
       Lemma wp_mono {w0 w1} (θ : Θ w0 w1) P Q:
         wlp θ (interface.bi_wand P Q) ⊢ₚ interface.bi_wand (wp θ P) (wp θ Q).
@@ -580,8 +556,7 @@ Module Pred.
       Proof.
         unfold wp; pred_unfold. split; intros HPQ.
         - intros ι0 (ι1 & <- & HP). now apply HPQ.
-        - intros ι1 HP. apply (HPQ (inst θ ι1)).
-          exists ι1. split; auto.
+        - intros ι1 HP. apply (HPQ (inst θ ι1)). exists ι1. split; auto.
       Qed.
 
       Lemma wp_impl {w0 w1} (θ1 : Θ w0 w1) (P : Pred _) (Q : Pred _) :
@@ -596,9 +571,9 @@ Module Pred.
         subst (wlp θ P) θ ⊢ₚ P.
       Proof. firstorder. Qed.
 
-      Lemma subst_wp {w0 w1} {θ : Θ w0 w1} (P : Pred w1) :
-        P ⊢ₚ subst (wp θ P) θ.
-      Proof. firstorder. Qed.
+      (* Lemma subst_wp {w0 w1} {θ : Θ w0 w1} (P : Pred w1) : *)
+      (*   P ⊢ₚ subst (wp θ P) θ. *)
+      (* Proof. firstorder. Qed. *)
 
       Lemma wlp_frame {w0 w1} (θ : Θ w0 w1) (P : Pred _) (Q : Pred _) :
         P ->ₚ wlp θ Q ⊣⊢ₚ wlp θ (subst P θ ->ₚ Q).
@@ -617,9 +592,8 @@ Module Pred.
       (subst P step ⊢ₚ lift t =ₚ @oty.evar _ α world.in_zero ->ₚ Q) ->
       (P ⊢ₚ wp (step (Θ := Θ)) Q).
     Proof.
-      pred_unfold. intros H ι HP. set (ι1 := env.snoc ι α t).
-      exists ι1. specialize (H ι1). rewrite inst_step in *; cbn in *.
-      intuition.
+      pred_unfold. intros H ι HP. set (ι1 := env.snoc ι α t). exists ι1.
+      specialize (H ι1). rewrite inst_step in H |- *; cbn in *. intuition.
     Qed.
 
     (* Better for iris proof mode. *)
@@ -628,9 +602,9 @@ Module Pred.
       wlp step (lift t =ₚ oty.evar world.in_zero ->ₚ Q) ⊢ₚ wp (step (Θ := Θ)) Q.
     Proof. apply (intro_wp_step' t). now rewrite subst_wlp. Qed.
 
-    Lemma wp_split  {Θ : SUB} [w0 w1] (θ : Θ w0 w1) P :
-      wp θ ⊤ₚ /\ₚ wlp θ P ⊢ₚ wp θ P.
-    Proof. now rewrite and_wp_l, subst_wlp, and_true_l. Qed.
+    (* Lemma wp_split  {Θ : SUB} [w0 w1] (θ : Θ w0 w1) P : *)
+    (*   wp θ ⊤ₚ /\ₚ wlp θ P ⊢ₚ wp θ P. *)
+    (* Proof. now rewrite and_wp_l, subst_wlp, and_true_l. Qed. *)
 
     Lemma wp_hmap `{LkHMap Θ1 Θ2} [w0 w1] (θ : Θ1 w0 w1) P :
       wp (hmap θ) P ⊣⊢ₚ wp θ P.
@@ -650,13 +624,10 @@ Module Pred.
 
   Definition PBox {Θ} : ⊧ Box Θ Pred ⇢ Pred :=
     fun w Q => (∀ₚ w' (θ : Θ w w'), Sub.wlp θ (Q w' θ))%P.
-  Notation "◼ Q" :=
-    (PBox Q%B)
-      (at level 9, right associativity, format "◼ Q").
+  Notation "◼ Q" := (PBox Q%B) (at level 9, right associativity, format "◼ Q").
 
   Section InstPred.
-    Import iris.bi.derived_laws.
-    Import iris.bi.interface.
+    Import iris.bi.derived_laws iris.bi.interface.
 
     (* A type class for things that can be interpreted as a predicate. *)
     Class InstPred (A : OType) :=
@@ -685,7 +656,7 @@ Module Pred.
     Proof.
       induction xs; cbn.
       - now rewrite and_true_l.
-      - rewrite Pred.and_assoc. now apply bi.and_proper.
+      - rewrite -bi.and_assoc. now apply bi.and_proper.
     Qed.
 
     Class InstPredSubst A {ipA : InstPred A} {subA : Subst A} :=
@@ -844,55 +815,24 @@ Module Pred.
   Import (hints) Par.
 
   Create HintDb predsimpl.
-  #[export] Hint Rewrite
-    (@subst_eq OEnv _ _ _ _)
-    (@subst_eq OTy _ _ _ _)
-    (@subst_refl OEnv _ _)
-    (@subst_refl OTy _ _)
-    (@subst_trans OEnv _ _)
-    (@subst_trans OTy _ _)
-    @Sub.wlp_refl
-    @Sub.wlp_trans
-    @Sub.wlp_true
-    @Sub.wp_false
-    @Sub.wp_refl
-    @Sub.wp_trans
-    @and_false_l
-    @and_false_r
-    @and_true_l
-    @and_true_r
-    @eq_func
-    @eqₚ_refl
-    @impl_and
-    @impl_false_l
-    @impl_true_l
-    @impl_true_r
-    @lk_refl
-    @lk_step
-    @lk_trans
-    @subst_and
-    @subst_false
-    @subst_pred_refl
-    @subst_pred_trans
-    @subst_tpb
-    @subst_true
-    @trans_refl_r
+  #[export] Hint Rewrite (@subst_eq OEnv _ _ _ _) (@subst_eq OTy _ _ _ _)
+    (@subst_refl OEnv _ _) (@subst_refl OTy _ _) (@subst_trans OEnv _ _)
+    (@subst_trans OTy _ _) @Sub.wlp_refl @Sub.wlp_trans @Sub.wlp_true
+    @Sub.wp_false @Sub.wp_refl @Sub.wp_trans @and_false_l @and_false_r
+    @and_true_l @and_true_r @eq_func @eqₚ_refl @impl_and @impl_false_l
+    @impl_true_l @impl_true_r @lk_refl @lk_step @lk_trans @subst_and @subst_false
+    @subst_pred_refl @subst_pred_trans @subst_tpb @subst_true @trans_refl_r
     : predsimpl.
-
   Ltac predsimpl :=
     repeat
       (try (progress cbn); unfold _4;
        change_no_check (@gmap.gmap string _ _ (OTy ?w)) with (OEnv w) in *;
        repeat
          match goal with
-         | |- Sub.wp ?θ _ ⊣⊢ₚ Sub.wp ?θ _ =>
-             apply Sub.proper_wp_bientails
-         | |- Sub.wlp ?θ _ ⊣⊢ₚ Sub.wlp ?θ _ =>
-             apply Sub.proper_wlp_bientails
+         | |- Sub.wp ?θ _ ⊣⊢ₚ Sub.wp ?θ _ => apply Sub.proper_wp_bientails
+         | |- Sub.wlp ?θ _ ⊣⊢ₚ Sub.wlp ?θ _ => apply Sub.proper_wlp_bientails
          end;
-       try easy;
-       repeat rewrite_db predsimpl;
-       auto 1 with typeclass_instances;
+       try easy; repeat rewrite_db predsimpl; auto 1 with typeclass_instances;
        repeat
          match goal with
          | |- context[@subst ?A ?I ?Θ ?w0 ?x ?w1 ?θ] =>

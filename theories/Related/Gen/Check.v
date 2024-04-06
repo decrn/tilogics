@@ -28,72 +28,56 @@
 
 Require Import Coq.Classes.RelationClasses.
 From iris Require Import proofmode.tactics.
-From Em Require Import BaseLogic Prefix Spec.
-From Em Require Import Related.Monad.Interface.
+From Em Require Import BaseLogic Prefix Spec Related.Monad.Interface.
+Require Import Em.Shallow.Gen.Check Em.Gen.Check.
 
-Require Em.Monad.Free Em.Shallow.Monad.Free.
-
-Module D := Em.Monad.Free.
-Module S := Em.Shallow.Monad.Free.
-
-Import (hints) D S.
-
-Import Pred Pred.notations Pred.Sub Pred.proofmode world.notations.
+Import Pred Pred.notations Pred.proofmode lr lr.notations.
 
 #[local] Set Implicit Arguments.
 
-Import lr lr.notations.
+Section Relatedness.
 
-Section Relation.
-  Context (DA : OType) (SA : Type) (RA : Rel DA SA).
+  Context `{RTypeCheckLogicM DM SM}.
 
-  Fixpoint RawFree [w] (d : D.Free DA w) (s : S.Free SA) {struct d} : Pred w :=
-    match d , s with
-    | D.Ret d            , S.Ret s            =>
-        RSat RA d s
-    | D.Fail             , S.Fail             =>
-        True
-    | D.Equalsk d1 d2 dk , S.Equalsk s1 s2 sk =>
-        RSat RTy d1 s1 ∧ RSat RTy d2 s2 ∧ RawFree dk sk
-    | D.Pickk α k        , S.Pickk f          =>
-        wlp step (∀ τ : Ty, eqₚ (lift τ) (oty.evar world.in_zero) -∗ RawFree k (f τ))
-    | _           , _         => False
-    end%I.
+  Goal False. Proof.
+  Ltac relih :=
+    match goal with
+    | IH: RValid _ (Em.Gen.Check.check ?e) (Em.Shallow.Gen.Check.check ?e) |-
+        environments.envs_entails _ (RSat (RM _) (Em.Gen.Check.check ?e _ _) (Em.Shallow.Gen.Check.check ?e _ _)) =>
+        iApply IH
+    end.
+  Ltac relauto :=
+    repeat first [iAssumption|relstep|relih];
+    try (iStopProof; pred_unfold; cbv [RSat RInst RExp RTy];
+         pred_unfold; now intuition subst).
+  Abort.
 
-  #[export] Instance RFree : Rel (D.Free DA) (S.Free SA) :=
-    MkRel RawFree.
+  Lemma relatedness_of_generators (e : Exp) :
+    ℛ⟦REnv ↣ RTy ↣ RM RExp⟧ (Em.Gen.Check.check e) (Em.Shallow.Gen.Check.check e).
+  Proof.
+    induction e; iIntros (w dΓ sΓ) "#rΓ"; iIntros (dτ sτ) "#rτ"; cbn; relauto.
+    iPoseProof (rlookup x with "rΓ") as "rlk".
+    destruct (dΓ !! x), (sΓ !! x); relauto.
+  Qed.
 
-End Relation.
+  Lemma relatedness_of_algo_typing :
+    ℛ⟦REnv ↣ RConst Exp ↣ RTy ↣ RExp ↣ RPred⟧
+      (TPB_algo (M := DM))
+      (tpb_algorithmic (M := SM)).
+  Proof.
+    unfold RValid, TPB_algo, tpb_algorithmic. cbn.
+    iIntros (w) "%dΓ %sΓ #rΓ %e %se %re %dτ %sτ #rτ %de1 %se1 #re2". subst se.
+    iApply RWP. iApply relatedness_of_generators; auto.
+    iIntros "%w1 %θ1 !>". iIntros (de' se') "#re'".
+    iApply req; auto.
+  Qed.
 
-#[export] Instance rtcmfree : RTypeCheckM D.Free S.Free RFree.
-Proof.
-  constructor; try easy.
-  - intros DA DB SA SB RA RB w.
-    apply bi.forall_intro. intros da.
-    induction da; iIntros "_ %sa ra %df %sf #rf";
-      destruct sa; cbn - [thick]; auto.
-    + iMod "rf". now iApply "rf".
-    + iDestruct "ra" as "(#r1 & #r2 & #rk)". repeat iSplit; auto.
-      iApply IHda; auto.
-    + iApply (wlp_mono with "[] ra"). iIntros "!> #ra %t #Heq".
-      iApply IHda; auto. now iApply "ra".
-  - constructor; cbn. pred_unfold.
-Qed.
+  Lemma generate_correct_logrel `{!Shallow.Monad.Interface.TypeCheckLogicM SM}
+    {w} (Γ : OEnv w) (e : Exp) (τ : OTy w) (e' : OExp w) :
+    TPB_algo (Θ := Prefix) (M := DM) Γ e τ e' ⊣⊢ₚ Γ |--ₚ e; τ ~> e'.
+  Proof.
+    constructor. intros ι. simpl. rewrite check_correct.
+    now apply relatedness_of_algo_typing.
+  Qed.
 
-#[export] Instance rtclogicmfree : RTypeCheckLogicM D.Free S.Free RFree rtcmfree.
-Proof.
-  constructor.
-  - intros DA SA RA w. cbn.
-    apply bi.forall_intro; intros da.
-    apply bi.forall_intro; intros sa. revert w da.
-    induction sa; intros w []; cbn; try easy.
-    + iIntros "_ ra %DQ %SQ RQ". iMod "RQ". now iApply "RQ".
-    + iIntros "_ (#r1 & #r2 & #rk) %DQ %SQ RQ".
-      iApply rand; [ by iApply req | by iApply IHsa ].
-    + iIntros "_ #rk %DQ %SQ RQ".
-      iApply rwpstep. iIntros "!> %τ #Heq".
-      iApply H. auto. now iApply "rk".
-      iIntros (? ?) "!> %da %sa #ra". iMod "RQ".
-      iSpecialize ("RQ" $! da sa with "ra").
-      now rewrite trans_refl_r.
-Qed.
+End Relatedness.

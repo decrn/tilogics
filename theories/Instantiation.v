@@ -245,8 +245,7 @@ Lemma inst_insert {w} (Γ : OEnv w) (x : string) (t : OTy w) (ι : Assignment w)
   inst (insert (M := OEnv w) x t Γ) ι = inst Γ ι ,, x ∷ inst t ι.
 Proof. cbv [inst inst_env OEnv]. now rewrite fmap_insert. Qed.
 
-Lemma inst_empty {w} (ι : Assignment w) :
-  inst (A := OEnv) empty ι = empty.
+Lemma inst_empty {w} (ι : Assignment w) : inst (A := OEnv) empty ι = empty.
 Proof. cbv [inst inst_env OEnv]. now rewrite fmap_empty. Qed.
 
 Lemma lift_insert {w x t Γ} :

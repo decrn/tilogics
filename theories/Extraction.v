@@ -26,42 +26,18 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Coq Require Import
-  extraction.ExtrHaskellBasic
-  extraction.ExtrHaskellNatInt
-  extraction.ExtrHaskellString
-  Bool.Bool.
+From Coq Require Import ExtrHaskellBasic ExtrHaskellNatInt ExtrHaskellString Bool.
 From Em Require Import Composition.
 
 Extraction Language Haskell.
-Extraction Inline
-  Bool.Bool.iff_reflect
-  Environment.env.view
-  Init.Datatypes.nat_rec
-  Init.Logic.False_rec
-  Init.Logic.and_rec
-  Init.Logic.and_rect
-  Init.Logic.eq_rec_r
-  Init.Specif.sumbool_rec
-  Init.Specif.sumbool_rect
-  Unification.atrav
-  Unification.flex
-  UnificationGeneric.loeb
-  UnificationGeneric.remove_acc_rect
-  Unification.varview
-  Worlds.Box
-  Worlds.Impl
-  Worlds.Impl
-  Worlds.Valid
-  Worlds.lk
-  Worlds._4
-  Worlds.world.view
-  stdpp.base.empty
-  stdpp.base.insert
-  stdpp.base.fmap
-  stdpp.base.decide_rel
-  stdpp.gmap.gmap_fmap
-  stdpp.option.option_fmap.
+Extraction Inline Bool.Bool.iff_reflect Environment.env.view
+  Init.Datatypes.nat_rec Init.Logic.False_rec Init.Logic.and_rec
+  Init.Logic.and_rect Init.Logic.eq_rec_r Init.Specif.sumbool_rec
+  Init.Specif.sumbool_rect Unification.atrav Unification.flex
+  UnificationGeneric.loeb UnificationGeneric.remove_acc_rect Unification.varview
+  Worlds.Box Worlds.Impl Worlds.Impl Worlds.Valid Worlds.lk Worlds._4
+  Worlds.world.view stdpp.base.empty stdpp.base.insert stdpp.base.fmap
+  stdpp.base.decide_rel stdpp.gmap.gmap_fmap stdpp.option.option_fmap.
 
 Extract Inductive reflect => "Prelude.Bool" [ "Prelude.True" "Prelude.False" ].
 Extract Inlined Constant Init.Datatypes.fst => "Prelude.fst".

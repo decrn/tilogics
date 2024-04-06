@@ -93,22 +93,18 @@ Module Par.
 
   #[export] Instance refltrans_par : ReflTrans Par.
   Proof.
-    constructor.
-    - intros. apply env.lookup_extensional. intros. foldlk.
-      now rewrite lk_trans, lk_refl.
-    - intros. apply env.lookup_extensional. intros. foldlk.
-      now rewrite lk_trans, subst_refl.
-    - intros. apply env.lookup_extensional. intros. foldlk.
-      now rewrite ?lk_trans, subst_trans.
+    constructor; intros; apply env.lookup_extensional; intros; foldlk.
+    - now rewrite lk_trans, lk_refl.
+    - now rewrite lk_trans, subst_refl.
+    - now rewrite ?lk_trans, subst_trans.
   Qed.
 
   Lemma comp_thin_thick {w α} (αIn : α ∈ w) (s : OTy (w - α)) :
     trans (thin α) (thick α s) = refl.
   Proof.
     apply env.lookup_extensional. intros β βIn. foldlk.
-    rewrite lk_trans, lk_refl, lk_thin. cbn. foldlk.
-    rewrite lk_thick. unfold thickIn.
-    now rewrite world.occurs_check_view_thin.
+    rewrite lk_trans, lk_refl, lk_thin. cbn. foldlk. rewrite lk_thick.
+    unfold thickIn. now rewrite world.occurs_check_view_thin.
   Qed.
 
   Lemma thin_thick_pointful {w α} (αIn : α ∈ w) (s : OTy (w - α)) (t : OTy (w - α)) :
@@ -120,8 +116,7 @@ Module Par.
 
   #[export] Instance lk_hmap_par {Θ : SUB} : LkHMap Θ Par.
   Proof.
-    intros w0 w1 θ a αIn.
-    unfold hmap, hmap_par, lk at 1; cbn.
+    intros w0 w1 θ a αIn. unfold hmap, hmap_par, lk at 1; cbn.
     now rewrite env.lookup_tabulate.
   Qed.
 
