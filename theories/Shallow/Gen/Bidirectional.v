@@ -43,14 +43,14 @@ From Em Require Import
 #[local] Set Implicit Arguments.
 
 Section Elaborate.
-  Context M {mretM : MPure M} {mbindM : MBind M} {mfailM : MFail M} {tcmM : TypeCheckM M}.
 
-    Fixpoint check (e : Exp) (Γ : Env) (t : Ty) : M Exp :=
+    Fixpoint check `{MPure M, MBind M, MFail M, TypeCheckM M}
+      (e : Exp) (Γ : Env) (t : Ty) : M Exp :=
       match e with
       | exp.var x =>
           match lookup x Γ with
-          | Some t => pure e
-          | None   => fail
+          | Some t' => equals t t';; pure e
+          | None    => fail
           end
       | exp.false => equals t ty.bool ;; pure e
       | exp.true  => equals t ty.bool ;; pure e
@@ -62,20 +62,21 @@ Section Elaborate.
       | exp.absu x e =>
           t1 ← pick;
           t2 ← pick;
-          e' ← check e (Γ ,, x∷t1) t2;
           _  ← equals t (ty.func t1 t2);
+          e' ← check e (Γ ,, x∷t1) t2;
           pure (exp.abst x t1 e')
       | exp.abst x t1 e =>
           t2 ← pick;
-          e' ← check e (Γ ,, x∷t1) t2;
           _  ← equals t (ty.func t1 t2);
+          e' ← check e (Γ ,, x∷t1) t2;
           pure (exp.abst x t1 e')
       | exp.app e1 e2 =>
           '(t2,e2') ← synth e2 Γ;
           e1' ← check e1 Γ (ty.func t2 t);
           pure (exp.app e1' e2')
         end
-  with synth (e : Exp) (Γ : Env) : M (Ty * Exp) :=
+  with synth `{MPure M, MBind M, MFail M, TypeCheckM M}
+         (e : Exp) (Γ : Env) : M (Ty * Exp)%type :=
     match e with
     | exp.var x =>
         match lookup x Γ with
@@ -105,6 +106,7 @@ Section Elaborate.
         pure (t2, exp.app e1' e2')
     end.
 
+  Context M {mretM : MPure M} {mbindM : MBind M} {mfailM : MFail M} {tcmM : TypeCheckM M}.
   Context {wpM : WeakestPre M} {wlpM : WeakestLiberalPre M}
     {tclM : TypeCheckLogicM M}.
 
@@ -115,6 +117,7 @@ Section Elaborate.
   Definition tpb_algorithmic_check (Γ : Env) (e : Exp) (t : Ty) (ee : Exp) : Prop :=
     WP (check e Γ t) (fun ee' => ee = ee').
 
+  Goal False. Proof.
   Ltac solve_complete :=
     repeat
       (try apply wp_pure; try apply wp_fail; try apply wp_bind;
@@ -122,6 +125,8 @@ Section Elaborate.
        try
          match goal with
          | H: ?x = _ |- WP match ?x with _ => _ end _ => rewrite H
+         | IH: WP (check ?e ?Γ1 ?t1) _ |- WP (check ?e ?Γ2 ?t2) _ =>
+             unify Γ1 Γ2; unify t1 t2; revert IH; apply wp_mono; intros; subst
          | IH: WP (synth ?e ?Γ1) _ |- WP (synth ?e ?Γ2) _ =>
              unify Γ1 Γ2; revert IH; apply wp_mono; intros; subst
          | H: _ /\ _ |- _ => destruct H; subst
@@ -133,45 +138,64 @@ Section Elaborate.
              end
          end;
        intros; eauto).
+  Abort.
 
-  Lemma synth_complete (Γ : Env) (e ee : Exp) (t : Ty) :
-    Γ |-- e ∷ t ~> ee -> Γ |--ₐ e ∷ t ~> ee.
+  Lemma complete (Γ : Env) (e ee : Exp) (t : Ty) :
+    Γ |-- e ∷ t ~> ee -> tpb_algorithmic_check Γ e t ee /\ Γ |--ₐ e ∷ t ~> ee.
   Proof.
-    unfold tpb_algorithmic_synth.
-    induction 1; cbn; solve_complete;
-      try (eexists; solve_complete; fail).
+    unfold tpb_algorithmic_check, tpb_algorithmic_synth.
+    induction 1; cbn; solve_complete.
   Qed.
 
+  Goal False. Proof.
   Ltac solve_sound :=
     repeat
       (try apply wlp_pure; try apply wlp_fail; try apply wlp_bind;
        try (apply wlp_equals; intros; subst); try (apply wlp_pick; intro);
        try
          match goal with
+         | H: _ /\ _ |- _ => destruct H
+         | IH : forall Γ1 t1, WLP (check ?e Γ1 t1) _
+                          |- WLP (check ?e ?Γ2 ?t2) _ =>
+             specialize (IH Γ2 t2); revert IH; apply wlp_mono; intros
          | IH : forall Γ, WLP (synth ?e Γ) _
                           |- WLP (synth ?e ?Γ) _ =>
              specialize (IH Γ); revert IH; apply wlp_mono; intros
-         | |- tpb _ _ _ _    =>
-             econstructor
-           | |- WLP (match ?t with _ => _ end) _ =>
-             destruct t eqn:?
+         | |- tpb _ _ _ _    => econstructor
+         | |- WLP (match ?t with _ => _ end) _ => destruct t eqn:?
          end;
        intros; eauto).
+  Abort.
 
+  Lemma sound_aux e :
+    (∀ Γ t, WLP (check e Γ t) (fun ee => Γ |-- e ∷ t ~> ee)) /\
+    (∀ Γ,   WLP (synth e Γ) (fun '(t,ee) => Γ |-- e ∷ t ~> ee)).
+  Proof.
+    induction e; cbn; (split; [intros Γ ?t | intros Γ]); solve_sound.
+  Qed.
+
+  Lemma check_sound (Γ : Env) (e : Exp) t ee :
+    tpb_algorithmic_check Γ e t ee -> (Γ |-- e ∷ t ~> ee).
+  Proof.
+    unfold tpb_algorithmic_check. apply wp_impl.
+    eapply wlp_mono; [| apply sound_aux].
+    intros ? ? ?; now subst.
+  Qed.
 
   Lemma synth_sound (Γ : Env) (e : Exp) t ee :
     (Γ |--ₐ e ∷ t ~> ee) -> (Γ |-- e ∷ t ~> ee).
   Proof.
-    enough (WLP (synth e Γ) (fun '(t',ee') => Γ |-- e ∷ t' ~> ee')).
-    { unfold tpb_algorithmic. apply wp_impl. revert H.
-      apply wlp_mono. intros [t1 e1] HT [Heq1 Heq2]. now subst.
-    }
-    revert Γ. clear t ee.
-    induction e; cbn; intros Γ; solve_sound.
+    unfold tpb_algorithmic_synth. apply wp_impl.
+    eapply wlp_mono; [| apply sound_aux].
+    intros [] ? []; now subst.
   Qed.
+
+  Lemma check_correct Γ e t ee :
+    Γ |-- e ∷ t ~> ee <-> tpb_algorithmic_check Γ e t ee.
+  Proof. split. apply complete. apply check_sound. Qed.
 
   Lemma synth_correct Γ e t ee :
     Γ |-- e ∷ t ~> ee <-> Γ |--ₐ e ∷ t ~> ee.
-  Proof. split; auto using synth_complete, synth_sound. Qed.
+  Proof. split. apply complete. apply synth_sound. Qed.
 
 End Elaborate.

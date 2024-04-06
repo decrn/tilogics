@@ -84,6 +84,7 @@ Section Elaborate.
     WP (check e Γ t) (fun ee' => ee = ee').
   Notation "Γ |--ₐ e ∷ t ~> e'" := (tpb_algorithmic Γ e t e') (at level 80).
 
+  Goal False. Proof.
   Ltac solve_complete :=
     repeat
       (try apply wp_pure; try apply wp_fail; try apply wp_bind;
@@ -102,6 +103,7 @@ Section Elaborate.
              end
          end;
        intros; eauto).
+  Abort.
 
   Lemma check_complete (Γ : Env) (e ee : Exp) (t : Ty) :
     Γ |-- e ∷ t ~> ee -> Γ |--ₐ e ∷ t ~> ee.
@@ -111,6 +113,7 @@ Section Elaborate.
       try (eexists; solve_complete; fail).
   Qed.
 
+  Goal False. Proof.
   Ltac solve_sound :=
     repeat
       (try apply wlp_pure; try apply wlp_fail; try apply wlp_bind;
@@ -120,13 +123,11 @@ Section Elaborate.
          | IH : forall Γ1 t1, WLP (check ?e Γ1 t1) _
                           |- WLP (check ?e ?Γ2 ?t2) _ =>
              specialize (IH Γ2 t2); revert IH; apply wlp_mono; intros
-         | |- tpb _ _ _ _    =>
-             econstructor
-           | |- WLP (match ?t with _ => _ end) _ =>
-             destruct t eqn:?
+         | |- tpb _ _ _ _    => econstructor
+         | |- WLP (match ?t with _ => _ end) _ => destruct t eqn:?
          end;
        intros; eauto).
-
+  Abort.
 
   Lemma check_sound (Γ : Env) (e : Exp) t ee :
     (Γ |--ₐ e ∷ t ~> ee) -> (Γ |-- e ∷ t ~> ee).

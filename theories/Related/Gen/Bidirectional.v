@@ -29,7 +29,7 @@
 Require Import Coq.Classes.RelationClasses.
 From iris Require Import proofmode.tactics.
 From Em Require Import BaseLogic Prefix Spec Related.Monad.Interface.
-Require Import Em.Shallow.Gen.Synthesise Em.Gen.Synthesise.
+Require Import Em.Shallow.Gen.Bidirectional Em.Gen.Bidirectional.
 
 Import Pred Pred.notations Pred.proofmode lr lr.notations.
 
@@ -37,41 +37,19 @@ Import Pred Pred.notations Pred.proofmode lr lr.notations.
 
 Section Relatedness.
 
-  (* Show that the deep and shallow constraint generators are logically related.
-     Relations in this context are predicate-valued. They are binary and relate
-     something that can contain variables, i.e. an [OType], with something that
-     does not, i.e. a normal [Type]. We also wrap everything in a record:
-
-       Record Rel (DA : OType) (SA : Type) : Type :=
-         { RSat : ∀ w : World, DA w → SA → Pred w }.
-
-     Note we do not define a universe of types first on which we then define a
-     deep, shallow and relational semantics by recursion. We could carve out a
-     subset that is contains everything that we use in the definition of the
-     constraint generator, but there are some technical usability issues.
-     Instead, we always quantify over these three pieces of information:
-       ∀ (DA : OType) (SA : Type) (RA : Rel DA SA)
-   *)
-   (* The [Context] command below introduces multiple variables:
-       - DM : OType → OType
-         A monad that implements our constraint interface using deep embeddings
-         (de Bruijn variables + string decorations) for existentials.
-       - SM : Type → Type
-         A monad that implements the shallow constraint interface which uses
-         HOAS for existentials.
-       - RM : ∀ (DA : OType) (SA : Type) (RA : Rel DA SA), Rel (DM DA) (SM SA)
-         A predicate valued relation for the monads.
-
-      The [RTypeCheckLogicM] type class requires then that all monadic operations
-      (pure, bind, fail, equals, pick) and the wp and wlp semantics of DM and SM
-      are logically related. *)
   Context `{RTypeCheckLogicM DM SM}.
 
   Goal False. Proof.
   Ltac relih :=
     match goal with
-    | IH: RValid _ (generate ?e) (synth ?e) |-
-        environments.envs_entails _ (RSat (RM _) (generate ?e _) (synth ?e _)) =>
+    | H: _ /\ _ |- _ => destruct H
+    | IH: RValid _ (Em.Gen.Bidirectional.check ?e) (Em.Shallow.Gen.Bidirectional.check ?e) |-
+        environments.envs_entails _ (RSat (RM _)
+          (Em.Gen.Bidirectional.check ?e _ _) (Em.Shallow.Gen.Bidirectional.check ?e _ _)) =>
+        iApply IH
+    | IH: RValid _ (Em.Gen.Bidirectional.synth ?e) (Em.Shallow.Gen.Bidirectional.synth ?e) |-
+        environments.envs_entails _ (RSat (RM _)
+          (Em.Gen.Bidirectional.synth ?e _) (Em.Shallow.Gen.Bidirectional.synth ?e _)) =>
         iApply IH
     end.
   Ltac relauto :=
@@ -81,31 +59,35 @@ Section Relatedness.
   Abort.
 
   Lemma relatedness_of_generators (e : Exp) :
-    ℛ⟦REnv ↣ RM (RProd RTy RExp)⟧ (generate e) (synth e).
+    ℛ⟦REnv ↣ RTy ↣ RM RExp⟧ (Em.Gen.Bidirectional.check e) (Em.Shallow.Gen.Bidirectional.check e) /\
+    ℛ⟦REnv ↣ RM (RProd RTy RExp)⟧ (Em.Gen.Bidirectional.synth e) (Em.Shallow.Gen.Bidirectional.synth e).
   Proof.
-    induction e; iIntros (w dΓ sΓ) "#rΓ"; cbn; relauto.
-    iPoseProof (rlookup x with "rΓ") as "rlk".
-    destruct (dΓ !! x), (sΓ !! x); relauto.
+    induction e;
+      (split; cbn; iIntros (w dΓ sΓ) "#rΓ";
+       [iIntros (dτ sτ) "#rτ"|]; relauto);
+      iPoseProof (rlookup x with "rΓ") as "rlk";
+      destruct (dΓ !! x), (sΓ !! x); relauto.
   Qed.
 
-  Lemma relatedness_of_algo_typing :
+  Lemma relatedness_of_algo_typing_synth :
     ℛ⟦REnv ↣ RConst Exp ↣ RTy ↣ RExp ↣ RPred⟧
       (TPB_algo (M := DM))
-      (tpb_algorithmic (M := SM)).
+      (tpb_algorithmic_synth (M := SM)).
   Proof.
-    unfold RValid, TPB_algo, tpb_algorithmic. cbn.
+    unfold RValid, TPB_algo, tpb_algorithmic_synth. cbn.
     iIntros (w) "%dΓ %sΓ #rΓ %e %se %re %dτ %sτ #rτ %de1 %se1 #re2". subst se.
-    iApply RWP. iApply relatedness_of_generators; auto.
+    destruct (relatedness_of_generators e) as [_ Hrel].
+    iApply RWP. iApply Hrel; auto.
     iIntros "%w1 %θ1 !>". iIntros ([dτ'' de'] [sτ' se']) "[#rτ' #re']".
     iApply rand; iApply req; auto.
   Qed.
 
-  Lemma generate_correct_logrel `{!Shallow.Monad.Interface.TypeCheckLogicM SM}
+  Lemma synth_correct_logrel `{!Shallow.Monad.Interface.TypeCheckLogicM SM}
     {w} (Γ : OEnv w) (e : Exp) (τ : OTy w) (e' : OExp w) :
     TPB_algo (Θ := Prefix) (M := DM) Γ e τ e' ⊣⊢ₚ Γ |--ₚ e; τ ~> e'.
   Proof.
     constructor. intros ι. simpl. rewrite synth_correct.
-    now apply relatedness_of_algo_typing.
+    now apply relatedness_of_algo_typing_synth.
   Qed.
 
 End Relatedness.

@@ -42,11 +42,10 @@ Set Implicit Arguments.
 Section Generator.
   Import MonadNotations.
 
-  Context `{lkReflΘ: LkRefl Θ, lkTransΘ: LkTrans Θ, lkStepΘ: LkStep Θ}
-    {reflTransΘ: ReflTrans Θ}.
-  Context `{pureM:Pure M, bindM:Bind Θ M, failM:Fail M, tcM:TypeCheckM M}.
-
-  Fixpoint check (e : Exp) : ⊧ OEnv ⇢ OTy ⇢ M OExp :=
+  Fixpoint check
+    `{lkReflΘ: LkRefl Θ, lkTransΘ: LkTrans Θ, lkStepΘ: LkStep Θ} {reflTransΘ: ReflTrans Θ}
+    `{pureM:Pure M, bindM:Bind Θ M, failM:Fail M, tcM:TypeCheckM M}
+    (e : Exp) : ⊧ OEnv ⇢ OTy ⇢ M OExp :=
     fun w Γ τ =>
       match e with
       | exp.var x =>
@@ -82,7 +81,9 @@ Section Generator.
          e1'       <- check e1 Γ[_] (oty.func τ2 τ[_]) ;;
          pure (oexp.app e1' e2'[_])
       end
-  with synth (e : Exp) : ⊧ OEnv ⇢ M (OTy * OExp) :=
+  with synth `{lkReflΘ: LkRefl Θ, lkTransΘ: LkTrans Θ, lkStepΘ: LkStep Θ} {reflTransΘ: ReflTrans Θ}
+         `{pureM:Pure M, bindM:Bind Θ M, failM:Fail M, tcM:TypeCheckM M}
+  (e : Exp) : ⊧ OEnv ⇢ M (OTy * OExp) :=
     fun w Γ =>
       match e with
       | exp.var x =>
@@ -118,6 +119,8 @@ Section Generator.
   Import iris.proofmode.tactics.
   Open Scope pred_scope.
 
+  Context `{lkReflΘ: LkRefl Θ, lkTransΘ: LkTrans Θ, lkStepΘ: LkStep Θ} {reflTransΘ: ReflTrans Θ}.
+  Context `{pureM:Pure M, bindM:Bind Θ M, failM:Fail M, tcM:TypeCheckM M}.
   Context {wpM : WeakestPre Θ M} {wlpM : WeakestLiberalPre Θ M}
     {tcLogicM : TypeCheckLogicM Θ M}.
 

@@ -109,9 +109,9 @@ Section Generator.
   Lemma generate_sound_aux e :
     ∀ w (G : OEnv w),
       ⊢ WLP (generate e G) (fun _ θ '(t,ee) => G[θ] |--ₚ e; t ~> ee).
+    (*
   Proof with
     iStopProof; pred_unfold; intuition (subst; econstructor; eauto; fail).
-
     induction e; cbn; intros w G; iStartProof.
     - destruct lookup eqn:HGx; wlpauto.
       iStopProof; pred_unfold. constructor. now rewrite lookup_inst HGx.
@@ -182,7 +182,8 @@ Section Generator.
       iStopProof. pred_unfold.
       (* Use the typing rule of the closed typing relation. *)
       intuition (subst; econstructor; eauto; fail).
-  Restart.
+  *)
+  Proof.
     induction e; cbn; intros w G; iStartProof; wlpauto.
     destruct lookup eqn:HGx; wlpauto. iStopProof; pred_unfold.
     constructor. now rewrite lookup_inst HGx.

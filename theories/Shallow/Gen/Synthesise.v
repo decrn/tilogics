@@ -83,6 +83,7 @@ Section Elaborate.
     WP (synth e Γ) (fun '(t',ee') => t = t' /\ ee = ee').
   Notation "Γ |--ₐ e ∷ t ~> e'" := (tpb_algorithmic Γ e t e') (at level 80).
 
+  Goal False. Proof.
   Ltac solve_complete :=
     repeat
       (try apply wp_pure; try apply wp_fail; try apply wp_bind;
@@ -101,6 +102,7 @@ Section Elaborate.
              end
          end;
        intros; eauto).
+  Abort.
 
   Lemma synth_complete (Γ : Env) (e ee : Exp) (t : Ty) :
     Γ |-- e ∷ t ~> ee -> Γ |--ₐ e ∷ t ~> ee.
@@ -110,6 +112,7 @@ Section Elaborate.
       try (eexists; solve_complete; fail).
   Qed.
 
+  Goal False. Proof.
   Ltac solve_sound :=
     repeat
       (try apply wlp_pure; try apply wlp_fail; try apply wlp_bind;
@@ -125,7 +128,7 @@ Section Elaborate.
              destruct t eqn:?
          end;
        intros; eauto).
-
+  Abort.
 
   Lemma synth_sound (Γ : Env) (e : Exp) t ee :
     (Γ |--ₐ e ∷ t ~> ee) -> (Γ |-- e ∷ t ~> ee).

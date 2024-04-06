@@ -228,4 +228,34 @@ Module lr.
   #[global] Arguments RTypeCheckM DM SM RM {_ _ _ _ _ _ _ _}.
   #[global] Arguments RTypeCheckLogicM DM SM RM {_ _ _ _ _ _ _ _ _ _ _ _ (* _ *)}.
 
+  Goal False. Proof.
+  Ltac relstep :=
+    lazymatch goal with
+    | |- environments.envs_entails _ (RSat (RImpl (RProd _ _) _) _ _) =>
+        iIntros ([?dx ?dy] [?sx ?sy]) "[#? #?]"
+    | |- environments.envs_entails _ (RSat (RImpl RUnit _ ) _ _) =>
+        iIntros (? ?) "_"
+    | |- environments.envs_entails _ (RSat (RImpl RTy _ ) _ _) =>
+        iIntros (?dτ ?sτ) "#?"
+    | |- environments.envs_entails _ (RSat (RImpl RExp _ ) _ _) =>
+        iIntros (?de ?se) "#?"
+    | |- environments.envs_entails _ (RSat _ (Em.Monad.Interface.pure _) (Em.Shallow.Monad.Interface.pure _)) =>
+        iApply rpure
+    | |- environments.envs_entails _ (RSat _ D.fail Em.Shallow.Monad.Interface.fail) =>
+        iApply rfail
+    | |- environments.envs_entails _ (RSat _ (Em.Monad.Interface.equals _ _) (Em.Shallow.Monad.Interface.equals _ _)) =>
+        iApply requals
+    | |- environments.envs_entails _ (RSat _ Em.Monad.Interface.pick Em.Shallow.Monad.Interface.pick) =>
+        iApply rpick
+    | |- environments.envs_entails _ (RSat _ (insert ?x _ _) (insert ?x _ _)) =>
+        iApply rinsert
+    | |- environments.envs_entails _ (RSat _ (Em.Monad.Interface.bind _ _) (Em.Shallow.Monad.Interface.bind _ _)) =>
+        iApply rbind
+    | |- environments.envs_entails _ (RSat (RBox _) (fun w θ => _) _) =>
+        iIntros (?w ?θ) "!>"
+    | |- environments.envs_entails _ (RSat (RProd _ _) (pair _ _) (pair _ _)) =>
+        iSplit
+    end.
+  Abort.
+
 End lr.
