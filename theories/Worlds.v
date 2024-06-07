@@ -179,10 +179,19 @@ Module Import world.
                        else (false , String a s')
       end.
 
+    Fixpoint string_to_pos_cont (s : string) (p : positive) : positive :=
+      match s with
+      | EmptyString => p
+      | String c s => string_to_pos_cont s (strings.ascii_cons_pos c p)
+      end.
+
+    Definition shortlex_ltb (x y : string) : bool :=
+      Pos.ltb (string_to_pos_cont x 1) (string_to_pos_cont y 1).
+
     Fixpoint max (α : string) (w : World) : string :=
       match w with
       | nil      => α
-      | snoc w β => if String.ltb α β then max β w else max α w
+      | snoc w β => if shortlex_ltb α β then max β w else max α w
       end.
 
     Definition fresh (w : World) : string :=
@@ -194,6 +203,7 @@ Module Import world.
     Example fresh_a   : fresh (ε ، "a") = "b"  := eq_refl.
     Example fresh_z   : fresh (ε ، "z") = "aa" := eq_refl.
     Example fresh_tld : fresh (ε ، "~") = "aa" := eq_refl.
+    Example fresh_aa  : fresh (ε ، "aa") = "ab" := eq_refl.
 
   End Fresh.
 
