@@ -88,6 +88,27 @@ Section RemoveAcc.
       | world.snoc w b => remove_acc_step (all w)
       end.
 
+  (* Calculating the full predicate is costly. It has quadratic running
+     time in the size of the context. This code is deleted in the extraction
+     but for computations inside of Coq, it is better to not use this directly
+     but the [remove_acc_all_gen] defined below. *)
+
+  (* Similar to the Acc_intro_generator from the Coq standrd library.
+     Adds 2ⁿ - 1 [remove_acc_intro]s to the given [all]. *)
+  Fixpoint remove_acc_intro_gen (n : nat) (all : ⊧ remove_acc) {struct n} :
+    ⊧ remove_acc :=
+    match n with
+    | 0   => all
+    | S m =>
+        fun w =>
+          remove_acc_intro
+            (fun α αIn =>
+               remove_acc_intro_gen m (remove_acc_intro_gen m all) (w - α))
+    end.
+
+  Definition remove_acc_all_gen : ⊧ remove_acc :=
+    remove_acc_intro_gen 20 (remove_acc_all).
+
   Definition loeb {A : World → Type} : (⊧ ▷A ⇢ A) → (⊧ A) :=
     fun step w => remove_acc_rect step (remove_acc_all w).
 
