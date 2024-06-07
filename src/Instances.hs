@@ -5,7 +5,7 @@ module Instances where
 import Data.List
 import Infer
 
-toList :: World -> List String -> List String
+toList :: World -> [String] -> [String]
 toList Nil        = id
 toList (Snoc w a) = toList w . (a:)
 
