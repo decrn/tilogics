@@ -1,5 +1,5 @@
 {
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
   inputs.flake-utils.url = "github:numtide/flake-utils";
 
   outputs = inputs:
@@ -10,7 +10,7 @@
         # - coqPackages: The set of all Coq packages.
         # - versions: An attribute set of packages with their versions we want to override.
         patchCoqPackages = coqPackages: versions:
-          coqPackages.overrideScope' (
+          coqPackages.overrideScope (
             _self: super:
               pkgs.lib.foldlAttrs
               # foldAttrs is used to iterate over the versions set and apply a function
