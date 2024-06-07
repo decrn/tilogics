@@ -250,7 +250,7 @@ Section Correctness.
     ∀ w1 (θ1 : w0 ⊑⁻ w1),
       instpred (asolve C θ1) ⊣⊢ₚ (instpred C)[θ1].
   Proof.
-    induction C as [|[t1 t2]]; cbn - [ctrue cand]; intros.
+    induction C as [|[t1 t2]]; cbn [asolve]; intros.
     - now rewrite instpred_ctrue.
     - apply instpred_cand_intro; auto. intros. apply amgu_correct.
   Qed.
