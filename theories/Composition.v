@@ -37,11 +37,16 @@ Import (hints) Par.
 
 Section Run.
   Import MonadNotations.
-  Definition run {A} `{Subst A} : ⊧ Free A ⇢ Solved Par A :=
+
+  Definition run_prenex {A} `{Subst A} : ⊧ Prenex A ⇢ Solved Par A :=
     fun w m =>
-      '(cs,a) <- solved_hmap (prenex m) ;;
+      '(cs,a) <- solved_hmap m ;;
       _       <- solve cs ;;
       pure (subst a _).
+
+  Definition run_free {A} `{Subst A} : ⊧ Free A ⇢ Solved Par A :=
+    fun w m => run_prenex w (prenex m).
+
 End Run.
 
 Record Result :=
@@ -60,17 +65,31 @@ Definition ground_expr (r : Result) : Exp :=
 Section Reconstruct.
   Import option.notations.
 
-  Definition reconstruct (Γ : Env) (e : Exp) : option Result :=
-    '(existT w (_ , (t,e))) <- run _ (generate (w := world.nil) e (lift Γ)) ;;
+  Definition reconstruct_free (Γ : Env) (e : Exp) : option Result :=
+    '(existT w (_ , (t,e))) <- run_free _ (generate (w := world.nil) e (lift Γ)) ;;
     Some (MkResult w t e).
 
-  Definition infer (e : Exp) : option Result :=
-    reconstruct empty e.
+  Definition infer_free (e : Exp) : option Result :=
+    reconstruct_free empty e.
+
+  Definition reconstruct_prenex (Γ : Env) (e : Exp) : option Result :=
+    '(existT w (_ , (t,e))) <- run_prenex _ (generate (w := world.nil) e (lift Γ)) ;;
+    Some (MkResult w t e).
+
+  Definition infer_prenex (e : Exp) : option Result :=
+    reconstruct_prenex empty e.
+
+  Definition reconstruct_solved (Γ : Env) (e : Exp) : option Result :=
+    '(existT w (_ , (t,e))) <- generate (w := world.nil) e (lift Γ) ;;
+    Some (MkResult w t e).
+
+  Definition infer_solved (e : Exp) : option Result :=
+    reconstruct_solved empty e.
 
 End Reconstruct.
 
 Definition algorithmic_typing (Γ : Env) (e : Exp) (τ : Ty) (e' : Exp) : Prop :=
-  match reconstruct Γ e with
+  match reconstruct_free Γ e with
   | Some (MkResult w1 τ1 e1) =>
       exists ι : Assignment w1, τ = inst τ1 ι /\ e' = inst e1 ι
   | None => False
@@ -81,7 +100,7 @@ Lemma correctness (Γ : Env) (e : Exp) (τ : Ty) (e' : Exp) :
 Proof.
   generalize (generate_correct (M := Free) (w:=world.nil)
                 (lift Γ) e (lift τ) (lift e')).
-  unfold TPB_algo, algorithmic_typing, reconstruct, run.
+  unfold TPB_algo, algorithmic_typing, reconstruct_free, run_free.
   rewrite <- prenex_correct. destruct prenex as [(w1 & θ1 & C & t1 & e1)|]; cbn.
   - rewrite <- (solve_correct C).
     destruct (solve C) as [(w2 & θ2 & [])|]; predsimpl.
@@ -113,7 +132,7 @@ Lemma decidability Γ e τ :
 Proof.
   pose proof (correctness Γ e τ) as Hcorr.
   unfold algorithmic_typing in Hcorr.
-  destruct reconstruct as [[w oτ oe']|].
+  destruct reconstruct_free as [[w oτ oe']|].
   - destruct (decidable_type_instantiation τ oτ) as [(ι & Heq)|].
     + left. exists (inst oe' ι). apply Hcorr. now exists ι.
     + right. intros (e' & HT). apply Hcorr in HT.

@@ -42,4 +42,4 @@ Extraction Inline Bool.Bool.iff_reflect Environment.env.view
 Extract Inductive reflect => "Prelude.Bool" [ "Prelude.True" "Prelude.False" ].
 Extract Inlined Constant Init.Datatypes.fst => "Prelude.fst".
 Extract Inlined Constant Init.Datatypes.snd => "Prelude.snd".
-Extraction "Extract" ground_type ground_expr infer.
+Extraction "Extract" ground_type ground_expr infer_free infer_prenex infer_solved.

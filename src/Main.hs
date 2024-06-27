@@ -6,20 +6,29 @@ import Data.Semigroup ((<>))
 import Options.Applicative
 import System.Exit
 
-import Infer (Exp, Result(..), ground_expr, infer)
+import Infer (Exp, Result(..), ground_expr, infer_free, infer_prenex, infer_solved)
 import Instances ()
 import Parser (parse)
 
-optionsParser :: Parser String
-optionsParser =
+pFile :: Parser String
+pFile =
   argument str
   (metavar "FILENAME" <>
    help "Path to the file to type check")
 
-parserInfo :: ParserInfo String
-parserInfo =
+pAlgo :: Parser (Exp -> Maybe Result)
+pAlgo =
+  flag infer_free infer_free (long "free" <> help "Use the Free monad")
+  <|> flag' infer_prenex (long "prenex" <> help "Use the Prenex monad")
+  <|> flag' infer_solved (long "solved" <> help "Use the Prenex monad")
+
+pOpts :: Parser (Exp -> Maybe Result, String)
+pOpts = (,) <$> pAlgo <*> pFile
+
+opts :: ParserInfo (Exp -> Maybe Result, String)
+opts =
   info
-  (optionsParser <**> helper)
+  (pOpts <**> helper)
   (fullDesc
     <> progDesc "Typecheck FILENAME"
     <> header "em - a typechecker for lambdabool" )
@@ -43,8 +52,8 @@ doParse content =
       print e
       return e
 
-doInfer :: Exp -> IO ()
-doInfer e =
+doInfer :: (Exp -> Maybe Result) -> Exp -> IO ()
+doInfer infer e =
   case infer e of
     Just r@(MkResult w ot _oe) -> do
       putStr ("Unconstrained: ")
@@ -57,6 +66,6 @@ doInfer e =
     Nothing -> putStrLn "Inference failed"
 
 main :: IO ()
-main =
-  execParser parserInfo >>=
-  (doRead >=> doParse >=> doInfer)
+main = do
+  (infer,file) <- execParser opts
+  doRead file >>= (doParse >=> doInfer infer)
