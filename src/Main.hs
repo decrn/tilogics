@@ -20,7 +20,7 @@ pAlgo :: Parser (Exp -> Maybe Result)
 pAlgo =
   flag infer_free infer_free (long "free" <> help "Use the Free monad")
   <|> flag' infer_prenex (long "prenex" <> help "Use the Prenex monad")
-  <|> flag' infer_solved (long "solved" <> help "Use the Prenex monad")
+  <|> flag' infer_solved (long "solved" <> help "Use the Solved monad")
 
 pOpts :: Parser (Exp -> Maybe Result, String)
 pOpts = (,) <$> pAlgo <*> pFile
