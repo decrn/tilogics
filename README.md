@@ -1,7 +1,6 @@
 # Type Inference Logics
 
-
-This repository contains a brief explanation of the supplementary material that we
+This document contains a brief explanation of the supplementary material that we
 include as part of the paper submission. We intend to supply a more thorough
 overview for the artifact submission.
 
