@@ -1,8 +1,7 @@
 # Type Inference Logics
 
-This document contains a brief explanation of the supplementary material that we
-include as part of the paper submission. We intend to supply a more thorough
-overview for the artifact submission.
+This document contains an overview of the supplementary material that we
+include as part of the paper submission.
 
 ## Overview
 
@@ -15,8 +14,9 @@ The different parts can be found in the following directories
 
 | Part                            | Directory                                  |
 |---------------------------------|--------------------------------------------|
-| Coq Formalization               | `em/theories`                        |
-| Haskell implementation          | `em/src`                             |
+| Coq Formalization               | `em/theories`                              |
+| Haskell implementation          | `em/src`                                   |
+| Example programs                | `em/examples`                              |
 
 
 ## Build instructions
@@ -38,6 +38,8 @@ After that you can build the code by calling `make` in the root directory.
 Note for macOS users: you might need to install a version of GNU utils and use `gmake`.
 
 ## Mechanized formalization (Coq)
+
+The primary artifact is a Coq project that implements the machinery discussed in the paper.
 
 The following tables relates concepts discussed in the paper to specific code in the Coq development.
 
