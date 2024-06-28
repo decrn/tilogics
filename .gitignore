@@ -311,3 +311,6 @@ _build/
 # Extracted files
 Extract.hs
 src/Infer.hs
+
+# Cabal
+dist-newstyle/
