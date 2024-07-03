@@ -66,21 +66,21 @@ Section Reconstruct.
   Import option.notations.
 
   Definition reconstruct_free (Γ : Env) (e : Exp) : option Result :=
-    '(existT w (_ , (t,e))) <- run_free _ (generate (w := world.nil) e (lift Γ)) ;;
+    '(existT w (_ , (t,e))) <- run_free _ (osynth (w := world.nil) e (lift Γ)) ;;
     Some (MkResult w t e).
 
   Definition infer_free (e : Exp) : option Result :=
     reconstruct_free empty e.
 
   Definition reconstruct_prenex (Γ : Env) (e : Exp) : option Result :=
-    '(existT w (_ , (t,e))) <- run_prenex _ (generate (w := world.nil) e (lift Γ)) ;;
+    '(existT w (_ , (t,e))) <- run_prenex _ (osynth (w := world.nil) e (lift Γ)) ;;
     Some (MkResult w t e).
 
   Definition infer_prenex (e : Exp) : option Result :=
     reconstruct_prenex empty e.
 
   Definition reconstruct_solved (Γ : Env) (e : Exp) : option Result :=
-    '(existT w (_ , (t,e))) <- generate (w := world.nil) e (lift Γ) ;;
+    '(existT w (_ , (t,e))) <- osynth (w := world.nil) e (lift Γ) ;;
     Some (MkResult w t e).
 
   Definition infer_solved (e : Exp) : option Result :=
@@ -88,19 +88,24 @@ Section Reconstruct.
 
 End Reconstruct.
 
-Definition algorithmic_typing (Γ : Env) (e : Exp) (τ : Ty) (e' : Exp) : Prop :=
+(* This is the end-to-end definition of an algorithmic typing relation that
+   is based on the end-to-end [reconstruct] function that combines constraint
+   generation and solving. *)
+Definition typing_algo (Γ : Env) (e : Exp) (τ : Ty) (e' : Exp) : Prop :=
   match reconstruct_free Γ e with
   | Some (MkResult w1 τ1 e1) =>
-      exists ι : Assignment w1, τ = inst τ1 ι /\ e' = inst e1 ι
+      ∃ ι : Assignment w1, τ = inst τ1 ι ∧ e' = inst e1 ι
   | None => False
   end.
 
-Lemma correctness (Γ : Env) (e : Exp) (τ : Ty) (e' : Exp) :
-  algorithmic_typing Γ e τ e' <-> tpb Γ e τ e'.
+(* The correctness theorem expresses equivalence of algorithmic and
+   declarative typing. *)
+Theorem correctness (Γ : Env) (e : Exp) (τ : Ty) (e' : Exp) :
+  typing_algo Γ e τ e' ↔ tpb Γ e τ e'.
 Proof.
-  generalize (generate_correct (M := Free) (w:=world.nil)
+  generalize (ocorrectness (M := Free) (w:=world.nil)
                 (lift Γ) e (lift τ) (lift e')).
-  unfold TPB_algo, algorithmic_typing, reconstruct_free, run_free.
+  unfold otyping_algo, typing_algo, reconstruct_free, run_free.
   rewrite <- prenex_correct. destruct prenex as [(w1 & θ1 & C & t1 & e1)|]; cbn.
   - rewrite <- (solve_correct C).
     destruct (solve C) as [(w2 & θ2 & [])|]; predsimpl.
@@ -115,23 +120,33 @@ Proof.
   - pred_unfold. intros HE. now specialize (HE env.nil).
 Qed.
 
+(* Decide whether the open object language type [oτ] can be instantiated to the
+   given closed object language type [τ], i.e. if there exists an assignment
+   to the variables that can appear in [oτ] that after instantiation makes [oτ]
+   equal to [τ]. *)
 Lemma decidable_type_instantiation (τ : Ty) {w} (oτ : OTy w) :
   decidable (∃ ι : Assignment w, τ = inst oτ ι).
 Proof.
   pose proof (mgu_correct (lift τ) oτ) as [H].
   destruct (mgu (lift τ) oτ) as [(w' & θ & [])|]; cbn in H.
-  - pose (inst θ (grounding _)) as ι.
+  - (* In this case we get a substitution [θ] that unifies [τ] and [oτ]. After
+       applying this substitution there might still be variables in the world
+       which are not mentioned in [oτ]. At this point we simply ground the
+       remaining ones. The actual instantation [ι] we come up with is the
+       composition of the grounding with the unifying substitution. *)
+    pose (inst θ (grounding _)) as ι.
     specialize (H ι). rewrite inst_lift in H.
     left. exists ι. apply H. now exists (grounding w').
   - right. intros (ι & Heq). specialize (H ι).
     rewrite inst_lift in H. intuition auto.
 Qed.
 
+(* Decide the three place typing relation. *)
 Lemma decidability Γ e τ :
   decidable (exists e', Γ |-- e ∷ τ ~> e').
 Proof.
   pose proof (correctness Γ e τ) as Hcorr.
-  unfold algorithmic_typing in Hcorr.
+  unfold typing_algo in Hcorr.
   destruct reconstruct_free as [[w oτ oe']|].
   - destruct (decidable_type_instantiation τ oτ) as [(ι & Heq)|].
     + left. exists (inst oe' ι). apply Hcorr. now exists ι.

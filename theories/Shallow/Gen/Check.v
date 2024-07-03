@@ -28,11 +28,8 @@
 
 From Coq Require Import
   Classes.Morphisms_Prop
-(*   Lists.List *)
   Program.Tactics
   Strings.String.
-(* From Equations Require Import *)
-(*   Equations. *)
 From stdpp Require Import
   base gmap.
 From Em Require Import
@@ -50,7 +47,7 @@ Section Elaborate.
     | exp.var x =>
         match lookup x Γ with
         | Some t' => equals t t';; pure e
-        | None   => fail
+        | None    => fail
         end
     | exp.false => equals t ty.bool ;; pure e
     | exp.true  => equals t ty.bool ;; pure e
@@ -80,9 +77,9 @@ Section Elaborate.
   Context {wpM : WeakestPre M} {wlpM : WeakestLiberalPre M}
     {tclM : TypeCheckLogicM M}.
 
-  Definition tpb_algorithmic (Γ : Env) (e : Exp) (t : Ty) (ee : Exp) : Prop :=
+  Definition typing_algo (Γ : Env) (e : Exp) (t : Ty) (ee : Exp) : Prop :=
     WP (check e Γ t) (fun ee' => ee = ee').
-  Notation "Γ |--ₐ e ∷ t ~> e'" := (tpb_algorithmic Γ e t e') (at level 80).
+  Notation "Γ |--ₐ e ∷ t ~> e'" := (typing_algo Γ e t e') (at level 80).
 
   Goal False. Proof.
   Ltac solve_complete :=
@@ -105,10 +102,10 @@ Section Elaborate.
        intros; eauto).
   Abort.
 
-  Lemma check_complete (Γ : Env) (e ee : Exp) (t : Ty) :
-    Γ |-- e ∷ t ~> ee -> Γ |--ₐ e ∷ t ~> ee.
+  Lemma completeness (Γ : Env) (e ee : Exp) (t : Ty) :
+    Γ |-- e ∷ t ~> ee  →  Γ |--ₐ e ∷ t ~> ee.
   Proof.
-    unfold tpb_algorithmic.
+    unfold typing_algo.
     induction 1; cbn; solve_complete;
       try (eexists; solve_complete; fail).
   Qed.
@@ -121,27 +118,27 @@ Section Elaborate.
        try
          match goal with
          | IH : forall Γ1 t1, WLP (check ?e Γ1 t1) _
-                          |- WLP (check ?e ?Γ2 ?t2) _ =>
+           |- WLP (check ?e ?Γ2 ?t2) _ =>
              specialize (IH Γ2 t2); revert IH; apply wlp_mono; intros
-         | |- tpb _ _ _ _    => econstructor
+         | |- tpb _ _ _ _ => econstructor
          | |- WLP (match ?t with _ => _ end) _ => destruct t eqn:?
          end;
        intros; eauto).
   Abort.
 
-  Lemma check_sound (Γ : Env) (e : Exp) t ee :
-    (Γ |--ₐ e ∷ t ~> ee) -> (Γ |-- e ∷ t ~> ee).
+  Lemma soundness (Γ : Env) (e : Exp) t ee :
+    Γ |--ₐ e ∷ t ~> ee  →  Γ |-- e ∷ t ~> ee.
   Proof.
     enough (WLP (check e Γ t) (fun ee' => Γ |-- e ∷ t ~> ee')).
-    { unfold tpb_algorithmic. apply wp_impl. revert H.
+    { unfold typing_algo. apply wp_impl. revert H.
       apply wlp_mono. intros e1 HT Heq2. now subst.
     }
     revert Γ t. clear ee.
     induction e; cbn; intros Γ; solve_sound.
   Qed.
 
-  Lemma check_correct Γ e t ee :
-    Γ |-- e ∷ t ~> ee <-> Γ |--ₐ e ∷ t ~> ee.
-  Proof. split; auto using check_complete, check_sound. Qed.
+  Lemma correctness Γ e t ee :
+    Γ |-- e ∷ t ~> ee ↔ Γ |--ₐ e ∷ t ~> ee.
+  Proof. split; auto using completeness, soundness. Qed.
 
 End Elaborate.

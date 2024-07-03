@@ -44,8 +44,8 @@ Section Generator.
     {reflTransΘ: ReflTrans Θ}.
   Context `{pureM:Pure M, bindM:Bind Θ M, failM:Fail M, tcM:TypeCheckM M}.
 
-  Definition check : Exp -> ⊧ OEnv ⇢ OTy ⇢ M OExp :=
-    fix gen e {w} Γ τ :=
+  Definition ocheck : Exp -> ⊧ OEnv ⇢ OTy ⇢ M OExp :=
+    fix ocheck e {w} Γ τ :=
       match e with
       | exp.var x =>
           match lookup x Γ with
@@ -60,33 +60,33 @@ Section Generator.
           _ <- equals τ oty.bool ;;
           pure oexp.false
       | exp.ifte e1 e2 e3 =>
-          e1' <- gen e1 Γ oty.bool ;;
-          e2' <- gen e2 Γ[_] τ[_] ;;
-          e3' <- gen e3 Γ[_] τ[_] ;;
+          e1' <- ocheck e1 Γ oty.bool ;;
+          e2' <- ocheck e2 Γ[_] τ[_] ;;
+          e3' <- ocheck e3 Γ[_] τ[_] ;;
           pure (oexp.ifte e1'[_] e2'[_] e3')
       | exp.absu x e =>
           t1  <- pick ;;
           t2  <- pick ;;
-          e'  <- gen e (Γ[_] ,, x∷t1[_]) t2 ;;
+          e'  <- ocheck e (Γ[_] ,, x∷t1[_]) t2 ;;
           _   <- equals (τ[_]) (oty.func t1[_] t2[_]) ;;
           pure (oexp.abst x t1[_] e'[_])
       | exp.abst x t1 e =>
           t2  <- pick ;;
-          e'  <- gen e (Γ[_] ,, x∷lift t1) t2 ;;
+          e'  <- ocheck e (Γ[_] ,, x∷lift t1) t2 ;;
           _   <- equals (τ[_]) (oty.func (lift t1) t2[_]) ;;
           pure (oexp.abst x (lift t1) e'[_])
       | exp.app e1 e2 =>
           t1  <- pick ;;
-          e1' <- gen e1 Γ[_] (oty.func t1 τ[_]) ;;
-          e2' <- gen e2 Γ[_] t1[_] ;;
+          e1' <- ocheck e1 Γ[_] (oty.func t1 τ[_]) ;;
+          e2' <- ocheck e2 Γ[_] t1[_] ;;
           pure (oexp.app e1'[_] e2')
       end.
 
-  Definition synth (e : Exp) :
+  Definition osynth (e : Exp) :
     ⊧ OEnv ⇢ M (Prod OTy OExp) :=
     fun w G =>
       τ  <- pick ;;
-      e' <- check e G[_] τ ;;
+      e' <- ocheck e G[_] τ ;;
       pure (τ[_] , e').
 
   Import Pred.proofmode iris.proofmode.tactics Pred Pred.notations.
@@ -96,14 +96,15 @@ Section Generator.
   Context {wpM : WeakestPre Θ M} {wlpM : WeakestLiberalPre Θ M}
     {tcLogicM : TypeCheckLogicM Θ M}.
 
-  Definition TPB_algo : ⊧ OEnv ⇢ Const Exp ⇢ OTy ⇢ OExp ⇢ Pred :=
-    fun w0 G0 e τ0 e0 => WP (check e G0 τ0) (fun _ θ1 e1 => e0[θ1] =ₚ e1).
+  Definition otyping_algo : ⊧ OEnv ⇢ Const Exp ⇢ OTy ⇢ OExp ⇢ Pred :=
+    fun w0 G0 e τ0 e0 => WP (ocheck e G0 τ0) (fun _ θ1 e1 => e0[θ1] =ₚ e1).
+  Notation "Γ |--ₐ e ∷ t ~> e'" := (otyping_algo Γ e t e') (at level 80).
 
   Goal False. Proof.
   Ltac wlpauto := repeat (repeat wpsimpl; try
     match goal with
-    | IH: ∀ w G τ, bi_emp_valid (WLP (check ?e G τ) _)
-      |- environments.envs_entails _ (WLP (check ?e ?G ?τ) _) =>
+    | IH: ∀ w G τ, bi_emp_valid (WLP (ocheck ?e G τ) _)
+      |- environments.envs_entails _ (WLP (ocheck ?e ?G ?τ) _) =>
         iApply (wlp_mono' $! (IH _ G τ));
         iIntros (?w ?θ) "!>"; iIntros (?e') "#?"
     | |- environments.envs_entails _ (TPB _ _ _ _) =>
@@ -113,8 +114,8 @@ Section Generator.
   Ltac wpauto := repeat (repeat wpsimpl; try
     match goal with
     | IH: ∀ w (G : OEnv w) (t : OTy w),
-        bi_emp_valid (bi_impl _ (bi_impl _ (WP (check ?e G t) _)))
-        |- environments.envs_entails _ (WP (check ?e ?G ?t) _) =>
+        bi_emp_valid (bi_impl _ (bi_impl _ (WP (ocheck ?e G t) _)))
+        |- environments.envs_entails _ (WP (ocheck ?e ?G ?t) _) =>
         iPoseProof (IH _ G t with "[] []") as "-#IH"; clear IH;
         [ | | iApply (wp_mono' with "IH");
               iIntros (?w ?θ) "!>"; iIntros (?e') "#?"
@@ -122,28 +123,28 @@ Section Generator.
     end).
   Abort.
 
-  Lemma sound_aux e :
+  Lemma osoundness_aux e :
     ∀ w (G : OEnv w) (t : OTy w),
-      ⊢ WLP (check e G t) (fun w1 θ ee => G[θ] |--ₚ e; t[θ] ~> ee).
+      ⊢ WLP (ocheck e G t) (fun w1 θ ee => G[θ] |--ₚ e; t[θ] ~> ee).
   Proof.
     induction e; cbn; intros w G τ; iStartProof; wlpauto.
     destruct lookup eqn:HGx; wlpauto. iStopProof; pred_unfold.
     intros ->. constructor. now rewrite lookup_inst HGx.
   Qed.
 
-  Lemma sound (e : Exp) (w0 : World) (G0 : OEnv w0) t0 e0 :
-    TPB_algo G0 e t0 e0 ⊢ₚ G0 |--ₚ e; t0 ~> e0.
+  Lemma osoundness (e : Exp) {w} (Γ : OEnv w) τ e' :
+    Γ |--ₐ e ∷ τ ~> e'  ⊢ₚ  Γ |--ₚ e; τ ~> e'.
   Proof.
     iStartProof. rewrite wand_is_impl. rewrite -wp_impl.
-    iApply (wlp_mono' $! (@sound_aux e w0 G0 t0)).
-    iIntros "%w1 %θ1 !>" (e') "HT". iStopProof. pred_unfold.
+    iApply (wlp_mono' $! (@osoundness_aux e w Γ τ)).
+    iIntros "%w1 %θ1 !>" (e'') "HT". iStopProof. pred_unfold.
     intros HT Heq. now subst.
   Qed.
 
-  Lemma complete_aux {G e t ee} (T : G |-- e ∷ t ~> ee) :
+  Lemma ocompleteness_aux {G e t ee} (T : G |-- e ∷ t ~> ee) :
     ∀ w0 (G0 : OEnv w0) (t0 : OTy w0),
       ⊢ lift G =ₚ G0 ->ₚ lift t =ₚ t0 ->ₚ
-      WP (check e G0 t0) (fun _ _ e' => Open.pure ee =ₚ e')%P.
+      WP (ocheck e G0 t0) (fun _ _ e' => Open.pure ee =ₚ e')%P.
   Proof.
     induction T; cbn; intros w0 G0 t0; iStartProof; wpauto.
     destruct (G0 !! _) eqn:HGx; wpauto.
@@ -155,18 +156,18 @@ Section Generator.
       rewrite lookup_inst HGx in H. now discriminate H.
   Qed.
 
-  Lemma complete (e : Exp) w0 (G0 : OEnv w0) t0 e0 :
-    G0 |--ₚ e; t0 ~> e0 ⊢ₚ TPB_algo G0 e t0 e0.
+  Lemma ocompleteness {w} (Γ : OEnv w) (e : Exp) (τ : OTy w) (e' : OExp w) :
+    Γ |--ₚ e; τ ~> e'  ⊢ₚ  Γ |--ₐ e ∷ τ ~> e'.
   Proof.
-    unfold TPB_algo. pred_unfold. intros ι HT.
-    pose proof (complete_aux HT G0 t0) as [Hcompl].
+    unfold otyping_algo. pred_unfold. intros ι HT.
+    pose proof (ocompleteness_aux HT Γ τ) as [Hcompl].
     specialize (Hcompl ι (MkEmp _)). pred_unfold.
     rewrite ?inst_lift in Hcompl. specialize (Hcompl eq_refl eq_refl).
     revert Hcompl. apply wp_mono. intros w1 θ1 e1 <-. predsimpl.
   Qed.
 
-  Lemma correct {w} (Γ : OEnv w) (e : Exp) (τ : OTy w) (e' : OExp w) :
-    Γ |--ₚ e; τ ~> e' ⊣⊢ₚ TPB_algo Γ e τ e'.
-  Proof. iSplit. iApply complete. iApply sound. Qed.
+  Lemma ocorrectness {w} (Γ : OEnv w) (e : Exp) (τ : OTy w) (e' : OExp w) :
+    Γ |--ₚ e; τ ~> e'  ⊣⊢ₚ  Γ |--ₐ e ∷ τ ~> e'.
+  Proof. iSplit. iApply ocompleteness. iApply osoundness. Qed.
 
 End Generator.

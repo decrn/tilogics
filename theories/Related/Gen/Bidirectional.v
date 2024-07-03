@@ -43,13 +43,13 @@ Section Relatedness.
   Ltac relih :=
     match goal with
     | H: _ /\ _ |- _ => destruct H
-    | IH: RValid _ (Em.Gen.Bidirectional.check ?e) (Em.Shallow.Gen.Bidirectional.check ?e) |-
+    | IH: RValid _ (ocheck ?e) (check ?e) |-
         environments.envs_entails _ (RSat (RM _)
-          (Em.Gen.Bidirectional.check ?e _ _) (Em.Shallow.Gen.Bidirectional.check ?e _ _)) =>
+          (ocheck ?e _ _) (check ?e _ _)) =>
         iApply IH
-    | IH: RValid _ (Em.Gen.Bidirectional.synth ?e) (Em.Shallow.Gen.Bidirectional.synth ?e) |-
+    | IH: RValid _ (osynth ?e) (synth ?e) |-
         environments.envs_entails _ (RSat (RM _)
-          (Em.Gen.Bidirectional.synth ?e _) (Em.Shallow.Gen.Bidirectional.synth ?e _)) =>
+          (osynth ?e _) (synth ?e _)) =>
         iApply IH
     end.
   Ltac relauto :=
@@ -59,22 +59,22 @@ Section Relatedness.
   Abort.
 
   Lemma relatedness_of_generators (e : Exp) :
-    ℛ⟦REnv ↣ RTy ↣ RM RExp⟧ (Em.Gen.Bidirectional.check e) (Em.Shallow.Gen.Bidirectional.check e) /\
-    ℛ⟦REnv ↣ RM (RProd RTy RExp)⟧ (Em.Gen.Bidirectional.synth e) (Em.Shallow.Gen.Bidirectional.synth e).
+    ℛ⟦REnv ↣ RTy ↣ RM RExp⟧ (ocheck e) (check e) ∧
+    ℛ⟦REnv ↣ RM (RProd RTy RExp)⟧ (osynth e) (synth e).
   Proof.
     induction e;
       (split; cbn; iIntros (w dΓ sΓ) "#rΓ";
        [iIntros (dτ sτ) "#rτ"|]; relauto);
-      iPoseProof (rlookup x with "rΓ") as "rlk";
+    iPoseProof (rlookup x with "rΓ") as "rlk";
       destruct (dΓ !! x), (sΓ !! x); relauto.
   Qed.
 
   Lemma relatedness_of_algo_typing_synth :
     ℛ⟦REnv ↣ RConst Exp ↣ RTy ↣ RExp ↣ RPred⟧
-      (TPB_algo (M := DM))
-      (tpb_algorithmic_synth (M := SM)).
+      (otyping_algo_synth (M := DM))
+      (typing_algo_synth (M := SM)).
   Proof.
-    unfold RValid, TPB_algo, tpb_algorithmic_synth. cbn.
+    unfold RValid, otyping_algo_synth, typing_algo_synth. cbn.
     iIntros (w) "%dΓ %sΓ #rΓ %e %se %re %dτ %sτ #rτ %de1 %se1 #re2". subst se.
     destruct (relatedness_of_generators e) as [_ Hrel].
     iApply RWP. iApply Hrel; auto.
@@ -84,9 +84,9 @@ Section Relatedness.
 
   Lemma synth_correct_logrel `{!Shallow.Monad.Interface.TypeCheckLogicM SM}
     {w} (Γ : OEnv w) (e : Exp) (τ : OTy w) (e' : OExp w) :
-    TPB_algo (Θ := Prefix) (M := DM) Γ e τ e' ⊣⊢ₚ Γ |--ₚ e; τ ~> e'.
+    otyping_algo_synth (M := DM) Γ e τ e' ⊣⊢ₚ Γ |--ₚ e; τ ~> e'.
   Proof.
-    constructor. intros ι. simpl. rewrite synth_correct.
+    constructor. intros ι. simpl. rewrite correctness_synth.
     now apply relatedness_of_algo_typing_synth.
   Qed.
 

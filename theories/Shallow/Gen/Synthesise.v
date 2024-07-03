@@ -79,9 +79,9 @@ Section Elaborate.
   Context {wpM : WeakestPre M} {wlpM : WeakestLiberalPre M}
     {tclM : TypeCheckLogicM M}.
 
-  Definition tpb_algorithmic (Γ : Env) (e : Exp) (t : Ty) (ee : Exp) : Prop :=
+  Definition typing_algo (Γ : Env) (e : Exp) (t : Ty) (ee : Exp) : Prop :=
     WP (synth e Γ) (fun '(t',ee') => t = t' /\ ee = ee').
-  Notation "Γ |--ₐ e ∷ t ~> e'" := (tpb_algorithmic Γ e t e') (at level 80).
+  Notation "Γ |--ₐ e ∷ t ~> e'" := (typing_algo Γ e t e') (at level 80).
 
   Goal False. Proof.
   Ltac solve_complete :=
@@ -104,10 +104,10 @@ Section Elaborate.
        intros; eauto).
   Abort.
 
-  Lemma synth_complete (Γ : Env) (e ee : Exp) (t : Ty) :
-    Γ |-- e ∷ t ~> ee -> Γ |--ₐ e ∷ t ~> ee.
+  Lemma completeness (Γ : Env) (e ee : Exp) (t : Ty) :
+    Γ |-- e ∷ t ~> ee  →  Γ |--ₐ e ∷ t ~> ee.
   Proof.
-    unfold tpb_algorithmic.
+    unfold typing_algo.
     induction 1; cbn; solve_complete;
       try (eexists; solve_complete; fail).
   Qed.
@@ -130,19 +130,19 @@ Section Elaborate.
        intros; eauto).
   Abort.
 
-  Lemma synth_sound (Γ : Env) (e : Exp) t ee :
-    (Γ |--ₐ e ∷ t ~> ee) -> (Γ |-- e ∷ t ~> ee).
+  Lemma soundness (Γ : Env) (e : Exp) t ee :
+    Γ |--ₐ e ∷ t ~> ee  →  Γ |-- e ∷ t ~> ee.
   Proof.
     enough (WLP (synth e Γ) (fun '(t',ee') => Γ |-- e ∷ t' ~> ee')).
-    { unfold tpb_algorithmic. apply wp_impl. revert H.
+    { unfold typing_algo. apply wp_impl. revert H.
       apply wlp_mono. intros [t1 e1] HT [Heq1 Heq2]. now subst.
     }
     revert Γ. clear t ee.
     induction e; cbn; intros Γ; solve_sound.
   Qed.
 
-  Lemma synth_correct Γ e t ee :
-    Γ |-- e ∷ t ~> ee <-> Γ |--ₐ e ∷ t ~> ee.
-  Proof. split; auto using synth_complete, synth_sound. Qed.
+  Lemma correctness Γ e t ee :
+    Γ |-- e ∷ t ~> ee  ↔  Γ |--ₐ e ∷ t ~> ee.
+  Proof. split; auto using completeness, soundness. Qed.
 
 End Elaborate.

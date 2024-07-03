@@ -42,8 +42,8 @@ Section Relatedness.
   Goal False. Proof.
   Ltac relih :=
     match goal with
-    | IH: RValid _ (Em.Gen.Check.check ?e) (Em.Shallow.Gen.Check.check ?e) |-
-        environments.envs_entails _ (RSat (RM _) (Em.Gen.Check.check ?e _ _) (Em.Shallow.Gen.Check.check ?e _ _)) =>
+    | IH: RValid _ (ocheck ?e) (check ?e) |-
+        environments.envs_entails _ (RSat (RM _) (ocheck ?e _ _) (check ?e _ _)) =>
         iApply IH
     end.
   Ltac relauto :=
@@ -53,7 +53,7 @@ Section Relatedness.
   Abort.
 
   Lemma relatedness_of_generators (e : Exp) :
-    ℛ⟦REnv ↣ RTy ↣ RM RExp⟧ (Em.Gen.Check.check e) (Em.Shallow.Gen.Check.check e).
+    ℛ⟦REnv ↣ RTy ↣ RM RExp⟧ (ocheck e) (check e).
   Proof.
     induction e; iIntros (w dΓ sΓ) "#rΓ"; iIntros (dτ sτ) "#rτ"; cbn; relauto.
     iPoseProof (rlookup x with "rΓ") as "rlk".
@@ -62,21 +62,20 @@ Section Relatedness.
 
   Lemma relatedness_of_algo_typing :
     ℛ⟦REnv ↣ RConst Exp ↣ RTy ↣ RExp ↣ RPred⟧
-      (TPB_algo (M := DM))
-      (tpb_algorithmic (M := SM)).
+      (otyping_algo (M := DM))
+      (typing_algo (M := SM)).
   Proof.
-    unfold RValid, TPB_algo, tpb_algorithmic. cbn.
-    iIntros (w) "%dΓ %sΓ #rΓ %e %se %re %dτ %sτ #rτ %de1 %se1 #re2". subst se.
-    iApply RWP. iApply relatedness_of_generators; auto.
-    iIntros "%w1 %θ1 !>". iIntros (de' se') "#re'".
-    iApply req; auto.
+    unfold RValid, otyping_algo, typing_algo. cbn.
+    iIntros (w) "%dΓ %sΓ #rΓ %e %se %re %dτ %sτ #rτ %de1 %se1 #re2".
+    subst se. iApply RWP. iApply relatedness_of_generators; auto.
+    iIntros "%w1 %θ1 !>" (de' se') "#re'". iApply req; auto.
   Qed.
 
   Lemma generate_correct_logrel `{!Shallow.Monad.Interface.TypeCheckLogicM SM}
     {w} (Γ : OEnv w) (e : Exp) (τ : OTy w) (e' : OExp w) :
-    TPB_algo (Θ := Prefix) (M := DM) Γ e τ e' ⊣⊢ₚ Γ |--ₚ e; τ ~> e'.
+    otyping_algo (M := DM) Γ e τ e' ⊣⊢ₚ Γ |--ₚ e; τ ~> e'.
   Proof.
-    constructor. intros ι. simpl. rewrite check_correct.
+    constructor. intros ι. simpl. rewrite correctness.
     now apply relatedness_of_algo_typing.
   Qed.
 

@@ -28,11 +28,8 @@
 
 From Coq Require Import
   Classes.Morphisms_Prop
-(*   Lists.List *)
   Program.Tactics
   Strings.String.
-(* From Equations Require Import *)
-(*   Equations. *)
 From stdpp Require Import
   base gmap.
 From Em Require Import
@@ -44,39 +41,39 @@ From Em Require Import
 
 Section Elaborate.
 
-    Fixpoint check `{MPure M, MBind M, MFail M, TypeCheckM M}
-      (e : Exp) (Γ : Env) (t : Ty) : M Exp :=
-      match e with
-      | exp.var x =>
-          match lookup x Γ with
-          | Some t' => equals t t';; pure e
-          | None    => fail
-          end
-      | exp.false => equals t ty.bool ;; pure e
-      | exp.true  => equals t ty.bool ;; pure e
-      | exp.ifte e1 e2 e3 =>
-          e1' ← check e1 Γ ty.bool;
-          e2' ← check e2 Γ t;
-          e3' ← check e3 Γ t;
-          pure (exp.ifte e1' e2' e3')
-      | exp.absu x e =>
-          t1 ← pick;
-          t2 ← pick;
-          _  ← equals t (ty.func t1 t2);
-          e' ← check e (Γ ,, x∷t1) t2;
-          pure (exp.abst x t1 e')
-      | exp.abst x t1 e =>
-          t2 ← pick;
-          _  ← equals t (ty.func t1 t2);
-          e' ← check e (Γ ,, x∷t1) t2;
-          pure (exp.abst x t1 e')
-      | exp.app e1 e2 =>
-          '(t2,e2') ← synth e2 Γ;
-          e1' ← check e1 Γ (ty.func t2 t);
-          pure (exp.app e1' e2')
+  Fixpoint check `{MPure M, MBind M, MFail M, TypeCheckM M}
+    (e : Exp) (Γ : Env) (t : Ty) : M Exp :=
+    match e with
+    | exp.var x =>
+        match lookup x Γ with
+        | Some t' => equals t t';; pure e
+        | None    => fail
         end
+    | exp.false => equals t ty.bool ;; pure e
+    | exp.true  => equals t ty.bool ;; pure e
+    | exp.ifte e1 e2 e3 =>
+        e1' ← check e1 Γ ty.bool;
+        e2' ← check e2 Γ t;
+        e3' ← check e3 Γ t;
+        pure (exp.ifte e1' e2' e3')
+    | exp.absu x e =>
+        t1 ← pick;
+        t2 ← pick;
+        _  ← equals t (ty.func t1 t2);
+        e' ← check e (Γ ,, x∷t1) t2;
+        pure (exp.abst x t1 e')
+    | exp.abst x t1 e =>
+        t2 ← pick;
+        _  ← equals t (ty.func t1 t2);
+        e' ← check e (Γ ,, x∷t1) t2;
+        pure (exp.abst x t1 e')
+    | exp.app e1 e2 =>
+        '(t2,e2') ← synth e2 Γ;
+        e1' ← check e1 Γ (ty.func t2 t);
+        pure (exp.app e1' e2')
+    end
   with synth `{MPure M, MBind M, MFail M, TypeCheckM M}
-         (e : Exp) (Γ : Env) : M (Ty * Exp)%type :=
+    (e : Exp) (Γ : Env) : M (Ty * Exp)%type :=
     match e with
     | exp.var x =>
         match lookup x Γ with
@@ -110,12 +107,13 @@ Section Elaborate.
   Context {wpM : WeakestPre M} {wlpM : WeakestLiberalPre M}
     {tclM : TypeCheckLogicM M}.
 
-  Definition tpb_algorithmic_synth (Γ : Env) (e : Exp) (t : Ty) (ee : Exp) : Prop :=
+  Definition typing_algo_synth (Γ : Env) (e : Exp) (t : Ty) (ee : Exp) : Prop :=
     WP (synth e Γ) (fun '(t',ee') => t = t' /\ ee = ee').
-  Notation "Γ |--ₐ e ∷ t ~> e'" := (tpb_algorithmic_synth Γ e t e') (at level 80).
+  Notation "Γ |--ₐ e ↓ t ~> e'" := (typing_algo_synth Γ e t e') (at level 75).
 
-  Definition tpb_algorithmic_check (Γ : Env) (e : Exp) (t : Ty) (ee : Exp) : Prop :=
+  Definition typing_algo_check (Γ : Env) (e : Exp) (t : Ty) (ee : Exp) : Prop :=
     WP (check e Γ t) (fun ee' => ee = ee').
+  Notation "Γ |--ₐ e ↑ t ~> e'" := (typing_algo_check Γ e t e') (at level 75).
 
   Goal False. Proof.
   Ltac solve_complete :=
@@ -140,10 +138,10 @@ Section Elaborate.
        intros; eauto).
   Abort.
 
-  Lemma complete (Γ : Env) (e ee : Exp) (t : Ty) :
-    Γ |-- e ∷ t ~> ee -> tpb_algorithmic_check Γ e t ee /\ Γ |--ₐ e ∷ t ~> ee.
+  Lemma completeness (Γ : Env) (e ee : Exp) (t : Ty) :
+    Γ |-- e ∷ t ~> ee  →  Γ |--ₐ e ↑ t ~> ee  ∧  Γ |--ₐ e ↓ t ~> ee.
   Proof.
-    unfold tpb_algorithmic_check, tpb_algorithmic_synth.
+    unfold typing_algo_check, typing_algo_synth.
     induction 1; cbn; solve_complete.
   Qed.
 
@@ -155,11 +153,11 @@ Section Elaborate.
        try
          match goal with
          | H: _ /\ _ |- _ => destruct H
-         | IH : forall Γ1 t1, WLP (check ?e Γ1 t1) _
-                          |- WLP (check ?e ?Γ2 ?t2) _ =>
+         | IH : ∀ Γ1 t1, WLP (check ?e Γ1 t1) _
+           |- WLP (check ?e ?Γ2 ?t2) _ =>
              specialize (IH Γ2 t2); revert IH; apply wlp_mono; intros
-         | IH : forall Γ, WLP (synth ?e Γ) _
-                          |- WLP (synth ?e ?Γ) _ =>
+         | IH : ∀ Γ, WLP (synth ?e Γ) _
+           |- WLP (synth ?e ?Γ) _ =>
              specialize (IH Γ); revert IH; apply wlp_mono; intros
          | |- tpb _ _ _ _    => econstructor
          | |- WLP (match ?t with _ => _ end) _ => destruct t eqn:?
@@ -167,35 +165,35 @@ Section Elaborate.
        intros; eauto).
   Abort.
 
-  Lemma sound_aux e :
-    (∀ Γ t, WLP (check e Γ t) (fun ee => Γ |-- e ∷ t ~> ee)) /\
+  Lemma soundness_aux e :
+    (∀ Γ t, WLP (check e Γ t) (fun ee => Γ |-- e ∷ t ~> ee)) ∧
     (∀ Γ,   WLP (synth e Γ) (fun '(t,ee) => Γ |-- e ∷ t ~> ee)).
   Proof.
     induction e; cbn; (split; [intros Γ ?t | intros Γ]); solve_sound.
   Qed.
 
-  Lemma check_sound (Γ : Env) (e : Exp) t ee :
-    tpb_algorithmic_check Γ e t ee -> (Γ |-- e ∷ t ~> ee).
+  Lemma soundness_check (Γ : Env) (e : Exp) t ee :
+    Γ |--ₐ e ↑ t ~> ee  →  Γ |-- e ∷ t ~> ee.
   Proof.
-    unfold tpb_algorithmic_check. apply wp_impl.
-    eapply wlp_mono; [| apply sound_aux].
+    unfold typing_algo_check. apply wp_impl.
+    eapply wlp_mono; [| apply soundness_aux].
     intros ? ? ?; now subst.
   Qed.
 
-  Lemma synth_sound (Γ : Env) (e : Exp) t ee :
-    (Γ |--ₐ e ∷ t ~> ee) -> (Γ |-- e ∷ t ~> ee).
+  Lemma soundness_synth (Γ : Env) (e : Exp) t ee :
+    Γ |--ₐ e ↓ t ~> ee  →  Γ |-- e ∷ t ~> ee.
   Proof.
-    unfold tpb_algorithmic_synth. apply wp_impl.
-    eapply wlp_mono; [| apply sound_aux].
+    unfold typing_algo_synth. apply wp_impl.
+    eapply wlp_mono; [| apply soundness_aux].
     intros [] ? []; now subst.
   Qed.
 
-  Lemma check_correct Γ e t ee :
-    Γ |-- e ∷ t ~> ee <-> tpb_algorithmic_check Γ e t ee.
-  Proof. split. apply complete. apply check_sound. Qed.
+  Lemma correctness_check Γ e t ee :
+    Γ |-- e ∷ t ~> ee  ↔  Γ |--ₐ e ↑ t ~> ee.
+  Proof. split. apply completeness. apply soundness_check. Qed.
 
-  Lemma synth_correct Γ e t ee :
-    Γ |-- e ∷ t ~> ee <-> Γ |--ₐ e ∷ t ~> ee.
-  Proof. split. apply complete. apply synth_sound. Qed.
+  Lemma correctness_synth Γ e t ee :
+    Γ |-- e ∷ t ~> ee  ↔  Γ |--ₐ e ↓ t ~> ee.
+  Proof. split. apply completeness. apply soundness_synth. Qed.
 
 End Elaborate.

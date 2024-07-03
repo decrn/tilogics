@@ -48,7 +48,8 @@ Section Relatedness.
      Note we do not define a universe of types first on which we then define a
      deep, shallow and relational semantics by recursion. We could carve out a
      subset that is contains everything that we use in the definition of the
-     constraint generator, but there are some technical usability issues.
+     constraint generator, but there are some technical usability issues related
+     to inverting denotations functions.
      Instead, we always quantify over these three pieces of information:
        ∀ (DA : OType) (SA : Type) (RA : Rel DA SA)
    *)
@@ -70,8 +71,8 @@ Section Relatedness.
   Goal False. Proof.
   Ltac relih :=
     match goal with
-    | IH: RValid _ (generate ?e) (synth ?e) |-
-        environments.envs_entails _ (RSat (RM _) (generate ?e _) (synth ?e _)) =>
+    | IH: RValid _ (osynth ?e) (synth ?e) |-
+        environments.envs_entails _ (RSat (RM _) (osynth ?e _) (synth ?e _)) =>
         iApply IH
     end.
   Ltac relauto :=
@@ -81,7 +82,7 @@ Section Relatedness.
   Abort.
 
   Lemma relatedness_of_generators (e : Exp) :
-    ℛ⟦REnv ↣ RM (RProd RTy RExp)⟧ (generate e) (synth e).
+    ℛ⟦REnv ↣ RM (RProd RTy RExp)⟧ (osynth e) (synth e).
   Proof.
     induction e; iIntros (w dΓ sΓ) "#rΓ"; cbn; relauto.
     iPoseProof (rlookup x with "rΓ") as "rlk".
@@ -90,10 +91,10 @@ Section Relatedness.
 
   Lemma relatedness_of_algo_typing :
     ℛ⟦REnv ↣ RConst Exp ↣ RTy ↣ RExp ↣ RPred⟧
-      (TPB_algo (M := DM))
-      (tpb_algorithmic (M := SM)).
+      (otyping_algo (M := DM))
+      (typing_algo (M := SM)).
   Proof.
-    unfold RValid, TPB_algo, tpb_algorithmic. cbn.
+    unfold RValid, otyping_algo, typing_algo. cbn.
     iIntros (w) "%dΓ %sΓ #rΓ %e %se %re %dτ %sτ #rτ %de1 %se1 #re2". subst se.
     iApply RWP. iApply relatedness_of_generators; auto.
     iIntros "%w1 %θ1 !>". iIntros ([dτ'' de'] [sτ' se']) "[#rτ' #re']".
@@ -102,9 +103,9 @@ Section Relatedness.
 
   Lemma generate_correct_logrel `{!Shallow.Monad.Interface.TypeCheckLogicM SM}
     {w} (Γ : OEnv w) (e : Exp) (τ : OTy w) (e' : OExp w) :
-    TPB_algo (Θ := Prefix) (M := DM) Γ e τ e' ⊣⊢ₚ Γ |--ₚ e; τ ~> e'.
+    otyping_algo (M := DM) Γ e τ e'  ⊣⊢ₚ  Γ |--ₚ e; τ ~> e'.
   Proof.
-    constructor. intros ι. simpl. rewrite synth_correct.
+    constructor. intros ι. simpl. rewrite correctness.
     now apply relatedness_of_algo_typing.
   Qed.
 
