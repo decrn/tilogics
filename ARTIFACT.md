@@ -2,6 +2,8 @@
 
 Paper: Type Inference Logics
 
+## Introduction
+
 This artifact contains the supplementary code to our paper titled Type Inference Logics.
 The code is comprised of two parts:
 
@@ -26,7 +28,7 @@ Please refer to the sections below in this document for detailed navigation of t
 
 To read the code itself, we propose loading it into your preferred code editor locally.
 
-However, to check the results that we claim in the paper, additional software is needed.
+However, to check the claims made in the paper, additional software is needed.
 We have prepared a prebuilt Docker image containing the necessary software. If you prefer manual installation, see the next section below.
 
 Proceed by downloading the prebuilt image and running it with Docker:
@@ -62,7 +64,6 @@ Note for macOS users: you might need to install a version of GNU utils and use `
 
 The primary artifact is a Coq project that implements the technical machinery discussed in the paper.
 
-The following tables relates concepts discussed in the paper to specific code in the Coq development.
 
 The assumptions, i.e. unimplemented or unproven parts, can be printed with the
 Coq command [`Print Assumptions`](https://coq.inria.fr/refman/proof-engine/vernacular-commands.html#coq:cmd.Print-Assumptions).
@@ -84,6 +85,7 @@ Assumptions of decidability of typing :
 Closed under the global context
 ```
 
+The following tables relates concepts discussed in the paper to specific code in the Coq development.
 
 ### Section 2: Overview
 
@@ -160,4 +162,13 @@ cabal run em examples/full-adder.stlcb
 ```
 
 The result is a type-reconstructed program.
+
+
+## Benchmarking
+
+In order to benchmark the performance of the extracted code, we provide a small synthetic benchmark that infers (and elaborates) the types
+of increasingly larger Church numerals and (possibly) worst-case terms.
+
+The scripts to generate these terms can be found in the `util` directory.
+
 
