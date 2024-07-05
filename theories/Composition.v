@@ -97,11 +97,12 @@ Definition typing_algo (Γ : Env) (e : Exp) (τ : Ty) (e' : Exp) : Prop :=
       ∃ ι : Assignment w1, τ = inst τ1 ι ∧ e' = inst e1 ι
   | None => False
   end.
+Notation "Γ |--ₐ e ∷ t ~> e'" := (typing_algo Γ e t e') (at level 75).
 
 (* The correctness theorem expresses equivalence of algorithmic and
    declarative typing. *)
 Theorem correctness (Γ : Env) (e : Exp) (τ : Ty) (e' : Exp) :
-  typing_algo Γ e τ e' ↔ tpb Γ e τ e'.
+  Γ |--ₐ e ∷ τ ~> e' ↔ Γ |-- e ∷ τ ~> e'.
 Proof.
   generalize (ocorrectness (M := Free) (w:=world.nil)
                 (lift Γ) e (lift τ) (lift e')).

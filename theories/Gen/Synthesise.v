@@ -87,7 +87,7 @@ Section Generator.
     WP (osynth e G0)
       (fun w1 (θ1 : Θ w0 w1) '(t1,e1) =>
          t0[θ1] =ₚ t1 /\ₚ e0[θ1] =ₚ e1).
-  Notation "Γ |--ₐ e ∷ t ~> e'" := (otyping_algo Γ e t e') (at level 80).
+  Notation "Γ |--ₐ e ∷ t ~> e'" := (otyping_algo Γ e t e') (at level 75).
 
   Goal False. Proof.
   Ltac wlpindhyp :=

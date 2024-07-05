@@ -133,7 +133,7 @@ Section Implementation.
         end.
     #[global] Arguments aflex α {αIn} τ [w1] _.
 
-    Definition atrav : (OTy ⇢ OTy ⇢ C)%W w :=
+    Definition atrav : AUnifier w :=
       fix atrav s t {struct s} :=
         match s , t with
         | @oty.evar _ α _  , t               => aflex α t

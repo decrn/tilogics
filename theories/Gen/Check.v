@@ -98,7 +98,7 @@ Section Generator.
 
   Definition otyping_algo : ⊧ OEnv ⇢ Const Exp ⇢ OTy ⇢ OExp ⇢ Pred :=
     fun w0 G0 e τ0 e0 => WP (ocheck e G0 τ0) (fun _ θ1 e1 => e0[θ1] =ₚ e1).
-  Notation "Γ |--ₐ e ∷ t ~> e'" := (otyping_algo Γ e t e') (at level 80).
+  Notation "Γ |--ₐ e ∷ t ~> e'" := (otyping_algo Γ e t e') (at level 75).
 
   Goal False. Proof.
   Ltac wlpauto := repeat (repeat wpsimpl; try

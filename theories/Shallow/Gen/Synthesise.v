@@ -81,7 +81,7 @@ Section Elaborate.
 
   Definition typing_algo (Γ : Env) (e : Exp) (t : Ty) (ee : Exp) : Prop :=
     WP (synth e Γ) (fun '(t',ee') => t = t' /\ ee = ee').
-  Notation "Γ |--ₐ e ∷ t ~> e'" := (typing_algo Γ e t e') (at level 80).
+  Notation "Γ |--ₐ e ∷ t ~> e'" := (typing_algo Γ e t e') (at level 75).
 
   Goal False. Proof.
   Ltac solve_complete :=
