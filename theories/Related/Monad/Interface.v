@@ -69,7 +69,7 @@ Module lr.
   (* This instance can be used for any (first-class) symbolic data that can be
        instantiated with a valuation, i.e. symbolic terms, stores, heaps etc. *)
   Definition RInst DA SA {instA : Inst DA SA} : Rel DA SA :=
-    MkRel (fun w d s ι => s = inst d ι)%P.
+    MkRel (fun w d s ι => s = inst d ι).
   #[global] Arguments RInst _ _ {_} : simpl never.
 
   (* Similarly, we can "upgrade" a relation between a (D)eep and (S)hallow type,
@@ -80,7 +80,7 @@ Module lr.
 
   (* For functions/impl: related inputs go to related outputs *)
   #[export] Instance RImpl {DA SA DB SB} (RA : Rel DA SA) (RB : Rel DB SB) :
-    Rel (DA ⇢ DB) (SA -> SB) :=
+    Rel (DA ↠ DB) (SA -> SB) :=
     MkRel
       (fun w df sf =>
          ∀ (da : DA w) (sa : SA),
@@ -152,7 +152,7 @@ Module lr.
   Proof. firstorder. Qed.
 
   Lemma req [DA SA] {instA : Inst DA SA} w :
-    ⊢ RSat (RInst DA SA ↣ RInst DA SA ↣ RPred) (eqₚ (w:=w)) eq.
+    ⊢ RSat (RInst DA SA ↣ RInst DA SA ↣ RPred) (oeq (w:=w)) eq.
   Proof. simpl; do 3 (constructor; intros ?); now subst.  Qed.
 
   Lemma rinsert x w :
@@ -177,8 +177,8 @@ Module lr.
   Qed.
 
   Lemma rwpstep {w α} (SP : Ty → Prop) (DP : Pred (w ، α)) :
-    (wlp step (∀ₚ τ : Ty, lift τ =ₚ oty.evar world.in_zero -∗ RSat RPred DP (SP τ)))%I ⊢ₚ
-      RSat RPred (wp step DP) (∃ t : Ty, SP t).
+    (wlp step (∀ τ : Ty, lift τ ≈ oty.evar world.in_zero -∗ RSat RPred DP (SP τ)))%I ⊢
+      RSat RPred (wp step DP) (∃ t : Ty, SP t)%type.
   Proof.
     constructor; simpl; intros ? ?. split.
     - intros (ι' & Heq & HP). specialize (H _ Heq).

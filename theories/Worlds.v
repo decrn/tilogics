@@ -318,7 +318,7 @@ Bind    Scope box_scope with Box.
 Delimit Scope box_scope with B.
 
 Notation "⊧ A" := (Valid A%W) (at level 200, right associativity) : type_scope.
-Notation "A ⇢ B" := (Impl A B)
+Notation "A ↠ B" := (Impl A B)
   (at level 99, B at level 200, right associativity) : indexed_scope.
 
 Notation "A * B" := (Prod A%W B%W) : indexed_scope.
@@ -332,7 +332,7 @@ Notation "◻ A" := (Box _ A%W)
 (* Notation "◇ A" := (Diamond _ A) *)
 (*   (at level 9, right associativity, format "◇ A") : indexed_scope. *)
 
-Definition _4 {Θ} {transΘ : Trans Θ} {A} : ⊧ Box Θ A ⇢ Box Θ (Box Θ A) :=
+Definition _4 {Θ} {transΘ : Trans Θ} {A} : ⊧ Box Θ A ↠ Box Θ (Box Θ A) :=
   fun w0 a w1 θ1 w2 θ2 => a w2 (trans θ1 θ2).
 #[global] Arguments _4 {Θ _ A} [_] _ [_] _ [_] _.
 

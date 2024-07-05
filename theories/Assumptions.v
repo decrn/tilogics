@@ -1,5 +1,5 @@
 (******************************************************************************)
-(* Copyright (c) 2023 Denis Carnier, Steven Keuchel                           *)
+(* Copyright (c) 2024 Denis Carnier, Steven Keuchel                           *)
 (* All rights reserved.                                                       *)
 (*                                                                            *)
 (* Redistribution and use in source and binary forms, with or without         *)
@@ -26,35 +26,19 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Em Require Export Monad.Free Monad.Prenex.
-Import option.notations Pred Pred.Sub Pred.notations Pred.proofmode.
+From Em Require Composition Gen.Bidirectional Gen.Check Gen.Synthesise.
 
-#[local] Set Implicit Arguments.
+Goal True. idtac "Assumptions of check generator correctness:". Abort.
+Print Assumptions Gen.Check.ocorrectness.
 
-Definition prenex {A} : ⊧ Free A ↠ Prenex A :=
-  fix pr {w} m {struct m} :=
-    match m with
-    | Free.Ret a => pure a
-    | Free.Fail => None
-    | Free.Equalsk t1 t2 m =>
-        '(existT w1 (r1, (cs, a))) <- pr m;;
-        let t1' := subst t1 r1 in
-        let t2' := subst t2 r1 in
-        let c   := (t1', t2') in
-        Some (existT w1 (r1, (cons c cs, a)))
-    | Free.Pickk α m =>
-        '(existT w1 (r1, csa)) <- pr m ;;
-        Some (existT w1 (step ⊙ r1, csa))
-    end.
+Goal True. idtac "Assumptions of synth generator correctness:". Abort.
+Print Assumptions Gen.Synthesise.ocorrectness.
 
-Lemma prenex_correct {A w} (m : Free A w) (Q : Box Prefix (A ↠ Pred) w) :
-  WP (prenex m) Q ⊣⊢ WP m Q.
-Proof.
-  induction m; predsimpl.
-  - rewrite <- IHm. clear IHm.
-    destruct (prenex m) as [(w1 & θ1 & C1 & a1)|]; predsimpl.
-    rewrite Sub.and_wp_r. apply Sub.proper_wp_bientails. predsimpl.
-    now rewrite <- derived_laws.bi.and_assoc.
-  - rewrite <- IHm. clear IHm.
-    destruct (prenex m) as [(w1 & θ1 & C1 & a1)|]; predsimpl.
-Qed.
+Goal True. idtac "Assumptions of bidirectional generator correctness:". Abort.
+Print Assumptions Gen.Bidirectional.ocorrectness.
+
+Goal True. idtac "Assumptions of end-to-end correctness:". Abort.
+Print Assumptions Composition.correctness.
+
+Goal True. idtac "Assumptions of decidability of typing :". Abort.
+Print Assumptions Composition.decidability.

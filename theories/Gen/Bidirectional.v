@@ -44,7 +44,7 @@ Section Generator.
      proofs. *)
   Fixpoint ocheck `{lkReflΘ: LkRefl Θ, lkTransΘ: LkTrans Θ, lkStepΘ: LkStep Θ,
     reflTransΘ: !ReflTrans Θ, pureM:Pure M, bindM:Bind Θ M, failM:Fail M,
-    tcM:TypeCheckM M} (e : Exp) : ⊧ OEnv ⇢ OTy ⇢ M OExp :=
+    tcM:TypeCheckM M} (e : Exp) : ⊧ OEnv ↠ OTy ↠ M OExp :=
     fun w Γ τ =>
       match e with
       | exp.var x =>
@@ -82,7 +82,7 @@ Section Generator.
       end
   with osynth `{lkReflΘ: LkRefl Θ, lkTransΘ: LkTrans Θ, lkStepΘ: LkStep Θ,
     reflTransΘ: !ReflTrans Θ, pureM:Pure M, bindM:Bind Θ M, failM:Fail M,
-    tcM:TypeCheckM M} (e : Exp) : ⊧ OEnv ⇢ M (OTy * OExp) :=
+    tcM:TypeCheckM M} (e : Exp) : ⊧ OEnv ↠ M (OTy * OExp) :=
     fun w Γ =>
       match e with
       | exp.var x =>
@@ -113,19 +113,16 @@ Section Generator.
           pure (τ2[_], oexp.app e1'[_] e2')
       end.
 
-  Import Pred Pred.notations Pred.proofmode iris.proofmode.tactics.
-  Open Scope pred_scope.
-
   Context `{lkReflΘ: LkRefl Θ, lkTransΘ: LkTrans Θ, lkStepΘ: LkStep Θ} {reflTransΘ: ReflTrans Θ}.
   Context `{pureM:Pure M, bindM:Bind Θ M, failM:Fail M, tcM:TypeCheckM M}.
   Context {wpM : WeakestPre Θ M} {wlpM : WeakestLiberalPre Θ M}
     {tcLogicM : TypeCheckLogicM Θ M}.
 
-  Definition otyping_algo_synth : ⊧ OEnv ⇢ Const Exp ⇢ OTy ⇢ OExp ⇢ Pred :=
+  Definition otyping_algo_synth : ⊧ OEnv ↠ Const Exp ↠ OTy ↠ OExp ↠ Pred :=
     fun w0 G0 e t0 e0 =>
     WP (osynth e G0)
       (fun w1 (θ1 : Θ w0 w1) '(t1,e1) =>
-         t0[θ1] =ₚ t1 /\ₚ e0[θ1] =ₚ e1).
+         t0[θ1] ≈ t1 ∧ e0[θ1] ≈ e1)%I.
   Notation "Γ |--ₐ e ↓ t ~> e'" := (otyping_algo_synth Γ e t e') (at level 75).
 
   Goal False. Proof.
@@ -143,7 +140,7 @@ Section Generator.
            |- environments.envs_entails _ (WLP (ocheck ?e ?G ?τ) _) =>
              iApply (wlp_mono' $! (IH _ G τ));
              iIntros (?w ?θ) "!>"; iIntros (?e') "#?"
-         | |- environments.envs_entails _ (TPB _ _ _ _) =>
+         | |- environments.envs_entails _ (otyping_decl _ _ _ _) =>
              predsimpl;
              iStopProof;
              pred_unfold;
@@ -187,7 +184,7 @@ Section Generator.
   Qed.
 
   Lemma osoundness (e : Exp) (w0 : World) (G0 : OEnv w0) t0 e0 :
-    G0 |--ₐ e ↓ t0 ~> e0  ⊢ₚ  G0 |--ₚ e; t0 ~> e0.
+    G0 |--ₐ e ↓ t0 ~> e0  ⊢  G0 |--ₚ e; t0 ~> e0.
   Proof.
     iStartProof. rewrite wand_is_impl. iApply wp_impl.
     destruct (@osoundness_aux e) as [_ Hsound].
@@ -198,11 +195,11 @@ Section Generator.
 
   Lemma ocompleteness_aux {G e t ee} (T : G |-- e ∷ t ~> ee) :
     (∀ w0 (G0 : OEnv w0) (t0 : OTy w0),
-      ⊢ lift G =ₚ G0 ->ₚ lift t =ₚ t0 ->ₚ
-        WP (ocheck e G0 t0) (fun _ _ e' => Open.pure ee =ₚ e')%P) /\
+      ⊢ lift G ≈ G0 → lift t ≈ t0 →
+        WP (ocheck e G0 t0) (fun _ _ e' => Open.pure ee ≈ e')) ∧
     (∀ w0 (G0 : OEnv w0),
-      ⊢ lift G =ₚ G0 →
-        WP (osynth e G0) (fun _ _ '(t',e') => lift t =ₚ t' /\ₚ Open.pure ee =ₚ e')%P).
+      ⊢ lift G ≈ G0 →
+        WP (osynth e G0) (fun _ _ '(t',e') => lift t ≈ t' ∧ Open.pure ee ≈ e')).
   Proof.
     induction T; cbn; (split; [intros ? G0 ?|intros ? G0]); iStartProof; wpauto.
     - destruct (G0 !! _) eqn:HGx; wpauto.
@@ -217,7 +214,7 @@ Section Generator.
   Qed.
 
   Lemma ocompleteness (e : Exp) (w0 : World) (G0 : OEnv w0) t0 e0 :
-    G0 |--ₚ e; t0 ~> e0  ⊢ₚ  G0 |--ₐ e ↓ t0 ~> e0.
+    G0 |--ₚ e; t0 ~> e0  ⊢  G0 |--ₐ e ↓ t0 ~> e0.
   Proof.
     pred_unfold. intros ι HT. destruct (ocompleteness_aux HT) as [_ Hcompl].
     specialize (Hcompl _ G0). destruct Hcompl as [Hcompl].
@@ -227,7 +224,7 @@ Section Generator.
   Qed.
 
   Lemma ocorrectness {w} (Γ : OEnv w) (e : Exp) (τ : OTy w) (e' : OExp w) :
-    Γ |--ₚ e; τ ~> e'  ⊣⊢ₚ  Γ |--ₐ e ↓ τ ~> e'.
+    Γ |--ₚ e; τ ~> e'  ⊣⊢  Γ |--ₐ e ↓ τ ~> e'.
   Proof. iSplit. iApply ocompleteness. iApply osoundness. Qed.
 
 End Generator.

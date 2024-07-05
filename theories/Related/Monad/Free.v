@@ -56,7 +56,7 @@ Section Relation.
     | D.Equalsk d1 d2 dk , S.Equalsk s1 s2 sk =>
         RSat RTy d1 s1 ∧ RSat RTy d2 s2 ∧ RawFree dk sk
     | D.Pickk α k        , S.Pickk f          =>
-        wlp step (∀ τ : Ty, eqₚ (lift τ) (oty.evar world.in_zero) -∗ RawFree k (f τ))
+        wlp step (∀ τ : Ty, lift τ ≈ oty.evar world.in_zero -∗ RawFree k (f τ))
     | _           , _         => False
     end%I.
 

@@ -39,7 +39,7 @@ Import MonadNotations Pred Pred.Sub Pred.notations Pred.proofmode
   fun A w a => Some (existT w (refl, (List.nil, a))).
 #[export] Instance bind_prenex : Bind Prefix Prenex :=
   fun A B w (m : Solved Prefix (List (OTy * OTy) * A) w)
-      (f : Box Prefix (A ⇢ Solved Prefix (List (OTy * OTy) * B)) w) =>
+      (f : Box Prefix (A ↠ Solved Prefix (List (OTy * OTy) * B)) w) =>
     '(C1,a1) <- m ;;
     '(C2,b2) <- f _ _ a1 ;;
     pure (subst C1 _ ++ C2, b2).
@@ -56,11 +56,11 @@ Import MonadNotations Pred Pred.Sub Pred.notations Pred.proofmode
 
 #[export] Instance wp_prenex : WeakestPre Prefix Prenex :=
   fun A w o Q => wp_option o (fun d =>
-    wp_diamond d (fun w1 θ1 '(C,a) => instpred C /\ₚ Q w1 θ1 a))%P.
+    wp_diamond d (fun w1 θ1 '(C,a) => instpred C ∧ Q w1 θ1 a))%I.
 
 #[export] Instance wlp_prenex : WeakestLiberalPre Prefix Prenex :=
   fun A w o Q => wlp_option o (fun d =>
-    wlp_diamond d (fun w1 θ1 '(C,a) => instpred C ->ₚ Q w1 θ1 a))%P.
+    wlp_diamond d (fun w1 θ1 '(C,a) => instpred C → Q w1 θ1 a))%I.
 
 #[export] Instance axiomatic_prenex : AxiomaticSemantics Prefix Prenex.
 Proof.

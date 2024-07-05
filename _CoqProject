@@ -3,6 +3,7 @@
 -arg "-w -notation-overridden"
 -Q theories Em
 
+theories/Assumptions.v
 theories/BaseLogic.v
 theories/Composition.v
 theories/Environment.v

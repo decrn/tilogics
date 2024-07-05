@@ -35,7 +35,7 @@ Import world.notations.
 #[local] Set Implicit Arguments.
 
 Class Subst (A : OType) : Type :=
-  subst : forall {Θ}, ⊧ A ⇢ Box Θ A.
+  subst : forall {Θ}, ⊧ A ↠ Box Θ A.
 #[global] Arguments subst {_ _ _} [w] _ [_] _.
 
 #[export] Instance subst_ty : Subst OTy :=

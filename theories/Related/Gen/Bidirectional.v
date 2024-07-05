@@ -84,7 +84,7 @@ Section Relatedness.
 
   Lemma synth_correct_logrel `{!Shallow.Monad.Interface.TypeCheckLogicM SM}
     {w} (Γ : OEnv w) (e : Exp) (τ : OTy w) (e' : OExp w) :
-    otyping_algo_synth (M := DM) Γ e τ e' ⊣⊢ₚ Γ |--ₚ e; τ ~> e'.
+    otyping_algo_synth (M := DM) Γ e τ e' ⊣⊢ Γ |--ₚ e; τ ~> e'.
   Proof.
     constructor. intros ι. simpl. rewrite correctness_synth.
     now apply relatedness_of_algo_typing_synth.

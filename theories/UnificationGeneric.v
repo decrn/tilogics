@@ -29,17 +29,17 @@
 From Equations Require Import Equations.
 From Em Require Import BaseLogic Monad.Interface Parallel Triangular.
 
-Import Pred world.notations Pred.notations.
+Import Pred world.notations Pred.notations Pred.proofmode.
 Import (hints) Par Tri.
 
 Set Implicit Arguments.
 
 #[local] Notation "s [ ζ ]" :=
   (subst s ζ)
-    (at level 8, left associativity,
+    (at level 7, left associativity,
       format "s [ ζ ]").
 
-#[local] Notation "▷ A" :=
+#[local] Notation "▹ A" :=
   (fun (w : World) => ∀ α (αIn : α ∈ w), A%W (w - α))
     (at level 9, right associativity).
 
@@ -58,14 +58,14 @@ Section RemoveAcc.
   #[local] Unset Elimination Schemes.
 
   Inductive remove_acc : World → Prop :=
-    remove_acc_intro : ⊧ ▷remove_acc ⇢ remove_acc.
+    remove_acc_intro : ⊧ ▹remove_acc ↠ remove_acc.
 
-  Definition remove_acc_inv : ⊧ remove_acc ⇢ ▷remove_acc :=
+  Definition remove_acc_inv : ⊧ remove_acc ↠ ▹remove_acc :=
     fun w d => match d with remove_acc_intro f => f end.
 
   (* We only define a non-dependent elimination scheme for Type. *)
-  Definition remove_acc_rect (P : OType) (f : ⊧ ▷P ⇢ P) :
-    ⊧ remove_acc ⇢ P :=
+  Definition remove_acc_rect (P : OType) (f : ⊧ ▹P ↠ P) :
+    ⊧ remove_acc ↠ P :=
     fix F w (d : remove_acc w) {struct d} : P w :=
       f w (fun α αIn => F (w - α) (remove_acc_inv d αIn)).
 
@@ -109,18 +109,18 @@ Section RemoveAcc.
   Definition remove_acc_all_gen : ⊧ remove_acc :=
     remove_acc_intro_gen 20 (remove_acc_all).
 
-  Definition loeb {A : World → Type} : (⊧ ▷A ⇢ A) → (⊧ A) :=
+  Definition loeb {A : World → Type} : (⊧ ▹A ↠ A) → (⊧ A) :=
     fun step w => remove_acc_rect step (remove_acc_all w).
 
   (* Derive a dependent elimination scheme for Prop. *)
   Scheme remove_acc_ind := Induction for remove_acc Sort Prop.
 
-  #[local] Notation "▶ P" :=
-    (fun (f : ▷_ _) => forall α (αIn : α ∈ _), P (_ - α) (f α αIn))
+  #[local] Notation "▸ P" :=
+    (fun (f : ▹_ _) => forall α (αIn : α ∈ _), P (_ - α) (f α αIn))
       (at level 9, right associativity).
 
-  Definition loeb_elim {A} (step : ⊧ ▷A ⇢ A) (P : ∀ [w], A w → Prop)
-    (pstep: ∀ w (f : ▷A w) (IH : ▶P f), P (step w f)) w : P (loeb step w).
+  Definition loeb_elim {A} (step : ⊧ ▹A ↠ A) (P : ∀ [w], A w → Prop)
+    (pstep: ∀ w (f : ▹A w) (IH : ▸P f), P (step w f)) w : P (loeb step w).
   Proof. unfold loeb. induction (remove_acc_all w). eauto. Qed.
 
 End RemoveAcc.
@@ -141,14 +141,14 @@ Section Implementation.
     fun w0 w1 r01 => pure tt.
   Definition cfalse : ⊧ C :=
     fun w0 w1 r01 => fail.
-  Definition cand : ⊧ C ⇢ C ⇢ C :=
+  Definition cand : ⊧ C ↠ C ↠ C :=
     fun w0 c1 c2 w1 r01 =>
       bind (c1 w1 r01) (fun w2 r12 _ => _4 c2 r01 r12).
   #[global] Arguments cfalse {w} [w1] _.
   #[global] Arguments ctrue {w} [w1] _.
 
   Definition AUnifier : OType :=
-    OTy ⇢ OTy ⇢ C.
+    OTy ↠ OTy ↠ C.
 
 End Implementation.
 
@@ -156,22 +156,22 @@ Section Correctness.
 
   Local Existing Instance proper_subst_bientails.
   Lemma instpred_ctrue {w0 w1} (θ1 : Tri w0 w1) :
-    instpred (ctrue θ1) ⊣⊢ₚ ⊤ₚ.
+    instpred (ctrue θ1) ⊣⊢ ⊤.
   Proof. cbn. now rewrite Sub.wp_refl. Qed.
 
   Lemma instpred_cfalse {w0 w1} (θ1 : Tri w0 w1) :
-    instpred (cfalse θ1) ⊣⊢ₚ ⊥ₚ.
+    instpred (cfalse θ1) ⊣⊢ ⊥.
   Proof. reflexivity. Qed.
 
   Lemma instpred_cand_intro {w0} (c1 c2 : C w0) P Q :
-    (∀ w1 (θ1 : Tri w0 w1), instpred (c1 w1 θ1) ⊣⊢ₚ P[θ1]) →
-    (∀ w1 (θ1 : Tri w0 w1), instpred (c2 w1 θ1) ⊣⊢ₚ Q[θ1]) →
-    (∀ w1 (θ1 : Tri w0 w1), instpred (cand c1 c2 θ1) ⊣⊢ₚ (P /\ₚ Q)[θ1]).
+    (∀ w1 (θ1 : Tri w0 w1), instpred (c1 w1 θ1) ⊣⊢ P[θ1]) →
+    (∀ w1 (θ1 : Tri w0 w1), instpred (c2 w1 θ1) ⊣⊢ Q[θ1]) →
+    (∀ w1 (θ1 : Tri w0 w1), instpred (cand c1 c2 θ1) ⊣⊢ (P ∧ Q)[θ1]).
   Proof.
     unfold instpred, instpred_solved, cand. intros H1 H2 w1 θ1.
-    rewrite wp_solved_bind, subst_and, <- H1, wp_solved_frame.
+    rewrite wp_solved_bind subst_and -H1 wp_solved_frame.
     unfold _4. apply proper_wp_solved_bientails. intros w2 θ2 [].
-    cbn. rewrite and_true_l, <- subst_pred_trans. apply H2.
+    cbn. rewrite and_true_l -subst_pred_trans. apply H2.
   Qed.
 
 End Correctness.

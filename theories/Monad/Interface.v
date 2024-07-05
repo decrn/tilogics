@@ -38,10 +38,10 @@ Import world.notations Pred Pred.notations Pred.proofmode.
 #[local] Set Implicit Arguments.
 
 Class Pure (M : OType → OType) : Type :=
-  pure : ∀ A, ⊧ A ⇢ M A.
+  pure : ∀ A, ⊧ A ↠ M A.
 #[global] Arguments pure {M _ A} [w].
 Class Bind (Θ : SUB) (M : OType → OType) : Type :=
-  bind : ∀ A B, ⊧ M A ⇢ Box Θ (A ⇢ M B) ⇢ M B.
+  bind : ∀ A B, ⊧ M A ↠ Box Θ (A ↠ M B) ↠ M B.
 #[global] Arguments bind {Θ M _ A B} [w].
 Class Fail (M : OType → OType) : Type :=
   fail : ∀ A, ⊧ M A.
@@ -63,16 +63,16 @@ Import Pred Pred.Sub.
 
 
 Class TypeCheckM (M : OType -> OType) : Type :=
-  { equals : ⊧ OTy ⇢ OTy ⇢ M Unit;
+  { equals : ⊧ OTy ↠ OTy ↠ M Unit;
     pick   : ⊧ M OTy;
   }.
 #[global] Arguments fail {_ _ _ w}.
 #[global] Arguments pick {_ _ w}.
 
 Class WeakestPre (Θ : SUB) (M : OType -> OType) : Type :=
-  WP [A] : ⊧ M A ⇢ Box Θ (A ⇢ Pred) ⇢ Pred.
+  WP [A] : ⊧ M A ↠ Box Θ (A ↠ Pred) ↠ Pred.
 Class WeakestLiberalPre (Θ : SUB) (M : OType -> OType) : Type :=
-  WLP [A] : ⊧ M A ⇢ Box Θ (A ⇢ Pred) ⇢ Pred.
+  WLP [A] : ⊧ M A ↠ Box Θ (A ↠ Pred) ↠ Pred.
 
 Class AxiomaticSemantics
   Θ {reflΘ : Refl Θ} {stepΘ : Step Θ} {transΘ : Trans Θ } {reflTransΘ : ReflTrans Θ}
@@ -80,38 +80,38 @@ Class AxiomaticSemantics
   M {pureM : Pure M} {bindM : Bind Θ M} {failM : Fail M} {tcM : TypeCheckM M}
     {wpM : WeakestPre Θ M} {wlpM : WeakestLiberalPre Θ M} : Type :=
 
-  { ax_wp_pure [A w] (a : A w) (Q : ◻(A ⇢ Pred) w) :
-      WP (pure a) Q ⊣⊢ₚ Q _ refl a;
-    ax_wp_bind [A B w0] (m : M A w0) (f : ◻(A ⇢ M B) w0) (Q : ◻(B ⇢ Pred) w0) :
-      WP (bind m f) Q ⊣⊢ₚ WP m (fun _ θ1 a => WP (f _ θ1 a) (fun _ θ2 => Q _ (θ1⊙θ2)));
-    ax_wp_equals [w] (σ τ : OTy w) (Q : ◻(Unit ⇢ Pred) w) :
-      WP (equals σ τ) Q ⊣⊢ₚ σ =ₚ τ /\ₚ Q _ refl tt;
-    ax_wp_pick [w] (Q : ◻(OTy ⇢ Pred) w) :
+  { ax_wp_pure [A w] (a : A w) (Q : ◻(A ↠ Pred) w) :
+      WP (pure a) Q ⊣⊢ Q _ refl a;
+    ax_wp_bind [A B w0] (m : M A w0) (f : ◻(A ↠ M B) w0) (Q : ◻(B ↠ Pred) w0) :
+      WP (bind m f) Q ⊣⊢ WP m (fun _ θ1 a => WP (f _ θ1 a) (fun _ θ2 => Q _ (θ1⊙θ2)));
+    ax_wp_equals [w] (σ τ : OTy w) (Q : ◻(Unit ↠ Pred) w) :
+      WP (equals σ τ) Q ⊣⊢ σ ≈ τ ∧ Q _ refl tt;
+    ax_wp_pick [w] (Q : ◻(OTy ↠ Pred) w) :
       let α := world.fresh w in
-      WP pick Q ⊣⊢ₚ Sub.wp step (Q (w ، α) step (oty.evar world.in_zero));
-    ax_wp_fail [A w] (Q : ◻(A ⇢ Pred) w) :
-      WP fail Q ⊣⊢ₚ ⊥ₚ;
-    ax_wp_mono [A w] (m : M A w) (P Q : ◻(A ⇢ Pred) w) :
+      WP pick Q ⊣⊢ Sub.wp step (Q (w ، α) step (oty.evar world.in_zero));
+    ax_wp_fail [A w] (Q : ◻(A ↠ Pred) w) :
+      WP fail Q ⊣⊢ ⊥;
+    ax_wp_mono [A w] (m : M A w) (P Q : ◻(A ↠ Pred) w) :
       ◼(fun _ θ1 => ∀ a, P _ θ1 a -∗ Q _ θ1 a) ⊢
       (WP m P -∗ WP m Q);
 
-    ax_wlp_pure [A w] (a : A w) (Q : ◻(A ⇢ Pred) w) :
-      WLP (pure a) Q ⊣⊢ₚ Q _ refl a;
-    ax_wlp_bind [A B w0] (m : M A w0) (f : ◻(A ⇢ M B) w0) (Q : ◻(B ⇢ Pred) w0) :
-      WLP (bind m f) Q ⊣⊢ₚ WLP m (fun w1 θ1 a => WLP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2)));
-    ax_wlp_equals [w] (σ τ : OTy w) (Q : ◻(Unit ⇢ Pred) w) :
-      WLP (equals σ τ) Q ⊣⊢ₚ σ =ₚ τ ->ₚ Q _ refl tt;
-    ax_wlp_pick [w] (Q : ◻(OTy ⇢ Pred) w) :
+    ax_wlp_pure [A w] (a : A w) (Q : ◻(A ↠ Pred) w) :
+      WLP (pure a) Q ⊣⊢ Q _ refl a;
+    ax_wlp_bind [A B w0] (m : M A w0) (f : ◻(A ↠ M B) w0) (Q : ◻(B ↠ Pred) w0) :
+      WLP (bind m f) Q ⊣⊢ WLP m (fun w1 θ1 a => WLP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2)));
+    ax_wlp_equals [w] (σ τ : OTy w) (Q : ◻(Unit ↠ Pred) w) :
+      WLP (equals σ τ) Q ⊣⊢ (σ ≈ τ → Q _ refl tt);
+    ax_wlp_pick [w] (Q : ◻(OTy ↠ Pred) w) :
       let α := world.fresh w in
-      WLP pick Q ⊣⊢ₚ Sub.wlp step (Q (w ، α) step (oty.evar world.in_zero));
-    ax_wlp_fail [A w] (Q : ◻(A ⇢ Pred) w) :
-      WLP fail Q ⊣⊢ₚ ⊤ₚ;
-    ax_wlp_mono [A w] (m : M A w) (P Q : ◻(A ⇢ Pred) w) :
+      WLP pick Q ⊣⊢ Sub.wlp step (Q (w ، α) step (oty.evar world.in_zero));
+    ax_wlp_fail [A w] (Q : ◻(A ↠ Pred) w) :
+      WLP fail Q ⊣⊢ ⊤;
+    ax_wlp_mono [A w] (m : M A w) (P Q : ◻(A ↠ Pred) w) :
       ◼(fun _ θ1 => ∀ a, P _ θ1 a -∗ Q _ θ1 a) ⊢
       (WLP m P -∗ WLP m Q);
 
-    ax_wp_impl [A w] (m : M A w) (P : ◻(A ⇢ Pred) w) (Q : Pred w) :
-      (WP m P ->ₚ Q) ⊣⊢ₚ WLP m (fun w1 θ1 a1 => P w1 θ1 a1 ->ₚ Q[θ1]);
+    ax_wp_impl [A w] (m : M A w) (P : ◻(A ↠ Pred) w) (Q : Pred w) :
+      (WP m P → Q) ⊣⊢ WLP m (fun w1 θ1 a1 => P w1 θ1 a1 → Q[θ1]);
   }.
 #[global] Arguments AxiomaticSemantics Θ {_ _ _ _ _ _ _} _ {_ _ _ _ _ _}.
 
@@ -119,10 +119,10 @@ Class AxiomaticSemantics
 (* Alternative rule for pick which substitutes the last variable away
  as discussed in the papter. *)
 Lemma ax_wp_pick_substitute `{AxiomaticSemantics Θ M, Thick Θ} {lkThickΘ : LkThick Θ}
-  [w] (Q : ◻(OTy ⇢ Pred) w) :
-  WP pick Q ⊣⊢ₚ
+  [w] (Q : ◻(OTy ↠ Pred) w) :
+  WP pick Q ⊣⊢
     let α := world.fresh w in
-    (∃ₚ τ : OTy w, (Q (w ، α) step (oty.evar world.in_zero))[thick α (αIn := world.in_zero) τ]).
+    (∃ τ : OTy w, (Q (w ، α) step (oty.evar world.in_zero))[thick α (αIn := world.in_zero) τ]).
 Proof.
   rewrite ax_wp_pick. constructor; intros ι. unfold Sub.wp; pred_unfold. split.
   - intros (ι' & Heq & HQ). destruct (env.view ι') as [ι' τ].
@@ -139,37 +139,37 @@ Class TypeCheckLogicM
     {wpM : WeakestPre Θ M} {wlpM : WeakestLiberalPre Θ M} : Type :=
 
   { wp_pure [A] {subA : Subst A}
-      [w] (a : A w) (Q : ◻(A ⇢ Pred) w) :
-      Q _ refl a ⊢ₚ WP (pure a) Q;
-    wp_bind [A B w0] (m : M A w0) (f : ◻(A ⇢ M B) w0) (Q : ◻(B ⇢ Pred) w0) :
-      WP m (fun w1 θ1 a => WP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2))) ⊢ₚ WP (bind m f) Q;
-    wp_equals [w] (σ τ : OTy w) (Q : ◻(Unit ⇢ Pred) w) :
-      σ =ₚ τ /\ₚ ◼(fun _ θ => Q _ θ tt) ⊢ₚ WP (equals σ τ) Q;
-    wp_pick [w] [Q : ◻(OTy ⇢ Pred) w] (τ : Ty) :
-      ◼(fun _ θ => ∀ₚ τ', lift τ =ₚ τ' ->ₚ Q _ θ τ') ⊢ₚ WP pick Q;
-    wp_fail [A w] (Q : ◻(A ⇢ Pred) w) :
-      ⊥ₚ ⊢ₚ WP fail Q;
-    wp_mono [A w] (m : M A w) (P Q : ◻(A ⇢ Pred) w) :
-      ◼(fun _ θ => ∀ₚ a, P _ θ a -∗ Q _ θ a)%I ⊢ₚ
-      (WP m P -∗ WP m Q)%I;
+      [w] (a : A w) (Q : ◻(A ↠ Pred) w) :
+      Q _ refl a ⊢ WP (pure a) Q;
+    wp_bind [A B w0] (m : M A w0) (f : ◻(A ↠ M B) w0) (Q : ◻(B ↠ Pred) w0) :
+      WP m (fun w1 θ1 a => WP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2))) ⊢ WP (bind m f) Q;
+    wp_equals [w] (σ τ : OTy w) (Q : ◻(Unit ↠ Pred) w) :
+      σ ≈ τ ∧ ◼(fun _ θ => Q _ θ tt) ⊢ WP (equals σ τ) Q;
+    wp_pick [w] [Q : ◻(OTy ↠ Pred) w] (τ : Ty) :
+      ◼(fun _ θ => ∀ τ', lift τ ≈ τ' → Q _ θ τ') ⊢ WP pick Q;
+    wp_fail [A w] (Q : ◻(A ↠ Pred) w) :
+      ⊥ ⊢ WP fail Q;
+    wp_mono [A w] (m : M A w) (P Q : ◻(A ↠ Pred) w) :
+      ◼(fun _ θ => ∀ a, P _ θ a -∗ Q _ θ a) ⊢
+      (WP m P -∗ WP m Q);
 
     wlp_pure [A] {subA : Subst A}
-      [w] (a : A w) (Q : ◻(A ⇢ Pred) w) :
-      Q _ refl a ⊢ₚ WLP (pure a) Q;
-    wlp_bind [A B w0] (m : M A w0) (f : ◻(A ⇢ M B) w0) (Q : ◻(B ⇢ Pred) w0) :
-      WLP m (fun w1 θ1 a => WLP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2))) ⊢ₚ WLP (bind m f) Q;
-    wlp_equals [w] (σ τ : OTy w) (Q : ◻(Unit ⇢ Pred) w) :
-      σ =ₚ τ ->ₚ ◼(fun _ θ => Q _ θ tt) ⊢ₚ WLP (equals σ τ) Q;
-    wlp_pick [w] (Q : ◻(OTy ⇢ Pred) w) :
-      ◼(fun _ θ => ∀ₚ τ, Q _ θ τ) ⊢ₚ WLP pick Q;
-    wlp_fail [A w] (Q : ◻(A ⇢ Pred) w) :
-      ⊤ₚ ⊢ₚ WLP fail Q;
-    wlp_mono [A w] (m : M A w) (P Q : ◻(A ⇢ Pred) w) :
-      ◼(fun _ θ => ∀ₚ a, P _ θ a -∗ Q _ θ a)%I ⊢ₚ
-      (WLP m P -∗ WLP m Q)%I;
+      [w] (a : A w) (Q : ◻(A ↠ Pred) w) :
+      Q _ refl a ⊢ WLP (pure a) Q;
+    wlp_bind [A B w0] (m : M A w0) (f : ◻(A ↠ M B) w0) (Q : ◻(B ↠ Pred) w0) :
+      WLP m (fun w1 θ1 a => WLP (f _ θ1 a) (fun _ θ2 => Q _ (trans θ1 θ2))) ⊢ WLP (bind m f) Q;
+    wlp_equals [w] (σ τ : OTy w) (Q : ◻(Unit ↠ Pred) w) :
+      (σ ≈ τ → ◼(fun _ θ => Q _ θ tt)) ⊢ WLP (equals σ τ) Q;
+    wlp_pick [w] (Q : ◻(OTy ↠ Pred) w) :
+      ◼(fun _ θ => ∀ τ, Q _ θ τ) ⊢ WLP pick Q;
+    wlp_fail [A w] (Q : ◻(A ↠ Pred) w) :
+      ⊤ ⊢ WLP fail Q;
+    wlp_mono [A w] (m : M A w) (P Q : ◻(A ↠ Pred) w) :
+      ◼(fun _ θ => ∀ a, P _ θ a -∗ Q _ θ a) ⊢
+      (WLP m P -∗ WLP m Q);
 
-    wp_impl [A w] (m : M A w) (P : ◻(A ⇢ Pred) w) (Q : Pred w) :
-      WLP m (fun w1 θ1 a1 => P w1 θ1 a1 ->ₚ Q[θ1]) ⊢ₚ (WP m P ->ₚ Q);
+    wp_impl [A w] (m : M A w) (P : ◻(A ↠ Pred) w) (Q : Pred w) :
+      WLP m (fun w1 θ1 a1 => P w1 θ1 a1 → Q[θ1]) ⊢ (WP m P → Q);
 
   }.
 #[global] Arguments TypeCheckLogicM Θ {_ _ _ _ _} _ {_ _ _ _ _ _}.
@@ -198,25 +198,25 @@ Proof.
   - now rewrite ax_wp_impl.
 Qed.
 
-Lemma wp_mono' `{TypeCheckLogicM Θ M} {A w} (m : M A w) (P Q : ◻(A ⇢ Pred) w) :
-  (WP m P -∗ ◼(fun _ θ1 => ∀ₚ a1, P _ θ1 a1 -∗ Q _ θ1 a1) -∗ WP m Q)%P.
+Lemma wp_mono' `{TypeCheckLogicM Θ M} {A w} (m : M A w) (P Q : ◻(A ↠ Pred) w) :
+  WP m P -∗ ◼(fun _ θ1 => ∀ a1, P _ θ1 a1 -∗ Q _ θ1 a1) -∗ WP m Q.
 Proof. iIntros "WP PQ". iRevert "WP". now rewrite -wp_mono. Qed.
 
-Lemma wlp_mono' `{TypeCheckLogicM Θ M} {A w} (m : M A w) (P Q : ◻(A ⇢ Pred) w) :
-  (WLP m P -∗ ◼(fun _ θ1 => ∀ₚ a1, P _ θ1 a1 -∗ Q _ θ1 a1) -∗ WLP m Q)%P.
+Lemma wlp_mono' `{TypeCheckLogicM Θ M} {A w} (m : M A w) (P Q : ◻(A ↠ Pred) w) :
+  WLP m P -∗ ◼(fun _ θ1 => ∀ a1, P _ θ1 a1 -∗ Q _ θ1 a1) -∗ WLP m Q.
 Proof. iIntros "WP PQ". iRevert "WP". now rewrite -wlp_mono. Qed.
 
-Definition wp_diamond {Θ : SUB} {A} : ⊧ Diamond Θ A ⇢ ◻(A ⇢ Pred) ⇢ Pred :=
+Definition wp_diamond {Θ : SUB} {A} : ⊧ Diamond Θ A ↠ ◻(A ↠ Pred) ↠ Pred :=
   fun w '(existT w1 (θ, a)) Q => Sub.wp θ (Q w1 θ a).
 
-Definition wlp_diamond {Θ : SUB} {A} : ⊧ Diamond Θ A ⇢ ◻(A ⇢ Pred) ⇢ Pred :=
+Definition wlp_diamond {Θ : SUB} {A} : ⊧ Diamond Θ A ↠ ◻(A ↠ Pred) ↠ Pred :=
   fun w '(existT w1 (θ, a)) Q => Sub.wlp θ (Q w1 θ a).
 
 Definition wp_option {A w1 w2} : Option A w1 -> (A w1 -> Pred w2) -> Pred w2 :=
-  fun o Q => match o with Some a => Q a | None => ⊥ₚ end%P.
+  fun o Q => match o with Some a => Q a | None => ⊥ end%I.
 
 Definition wlp_option {A w1 w2} : Option A w1 -> (A w1 -> Pred w2) -> Pred w2 :=
-  fun o Q => match o with Some a => Q a | None => ⊤ₚ end%P.
+  fun o Q => match o with Some a => Q a | None => ⊤ end%I.
 
 Definition Solved (Θ : SUB) (A : OType) : OType := Option (Diamond Θ A).
 Definition Prenex (A : OType) : OType := Solved Prefix (List (OTy * OTy) * A).
@@ -233,7 +233,7 @@ Section Solved.
   #[global] Instance params_wp_solved : Params (@wp_solved) 3 := {}.
   #[export] Instance proper_wp_solved_bientails {Θ A w} :
     Proper (pointwise_relation _ (forall_relation
-      (fun _ => pointwise_relation _ (pointwise_relation _ (⊣⊢ₚ))) ==> (⊣⊢ₚ)))
+      (fun _ => pointwise_relation _ (pointwise_relation _ (⊣⊢))) ==> (⊣⊢)))
       (@wp_solved Θ A w).
   Proof.
     intros d p q pq. destruct d as [(w1 & r01 & a)|]; cbn; [|easy].
@@ -250,8 +250,8 @@ Section Solved.
   Qed.
 
   Lemma wp_solved_frame {Θ A w} (m : Solved Θ A w)
-    (P : ◻(A ⇢ Pred) w) (Q : Pred w) :
-    WP m P /\ₚ Q ⊣⊢ₚ WP m (fun w1 θ1 a1 => P w1 θ1 a1 /\ₚ subst Q θ1).
+    (P : ◻(A ↠ Pred) w) (Q : Pred w) :
+    WP m P ∧ Q ⊣⊢ WP m (fun w1 θ1 a1 => P w1 θ1 a1 ∧ subst Q θ1).
   Proof.
     destruct m as [(w1 & θ1 & a1)|]; cbn;
       [ rewrite Sub.and_wp_l | rewrite bi.False_and ]; easy.
@@ -270,14 +270,14 @@ Section Solved.
     fun A w => None.
 
   Lemma wp_solved_pure {Θ} {reflΘ : Refl Θ} {lkreflΘ : LkRefl Θ}
-    {A w0} (a : A w0) (Q : ◻(A ⇢ Pred) w0) :
-    wp_solved (pure (M := Solved Θ) a) Q ⊣⊢ₚ Q _ refl a.
+    {A w0} (a : A w0) (Q : ◻(A ↠ Pred) w0) :
+    wp_solved (pure (M := Solved Θ) a) Q ⊣⊢ Q _ refl a.
   Proof. cbn. now rewrite Sub.wp_refl. Qed.
 
   Lemma wp_solved_bind {Θ} {transΘ : Trans Θ} {lkTransΘ : LkTrans Θ}
-    {A B w0} (m : Solved Θ A w0) (f : ◻(A ⇢ Solved Θ B) w0)
-    (Q : ◻(B  ⇢ Pred) w0) :
-    WP (bind m f) Q ⊣⊢ₚ WP m (fun w1 ζ1 a1 => WP (f w1 ζ1 a1) (_4 Q ζ1)).
+    {A B w0} (m : Solved Θ A w0) (f : ◻(A ↠ Solved Θ B) w0)
+    (Q : ◻(B  ↠ Pred) w0) :
+    WP (bind m f) Q ⊣⊢ WP m (fun w1 ζ1 a1 => WP (f w1 ζ1 a1) (_4 Q ζ1)).
   Proof.
     destruct m as [(w1 & r01 & a)|]; cbn; [|reflexivity].
     destruct (f w1 r01 a) as [(w2 & r12 & b2)|]; cbn;
@@ -293,12 +293,12 @@ End Solved.
   InstPred (Solved Θ A) :=
   fun w m => WP m (fun _ _ a => instpred a).
 
-Definition solved_hmap `{HMap Θ1 Θ2} {A} : ⊧ Solved Θ1 A ⇢ Solved Θ2 A :=
+Definition solved_hmap `{HMap Θ1 Θ2} {A} : ⊧ Solved Θ1 A ↠ Solved Θ2 A :=
   fun w => option.map (fun '(existT w (θ, a)) => existT w (hmap θ, a)).
 
 Lemma instpred_solved_hmap `{LkHMap Θ1 Θ2} {A} `{ipA : InstPred A}
   {w} (m : Solved Θ1 A w) :
-  instpred (solved_hmap m) ⊣⊢ₚ instpred m.
+  instpred (solved_hmap m) ⊣⊢ instpred m.
 Proof. destruct m as [(w' & θ & a)|]; cbn; now rewrite ?Sub.wp_hmap. Qed.
 
 (* Create HintDb wpeq. *)
@@ -321,10 +321,10 @@ Ltac wpeq :=
        ?(@subst_eq OTy _ _ _ _) ?(@subst_trans OEnv _ _) ?(@subst_trans OTy _ _);
      try done;
      try match goal with
-       | |- environments.envs_entails _ (eqₚ ?x ?x) =>
-           iApply eqₚ_intro
-       | |- environments.envs_entails _ (eqₚ (insert ?x _ _) (insert ?x _ _)) =>
-           iApply eqₚ_insert; iSplit
+       | |- environments.envs_entails _ (?x ≈ ?x) =>
+           iApply oeq_intro
+       | |- environments.envs_entails _ (insert ?x _ _ ≈ insert ?x _ _) =>
+           iApply oeq_insert; iSplit
        end; auto 1 with typeclass_instances;
      try (iStopProof; pred_unfold;
           intuition (subst; auto; fail))).
@@ -337,7 +337,7 @@ Ltac wpsimpl :=
   | |- environments.envs_entails _ (bi_impl _ _) => iIntros "#?"
   | |- environments.envs_entails _ (bi_affinely _) => iModIntro
   | |- environments.envs_entails _ (bi_and _ _) => iSplit
-  | |- environments.envs_entails _ (eqₚ _ _) => wpeq
+  | |- environments.envs_entails _ (oeq _ _) => wpeq
   | |- environments.envs_entails _ (bi_pure True) => done
   | |- environments.envs_entails _ (WP (pure _) _) =>
       rewrite -wp_pure ?trans_refl_r ?trans_refl_r ?subst_refl

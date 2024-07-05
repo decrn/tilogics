@@ -67,26 +67,26 @@ Inductive Free (A : OType) (w : World) : Type :=
 
 #[export] Instance wp_free : WeakestPre Prefix Free :=
   fun A =>
-    fix WP {w} (m : Free A w) (POST : ◻(A ⇢ Pred) w) {struct m} :=
+    fix WP {w} (m : Free A w) (POST : ◻(A ↠ Pred) w) {struct m} :=
     match m with
     | Ret a => POST _ refl a
-    | Fail => ⊥ₚ
-    | Equalsk t1 t2 k => t1 =ₚ t2 /\ₚ WP k POST
+    | Fail => ⊥
+    | Equalsk t1 t2 k => t1 ≈ t2 ∧ WP k POST
     | Pickk α k => Sub.wp step (WP k (_4 POST step))
-    end%P.
+    end%I.
 
 #[export] Instance wlp_free : WeakestLiberalPre Prefix Free :=
   fun A =>
-    fix WLP {w} (m : Free A w) (POST : ◻(A ⇢ Pred) w) {struct m} :=
+    fix WLP {w} (m : Free A w) (POST : ◻(A ↠ Pred) w) {struct m} :=
     match m with
     | Ret a => POST _ refl a
-    | Fail => ⊤ₚ
-    | Equalsk t1 t2 k => t1 =ₚ t2 ->ₚ WLP k POST
+    | Fail => ⊤
+    | Equalsk t1 t2 k => t1 ≈ t2 → WLP k POST
     | Pickk α k => Sub.wlp step (WLP k (_4 POST step))
-    end%P.
+    end%I.
 
-Lemma wp_free_mono [A w0] (m : Free A w0) (P Q : ◻(A ⇢ Pred) w0) :
-  ◼(fun _ θ1 => ∀ₚ a, P _ θ1 a -∗ Q _ θ1 a)%P ⊢ (WP m P -∗ WP m Q).
+Lemma wp_free_mono [A w0] (m : Free A w0) (P Q : ◻(A ↠ Pred) w0) :
+  ◼(fun _ θ1 => ∀ a, P _ θ1 a -∗ Q _ θ1 a) ⊢ (WP m P -∗ WP m Q).
 Proof.
   induction m; cbn; iIntros "#PQ".
   - now iMod "PQ".
@@ -96,8 +96,8 @@ Proof.
     iMod "PQ". iSpecialize ("PQ" $! a1). now rewrite trans_refl_r.
 Qed.
 
-Lemma wlp_free_mono [A w0] (m : Free A w0) (P Q : ◻(A ⇢ Pred) w0) :
-  ◼(fun _ θ1 => ∀ₚ a, P _ θ1 a -∗ Q _ θ1 a)%P ⊢ (WLP m P -∗ WLP m Q).
+Lemma wlp_free_mono [A w0] (m : Free A w0) (P Q : ◻(A ↠ Pred) w0) :
+  ◼(fun _ θ1 => ∀ a, P _ θ1 a -∗ Q _ θ1 a) ⊢ (WLP m P -∗ WLP m Q).
 Proof.
   induction m; cbn; iIntros "#PQ".
   - now iMod "PQ".
@@ -115,28 +115,28 @@ Qed.
   (@pointwise_relation A%type _ P%signature) : signature_scope.
 
 #[export] Instance proper_wp_entails {A w} (m : Free A w) :
-  Proper ((∀ w1, w ⊑⁺ w1 → A w1 → (⊢ₚ)) ==> (⊢ₚ)) (WP m).
+  Proper ((∀ w1, w ⊑⁺ w1 → A w1 → (⊢)) ==> (⊢)) (WP m).
 Proof.
   intros P Q PQ. iApply wp_free_mono.
   iIntros "%w1 %θ1 !> %a1". iApply PQ.
 Qed.
 
 #[export] Instance proper_wp_bientails {A w} (m : Free A w) :
-  Proper ((∀ w1, w ⊑⁺ w1 → A w1 → (⊣⊢ₚ)) ==> (⊣⊢ₚ)) (WP m).
+  Proper ((∀ w1, w ⊑⁺ w1 → A w1 → (⊣⊢)) ==> (⊣⊢)) (WP m).
 Proof.
   intros P Q PQ; iSplit; iApply proper_wp_entails;
     intros w1 θ1 a1; now rewrite (PQ w1 θ1 a1).
 Qed.
 
 #[export] Instance proper_wlp_entails {A w} (m : Free A w) :
-  Proper ((∀ w1, w ⊑⁺ w1 → A w1 → (⊢ₚ)) ==> (⊢ₚ)) (WLP m).
+  Proper ((∀ w1, w ⊑⁺ w1 → A w1 → (⊢)) ==> (⊢)) (WLP m).
 Proof.
   intros P Q PQ. iApply wlp_free_mono.
   iIntros "%w1 %θ1 !> %a1". iApply PQ.
 Qed.
 
 #[export] Instance proper_wlp_bientails {A w} (m : Free A w):
-  Proper ((∀ w1, w ⊑⁺ w1 → A w1 → (⊣⊢ₚ)) ==> (⊣⊢ₚ)) (WLP m).
+  Proper ((∀ w1, w ⊑⁺ w1 → A w1 → (⊣⊢)) ==> (⊣⊢)) (WLP m).
 Proof.
   intros P Q PQ; iSplit; iApply proper_wlp_entails;
     intros w1 θ1 a1; now rewrite (PQ w1 θ1 a1).

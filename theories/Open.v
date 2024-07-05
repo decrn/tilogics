@@ -37,12 +37,12 @@ Module Open.
   Definition pure {A} (a : A) : Valid (Open A) := fun _ _ => a.
   #[global] Arguments pure {A} _ {w} ι/.
 
-  Definition fmap {A B} (f : A -> B) : ⊧ Open A ⇢ Open B :=
+  Definition fmap {A B} (f : A -> B) : ⊧ Open A ↠ Open B :=
     fun w a ι => f (a ι).
   #[global] Arguments fmap {A B} _ {w} a ι/.
 
   (* ap :: f (a -> b) -> f a -> f b *)
-  Definition ap {A B : Type} : ⊧ Open (A → B) ⇢ Open A ⇢ Open B :=
+  Definition ap {A B : Type} : ⊧ Open (A → B) ↠ Open A ↠ Open B :=
     fun w f a ι => f ι (a ι).
   #[global] Arguments ap {A B} [w] f a ι/.
 
@@ -98,9 +98,9 @@ Module Open.
 
   End PersistLemmas.
 
-  Definition close_ty : ⊧ OTy ⇢ Open Ty := fun w t => inst t.
+  Definition close_ty : ⊧ OTy ↠ Open Ty := fun w t => inst t.
   #[global] Arguments close_ty [w] _.
-  (* Definition close_env : ⊧ OEnv ⇢ Open Env := fun w G => inst G. *)
+  (* Definition close_env : ⊧ OEnv ↠ Open Env := fun w G => inst G. *)
   (* #[global] Arguments close_env [w] _. *)
 
   Module notations.
@@ -121,19 +121,19 @@ Module oexp.
   Set Implicit Arguments.
   Set Maximal Implicit Insertion.
 
-  Definition var : ⊧ Const string ⇢ OExp :=
+  Definition var : ⊧ Const string ↠ OExp :=
     fun _ x => Open.pure (exp.var x).
   Definition true : ⊧ OExp :=
     fun _ => Open.pure exp.true.
   Definition false : ⊧ OExp :=
     fun _ => Open.pure exp.false.
-  Definition ifte : ⊧ OExp ⇢ OExp ⇢ OExp ⇢ OExp :=
+  Definition ifte : ⊧ OExp ↠ OExp ↠ OExp ↠ OExp :=
     fun _ e1 e2 e3 => exp.ifte <$> e1 <*> e2 <*> e3.
-  Definition absu : ⊧ Const string ⇢ OExp ⇢ OExp :=
+  Definition absu : ⊧ Const string ↠ OExp ↠ OExp :=
     fun _ x e => exp.absu x <$> e.
-  Definition abst : ⊧ Const string ⇢ OTy ⇢ OExp ⇢ OExp :=
+  Definition abst : ⊧ Const string ↠ OTy ↠ OExp ↠ OExp :=
     fun _ x t e => exp.abst x <$> close_ty t <*> e.
-  Definition app : ⊧ OExp ⇢ OExp ⇢ OExp :=
+  Definition app : ⊧ OExp ↠ OExp ↠ OExp :=
     fun _ e1 e2 => exp.app <$> e1 <*> e2.
 
   Section InstLemmas.

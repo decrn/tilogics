@@ -38,13 +38,13 @@ Import (hints) Par.
 Section Run.
   Import MonadNotations.
 
-  Definition run_prenex {A} `{Subst A} : ⊧ Prenex A ⇢ Solved Par A :=
+  Definition run_prenex {A} `{Subst A} : ⊧ Prenex A ↠ Solved Par A :=
     fun w m =>
       '(cs,a) <- solved_hmap m ;;
       _       <- solve cs ;;
       pure (subst a _).
 
-  Definition run_free {A} `{Subst A} : ⊧ Free A ⇢ Solved Par A :=
+  Definition run_free {A} `{Subst A} : ⊧ Free A ↠ Solved Par A :=
     fun w m => run_prenex w (prenex m).
 
 End Run.

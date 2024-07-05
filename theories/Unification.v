@@ -29,17 +29,17 @@
 From Equations Require Import Equations.
 From Em Require Import BaseLogic Monad.Interface Parallel Triangular UnificationGeneric.
 
-Import Pred world.notations Pred.notations.
+Import Pred world.notations Pred.notations Pred.proofmode.
 Import (hints) Par Tri.
 
 Set Implicit Arguments.
 
 #[local] Notation "s [ ζ ]" :=
   (subst s ζ)
-    (at level 8, left associativity,
+    (at level 7, left associativity,
       format "s [ ζ ]").
 
-#[local] Notation "▷ A" :=
+#[local] Notation "▹ A" :=
   (fun (w : World) => ∀ α (αIn : α ∈ w), A%W (w - α))
     (at level 9, right associativity).
 
@@ -47,14 +47,14 @@ Section OccursCheck.
   Import option.notations.
   Import (hints) Par.
 
-  Definition occurs_check_in : ⊧ ∀ α, (α ∈) ⇢ ▷(Option (α ∈)) :=
+  Definition occurs_check_in : ⊧ ∀ α, (α ∈) ↠ ▹(Option (α ∈)) :=
     fun w x xIn y yIn =>
       match world.occurs_check_view yIn xIn with
       | world.Same _      => None
       | world.Diff _ xIn' => Some xIn'
       end.
 
-  Definition occurs_check : ⊧ OTy ⇢ ▷(Option OTy) :=
+  Definition occurs_check : ⊧ OTy ↠ ▹(Option OTy) :=
     fun w =>
       fix oc (t : OTy w) β (βIn : β ∈ w) {struct t} :=
       match t with
@@ -104,7 +104,7 @@ End VarView.
 
 Section Implementation.
 
-  Definition flex : ⊧ ∀ α, world.In α ⇢ OTy ⇢ Solved Tri Unit :=
+  Definition flex : ⊧ ∀ α, world.In α ↠ OTy ↠ Solved Tri Unit :=
     fun w α αIn τ =>
       match varview τ with
       | is_var βIn =>
@@ -122,7 +122,7 @@ Section Implementation.
 
   Section MguO.
 
-    Context [w] (lamgu : ▷AUnifier w).
+    Context [w] (lamgu : ▹AUnifier w).
     Arguments lamgu {_ _} _ _ {_} _.
 
     Definition aflex α {αIn : α ∈ w} (τ : OTy w) : C w :=
@@ -167,30 +167,30 @@ Section Implementation.
   Definition amgu : ⊧ AUnifier :=
     fun w => loeb atrav w.
 
-  Definition mgu `{HMap Tri Θ} : ⊧ OTy ⇢ OTy ⇢ Solved Θ Unit :=
+  Definition mgu `{HMap Tri Θ} : ⊧ OTy ↠ OTy ↠ Solved Θ Unit :=
     fun w s t => solved_hmap (@amgu w s t _ refl).
 
-  Definition asolve : ⊧ List (Prod OTy OTy) ⇢ C :=
+  Definition asolve : ⊧ List (Prod OTy OTy) ↠ C :=
     fix asolve {w} cs {struct cs} :=
       match cs with
       | List.nil             => ctrue
       | List.cons (t1,t2) cs => cand (amgu t1 t2) (asolve cs)
       end.
 
-  Definition solve `{HMap Tri Θ} : ⊧ List (Prod OTy OTy) ⇢ Solved Θ Unit :=
+  Definition solve `{HMap Tri Θ} : ⊧ List (Prod OTy OTy) ↠ Solved Θ Unit :=
     fun w cs => solved_hmap (asolve cs refl).
 
 End Implementation.
 
 Section Correctness.
 
-  Definition AUnifierCorrect : ⊧ AUnifier ⇢ PROP :=
+  Definition AUnifierCorrect : ⊧ AUnifier ↠ PROP :=
     fun w0 bu =>
       ∀ (t1 t2 : OTy w0) w1 (θ1 : w0 ⊑⁻ w1),
-        instpred (bu t1 t2 w1 θ1) ⊣⊢ₚ (t1 =ₚ t2)[θ1].
+        instpred (bu t1 t2 w1 θ1) ⊣⊢ (t1 ≈ t2)[θ1].
 
   Lemma flex_correct {w α} (αIn : α ∈ w) (t : OTy w) :
-    instpred (flex α t) ⊣⊢ₚ oty.evar αIn =ₚ t.
+    instpred (flex α t) ⊣⊢ oty.evar αIn ≈ t.
   Proof.
     unfold flex. destruct varview; cbn.
     - destruct world.occurs_check_view; predsimpl.
@@ -207,17 +207,17 @@ Section Correctness.
 
   Section InnerRecursion.
 
-    Context [w] (lamgu : ▷AUnifier w).
+    Context [w] (lamgu : ▹AUnifier w).
     Context (lamgu_correct : ∀ x (xIn : x ∈ w),
                 AUnifierCorrect (lamgu xIn)).
 
     Lemma aflex_correct {α} (αIn : α ∈ w) (t : OTy w) w1 (θ1 : w ⊑⁻ w1) :
-      instpred (aflex lamgu α t θ1) ⊣⊢ₚ (oty.evar αIn =ₚ t)[θ1].
+      instpred (aflex lamgu α t θ1) ⊣⊢ (oty.evar αIn ≈ t)[θ1].
     Proof.
       destruct θ1; cbn; Tri.folddefs.
       Tri.folddefs.
-      - now rewrite flex_correct, subst_pred_refl.
-      - now rewrite lamgu_correct, !subst_eq, !subst_trans.
+      - now rewrite flex_correct subst_pred_refl.
+      - now rewrite lamgu_correct !subst_eq !subst_trans.
     Qed.
 
     Lemma atrav_correct : AUnifierCorrect (atrav lamgu).
@@ -229,7 +229,7 @@ Section Correctness.
       - intros. predsimpl.
       - intros. predsimpl.
       - intros s1 s2 t1 t2 IH1 IH2 w1 θ1.
-        rewrite peq_ty_noconfusion. now apply instpred_cand_intro.
+        rewrite oeq_ty_noconfusion. now apply instpred_cand_intro.
     Qed.
 
   End InnerRecursion.
@@ -238,17 +238,17 @@ Section Correctness.
   Proof. apply loeb_elim, atrav_correct. Qed.
 
   Definition mgu_correct `{LkHMap Tri Θ} w (t1 t2 : OTy w) :
-    instpred (mgu (Θ := Θ) t1 t2) ⊣⊢ₚ t1 =ₚ t2.
+    instpred (mgu (Θ := Θ) t1 t2) ⊣⊢ t1 ≈ t2.
   Proof.
     unfold mgu. rewrite instpred_solved_hmap.
-    now rewrite amgu_correct, subst_pred_refl.
+    now rewrite amgu_correct subst_pred_refl.
   Qed.
 
   #[local] Existing Instance instpred_prod_ty.
 
   Lemma asolve_correct {w0} (C : List (OTy * OTy) w0) :
     ∀ w1 (θ1 : w0 ⊑⁻ w1),
-      instpred (asolve C θ1) ⊣⊢ₚ (instpred C)[θ1].
+      instpred (asolve C θ1) ⊣⊢ (instpred C)[θ1].
   Proof.
     induction C as [|[t1 t2]]; cbn [asolve]; intros.
     - now rewrite instpred_ctrue.
@@ -256,11 +256,11 @@ Section Correctness.
   Qed.
 
   Lemma solve_correct `{LkHMap Tri Θ} {w} (C : List (OTy * OTy) w) :
-    WP (solve (Θ := Θ) C) (fun _ _ _ => ⊤ₚ)%P ⊣⊢ₚ instpred C.
+    WP (solve (Θ := Θ) C) (fun _ _ _ => ⊤) ⊣⊢ instpred C.
   Proof.
-    change (instpred (solve (Θ := Θ) C) ⊣⊢ₚ instpred C).
+    change (instpred (solve (Θ := Θ) C) ⊣⊢ instpred C).
     unfold solve. rewrite instpred_solved_hmap.
-    now rewrite asolve_correct, subst_pred_refl.
+    now rewrite asolve_correct subst_pred_refl.
   Qed.
 
 End Correctness.
