@@ -45,7 +45,15 @@ haskell-build: extract
 	$(E) "Compiling Haskell implementation with Cabal"
 	$(Q)cabal build
 
-bench: haskell-build
+bench:
+	$(MAKE) bench-single PROG=church MONAD=free && \
+	$(MAKE) bench-single PROG=church MONAD=prenex && \
+	$(MAKE) bench-single PROG=church MONAD=solved && \
+	$(MAKE) bench-single PROG=worstcase MONAD=free && \
+	$(MAKE) bench-single PROG=worstcase MONAD=prenex && \
+	$(MAKE) bench-single PROG=worstcase MONAD=solved
+
+bench-single: haskell-build
 	$(E) "Running ${PROG} benchmark with Free monad with hyperfine"
 	$(Q)hyperfine --warmup 3 --export-markdown bench/${PROG}-${MONAD}.md -L num 10,100,200,300,400,500,600,700,800,900,1000 'cabal run em -- --${MONAD} examples/${PROG}-{num}.stlcb'
 
