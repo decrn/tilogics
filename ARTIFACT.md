@@ -71,6 +71,8 @@ Note for macOS users: you might need to install a version of GNU utils and use `
 - You can extract the Coq code to Haskell by running `make extract` in the root directory.
 - You can compile and run the extracted code on an example by running `cabal run em examples/two-bit-adder.stlcb` in the root directory.
 
+## Claims
+
 ### Functional Claim 1: Full separation of constraint generation and solving
 
 In the paper we claim that we formalized a constraint-based type inference algorithm that fully separates (logically) constraint generation from solving.
