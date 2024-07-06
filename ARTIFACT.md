@@ -59,8 +59,8 @@ opam pin add coq 8.17.1
 opam pin add coq-iris 4.1.0
 opam install coq-equations
 ```
-
-To compile the Haskell code you will need ghc (tested with v8.8) and the `optparse-applicative` (tested with v0.15) and `parsec` (tested with v3.1) libraries.
+b
+To compile the Haskell code you will need ghc (tested with v9.0) and the `optparse-applicative` (tested with v0.16) and `parsec` (tested with v3.1) libraries.
 These can will be installed automatically as dependencies when compiling our code with `cabal-install`.
 
 ### Compiling the code
