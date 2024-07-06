@@ -64,7 +64,7 @@ executable em
     -- other-extensions:
 
     -- Other library packages from which modules are imported.
-    build-depends:    base   >= 4.14,
+    build-depends:    base   >= 4.13,
                       optparse-applicative >= 0.15,
                       parsec >= 3.1
 
