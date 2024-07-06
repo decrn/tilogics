@@ -24,6 +24,48 @@ We take special care to document source code using comments and use an extensibl
 
 Please refer to the sections below in this document for detailed navigation of the code.
 
+### Functional Claim 1: Full separation of constraint generation and solving
+
+In the paper, we claim that we formalized a constraint-based type inference algorithm that fully separates (logically) constraint generation from solving.
+
+In particular `theories/Monad/Interface.v` defines a type class `TypeCheckM` that defines an interface for a constraint generation monad.
+Said interface 
+
+Three instances of this monad are then derived:
+* `theories/Monad/Free.v` using the Free monad discussed in §3.1;
+* `theories/Monad/Prenex.v`, discussed in §3.4; and
+* `theories/Monad/Solved.v`, discussed in §3.5. This instance is by far the most performant.
+
+### Functional Claim 2: Executable through Code Extraction to Haskell
+
+In the paper, we claim that we can extract the Coq formalization to Haskell, thereby showing that our approach is directly executable.
+
+To get started, see below. In essence, a user can run `make extract` which employs Coq's code extraction facility to compile a number of functions from the formalization to Haskell and applies a patch to the Haskell project under the `src/` directory.
+
+
+The specific functions that are extracted from Coq can be found in `theories/Extraction.v:45`.
+Coq extracts those functions and all their (recursive) dependencies. 
+In summary, we extract all the necessary code to run the end-to-end `reconstruct` function from section 3.6
+for all three monad instances (in the Coq formalization, this code can be found under `theories/Composition.v`, lines 65-89).
+
+We augment the extracted Coq code with a (tiny, non-verified) parser for a surface syntax of
+the STLCB and a (tiny, non-verified) pretty printer.
+
+The relevant code can be found in the `src` subdirectory. To run it, first invoke Coq's extraction facilities
+using `make extract` in the root directory. Then, use e.g. `cabal` to run one of the example programs from
+the `examples/` directory:
+
+```
+make extract
+cabal run em -- --solved examples/two-bit-adder.stlcb
+```
+
+The result is a type-reconstructed program, that was type checked and subsequently elaborated using the Solved monad from the type class discussed in Claim 1 above.
+
+See also the section on Benchmarking below for a more detailed account of how to run our synthetic benchmark.
+
+### Functional Claim 3: 
+
 ## Get started with Docker
 
 To read the code itself, we propose loading it into your preferred code editor locally.
@@ -51,7 +93,7 @@ pinning the Coq and Iris versions and installing `equations`, then, `stdpp` will
 ```bash
 opam switch create em ocaml-base-compiler.4.14.1
 opam repo add coq-released https://coq.inria.fr/opam/released
-opam pin add coq 8.18.0
+opam pin add coq 8.17.0
 opam pin add coq-iris 4.1.0
 opam install coq-equations
 ```
@@ -144,24 +186,6 @@ The following tables relates concepts discussed in the paper to specific code in
 | Theorem 4.2 (again) | Generator correctness (via logrel) | `Related/Gen/Synthesise.v:103` |
 
 ## Haskell implementation
-
-In this smaller artifact, we use Coq's extraction facilities to export results outside of the proof assistant.
-In particular, we extract all the necessary code to run the end-to-end `reconstruct` function
-from section 3.6 (in the Coq formalization, this code can be found under `theories/Composition.v`, lines 74-76).
-
-We augment the extracted Haskell code with a (tiny, non-verified) parser for a surface syntax of
-the STLCB and a (tiny, non-verified) pretty printer.
-
-The relevant code can be found in the `src` subdirectory. To run it, first invoke Coq's extraction facilities
-using `make extract` in the root directory. Then, use e.g. `cabal` to run one of the example programs from
-the `examples/` directory:
-
-```
-make extract
-cabal run em examples/full-adder.stlcb
-```
-
-The result is a type-reconstructed program.
 
 
 ## Benchmarking
