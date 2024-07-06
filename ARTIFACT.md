@@ -76,12 +76,12 @@ Note for macOS users: you might need to install a version of GNU utils and use `
 In the paper we claim that we formalized a constraint-based type inference algorithm that fully separates (logically) constraint generation from solving.
 
 In particular `theories/Monad/Interface.v` defines a type class `TypeCheckM` that defines an interface for a constraint generation monad.
-Said interface 
+Said interface exposes only enough methods to generate constraints.
 
 Three instances of this monad are then derived:
 * `theories/Monad/Free.v` using the Free monad discussed in §3.1;
 * `theories/Monad/Prenex.v`, discussed in §3.4; and
-* `theories/Monad/Solved.v`, discussed in §3.5. This instance is by far the most performant.
+* `theories/Monad/Solved.v`, discussed in §3.5.
 
 ### Functional Claim 2: Executable through Code Extraction to Haskell
 
@@ -207,4 +207,4 @@ The scripts to generate these terms can be found in the `util` directory. We hav
 To run the benchmark, it is sufficient to run `make bench`, provided that Coq compilation, extraction and Haskell compilation have succeeded. This make target will invoke `hyperfine`.
 The result of the benchmark can then be found in the `bench/` directory. Each run will produce a short markdown summary of the execution times together with some small statistics.
 
-
+The total running time of `make bench` takes around  minutes on a M2 Macbook Air.
