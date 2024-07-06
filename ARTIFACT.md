@@ -23,6 +23,49 @@ The different parts can be found in the following directories
 We take special care to document source code using comments and use an extensible project layout that favours reusability whenever possible.
 
 Please refer to the sections below in this document for detailed navigation of the code.
+We provide a docker image with all the dependencies pre-installed, however, to read the code itself, we propose loading it into your preferred code editor locally.
+
+
+## Getting started
+
+### Get started with Docker
+
+We have prepared a prebuilt Docker image containing the necessary software. If you prefer manual installation, see the next section below.
+
+Proceed by downloading the prebuilt image tarball and running it with Docker:
+
+```bash
+docker load < tilogics-oopsla24-image.tar-gz
+docker run -it --rm tilogics/oopsla24
+```
+
+### Get started without Docker
+
+We strongly recommend the supplied prebuilt Docker image. Nevertheless, for manual installation, you can follow these steps.
+
+You will need both OCaml (with opam) and Haskell (with cabal).
+
+Proceed by creating a fresh opam switch,
+pinning the Coq and Iris versions and installing `equations`, then, `stdpp` will be installed as a dependency of Iris:
+
+```bash
+opam switch create em ocaml-base-compiler.4.14.1
+opam repo add coq-released https://coq.inria.fr/opam/released
+opam pin add coq 8.17.1
+opam pin add coq-iris 4.1.0
+opam install coq-equations
+```
+
+To compile the Haskell code you will need ghc (tested with v8.8) and the `optparse-applicative` (tested with v0.15) and `parsec` (tested with v3.1) libraries.
+These can will be installed automatically as dependencies when compiling our code with `cabal-install`.
+
+### Compiling the code
+
+Note for macOS users: you might need to install a version of GNU utils and use `gmake`.
+
+- After that you can compile the Coq code by calling `make` in the root directory.
+- You can extract the Coq code to Haskell by running `make extract` in the root directory.
+- You can compile and run the extracted code on an example by running `cabal run em examples/two-bit-adder.stlcb` in the root directory.
 
 ### Functional Claim 1: Full separation of constraint generation and solving
 
@@ -64,43 +107,8 @@ The result is a type-reconstructed program, that was type checked and subsequent
 
 See also the section on Benchmarking below for a more detailed account of how to run our synthetic benchmark.
 
-### Functional Claim 3: 
+### Functional Claim 3:
 
-## Get started with Docker
-
-To read the code itself, we propose loading it into your preferred code editor locally.
-
-However, to check the claims made in the paper, additional software is needed.
-We have prepared a prebuilt Docker image containing the necessary software. If you prefer manual installation, see the next section below.
-
-Proceed by downloading the prebuilt image and running it with Docker:
-
-```bash
-docker load < tilogics-oopsla24-image.tar-gz
-docker run -it --rm tilogics/oopsla24
-```
-
-
-## Get started without Docker
-
-We strongly recommend the supplied prebuilt Docker image. Nevertheless, for manual installation, you can follow these steps.
-
-You will need both OCaml (with opam) and Haskell (with cabal).
-
-Proceed by creating a fresh opam switch,
-pinning the Coq and Iris versions and installing `equations`, then, `stdpp` will be installed as a dependency of Iris:
-
-```bash
-opam switch create em ocaml-base-compiler.4.14.1
-opam repo add coq-released https://coq.inria.fr/opam/released
-opam pin add coq 8.17.0
-opam pin add coq-iris 4.1.0
-opam install coq-equations
-```
-
-After that you can compile the Coq code by calling `make` in the root directory.
-
-Note for macOS users: you might need to install a version of GNU utils and use `gmake`.
 
 ## Mechanized formalization (Coq)
 
