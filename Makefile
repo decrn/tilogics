@@ -18,7 +18,7 @@ AUXS := $(join $(dir $(SRCS)), $(addprefix ., $(notdir $(SRCS:.v=.aux))))
 PROG ?= church
 MONAD ?= solved
 
-.PHONY: coq clean extract install uninstall pretty-timed make-pretty-timed-before make-pretty-timed-after print-pretty-timed-diff
+.PHONY: coq clean extract install uninstall pretty-timed make-pretty-timed-before make-pretty-timed-after print-pretty-timed-diff haskell-build bench bench-single
 
 coq: Makefile.coq
 	$(E) "MAKE Makefile.coq"
@@ -55,5 +55,6 @@ bench:
 
 bench-single: haskell-build
 	$(E) "Running ${PROG} benchmark with Free monad with hyperfine"
+	$(shell mkdir bench 2>/dev/null)
 	$(Q)hyperfine --warmup 3 --export-markdown bench/${PROG}-${MONAD}.md -L num 10,100,200,300,400,500,600,700,800,900,1000 'cabal run em -- --${MONAD} examples/${PROG}-{num}.stlcb'
 
