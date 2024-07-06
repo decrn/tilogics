@@ -71,7 +71,7 @@ Note for macOS users: you might need to install a version of GNU utils and use `
 - You can extract the Coq code to Haskell by running `make extract` in the root directory.
 - You can compile and run the extracted code on an example by running `cabal run em examples/two-bit-adder.stlcb` in the root directory.
 
-## Claims
+## Claims (includes step-by-step)
 
 ### Functional Claim 1: Full separation of constraint generation and solving
 
@@ -91,8 +91,7 @@ In the paper we claim that we can extract the Coq formalization to Haskell, ther
 
 To get started, see below. In essence, a user can run `make extract` which employs Coq's code extraction facility to compile a number of functions from the formalization to Haskell and applies a patch to the Haskell project under the `src/` directory.
 
-
-The specific functions that are extracted from Coq can be found in `theories/Extraction.v:45`.
+The specific functions that will be extracted from Coq can be found in `theories/Extraction.v:45`.
 Coq extracts those functions and all their (recursive) dependencies. 
 In summary, we extract all the necessary code to run the end-to-end `reconstruct` function from section 3.6
 for all three monad instances (in the Coq formalization, this code can be found under `theories/Composition.v`, lines 65-89).
@@ -109,7 +108,7 @@ make extract
 cabal run em -- --solved examples/two-bit-adder.stlcb
 ```
 
-The result is a type-reconstructed program, that was type checked and subsequently elaborated using the Solved monad from the type class discussed in Claim 1 above.
+The result is a type-reconstructed variant of the input two-bit adder program, that was type checked and subsequently elaborated using the Solved monad from the type class discussed in Claim 1 above.
 
 See also the section on Benchmarking below for a more detailed account of how to run our synthetic benchmark.
 
@@ -210,3 +209,4 @@ To run the benchmark, it is sufficient to run `make bench`, provided that Coq co
 The result of the benchmark can then be found in the `bench/` directory. Each run will produce a short markdown summary of the execution times together with some small statistics.
 
 For reference, the total running time of `make bench` is around 20 minutes on an M2 Macbook Air.
+
