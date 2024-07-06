@@ -69,7 +69,7 @@ Note for macOS users: you might need to install a version of GNU utils and use `
 
 ### Functional Claim 1: Full separation of constraint generation and solving
 
-In the paper, we claim that we formalized a constraint-based type inference algorithm that fully separates (logically) constraint generation from solving.
+In the paper we claim that we formalized a constraint-based type inference algorithm that fully separates (logically) constraint generation from solving.
 
 In particular `theories/Monad/Interface.v` defines a type class `TypeCheckM` that defines an interface for a constraint generation monad.
 Said interface 
@@ -81,7 +81,7 @@ Three instances of this monad are then derived:
 
 ### Functional Claim 2: Executable through Code Extraction to Haskell
 
-In the paper, we claim that we can extract the Coq formalization to Haskell, thereby showing that our approach is directly executable.
+In the paper we claim that we can extract the Coq formalization to Haskell, thereby showing that our approach is directly executable.
 
 To get started, see below. In essence, a user can run `make extract` which employs Coq's code extraction facility to compile a number of functions from the formalization to Haskell and applies a patch to the Haskell project under the `src/` directory.
 
@@ -107,15 +107,11 @@ The result is a type-reconstructed program, that was type checked and subsequent
 
 See also the section on Benchmarking below for a more detailed account of how to run our synthetic benchmark.
 
-### Functional Claim 3:
+### Functional Claim 3: Fully Mechanized without Axioms or Unproven Assumptions
 
+In the paper we claim that our Coq development does not rely on additional axioms or unproven assumptions.
 
-## Mechanized formalization (Coq)
-
-The primary artifact is a Coq project that implements the technical machinery discussed in the paper.
-
-
-The assumptions, i.e. unimplemented or unproven parts, can be printed with the
+This can be confirmed by printing with the
 Coq command [`Print Assumptions`](https://coq.inria.fr/refman/proof-engine/vernacular-commands.html#coq:cmd.Print-Assumptions).
 
 Note that by running `make`, a file `theories/Assumptions.v` is automatically type checked and compiled by Coq that will print any
@@ -134,6 +130,10 @@ Closed under the global context
 Assumptions of decidability of typing :
 Closed under the global context
 ```
+
+## Mechanized formalization (Coq)
+
+The primary artifact is a Coq project that implements the technical machinery discussed in the paper.
 
 The following tables relates concepts discussed in the paper to specific code in the Coq development.
 
@@ -202,5 +202,9 @@ In order to benchmark the performance of the extracted code, we provide a small 
 of increasingly larger Church numerals and (possibly) worst-case terms.
 
 The scripts to generate these terms can be found in the `util` directory.
+
+To run the benchmark, it is sufficient to run `make bench`, provided that Coq compilation, extraction and Haskell compilation have succeeded.
+
+The result of the benchmark can be found in the `bench/` directory. Each run will produce a short markdown summary of the execution times.
 
 
