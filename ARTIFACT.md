@@ -25,6 +25,10 @@ We take special care to document source code using comments and use an extensibl
 Please refer to the sections below in this document for detailed navigation of the code.
 We provide a docker image with all the dependencies pre-installed, however, to read the code itself, we propose loading it into your preferred code editor locally.
 
+## Hardware dependencies
+
+This artifact can be evaluated on commodity hardware.
+The code has been tested on both AMD64 and M1/M2 laptops.
 
 ## Getting started
 
@@ -135,7 +139,7 @@ Closed under the global context
 
 The primary artifact is a Coq project that implements the technical machinery discussed in the paper.
 
-The following tables relates concepts discussed in the paper to specific code in the Coq development.
+The following tables relate concepts discussed in the paper to specific code in the Coq development.
 
 ### Section 2: Overview
 
@@ -193,18 +197,14 @@ The following tables relates concepts discussed in the paper to specific code in
 | Corollary 4.10      | Relatedness of algo typing         | `Related/Gen/Synthesise.v:91`  |
 | Theorem 4.2 (again) | Generator correctness (via logrel) | `Related/Gen/Synthesise.v:103` |
 
-## Haskell implementation
-
-
 ## Benchmarking
 
 In order to benchmark the performance of the extracted code, we provide a small synthetic benchmark that infers (and elaborates) the types
 of increasingly larger Church numerals and (possibly) worst-case terms.
 
-The scripts to generate these terms can be found in the `util` directory.
+The scripts to generate these terms can be found in the `util` directory. We have already generated these increasingly large Church numerals and worst-case terms. They can be found in the `examples/` directory besides other -- more realistic -- example programs.
 
-To run the benchmark, it is sufficient to run `make bench`, provided that Coq compilation, extraction and Haskell compilation have succeeded.
-
-The result of the benchmark can be found in the `bench/` directory. Each run will produce a short markdown summary of the execution times.
+To run the benchmark, it is sufficient to run `make bench`, provided that Coq compilation, extraction and Haskell compilation have succeeded. This make target will invoke `hyperfine`.
+The result of the benchmark can then be found in the `bench/` directory. Each run will produce a short markdown summary of the execution times together with some small statistics.
 
 
