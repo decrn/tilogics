@@ -56,5 +56,5 @@ bench:
 bench-single: haskell-build
 	$(E) "Running ${PROG} benchmark with Free monad with hyperfine"
 	$(shell mkdir bench 2>/dev/null)
-	$(Q)hyperfine --warmup 3 --export-markdown bench/${PROG}-${MONAD}.md -L num 10,100,200,300,400,500,600,700,800,900,1000 'cabal run em -- --${MONAD} examples/${PROG}-{num}.stlcb'
+	$(Q)hyperfine --warmup 3 --export-markdown bench/${PROG}-${MONAD}.md -L num 10,100,200,300,400,500 'cabal run em -- --${MONAD} examples/${PROG}-{num}.stlcb'
 
