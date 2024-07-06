@@ -150,7 +150,7 @@ The following tables relate concepts discussed in the paper to specific code in 
 | Figure 1  | Simply typed lambda calculus with Booleans  | `Spec.v:75`                    |
 | Figure 2  | Declarative typing and elab rules for STLCB | `Spec.v:92`                    |
 | Figure 4  | Monad Def of Cstr w semantic values         | `Shallow/Monad/Interface.v:66` |
-| Figure 5  | Monadic cstr gen w synth & elab             | `Shallow/Gen/Synthesise.v:92`  |
+| Figure 5  | Monadic cstr gen w synth & elab             | `Shallow/Gen/Synthesise.v:48`  |
 | Figure 6  | Free monad definition                       | `Shallow/Monad/Free.v:45`      |
 | Figure 7  | Weakest Pres for the Free monad             | `Shallow/Monad/Free.v:89`      |
 | Figure 8  | Weakest Liberal Pres for the Free monad     | `Shallow/Monad/Free.v:98`      |
@@ -159,45 +159,45 @@ The following tables relate concepts discussed in the paper to specific code in 
 
 | Concept   | Description                                 | Location in code        |
 |-----------|---------------------------------------------|-------------------------|
-| Figure 9  | World-indexed types                         | `Worlds.v:207`          |
+| Figure 9  | World-indexed types                         | `Worlds.v:217`          |
 | Figure 10 | Definition of the Free monad                | `Monad/Free.v:37`       |
 | Figure 11 | Parellel substitutions                      | `Sub/Parallel.v`        |
-| Figure 12 | Notations                                   | `Worlds.v:310`          |
+| Figure 12 | Notations                                   | `Worlds.v:320`          |
 | Figure 13 | Free monad bind                             | `Monad/Free.v:49`       |
 | Figure 14 | Monadic interface for constraint generation | `Monad/Interface.v:65`  |
 | Figure 15 | The Open modality and applicative interface | `Open.v`                |
 | N/A       | do-notation                                 | `Monad/Interface.v:50`  |
 | Figure 16 | Constraint generator for synth + elab       | `Gen/Synthesise:47`     |
-| N/A       | Smart constructors for STLCB                | `Open.v:124`            |
+| N/A       | Smart constructors for STLCB                | `Open.v:118`            |
 | N/A       | prenex function                             | `PrenexConversion.v:34` |
 | N/A       | solve function                              | `Unification.v:180`     |
-| N/A       | run function                                | `Composition.v:40`      |
-| N/A       | reconstruct function                        | `Composition.v:63`      |
+| N/A       | run function                                | `Composition.v:38`      |
+| N/A       | reconstruct function                        | `Composition.v:65`      |
 
 
 ### Section 4: Type inference logics
 
 | Concept             | Description                        | Location in code               |
 |---------------------|------------------------------------|--------------------------------|
-| Figure 17           | Closed alg. typing relation        | `Composition.v:72`             |
-| Figure 18           | Assignment predicates              | `BaseLogic.v:54`               |
-| Figure 19           | Substitution wp/wlp                | `BaseLogic.v:460`              |
+| Figure 17           | Closed alg. typing relation        | `Composition.v:94`             |
+| Figure 18           | Assignment predicates              | `BaseLogic.v:51`               |
+| Figure 19           | Substitution wp/wlp                | `BaseLogic.v:589`              |
 | Figure 20           | Free WP/WLP                        | `Monad/Free.v:68`              |
-| Figure 21           | Program logic interface for CstrM  | `Monad/Interface.v:81`         |
-| Theorem 4.1         | End-to-end correctness             | `Composition.v:79`             |
-| N/A                 | Open algorithmic typing relation   | `Gen/Synthesise.v:89`          |
-| Theorem 4.2         | Generator correctness              | `Gen/Synthesise.v:231`         |
-| Lemma 4.3           | Generator soundness                | `Gen/Synthesise.v:200`         |
-| Lemma 4.4           | Generator completeness             | `Gen/Synthesise.v:219`         |
+| Figure 21           | Program logic interface for CstrM  | `Monad/Interface.v:77`         |
+| Theorem 4.1         | End-to-end correctness             | `Composition.v:104`            |
+| N/A                 | Open algorithmic typing relation   | `Gen/Synthesise.v:82`          |
+| Theorem 4.2         | Generator correctness              | `Gen/Synthesise.v:227`         |
+| Lemma 4.3           | Generator soundness                | `Gen/Synthesise.v:196`         |
+| Lemma 4.4           | Generator completeness             | `Gen/Synthesise.v:215`         |
 | Lemma 4.5           | Prenex conversion correctness      | `PrenexConversion.v:50`        |
 | Lemma 4.6           | Constraint solver correctness      | `Unification.v:258`            |
-| Corollary 4.7       | Decidability of typing             | `Composition.v:111`            |
-| Figure 22           | Logical Relation                   | `Related/Monad/Interface.v:41` |
-| Figure 23           | Logical Relation for Free          | `Related/Monad/Free.v:50`      |
-| Lemma 4.8           | Relatedness of the generators      | `Related/Gen/Synthesise.v:83`  |
+| Corollary 4.7       | Decidability of typing             | `Composition.v:146`            |
+| Figure 22           | Logical Relation                   | `Related/Monad/Interface.v:44` |
+| Figure 23           | Logical Relation for Free          | `Related/Monad/Free.v:47`      |
+| Lemma 4.8           | Relatedness of the generators      | `Related/Gen/Synthesise.v:84`  |
 | Lemma 4.9           | Relatedness of WP                  | `Related/Monad/Free.v:83`      |
-| Corollary 4.10      | Relatedness of algo typing         | `Related/Gen/Synthesise.v:91`  |
-| Theorem 4.2 (again) | Generator correctness (via logrel) | `Related/Gen/Synthesise.v:103` |
+| Corollary 4.10      | Relatedness of algo typing         | `Related/Gen/Synthesise.v:92`  |
+| Theorem 4.2 (again) | Generator correctness (via logrel) | `Related/Gen/Synthesise.v:104` |
 
 ## Benchmarking
 
@@ -209,4 +209,4 @@ The scripts to generate these terms can be found in the `util` directory. We hav
 To run the benchmark, it is sufficient to run `make bench`, provided that Coq compilation, extraction and Haskell compilation have succeeded. This make target will invoke `hyperfine`.
 The result of the benchmark can then be found in the `bench/` directory. Each run will produce a short markdown summary of the execution times together with some small statistics.
 
-The total running time of `make bench` takes around  minutes on a M2 Macbook Air.
+For reference, the total running time of `make bench` is around 20 minutes on an M2 Macbook Air.
