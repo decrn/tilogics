@@ -15,8 +15,8 @@ endif
 SRCS := $(shell egrep '^.*\.v$$' _CoqProject | grep -v '^#')
 AUXS := $(join $(dir $(SRCS)), $(addprefix ., $(notdir $(SRCS:.v=.aux))))
 
-MONAD ?= solved
 PROG ?= church
+MONAD ?= solved
 
 .PHONY: coq clean extract install uninstall pretty-timed make-pretty-timed-before make-pretty-timed-after print-pretty-timed-diff
 
@@ -46,6 +46,6 @@ haskell-build: extract
 	$(Q)cabal build
 
 bench: haskell-build
-	$(E) "Running ${PROG} benchmark on ${MONAD} monad with hyperfine"
-	$(Q)hyperfine --warmup 3 --export-markdown bench/${PROG}.md -L num 10,100,1000,10000,100000,1000000 'cabal run em -- --${MONAD} examples/${PROG}-{num}.stlcb'
+	$(E) "Running ${PROG} benchmark with Free monad with hyperfine"
+	$(Q)hyperfine --warmup 3 --export-markdown bench/${PROG}-${MONAD}.md -L num 10,100,200,300,400,500,600,700,800,900,1000 'cabal run em -- --${MONAD} examples/${PROG}-{num}.stlcb'
 
