@@ -26,7 +26,9 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Em Require Composition Gen.Bidirectional Gen.Check Gen.Synthesise.
+From Em Require Composition Gen.Bidirectional Gen.Check Gen.Synthesise
+     Related.Gen.Bidirectional Related.Gen.Check Related.Gen.Synthesise
+     Related.Monad.Free.
 
 Goal True. idtac "Assumptions of check generator correctness:". Abort.
 Print Assumptions Gen.Check.ocorrectness.
@@ -42,3 +44,15 @@ Print Assumptions Composition.correctness.
 
 Goal True. idtac "Assumptions of decidability of typing :". Abort.
 Print Assumptions Composition.decidability.
+
+Goal True. idtac "Assumptions of check generator logical relatedness:". Abort.
+Print Assumptions Related.Gen.Check.generate_correct_logrel.
+
+Goal True. idtac "Assumptions of synth generator logical relatedness:". Abort.
+Print Assumptions Related.Gen.Synthesise.generate_correct_logrel.
+
+Goal True. idtac "Assumptions of bidirectional generator logical relatedness:". Abort.
+Print Assumptions Related.Gen.Bidirectional.synth_correct_logrel.
+
+Goal True. idtac "Assumptions of monad operation logical relatedness:". Abort.
+Print Assumptions Related.Monad.Free.rtclogicmfree.
