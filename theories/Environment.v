@@ -31,9 +31,6 @@ Import world.notations.
 
 #[local] Set Implicit Arguments.
 
-Declare Scope env_scope.
-Delimit Scope env_scope with env.
-
 Module env.
 
 Section WithBinding.
@@ -156,8 +153,7 @@ End WithBinding.
 
 #[global] Arguments Env D w : clear implicits.
 #[global] Arguments nil {D}.
-#[global] Arguments snoc {D w%world} E%env α & d.
+#[global] Arguments snoc {D w%world} E α & d.
 
 End env.
 Export env (Env).
-Bind Scope env_scope with Env.
