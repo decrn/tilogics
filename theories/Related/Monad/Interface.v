@@ -63,9 +63,6 @@ Module lr.
   Definition RValid {DA SA} (RA : Rel DA SA) (d : Valid DA) (s : SA) : Prop :=
     forall (w : World), (⊢ @RSat DA SA RA w (d w) s).
 
-  (* We use ℛ (\McR) to denote these relations that hold for Valid types *)
-  #[local] Notation "ℛ⟦ R ⟧" := (RValid R%R) (format "ℛ⟦ R ⟧").
-
   (* This instance can be used for any (first-class) symbolic data that can be
        instantiated with a valuation, i.e. symbolic terms, stores, heaps etc. *)
   Definition RInst DA SA {instA : Inst DA SA} : Rel DA SA :=
@@ -124,8 +121,9 @@ Module lr.
 
   Module Import notations.
     Open Scope rel_scope.
-    Notation "ℛ⟦ R ⟧" := (RSat R%R) (format "ℛ⟦ R ⟧", only printing).
-    Notation "ℛ⟦ R ⟧" := (RValid R%R) (format "ℛ⟦ R ⟧").
+    (* We use ℛ (\McR) to typeset logical relation judgements. *)
+    Notation "ℛ⟦ R ⟧" := (RSat R%R) (format "ℛ⟦ R ⟧") : bi_scope.
+    Notation "ℛ⟦ R ⟧" := (RValid R%R) (format "ℛ⟦ R ⟧") : type_scope.
     Notation "A ↣ B" :=
       (RImpl A%R B%R)
         (at level 99, B at level 200, right associativity)

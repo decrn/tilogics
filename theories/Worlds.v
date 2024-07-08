@@ -323,8 +323,7 @@ Notation "A ↠ B" := (Impl A B)
 
 Notation "A * B" := (Prod A%W B%W) : indexed_scope.
 Notation "'∀' x .. y , P " :=
-  (Forall (fun x => .. (Forall (fun y => P%W)) ..))
-    (at level 200, x binder, y binder, right associativity) : indexed_scope.
+  (Forall (fun x => .. (Forall (fun y => P%W)) ..)) : indexed_scope.
 Notation "( α ∈)" := (world.In α) (format "( α  ∈)") : indexed_scope.
 
 Notation "◻ A" := (Box _ A%W)

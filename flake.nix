@@ -32,26 +32,23 @@
           stdpp = "1.9.0";
         };
 
-        coqPackages816 = with (patchCoqPackages pkgs.coqPackages_8_16 iris41); [coq equations stdpp iris];
-        coqPackages817 = with (patchCoqPackages pkgs.coqPackages_8_17 iris41); [coq equations stdpp iris];
-        coqPackages818 = with (patchCoqPackages pkgs.coqPackages_8_18 iris41); [coq equations stdpp iris];
+        iris42 = {
+          iris = "4.2.0";
+          stdpp = "1.10.0";
+        };
 
-        emacsPackage = (pkgs.emacsPackagesFor pkgs.emacs).emacsWithPackages (ep:
-          with ep; [
-            company-coq
-            magit
-            proof-general
-          ]);
+        mkShell = coqPackages: irisVersions: 
+          let cp = patchCoqPackages coqPackages irisVersions; in
+          pkgs.mkShell {buildInputs = [cp.coq cp.equations cp.stdpp cp.iris];};
+
       in {
         devShells = rec {
-          default = coq817;
-          coq816 = pkgs.mkShell {buildInputs = coqPackages816;};
-          coq817 = pkgs.mkShell {buildInputs = coqPackages817;};
-          coq818 = pkgs.mkShell {buildInputs = coqPackages818;};
-
-          emacs816 = pkgs.mkShell {buildInputs = coqPackages816 ++ [emacsPackage];};
-          emacs817 = pkgs.mkShell {buildInputs = coqPackages817 ++ [emacsPackage];};
-          emacs818 = pkgs.mkShell {buildInputs = coqPackages818 ++ [emacsPackage];};
+          default = coq817_iris41;
+          coq816_iris41 = mkShell pkgs.coqPackages_8_16 iris41;
+          coq817_iris41 = mkShell pkgs.coqPackages_8_17 iris41;
+          coq818_iris41 = mkShell pkgs.coqPackages_8_18 iris41;
+          coq818_iris42 = mkShell pkgs.coqPackages_8_18 iris42;
+          coq819_iris42 = mkShell pkgs.coqPackages_8_19 iris42;
         };
       }
     );

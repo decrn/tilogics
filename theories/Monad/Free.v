@@ -108,9 +108,9 @@ Proof.
     iMod "PQ". iSpecialize ("PQ" $! a1). now rewrite trans_refl_r.
 Qed.
 
-#[local] Notation "∀ x , P" :=
-  (@forall_relation _ _ (fun x => P%signature))
-    (at level 200, x binder, right associativity) : signature_scope.
+#[local] Notation "∀ x .. y , P" :=
+  (@forall_relation _ _ (fun x => ..
+    (@forall_relation _ _ (fun y => P)) ..)) : signature_scope.
 #[local] Notation "A → P" :=
   (@pointwise_relation A%type _ P%signature) : signature_scope.
 
