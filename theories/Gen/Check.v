@@ -157,7 +157,7 @@ Section Generator.
   Proof.
     unfold otyping_algo. pred_unfold. intros ι HT.
     pose proof (ocompleteness_aux HT Γ τ) as [Hcompl].
-    specialize (Hcompl ι (MkEmp _)). pred_unfold.
+    specialize (Hcompl ι (MkEmpty _)). pred_unfold.
     rewrite ?inst_lift in Hcompl. specialize (Hcompl eq_refl eq_refl).
     revert Hcompl. apply wp_mono. intros w1 θ1 e1 <-. predsimpl.
   Qed.

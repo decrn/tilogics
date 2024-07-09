@@ -29,7 +29,7 @@
 From Equations Require Import Equations.
 From Em Require Import BaseLogic Monad.Interface Parallel Triangular.
 
-Import Pred world.notations Pred.notations Pred.proofmode.
+Import Pred Pred.notations Pred.proofmode world.notations.
 Import (hints) Par Tri.
 
 Set Implicit Arguments.

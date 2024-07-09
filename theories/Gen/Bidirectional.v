@@ -218,7 +218,7 @@ Section Generator.
   Proof.
     pred_unfold. intros ι HT. destruct (ocompleteness_aux HT) as [_ Hcompl].
     specialize (Hcompl _ G0). destruct Hcompl as [Hcompl].
-    specialize (Hcompl ι (MkEmp _)). pred_unfold. rewrite inst_lift in Hcompl.
+    specialize (Hcompl ι (MkEmpty _)). pred_unfold. rewrite inst_lift in Hcompl.
     specialize (Hcompl eq_refl). revert Hcompl. apply wp_mono.
     intros w1 θ1 ι1 <- [τ1 e1]. pred_unfold.
   Qed.

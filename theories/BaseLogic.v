@@ -28,7 +28,7 @@
 
 From Coq Require Import Classes.Morphisms Classes.Morphisms_Prop
   Classes.RelationClasses Relations.Relation_Definitions Strings.String.
-From iris Require Export bi.derived_connectives bi.interface proofmode.tactics.
+From iris Require Import bi.derived_laws proofmode.tactics.
 From stdpp Require Import base.
 
 From Em Require Export Environment Open Instantiation Substitution Worlds.
@@ -99,21 +99,19 @@ Module Pred.
     Proof. firstorder. Qed.
 
   End RewriteRelations.
-  #[global] Arguments bientails {w} (_ _)%I.
-  #[global] Arguments entails {w} (_ _)%I.
+  #[global] Arguments bientails {w} (_ _)%bi_scope.
+  #[global] Arguments entails {w} (_ _)%bi_scope.
 
   Module Import proofmode.
 
-    Import iris.bi.interface.
-
-    Variant empₚ {w} (ι : Assignment w) : Prop :=
-      MkEmp : empₚ ι.
-    Variant sepₚ {w} (P Q : Pred w) (ι : Assignment w) : Prop :=
-      MkSep : P ι -> Q ι -> sepₚ P Q ι.
-    Variant wandₚ {w} (P Q : Pred w) (ι : Assignment w) : Prop :=
-      MkWand : (P ι -> Q ι) -> wandₚ P Q ι.
+    Variant empty {w} (ι : Assignment w) : Prop :=
+      MkEmpty : empty ι.
+    Variant sep {w} (P Q : Pred w) (ι : Assignment w) : Prop :=
+      MkSep : P ι -> Q ι -> sep P Q ι.
+    Variant wand {w} (P Q : Pred w) (ι : Assignment w) : Prop :=
+      MkWand : (P ι -> Q ι) -> wand P Q ι.
     Variant persistently {w} (P : Pred w) (ι : Assignment w) : Prop :=
-      MkSubstly : P ι -> persistently P ι.
+      MkPersistently : P ι -> persistently P ι.
 
     #[export] Instance ofe_dist_pred {w} : ofe.Dist (Pred w) :=
       ofe.discrete_dist.
@@ -130,15 +128,15 @@ Module Pred.
       refine
         {| bi_car := Pred w;
            bi_entails := entails;
-           bi_emp := empₚ;
+           bi_emp := empty;
            bi_pure P _ := P;
            bi_and P Q ι := P ι /\ Q ι;
            bi_or P Q ι := P ι \/ Q ι;
            bi_impl P Q ι := P ι -> Q ι;
            bi_forall A f ι := forall a, f a ι;
            bi_exist A f ι := exists a, f a ι;
-           bi_sep := sepₚ;
-           bi_wand := wandₚ;
+           bi_sep := sep;
+           bi_wand := wand;
            bi_persistently := persistently;
            bi_later := later;
         |}.
@@ -146,18 +144,18 @@ Module Pred.
     Defined.
 
     #[export] Instance persistent_pred {w} {P : Pred w} :
-      derived_connectives.Persistent P.
+      Persistent P.
     Proof. constructor. intros ι HP. constructor. exact HP. Qed.
 
     #[export] Instance affine_pred {w} {P : Pred w} :
-      derived_connectives.Affine P.
+      Affine P.
     Proof. constructor. intros ι HP. constructor. Qed.
+
+    Export iris.bi.derived_laws.
 
   End proofmode.
 
   Module Import notations.
-
-    Import iris.bi.interface iris.bi.derived_connectives.
 
     Notation "⊤" := (@bi_pure (@bi_pred _) True) : bi_scope.
     Notation "⊥" := (@bi_pure (@bi_pred _) False) : bi_scope.
@@ -174,13 +172,13 @@ Module Pred.
     (P ⊢ Q) <-> ∀ ι, P ι -> Q ι.
   Proof. firstorder. Qed.
   Lemma sep_unfold w (P Q : Pred w) :
-    ∀ ι, interface.bi_sep P Q ι ↔ (P ι ∧ Q ι).
+    ∀ ι, bi_sep P Q ι ↔ (P ι ∧ Q ι).
   Proof. firstorder. Qed.
   Lemma wand_unfold w (P Q : Pred w) :
-    ∀ ι, interface.bi_wand P Q ι ↔ (P ι → Q ι).
+    ∀ ι, bi_wand P Q ι ↔ (P ι → Q ι).
   Proof. firstorder. Qed.
   Lemma intuitionistically_unfold w (P : Pred w) :
-    ∀ ι, @derived_connectives.bi_intuitionistically _ P ι ↔ P ι.
+    ∀ ι, bi_intuitionistically P ι ↔ P ι.
   Proof. firstorder. Qed.
 
   Create HintDb pred_unfold.
@@ -194,13 +192,13 @@ Module Pred.
     @oexp.inst_absu @oexp.inst_abst @oexp.inst_app : pred_unfold.
 
   Ltac punfold_connectives :=
-    change (@interface.bi_and (@bi_pred _) ?P ?Q ?ι) with (P ι /\ Q ι) in *;
-    change (@interface.bi_or (@bi_pred _) ?P ?Q ?ι) with (P ι \/ Q ι) in *;
-    change (@interface.bi_impl (@bi_pred _) ?P ?Q ?ι) with (P ι -> Q ι) in *;
-    change (@derived_connectives.bi_iff (@bi_pred _) ?P ?Q ?ι) with (iff (P ι) (Q ι)) in *;
-    change (@interface.bi_pure (@bi_pred _) ?P _) with P in *;
-    change (@interface.bi_forall (@bi_pred _) ?A ?P) with (fun ι => forall a : A, P a ι) in *;
-    change (@interface.bi_exist (@bi_pred _) ?A ?P) with (fun ι => exists a : A, P a ι) in *;
+    change (@bi_and (@bi_pred _) ?P ?Q ?ι) with (P ι /\ Q ι) in *;
+    change (@bi_or (@bi_pred _) ?P ?Q ?ι) with (P ι \/ Q ι) in *;
+    change (@bi_impl (@bi_pred _) ?P ?Q ?ι) with (P ι -> Q ι) in *;
+    change (@bi_iff (@bi_pred _) ?P ?Q ?ι) with (iff (P ι) (Q ι)) in *;
+    change (@bi_pure (@bi_pred _) ?P _) with P in *;
+    change (@bi_forall (@bi_pred _) ?A ?P) with (fun ι => forall a : A, P a ι) in *;
+    change (@bi_exist (@bi_pred _) ?A ?P) with (fun ι => exists a : A, P a ι) in *;
     change (@subst Pred subst_pred _ _ ?P _ ?θ ?ι) with (P (inst θ ι)) in *;
     try progress (cbn beta).
 
@@ -217,8 +215,8 @@ Module Pred.
              let ι := fresh "ι" in
              intro ι; pred_unfold;
              first [clear ι | revert ι]
-         | |- @interface.bi_emp_valid (@bi_pred _) _ => constructor; intros ι _; cbn
-         | |- @interface.bi_entails (@bi_pred _) _ _ => constructor; intros ι; cbn
+         | |- @bi_emp_valid (@bi_pred _) _ => constructor; intros ι _; cbn
+         | |- @bi_entails (@bi_pred _) _ _ => constructor; intros ι; cbn
          | |- context[@inst ?AT ?A ?I ?w ?x ?ι] =>
              is_var x; generalize (@inst AT A I w x ι);
              clear x; intro x; subst
@@ -226,7 +224,6 @@ Module Pred.
 
   Section Lemmas.
 
-    Import iris.bi.interface iris.bi.derived_laws.bi.
     Create HintDb obligation.
     #[local] Hint Rewrite @inst_refl @inst_trans : obligation.
 
@@ -357,7 +354,7 @@ Module Pred.
 
       Context {Θ : SUB}.
 
-      (* We could define a SubstLaws instance for the Pred type, but that's
+      (* We could define a SubstLaws instance for the Pred type, but that
          requires functional extensionality. Instead, we provide similar
          lemmas that use bientailment instead of Leibniz equality and thus
          avoid functional extensionality. *)
@@ -399,7 +396,6 @@ Module Pred.
   End Lemmas.
 
   Module Sub.
-    Import iris.bi.interface iris.bi.derived_laws.bi.
     Import (hints) Par.
     Section WithSubstitution.
       Context {Θ : SUB}.
@@ -459,7 +455,7 @@ Module Pred.
 
       Lemma and_wp_r {w0 w1} (θ : Θ w0 w1) (P : Pred w0) (Q : Pred w1) :
         P ∧ wp θ Q ⊣⊢ wp θ (P[θ] ∧ Q).
-      Proof. now rewrite and_comm and_wp_l and_comm. Qed.
+      Proof. now rewrite bi.and_comm and_wp_l bi.and_comm. Qed.
 
       Lemma wp_thick {thickΘ : Thick Θ} {lkThickΘ : LkThick Θ}
         {w α} (αIn : world.In α w) (t : OTy (w - α)) (Q : Pred (w - α)) :
@@ -589,7 +585,6 @@ Module Pred.
   End Sub.
 
   Section InstPred.
-    Import iris.bi.derived_laws iris.bi.interface.
 
     (* A type class for things that can be interpreted as a predicate. *)
     Class InstPred (A : OType) :=
