@@ -147,9 +147,10 @@ Module Pred.
       Persistent P.
     Proof. constructor. intros ι HP. constructor. exact HP. Qed.
 
-    #[export] Instance affine_pred {w} {P : Pred w} :
-      Affine P.
-    Proof. constructor. intros ι HP. constructor. Qed.
+    #[export] Instance affine_pred {w} :
+      BiAffine (@bi_pred w) | 0.
+    Proof. firstorder. Qed.
+    #[export] Hint Immediate affine_pred : core.
 
     Export iris.bi.derived_laws.
 

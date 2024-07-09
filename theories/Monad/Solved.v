@@ -53,7 +53,7 @@ Section WithSub.
       iIntros "[Hwp #HQ]". iApply (Sub.wp_mono with "[] Hwp").
       iIntros "!> _". iMod "HQ". now rewrite trans_refl_r.
     - rewrite <- (intro_wp_step τ). iIntros "#HQ !> #Heq". iMod "HQ".
-      rewrite trans_refl_r. iApply "HQ". now iModIntro.
+      rewrite trans_refl_r. now iApply "HQ".
     - destruct m as [(w1 & θ1 & a1)|]; predsimpl. iIntros "PQ".
       iApply Sub.wp_mono. iModIntro. iMod "PQ". now rewrite trans_refl_r.
     - destruct m as [(w1 & θ1 & a1)|]; predsimpl.
