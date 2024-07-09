@@ -1,6 +1,7 @@
 -arg "-w all"
 -arg "-w -disj-pattern-notation"
--arg "-w -notation-overridden"
+-arg "-w -argument-scope-delimiter"
+-arg "-w -extraction-default-directory"
 -Q theories Em
 
 theories/Assumptions.v
