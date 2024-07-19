@@ -39,7 +39,7 @@ We have prepared a prebuilt Docker image containing the necessary software. If y
 Proceed by downloading the prebuilt image tarball and running it with Docker:
 
 ```bash
-docker load < tilogics-oopsla24-image.tar-gz
+docker load < tilogics-oopsla24-image.tar.gz
 docker run -it --rm tilogics/oopsla24
 ```
 
