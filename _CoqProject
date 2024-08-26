@@ -35,6 +35,5 @@ theories/Sub/Parallel.v
 theories/Sub/Prefix.v
 theories/Substitution.v
 theories/Sub/Triangular.v
-theories/UnificationGeneric.v
 theories/Unification.v
 theories/Worlds.v

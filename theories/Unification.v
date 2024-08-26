@@ -27,9 +27,9 @@
 (******************************************************************************)
 
 From Equations Require Import Equations.
-From Em Require Import BaseLogic Monad.Interface Parallel Triangular UnificationGeneric.
+From Em Require Import BaseLogic Monad.Interface Parallel Triangular.
 
-Import Pred Pred.notations Pred.proofmode world.notations UnificationGeneric.
+Import Pred Pred.notations Pred.proofmode world.notations.
 Import (hints) Par Tri.
 
 Set Implicit Arguments.
@@ -38,6 +38,137 @@ Set Implicit Arguments.
   (subst s ζ)
     (at level 7, left associativity,
       format "s [ ζ ]").
+
+(* In this section we define a generic Bove-Capretta style accessibility
+   predicate for functions that recurse on smaller contexts by removing an
+   element.
+
+   See: BOVE, ANA, and VENANZIO CAPRETTA. “Modelling General Recursion in
+   Type Theory.” Mathematical Structures in Computer Science, vol. 15,
+   no. 4, 2005, pp. 671–708., doi:10.1017/S0960129505004822. *)
+Section RemoveAcc.
+
+  (* Coq only generates non-dependent elimination schemes for inductive
+     families in Prop. Hence, we disable the automatic generation and
+     define the elimination schemes for the predicate ourselves. *)
+  #[local] Unset Elimination Schemes.
+
+  Inductive remove_acc : World → Prop :=
+    remove_acc_intro : ⊧ ▹remove_acc ↠ remove_acc.
+
+  Definition remove_acc_inv : ⊧ remove_acc ↠ ▹remove_acc :=
+    fun w d => match d with remove_acc_intro f => f end.
+
+  (* We only define a non-dependent elimination scheme for Type. *)
+  Definition remove_acc_rect (P : OType) (f : ⊧ ▹P ↠ P) :
+    ⊧ remove_acc ↠ P :=
+    fix F w (d : remove_acc w) {struct d} : P w :=
+      f w (fun α αIn => F (w - α) (remove_acc_inv d αIn)).
+
+  Fixpoint remove_acc_step {w α} (r : remove_acc w) {struct r} :
+    remove_acc (world.snoc w α) :=
+    remove_acc_intro
+      (fun β (βIn : β ∈ world.snoc w α) =>
+         match world.view βIn in @world.SnocView _ _ β βIn
+               return remove_acc (world.snoc w α - β) with
+         | world.isZero   => r
+         | world.isSucc i => remove_acc_step (remove_acc_inv r i)
+         end).
+
+  Definition remove_acc_all : ⊧ remove_acc :=
+    fix all w :=
+      match w with
+      | world.nil      => remove_acc_intro
+                            (fun x (xIn : x ∈ world.nil) =>
+                               match world.view xIn with end)
+      | world.snoc w b => remove_acc_step (all w)
+      end.
+
+  (* Calculating the full predicate is costly. It has quadratic running
+     time in the size of the context. This code is deleted in the extraction
+     but for computations inside of Coq, it is better to not use this directly
+     but the [remove_acc_all_gen] defined below. *)
+
+  (* Similar to the Acc_intro_generator from the Coq standrd library.
+     Adds 2ⁿ - 1 [remove_acc_intro]s to the given [all]. *)
+  Fixpoint remove_acc_intro_gen (n : nat) (all : ⊧ remove_acc) : ⊧ remove_acc :=
+    match n with
+    | 0   => all
+    | S m =>
+        fun w =>
+          remove_acc_intro
+            (fun α αIn =>
+               remove_acc_intro_gen m (remove_acc_intro_gen m all) (w - α))
+    end.
+
+  Definition remove_acc_all_gen : ⊧ remove_acc :=
+    remove_acc_intro_gen 20 (remove_acc_all).
+
+  Definition loeb {A : World → Type} : (⊧ ▹A ↠ A) → (⊧ A) :=
+    fun step w => remove_acc_rect step (remove_acc_all w).
+
+  (* Derive a dependent elimination scheme for Prop. *)
+  Scheme remove_acc_ind := Induction for remove_acc Sort Prop.
+
+  #[local] Notation "▸ P" :=
+    (fun (f : ▹_ _) => ∀ α (αIn : α ∈ _), P (_ - α) (f α αIn))
+      (at level 9, right associativity).
+
+  Definition loeb_elim {A} (step : ⊧ ▹A ↠ A) (P : ∀ [w], A w → Prop)
+    (pstep: ∀ w (f : ▹A w) (IH : ▸P f), P (step w f)) w : P (loeb step w).
+  Proof. unfold loeb. induction (remove_acc_all w). eauto. Qed.
+
+End RemoveAcc.
+
+Section Operations.
+
+  Definition singleton {w x} (xIn : x ∈ w) (t : OTy (w - x)) :
+    Solved Tri Unit w :=
+    Some (existT (w - x) (thick (Θ := Tri) x t, tt)).
+
+End Operations.
+
+Section Implementation.
+
+  Definition C := Box Tri (Solved Tri Unit).
+
+  Definition ctrue : ⊧ C :=
+    fun w0 w1 r01 => pure tt.
+  Definition cfalse : ⊧ C :=
+    fun w0 w1 r01 => fail.
+  Definition cand : ⊧ C ↠ C ↠ C :=
+    fun w0 c1 c2 w1 r01 =>
+      bind (c1 w1 r01) (fun w2 r12 _ => _4 c2 r01 r12).
+  #[global] Arguments cfalse {w} [w1] _.
+  #[global] Arguments ctrue {w} [w1] _.
+
+  Definition AUnifier : OType :=
+    OTy ↠ OTy ↠ C.
+
+End Implementation.
+
+Section Correctness.
+
+  Lemma instpred_ctrue {w0 w1} (θ1 : Tri w0 w1) :
+    instpred (ctrue θ1) ⊣⊢ ⊤.
+  Proof. cbn. now rewrite Sub.wp_refl. Qed.
+
+  Lemma instpred_cfalse {w0 w1} (θ1 : Tri w0 w1) :
+    instpred (cfalse θ1) ⊣⊢ ⊥.
+  Proof. reflexivity. Qed.
+
+  Lemma instpred_cand_intro {w0} (c1 c2 : C w0) P Q :
+    (∀ w1 (θ1 : Tri w0 w1), instpred (c1 w1 θ1) ⊣⊢ P[θ1]) →
+    (∀ w1 (θ1 : Tri w0 w1), instpred (c2 w1 θ1) ⊣⊢ Q[θ1]) →
+    (∀ w1 (θ1 : Tri w0 w1), instpred (cand c1 c2 θ1) ⊣⊢ (P ∧ Q)[θ1]).
+  Proof.
+    unfold instpred, instpred_solved, cand. intros H1 H2 w1 θ1.
+    rewrite wp_solved_bind subst_and -H1 wp_solved_frame.
+    unfold _4. apply proper_wp_solved_bientails. intros w2 θ2 [].
+    cbn. rewrite and_true_l -subst_pred_trans. apply H2.
+  Qed.
+
+End Correctness.
 
 Section OccursCheck.
   Import option.notations.
@@ -50,53 +181,9 @@ Section OccursCheck.
       | world.Diff _ xIn' => Some xIn'
       end.
 
-  Definition occurs_check : ⊧ OTy ↠ ▹(Option OTy) :=
-    fun w =>
-      fix oc (t : OTy w) β (βIn : β ∈ w) {struct t} :=
-      match t with
-      | oty.evar αIn   => oty.evar <$> occurs_check_in αIn βIn
-      | oty.bool       => Some oty.bool
-      | oty.func t1 t2 => oty.func <$> oc t1 β βIn <*> oc t2 β βIn
-      end.
-
-  Lemma occurs_check_spec {w α} (αIn : α ∈ w) (t : OTy w) :
-    match occurs_check t αIn with
-    | Some t' => t = t'[thin α]
-    | None => t = oty.evar αIn \/ oty.OTy_subterm (oty.evar αIn) t
-    end.
-  Proof.
-    induction t; cbn.
-    - unfold occurs_check_in. destruct world.occurs_check_view; cbn.
-      + now left.
-      + now rewrite lk_thin.
-    - reflexivity.
-    - destruct (occurs_check t1 αIn), (occurs_check t2 αIn);
-        cbn; subst; auto; right;
-        match goal with
-        | H: _ \/ oty.OTy_subterm _ ?t |- _ =>
-            destruct H;
-            [ subst; constructor; constructor
-            | constructor 2 with t; auto; constructor; constructor
-            ]
-        end.
-  Qed.
+  Load UnificationStlcOccursCheck.
 
 End OccursCheck.
-
-Section VarView.
-
-  Inductive VarView {w} : OTy w → Type :=
-  | is_var {x} (xIn : x ∈ w) : VarView (oty.evar xIn)
-  | not_var {t} (H: ∀ x (xIn : x ∈ w), t <> oty.evar xIn) : VarView t.
-  #[global] Arguments not_var {w t} &.
-
-  Definition varview {w} (t : OTy w) : VarView t :=
-    match t with
-    | oty.evar xIn => is_var xIn
-    | _            => not_var (fun _ _ e => noConfusion_inv e)
-    end.
-
-End VarView.
 
 Section Implementation.
 
@@ -116,7 +203,7 @@ Section Implementation.
       end.
   #[global] Arguments flex {w} α {αIn} τ : rename.
 
-  Section MguO.
+  Section OpenRecursion.
 
     Context [w] (lamgu : ▹AUnifier w).
     Arguments lamgu {_ _} _ _ {_} _.
@@ -129,36 +216,9 @@ Section Implementation.
         end.
     #[global] Arguments aflex α {αIn} τ [w1] _.
 
-    Definition atrav : AUnifier w :=
-      fix atrav s t {struct s} :=
-        match s , t with
-        | @oty.evar _ α _  , t               => aflex α t
-        | s                , @oty.evar _ β _ => aflex β s
-        | oty.bool         , oty.bool        => ctrue
-        | oty.func s1 s2   , oty.func t1 t2  => cand (atrav s1 t1) (atrav s2 t2)
-        | _                , _               => cfalse
-        end.
+    Load UnificationStlcUnifier.
 
-    Section atrav_elim.
-
-      Context (P : OTy w → OTy w → C w → Type).
-      Context (fflex1 : ∀ α (αIn : α ∈ w) (t : OTy w), P (oty.evar αIn) t (aflex α t)).
-      Context (fflex2 : ∀ α (αIn : α ∈ w) (t : OTy w), P t (oty.evar αIn) (aflex α t)).
-      Context (fbool : P oty.bool oty.bool ctrue).
-      Context (fbool_func : ∀ T1 T2 : OTy w, P oty.bool (oty.func T1 T2) cfalse).
-      Context (ffunc_bool : ∀ T1 T2 : OTy w, P (oty.func T1 T2) oty.bool cfalse).
-      Context (ffunc : ∀ s1 s2 t1 t2 : OTy w,
-        (P s1 t1 (atrav s1 t1)) →
-        (P s2 t2 (atrav s2 t2)) →
-        P (oty.func s1 s2) (oty.func t1 t2)
-          (cand (atrav s1 t1) (atrav s2 t2))).
-
-      Lemma atrav_elim : ∀ (t1 t2 : OTy w), P t1 t2 (atrav t1 t2).
-      Proof. induction t1; intros t2; cbn; auto; destruct t2; auto. Qed.
-
-    End atrav_elim.
-
-  End MguO.
+  End OpenRecursion.
 
   Definition amgu : ⊧ AUnifier :=
     fun w => loeb atrav w.
@@ -204,8 +264,7 @@ Section Correctness.
   Section InnerRecursion.
 
     Context [w] (lamgu : ▹AUnifier w).
-    Context (lamgu_correct : ∀ x (xIn : x ∈ w),
-                AUnifierCorrect (lamgu xIn)).
+    Context (lamgu_correct : ∀ x (xIn : x ∈ w), AUnifierCorrect (lamgu xIn)).
 
     Lemma aflex_correct {α} (αIn : α ∈ w) (t : OTy w) w1 (θ1 : w ⊑⁻ w1) :
       instpred (aflex lamgu α t θ1) ⊣⊢ (oty.evar αIn ≈ t)[θ1].
@@ -216,17 +275,7 @@ Section Correctness.
       - now rewrite lamgu_correct !subst_eq !subst_trans.
     Qed.
 
-    Lemma atrav_correct : AUnifierCorrect (atrav lamgu).
-    Proof.
-      intros t1 t2. pattern (atrav lamgu t1 t2). apply atrav_elim; clear t1 t2.
-      - intros α αIn t w1 θ1. now rewrite aflex_correct.
-      - intros α αIn t w1 θ1. now rewrite aflex_correct.
-      - intros. predsimpl.
-      - intros. predsimpl.
-      - intros. predsimpl.
-      - intros s1 s2 t1 t2 IH1 IH2 w1 θ1.
-        rewrite oeq_ty_noconfusion. now apply instpred_cand_intro.
-    Qed.
+    Load UnificationStlcCorrect.
 
   End InnerRecursion.
 

@@ -1,5 +1,5 @@
 (******************************************************************************)
-(* Copyright (c) 2023 Denis Carnier, Steven Keuchel                           *)
+(* Copyright (c) 2022 Steven Keuchel                                          *)
 (* All rights reserved.                                                       *)
 (*                                                                            *)
 (* Redistribution and use in source and binary forms, with or without         *)
@@ -26,20 +26,45 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Coq Require Import ExtrHaskellBasic ExtrHaskellNatInt ExtrHaskellString Bool.
-From Em Require Import Composition.
 
-Extraction Language Haskell.
-Extraction Inline Bool.Bool.iff_reflect Environment.env.view
-  Init.Datatypes.nat_rec Init.Logic.False_rec Init.Logic.and_rec
-  Init.Logic.and_rect Init.Logic.eq_rec_r Init.Specif.sumbool_rec
-  Init.Specif.sumbool_rect Unification.atrav Unification.flex
-  Unification.loeb Unification.remove_acc_rect Unification.varview
-  Worlds.Box Worlds.Impl Worlds.Impl Worlds.Valid Worlds.lk Worlds._4
-  Worlds.world.view stdpp.base.empty stdpp.base.insert stdpp.base.fmap
-  stdpp.base.decide_rel stdpp.gmap.gmap_fmap stdpp.option.option_fmap.
+Definition occurs_check : ⊧ OTy ↠ ▹(Option OTy) :=
+  fun w =>
+    fix oc (t : OTy w) β (βIn : β ∈ w) {struct t} :=
+    match t with
+    | oty.evar αIn   => oty.evar <$> occurs_check_in αIn βIn
+    | oty.bool       => Some oty.bool
+    | oty.func t1 t2 => oty.func <$> oc t1 β βIn <*> oc t2 β βIn
+    end.
 
-Extract Inductive reflect => "Prelude.Bool" [ "Prelude.True" "Prelude.False" ].
-Extract Inlined Constant Init.Datatypes.fst => "Prelude.fst".
-Extract Inlined Constant Init.Datatypes.snd => "Prelude.snd".
-Extraction "Extract" ground_type ground_expr infer_free infer_prenex infer_solved.
+Lemma occurs_check_spec {w α} (αIn : α ∈ w) (t : OTy w) :
+  match occurs_check t αIn with
+  | Some t' => t = t'[thin α]
+  | None => t = oty.evar αIn \/ oty.OTy_subterm (oty.evar αIn) t
+  end.
+Proof.
+  induction t; cbn.
+  - unfold occurs_check_in. destruct world.occurs_check_view; cbn.
+    + now left.
+    + now rewrite lk_thin.
+  - reflexivity.
+  - destruct (occurs_check t1 αIn), (occurs_check t2 αIn);
+      cbn; subst; auto; right;
+      match goal with
+      | H: _ \/ oty.OTy_subterm _ ?t |- _ =>
+          destruct H;
+          [ subst; constructor; constructor
+          | constructor 2 with t; auto; constructor; constructor
+          ]
+      end.
+Qed.
+
+Inductive VarView {w} : OTy w → Type :=
+| is_var {x} (xIn : x ∈ w) : VarView (oty.evar xIn)
+| not_var {t} (H: ∀ x (xIn : x ∈ w), t <> oty.evar xIn) : VarView t.
+#[global] Arguments not_var {w t} &.
+
+Definition varview {w} (t : OTy w) : VarView t :=
+  match t with
+  | oty.evar xIn => is_var xIn
+  | _            => not_var (fun _ _ e => noConfusion_inv e)
+  end.

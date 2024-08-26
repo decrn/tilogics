@@ -26,20 +26,14 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Coq Require Import ExtrHaskellBasic ExtrHaskellNatInt ExtrHaskellString Bool.
-From Em Require Import Composition.
+#[export] Instance subst_ty : Subst OTy :=
+  fun Θ =>
+    fix subst {w0} (t : OTy w0) {w1} θ : OTy w1 :=
+    match t with
+    | oty.evar αIn   => lk θ αIn
+    | oty.bool       => oty.bool
+    | oty.func t1 t2 => oty.func (subst t1 θ) (subst t2 θ)
+    end.
 
-Extraction Language Haskell.
-Extraction Inline Bool.Bool.iff_reflect Environment.env.view
-  Init.Datatypes.nat_rec Init.Logic.False_rec Init.Logic.and_rec
-  Init.Logic.and_rect Init.Logic.eq_rec_r Init.Specif.sumbool_rec
-  Init.Specif.sumbool_rect Unification.atrav Unification.flex
-  Unification.loeb Unification.remove_acc_rect Unification.varview
-  Worlds.Box Worlds.Impl Worlds.Impl Worlds.Valid Worlds.lk Worlds._4
-  Worlds.world.view stdpp.base.empty stdpp.base.insert stdpp.base.fmap
-  stdpp.base.decide_rel stdpp.gmap.gmap_fmap stdpp.option.option_fmap.
-
-Extract Inductive reflect => "Prelude.Bool" [ "Prelude.True" "Prelude.False" ].
-Extract Inlined Constant Init.Datatypes.fst => "Prelude.fst".
-Extract Inlined Constant Init.Datatypes.snd => "Prelude.snd".
-Extraction "Extract" ground_type ground_expr infer_free infer_prenex infer_solved.
+#[export] Instance subst_env : Subst OEnv :=
+  fun Θ w0 Γ w1 θ => fmap (fun t => subst t θ) Γ.

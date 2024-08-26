@@ -1,5 +1,5 @@
 (******************************************************************************)
-(* Copyright (c) 2023 Denis Carnier, Steven Keuchel                           *)
+(* Copyright (c) 2022 Steven Keuchel                                          *)
 (* All rights reserved.                                                       *)
 (*                                                                            *)
 (* Redistribution and use in source and binary forms, with or without         *)
@@ -26,20 +26,14 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Coq Require Import ExtrHaskellBasic ExtrHaskellNatInt ExtrHaskellString Bool.
-From Em Require Import Composition.
-
-Extraction Language Haskell.
-Extraction Inline Bool.Bool.iff_reflect Environment.env.view
-  Init.Datatypes.nat_rec Init.Logic.False_rec Init.Logic.and_rec
-  Init.Logic.and_rect Init.Logic.eq_rec_r Init.Specif.sumbool_rec
-  Init.Specif.sumbool_rect Unification.atrav Unification.flex
-  Unification.loeb Unification.remove_acc_rect Unification.varview
-  Worlds.Box Worlds.Impl Worlds.Impl Worlds.Valid Worlds.lk Worlds._4
-  Worlds.world.view stdpp.base.empty stdpp.base.insert stdpp.base.fmap
-  stdpp.base.decide_rel stdpp.gmap.gmap_fmap stdpp.option.option_fmap.
-
-Extract Inductive reflect => "Prelude.Bool" [ "Prelude.True" "Prelude.False" ].
-Extract Inlined Constant Init.Datatypes.fst => "Prelude.fst".
-Extract Inlined Constant Init.Datatypes.snd => "Prelude.snd".
-Extraction "Extract" ground_type ground_expr infer_free infer_prenex infer_solved.
+Lemma atrav_correct : AUnifierCorrect (atrav lamgu).
+Proof.
+  intros t1 t2. pattern (atrav lamgu t1 t2). apply atrav_elim; clear t1 t2.
+  - intros α αIn t w1 θ1. now rewrite aflex_correct.
+  - intros α αIn t w1 θ1. now rewrite aflex_correct.
+  - intros. predsimpl.
+  - intros. predsimpl.
+  - intros. predsimpl.
+  - intros s1 s2 t1 t2 IH1 IH2 w1 θ1.
+    rewrite oeq_ty_noconfusion. now apply instpred_cand_intro.
+Qed.

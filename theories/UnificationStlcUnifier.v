@@ -1,5 +1,5 @@
 (******************************************************************************)
-(* Copyright (c) 2023 Denis Carnier, Steven Keuchel                           *)
+(* Copyright (c) 2022 Steven Keuchel                                          *)
 (* All rights reserved.                                                       *)
 (*                                                                            *)
 (* Redistribution and use in source and binary forms, with or without         *)
@@ -26,20 +26,31 @@
 (* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.               *)
 (******************************************************************************)
 
-From Coq Require Import ExtrHaskellBasic ExtrHaskellNatInt ExtrHaskellString Bool.
-From Em Require Import Composition.
+Definition atrav : AUnifier w :=
+  fix atrav s t {struct s} :=
+    match s , t with
+    | @oty.evar _ α _  , t               => aflex α t
+    | s                , @oty.evar _ β _ => aflex β s
+    | oty.bool         , oty.bool        => ctrue
+    | oty.func s1 s2   , oty.func t1 t2  => cand (atrav s1 t1) (atrav s2 t2)
+    | _                , _               => cfalse
+    end.
 
-Extraction Language Haskell.
-Extraction Inline Bool.Bool.iff_reflect Environment.env.view
-  Init.Datatypes.nat_rec Init.Logic.False_rec Init.Logic.and_rec
-  Init.Logic.and_rect Init.Logic.eq_rec_r Init.Specif.sumbool_rec
-  Init.Specif.sumbool_rect Unification.atrav Unification.flex
-  Unification.loeb Unification.remove_acc_rect Unification.varview
-  Worlds.Box Worlds.Impl Worlds.Impl Worlds.Valid Worlds.lk Worlds._4
-  Worlds.world.view stdpp.base.empty stdpp.base.insert stdpp.base.fmap
-  stdpp.base.decide_rel stdpp.gmap.gmap_fmap stdpp.option.option_fmap.
+Section atrav_elim.
 
-Extract Inductive reflect => "Prelude.Bool" [ "Prelude.True" "Prelude.False" ].
-Extract Inlined Constant Init.Datatypes.fst => "Prelude.fst".
-Extract Inlined Constant Init.Datatypes.snd => "Prelude.snd".
-Extraction "Extract" ground_type ground_expr infer_free infer_prenex infer_solved.
+  Context (P : OTy w → OTy w → C w → Type).
+  Context (fflex1 : ∀ α (αIn : α ∈ w) (t : OTy w), P (oty.evar αIn) t (aflex α t)).
+  Context (fflex2 : ∀ α (αIn : α ∈ w) (t : OTy w), P t (oty.evar αIn) (aflex α t)).
+  Context (fbool : P oty.bool oty.bool ctrue).
+  Context (fbool_func : ∀ T1 T2 : OTy w, P oty.bool (oty.func T1 T2) cfalse).
+  Context (ffunc_bool : ∀ T1 T2 : OTy w, P (oty.func T1 T2) oty.bool cfalse).
+  Context (ffunc : ∀ s1 s2 t1 t2 : OTy w,
+    (P s1 t1 (atrav s1 t1)) →
+    (P s2 t2 (atrav s2 t2)) →
+    P (oty.func s1 s2) (oty.func t1 t2)
+      (cand (atrav s1 t1) (atrav s2 t2))).
+
+  Lemma atrav_elim : ∀ (t1 t2 : OTy w), P t1 t2 (atrav t1 t2).
+  Proof. induction t1; intros t2; cbn; auto; destruct t2; auto. Qed.
+
+End atrav_elim.
