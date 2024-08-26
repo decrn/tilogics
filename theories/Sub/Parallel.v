@@ -40,8 +40,8 @@ Module Par.
     |}.
 
   #[local] Notation "w0 ⊑ˢ w1" := (sub Par w0 w1).
-  #[local] Notation "□ˢ A" := (Box Par A) (at level 9, format "□ˢ A", right associativity).
-  #[local] Notation subst t θ := (subst t θ) (only parsing).
+  #[local] Notation "□ˢ A" := (Box Par A)
+    (at level 9, format "□ˢ A", right associativity).
 
   #[export] Instance refl_par : Refl Par :=
     fun w => env.tabulate (@oty.evar w).
@@ -99,18 +99,6 @@ Module Par.
     - now rewrite ?lk_trans, subst_trans.
   Qed.
 
-  Lemma comp_thin_thick {w α} (αIn : α ∈ w) (s : OTy (w - α)) :
-    trans (thin α) (thick α s) = refl.
-  Proof.
-    apply env.lookup_extensional. intros β βIn. foldlk.
-    rewrite lk_trans, lk_refl, lk_thin. cbn. foldlk. rewrite lk_thick.
-    unfold thickIn. now rewrite world.occurs_check_view_thin.
-  Qed.
-
-  Lemma thin_thick_pointful {w α} (αIn : α ∈ w) (s : OTy (w - α)) (t : OTy (w - α)) :
-    subst (subst t (thin α)) (thick α s) = t.
-  Proof. now rewrite <- subst_trans, comp_thin_thick, subst_refl. Qed.
-
   #[export] Instance hmap_par {Θ : SUB} : HMap Θ Par :=
     fun w0 w1 θ => env.tabulate (@lk _ _ _ θ).
 
@@ -119,34 +107,6 @@ Module Par.
     intros w0 w1 θ a αIn. unfold hmap, hmap_par, lk at 1; cbn.
     now rewrite env.lookup_tabulate.
   Qed.
-
-  Lemma Ty_subterm_subst {w1 w2} (s t : OTy w1) (θ : Par w1 w2) :
-    oty.OTy_subterm s t -> oty.OTy_subterm (subst s θ) (subst t θ).
-  Proof.
-    unfold oty.OTy_subterm. induction 1; cbn.
-    - constructor 1; destruct H; constructor.
-    - econstructor 2; eauto.
-  Qed.
-
-  Lemma hmap_step {Θ} {stepΘ : Step Θ} {lkStepΘ : LkStep Θ} w α :
-    hmap (@step Θ stepΘ w α) = step (Θ := Par).
-  Proof.
-    apply env.lookup_extensional. intros β βIn.
-    foldlk. now rewrite lk_hmap, !lk_step.
-  Qed.
-
-  Lemma hmap_thick {Θ} {thickΘ : Thick Θ} {lkThickΘ : LkThick Θ}
-    w α (αIn : α ∈ w) t :
-    hmap (thick (Θ := Θ) α t) = thick (Θ := Par) α t.
-  Proof.
-    apply env.lookup_extensional. intros β βIn.
-    foldlk. now rewrite lk_hmap, !lk_thick.
-  Qed.
-
-  Lemma subst_hmap {Θ : SUB} {T} {subT : Subst T} {subLT : SubstLaws T}
-    [w0 w1] (θ : Θ w0 w1) :
-    forall t, subst t (hmap θ) = subst t θ.
-  Proof. intros. apply subst_simulation. intros. now rewrite lk_hmap. Qed.
 
 End Par.
 Export Par (Par).
