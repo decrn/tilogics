@@ -181,18 +181,15 @@ Proof.
   - now rewrite ax_wp_pure.
   - now rewrite ax_wp_bind.
   - rewrite ax_wp_equals. iIntros "[#Heq >HQ]". now iSplit.
-  - rewrite ax_wp_pick. rewrite <- (Sub.intro_wp_step τ). iIntros "#H !> #Heq".
-    iMod "H". iSpecialize ("H" $! (oty.evar world.in_zero) with "Heq").
-    now rewrite trans_refl_r.
+  - rewrite ax_wp_pick. rewrite <- (Sub.intro_wp_step τ).
+    iIntros "#H !> #Heq". iMod "H". now iApply "H".
   - now rewrite ax_wp_fail.
   - apply ax_wp_mono.
   - now rewrite ax_wlp_pure.
   - now rewrite ax_wlp_bind.
   - rewrite ax_wlp_equals. iIntros "#HQ #Heq".
     iSpecialize ("HQ" with "Heq"). now iMod "HQ".
-  - rewrite ax_wlp_pick. iIntros "#HQ !>". iMod "HQ".
-    iSpecialize ("HQ" $! (oty.evar world.in_zero)).
-    now rewrite trans_refl_r.
+  - rewrite ax_wlp_pick. iIntros "#HQ !>". iMod "HQ". now iApply "HQ".
   - now rewrite ax_wlp_fail.
   - apply ax_wlp_mono.
   - now rewrite ax_wp_impl.

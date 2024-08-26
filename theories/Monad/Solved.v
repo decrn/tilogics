@@ -51,19 +51,19 @@ Section WithSub.
       destruct f as [(w2 & θ2 & b2)|]; predsimpl.
     - rewrite <- mgu_correct. destruct mgu as [(w1 & θ1 & [])|]; predsimpl.
       iIntros "[Hwp #HQ]". iApply (Sub.wp_mono with "[] Hwp").
-      iIntros "!> _". iMod "HQ". now rewrite trans_refl_r.
+      iIntros "!> _". now iMod "HQ".
     - rewrite <- (intro_wp_step τ). iIntros "#HQ !> #Heq". iMod "HQ".
-      rewrite trans_refl_r. now iApply "HQ".
+      now iApply "HQ".
     - destruct m as [(w1 & θ1 & a1)|]; predsimpl. iIntros "PQ".
-      iApply Sub.wp_mono. iModIntro. iMod "PQ". now rewrite trans_refl_r.
+      iApply Sub.wp_mono. iModIntro. now iMod "PQ".
     - destruct m as [(w1 & θ1 & a1)|]; predsimpl.
       destruct f as [(w2 & θ2 & b2)|]; predsimpl.
     - rewrite <- mgu_correct. destruct mgu as [(w1 & θ1 & [])|]; predsimpl.
       unfold instpred, instpred_unit. rewrite Sub.wp_impl. predsimpl.
-      iIntros "HQ !>". rewrite subst_pbox. iMod "HQ". now rewrite trans_refl_r.
-    - iIntros "HQ !>". iMod "HQ". rewrite trans_refl_r. iApply "HQ".
+      iIntros "HQ !>". now iMod "HQ".
+    - iIntros "HQ !>". iMod "HQ". iApply "HQ".
     - destruct m as [(w1 & θ1 & a1)|]; predsimpl. iIntros "PQ".
-      iApply Sub.wlp_mono. iModIntro. iMod "PQ". now rewrite trans_refl_r.
+      iApply Sub.wlp_mono. iModIntro. now iMod "PQ".
     - destruct m as [(w1 & θ1 & a1)|]; predsimpl. rewrite Sub.wp_impl. predsimpl.
   Qed.
 

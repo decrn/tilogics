@@ -225,7 +225,7 @@ Section Correctness.
       intros t1 t2. pattern (atrav lamgu t1 t2). apply atrav_elim; clear t1 t2.
       - intros α αIn t w1 θ1. now rewrite aflex_correct.
       - intros α αIn t w1 θ1. now rewrite aflex_correct.
-      - intros. now rewrite instpred_ctrue.
+      - intros. predsimpl.
       - intros. predsimpl.
       - intros. predsimpl.
       - intros s1 s2 t1 t2 IH1 IH2 w1 θ1.

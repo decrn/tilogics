@@ -139,22 +139,22 @@ Module lr.
   #[export] Instance into_rsat_wlp [Θ : SUB] [w0 w1 : World] (θ : Θ w0 w1)
     DA SA `{InstSubst DA SA} (da0 : DA w0) (da1 : DA w1) (sa : SA) :
     IntoSubst θ da0 da1 ->
-    IntoWlp θ (RSat (RInst DA SA) da0 sa) (RSat (RInst DA SA) da1 sa).
+    IntoWlp θ (ℛ⟦RInst DA SA⟧ da0 sa) (ℛ⟦RInst DA SA⟧ da1 sa).
   Proof.
-    intros Hsubst. constructor. intros ι -> ? <-.
+    unfold IntoSubst, IntoWlp. intros [Hsubst]. constructor. intros ι -> ? <-.
     simpl. now rewrite <- Hsubst, inst_subst.
   Qed.
 
-  Lemma rand :
-    ⊧ fun w => ⊢ RSat (RPred ↣ RPred ↣ RPred) (@bi_and (@bi_pred w)) and.
+  Lemma rand w :
+    ⊢ ℛ⟦RPred ↣ RPred ↣ RPred⟧ (@bi_and (@bi_pred w)) and.
   Proof. firstorder. Qed.
 
   Lemma req [DA SA] {instA : Inst DA SA} w :
-    ⊢ RSat (RInst DA SA ↣ RInst DA SA ↣ RPred) (oeq (w:=w)) eq.
-  Proof. simpl; do 3 (constructor; intros ?); now subst.  Qed.
+    ⊢ ℛ⟦RInst DA SA ↣ RInst DA SA ↣ RPred⟧ (oeq (w:=w)) eq.
+  Proof. simpl; do 3 (constructor; intros ?); now subst. Qed.
 
   Lemma rinsert x w :
-    ⊢ RSat (w:=w) (RTy ↣ REnv ↣ REnv) (insert x) (insert x).
+    ⊢ ℛ⟦RTy ↣ REnv ↣ REnv⟧ (insert (M := OEnv w) x) (insert x).
   Proof.
     constructor. simpl.
     intros ι _ dτ sτ. constructor.
@@ -164,19 +164,19 @@ Module lr.
   Qed.
 
   Lemma rlift `{InstLift DA SA} {sa : SA} :
-    ℛ⟦RInst DA SA⟧ (@lift _ _ _ sa) sa.
+    ℛ⟦RInst DA SA⟧ (@lift DA SA H0 sa) sa.
   Proof. constructor. intros ι _. simpl. now rewrite inst_lift. Qed.
 
   Lemma rlookup x {w} :
-    ⊢ RSat (w := w) (REnv ↣ ROption RTy) (lookup x) (lookup x).
+    ⊢ ℛ⟦REnv ↣ ROption RTy⟧ (lookup (M := OEnv w) x) (lookup x).
   Proof.
     do 2 constructor. intros ->.
     rewrite lookup_inst. now destruct lookup.
   Qed.
 
   Lemma rwpstep {w α} (SP : Ty → Prop) (DP : Pred (w ، α)) :
-    (wlp step (∀ τ : Ty, lift τ ≈ oty.evar world.in_zero -∗ RSat RPred DP (SP τ)))%I ⊢
-      RSat RPred (wp step DP) (∃ t : Ty, SP t)%type.
+    (wlp step (∀ τ : Ty, lift τ ≈ oty.evar world.in_zero -∗ ℛ⟦RPred⟧ DP (SP τ))) ⊢
+      ℛ⟦RPred⟧ (wp step DP) (∃ t : Ty, SP t)%type.
   Proof.
     constructor; simpl; intros ? ?. split.
     - intros (ι' & Heq & HP). specialize (H _ Heq).

@@ -76,7 +76,7 @@ Proof.
     + iDestruct "ra" as "(#r1 & #r2 & #rk)". repeat iSplit; auto.
       iApply IHda; auto.
     + iApply (wlp_mono with "[] ra"). iIntros "!> #ra %t #Heq".
-      iApply IHda; auto. now iApply "ra".
+      iApply IHda; auto. now iApply "ra". iIntros (?w ?θ) "!>". now iMod "rf".
   - constructor; cbn. pred_unfold.
 Qed.
 
@@ -94,6 +94,5 @@ Proof.
       iApply rwpstep. iIntros "!> %τ #Heq".
       iApply H. auto. now iApply "rk".
       iIntros (? ?) "!> %da %sa #ra". iMod "RQ".
-      iSpecialize ("RQ" $! da sa with "ra").
-      now rewrite trans_refl_r.
+      now iSpecialize ("RQ" $! da sa with "ra").
 Qed.

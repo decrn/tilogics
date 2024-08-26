@@ -77,7 +77,7 @@ Module Import world.
        https://doi.org/10.1017/S0956796803004829 *)
 
   (* A view expressing that membership in the empty context is uninhabited. *)
-  Variant NilView [α] (αIn : In α nil) : Type :=.
+  Variant NilView [α] (αIn : α ∈ nil) : Type :=.
 
   (* A view for membership in a non-empty context. *)
   Variant SnocView {β w} : ∀ [α], α ∈ snoc w β → Type :=
@@ -99,6 +99,12 @@ Module Import world.
     | in_succ i => isSucc i
     end.
 
+  (* Calculate a new world with the given element removed. The [remove] function
+     and the subsequent [OccursCheckView] machinery are Based on:
+
+     Chantal Keller and Thorsten Altenkirch (2010), "Hereditary substitutions
+     for simple types, formalized." MSFP'10.
+     https://doi.org/10.1145/1863597.1863601 *)
   Fixpoint remove {w} α {αIn : α ∈ w} : World :=
     match αIn with
     | @in_zero _ w        => w
@@ -116,9 +122,9 @@ Module Import world.
                         end
     end.
 
-  Inductive OccursCheckView {w α} (αIn : In α w) : ∀ [β], In β w → Type :=
-  | Same                               : OccursCheckView αIn αIn
-  | Diff {β} (βIn : In β (remove w α)) : OccursCheckView αIn (in_thin αIn βIn).
+  Variant OccursCheckView {w α} (αIn : α ∈ w) : ∀ [β], β ∈ w → Type :=
+  | Same                           : OccursCheckView αIn αIn
+  | Diff {β} (βIn : β ∈ remove w α) : OccursCheckView αIn (in_thin αIn βIn).
 
   Equations occurs_check_view {w α β} (αIn : In α w) (βIn : In β w) :
     OccursCheckView αIn βIn :=
@@ -131,11 +137,11 @@ Module Import world.
       | Diff _ βIn' => Diff (in_succ αIn') (in_succ βIn')
       end.
 
-  Lemma occurs_check_view_refl {w α} (αIn : In α w) :
+  Lemma occurs_check_view_refl {w α} (αIn : α ∈ w) :
     occurs_check_view αIn αIn = Same αIn.
   Proof. induction αIn; cbn; now rewrite ?IHαIn. Qed.
 
-  Lemma occurs_check_view_thin {w α β} (αIn : In α w) (βIn : In β (remove w α)) :
+  Lemma occurs_check_view_thin {w α β} (αIn : α ∈ w) (βIn : β ∈ remove w α) :
     occurs_check_view αIn (in_thin αIn βIn) = Diff αIn βIn.
   Proof. induction αIn; [|destruct (view βIn)]; cbn; now rewrite ?IHαIn. Qed.
 
@@ -198,12 +204,12 @@ Module Import world.
       let (b, s') := incr (max "" w) in
       if b then String "a" s' else s'.
 
-    Example fresh_nil : fresh nil = "a" := eq_refl.
-    Example fresh_1   : fresh (ε ، "1") = "aa" := eq_refl.
-    Example fresh_a   : fresh (ε ، "a") = "b"  := eq_refl.
-    Example fresh_z   : fresh (ε ، "z") = "aa" := eq_refl.
-    Example fresh_tld : fresh (ε ، "~") = "aa" := eq_refl.
-    Example fresh_aa  : fresh (ε ، "aa") = "ab" := eq_refl.
+    Goal fresh nil        = "a".  reflexivity. Abort.
+    Goal fresh (ε ، "1")  = "aa". reflexivity. Abort.
+    Goal fresh (ε ، "a")  = "b".  reflexivity. Abort.
+    Goal fresh (ε ، "z")  = "aa". reflexivity. Abort.
+    Goal fresh (ε ، "~")  = "aa". reflexivity. Abort.
+    Goal fresh (ε ، "aa") = "ab". reflexivity. Abort.
 
   End Fresh.
 
@@ -265,11 +271,11 @@ Infix "⊙" := trans (at level 60, right associativity).
 
 Class ReflTrans Θ {reflΘ : Refl Θ} {transΘ : Trans Θ} : Prop :=
   { trans_refl_l {w1 w2} {r : Θ w1 w2} :
-      trans refl r = r;
+      refl ⊙ r = r;
     trans_refl_r {w1 w2} {r : Θ w1 w2} :
-      trans r refl = r;
+      r ⊙ refl = r;
     trans_assoc {w0 w1 w2 w3} (r1 : Θ w0 w1) (r2 : Θ w1 w2) (r3 : Θ w2 w3) :
-      trans (trans r1 r2) r3 = trans r1 (trans r2 r3);
+      (r1 ⊙ r2) ⊙ r3 = r1 ⊙ (r2 ⊙ r3);
   }.
 #[global] Arguments ReflTrans Θ {_ _}.
 

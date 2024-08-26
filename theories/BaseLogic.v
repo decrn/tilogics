@@ -40,9 +40,8 @@ Import world.notations.
 #[local] Arguments step : simpl never.
 #[local] Arguments thick : simpl never.
 
-#[local] Notation "Q [ θ ]" := (fun _ θ' => Q _ (θ ⊙ θ'))
+#[local] Notation "Q [ θ ]" := (_4 Q θ)
   (at level 7, left associativity, format "Q [ θ ]") : box_scope.
-
 #[local] Notation "P [ θ ]" := (subst P θ)
   (at level 7, left associativity, format "P [ θ ]") : bi_scope.
 
@@ -85,7 +84,7 @@ Module Pred.
       subrelation (≡@{Pred w}) entails.
     Proof. firstorder. Qed.
     #[export] Instance subrelation_bientails_flip_entails :
-      subrelation (≡@{Pred w}) (Basics.flip entails).
+      subrelation (≡@{Pred w}) (flip entails).
     Proof. firstorder. Qed.
 
     (* #[export] Instance proper_bientails : *)
@@ -95,7 +94,7 @@ Module Pred.
       Proper ((≡@{Pred w}) ==> (≡@{Pred w}) ==> iff) entails.
     Proof. firstorder. Qed.
     #[export] Instance proper_entails_entails :
-      Proper (Basics.flip entails ==> entails ==> Basics.impl) entails.
+      Proper (entails --> entails ==> impl) entails.
     Proof. firstorder. Qed.
 
   End RewriteRelations.
@@ -113,15 +112,14 @@ Module Pred.
     Variant persistently {w} (P : Pred w) (ι : Assignment w) : Prop :=
       MkPersistently : P ι -> persistently P ι.
 
-    #[export] Instance ofe_dist_pred {w} : ofe.Dist (Pred w) :=
-      ofe.discrete_dist.
+    #[export] Instance ofe_dist_pred {w} : Dist (Pred w) := discrete_dist.
 
     (* Iris defines [bi_later_mixin_id] for BI algebras without later. However,
        the identity function as later still causes some later-specific
        typeclasses to be picked. We just define our own trivial modality and
        mixin to avoid that. *)
     Variant later {w} (P : Pred w) (ι : Assignment w) : Prop :=
-      MkLater : P ι -> later P ι.
+      MkLater : P ι → later P ι.
 
     Canonical bi_pred {w : World} : bi.
     Proof.
@@ -130,11 +128,11 @@ Module Pred.
            bi_entails := entails;
            bi_emp := empty;
            bi_pure P _ := P;
-           bi_and P Q ι := P ι /\ Q ι;
-           bi_or P Q ι := P ι \/ Q ι;
-           bi_impl P Q ι := P ι -> Q ι;
-           bi_forall A f ι := forall a, f a ι;
-           bi_exist A f ι := exists a, f a ι;
+           bi_and P Q ι := P ι ∧ Q ι;
+           bi_or P Q ι := P ι ∨ Q ι;
+           bi_impl P Q ι := P ι → Q ι;
+           bi_forall A f ι := ∀ a, f a ι;
+           bi_exist A f ι := ∃ a, f a ι;
            bi_sep := sep;
            bi_wand := wand;
            bi_persistently := persistently;
@@ -143,12 +141,10 @@ Module Pred.
       all: abstract firstorder.
     Defined.
 
-    #[export] Instance persistent_pred {w} {P : Pred w} :
-      Persistent P.
+    #[export] Instance persistent_pred {w} {P : Pred w} : Persistent P.
     Proof. constructor. intros ι HP. constructor. exact HP. Qed.
 
-    #[export] Instance affine_pred {w} :
-      BiAffine (@bi_pred w) | 0.
+    #[export] Instance affine_pred {w} : BiAffine (@bi_pred w) | 0.
     Proof. firstorder. Qed.
     #[export] Hint Immediate affine_pred : core.
 
@@ -167,10 +163,10 @@ Module Pred.
   End notations.
 
   Lemma bientails_unfold [w] (P Q : Pred w) :
-    (P ⊣⊢ Q) <-> ∀ ι, P ι <-> Q ι.
+    (P ⊣⊢ Q) ↔ ∀ ι, P ι ↔ Q ι.
   Proof. firstorder. Qed.
   Lemma entails_unfold [w] (P Q : Pred w) :
-    (P ⊢ Q) <-> ∀ ι, P ι -> Q ι.
+    (P ⊢ Q) ↔ ∀ ι, P ι → Q ι.
   Proof. firstorder. Qed.
   Lemma sep_unfold w (P Q : Pred w) :
     ∀ ι, bi_sep P Q ι ↔ (P ι ∧ Q ι).
@@ -193,13 +189,13 @@ Module Pred.
     @oexp.inst_absu @oexp.inst_abst @oexp.inst_app : pred_unfold.
 
   Ltac punfold_connectives :=
-    change (@bi_and (@bi_pred _) ?P ?Q ?ι) with (P ι /\ Q ι) in *;
-    change (@bi_or (@bi_pred _) ?P ?Q ?ι) with (P ι \/ Q ι) in *;
-    change (@bi_impl (@bi_pred _) ?P ?Q ?ι) with (P ι -> Q ι) in *;
+    change (@bi_and (@bi_pred _) ?P ?Q ?ι) with (P ι ∧ Q ι) in *;
+    change (@bi_or (@bi_pred _) ?P ?Q ?ι) with (P ι ∨ Q ι) in *;
+    change (@bi_impl (@bi_pred _) ?P ?Q ?ι) with (P ι → Q ι) in *;
     change (@bi_iff (@bi_pred _) ?P ?Q ?ι) with (iff (P ι) (Q ι)) in *;
     change (@bi_pure (@bi_pred _) ?P _) with P in *;
-    change (@bi_forall (@bi_pred _) ?A ?P) with (fun ι => forall a : A, P a ι) in *;
-    change (@bi_exist (@bi_pred _) ?A ?P) with (fun ι => exists a : A, P a ι) in *;
+    change (@bi_forall (@bi_pred _) ?A ?P) with (fun ι => ∀ a : A, P a ι) in *;
+    change (@bi_exist (@bi_pred _) ?A ?P) with (fun ι => ∃ a : A, P a ι) in *;
     change (@subst Pred subst_pred _ _ ?P _ ?θ ?ι) with (P (inst θ ι)) in *;
     try progress (cbn beta).
 
@@ -335,7 +331,7 @@ Module Pred.
     Lemma oeq_pair
       {AT BT : OType} {A B : Type} {instA : Inst AT A} {instB : Inst BT B}
       [w] (a1 a2 : AT w) (b1 b2 : BT w) :
-      (a1,b1) ≈ (a2,b2) ⊣⊢ ((a1 ≈ a2) ∧ (b1 ≈ b2)).
+      (a1,b1) ≈ (a2,b2)  ⊣⊢  a1 ≈ a2 ∧ b1 ≈ b2.
     Proof.
       pred_unfold. intros ι; cbn. split.
       - now injection 1.
@@ -402,9 +398,9 @@ Module Pred.
       Context {Θ : SUB}.
 
       Definition wp {w0 w1} (θ : Θ w0 w1) (Q : Pred w1) : Pred w0 :=
-        fun ι0 => exists (ι1 : Assignment w1), inst θ ι1 = ι0 ∧ Q ι1.
+        fun ι0 => ∃ (ι1 : Assignment w1), inst θ ι1 = ι0 ∧ Q ι1.
       Definition wlp {w0 w1} (θ : Θ w0 w1) (Q : Pred w1) : Pred w0 :=
-        fun ι0 => forall (ι1 : Assignment w1), inst θ ι1 = ι0 → Q ι1.
+        fun ι0 => ∀ (ι1 : Assignment w1), inst θ ι1 = ι0 → Q ι1.
 
       #[global] Arguments wp {_ _} _ _ ι0/.
       #[global] Arguments wlp {_ _} _ _ ι0/.
@@ -657,10 +653,9 @@ Module Pred.
 
   Definition PBox {Θ} : ⊧ Box Θ Pred ↠ Pred :=
     fun w Q => (∀ w' (θ : Θ w w'), Sub.wlp θ (Q w' θ))%I.
-  Notation "◼ Q" := (PBox Q%B) (at level 9, right associativity, format "◼ Q").
+  Notation "◼ Q" := (PBox Q%B) (at level 6, right associativity, format "◼ Q").
 
   Section PBoxModality.
-    Import iris.proofmode.tactics.
 
     (* We instantiate the iris modality elimination machinery for the ◼ modality.
        That means every time we have a hypothesis with that modality at the
@@ -670,9 +665,9 @@ Module Pred.
       {w} (P : ◻Pred w) (Q : Pred w) :
       ElimModal True p true ◼P (P w refl) Q Q.
     Proof.
-      intros _. unfold PBox. cbn. iIntros "[#H1 H2]". iApply "H2".
-      destruct p; cbn; iSpecialize ("H1" $! w (refl (Refl := reflΘ)));
-        now erewrite Sub.wlp_refl.
+      intros _. iIntros "[H1 H2]". iApply "H2".
+      iPoseProof (bi.intuitionistically_if_elim with "H1") as "#HBox".
+      iModIntro. iStopProof. pred_unfold. intros ι HP. apply HP, inst_refl.
     Qed.
 
     (* Substitution distributes over ◼. *)
@@ -681,6 +676,15 @@ Module Pred.
     Proof.
       constructor; intros ι1 HQ w2 θ2 ι2 <-.
       apply HQ. now rewrite inst_trans.
+    Qed.
+
+    #[export] Instance elimsubstpbox (Θ : SUB) (p : bool)
+      {w} (P : ◻Pred w) [w1] (θ1 : Θ w w1) (Q : Pred w1) :
+      ElimModal True p true ◼P[θ1] (P w1 θ1) Q Q.
+    Proof.
+      intros _. iIntros "[H1 H2]". iApply "H2".
+      iPoseProof (bi.intuitionistically_if_elim with "H1") as "#HBox".
+      iModIntro. iStopProof. pred_unfold. intros ι HP. now apply HP.
     Qed.
 
   End PBoxModality.
@@ -694,39 +698,81 @@ Module Pred.
        equivalent to [x] with the substitution [θ] applied. *)
     Class IntoSubst `{Inst T A, Subst T}
       [w0 w1] (θ : Θ w0 w1) (x : T w0) (y : T w1) : Prop :=
-      into_subst : ∀ ι : Assignment w1, inst (subst x θ) ι = inst y ι.
+      into_subst : ⊢ x[θ] ≈ y.
 
     (* The default instance (with lower priority) simply applies [θ] to [t]. *)
     #[export] Instance into_subst_default `{Inst T A, Subst T}
       [w0 w1] (θ : Θ w0 w1) (t : T w0) : IntoSubst θ t (subst t θ) | 10.
     Proof. easy. Qed.
 
-    (* #[export] Instance into_subst_subst `{LkTrans Θ, InstSubst T A} *)
-    (*   [w0 w1 w2] (θ1 : Θ w0 w1) (θ2 : Θ w1 w2) (t : T w0) : *)
-    (*   IntoSubst θ2 (subst t θ1) (subst t (trans θ1 θ2)) | 0. *)
-    (* Proof. intros ι. now rewrite !inst_subst, inst_trans. Qed. *)
+    #[export] Instance into_subst_subst `{LkTrans Θ, Inst T A, SubstLaws T}
+      [w0 w1 w2] (θ1 : Θ w0 w1) (θ2 : Θ w1 w2) (t : T w0) :
+      IntoSubst θ2 (subst t θ1) (subst t (θ1 ⊙ θ2)) | 0.
+    Proof. unfold IntoSubst. now rewrite subst_trans. Qed.
 
-    #[export] Instance into_subst_lift {T A} {instTA : Inst T A} {liftTA : Lift T A}
-      {subT : Subst T} {instLiftTA : InstLift T A} {instSubTA : InstSubst T A}
-      [w0 w1] (θ : Θ w0 w1) (a : A) :
-      IntoSubst θ (lift a) (lift a) | 0.
-    Proof. intros ι. now rewrite inst_subst !inst_lift. Qed.
+    #[export] Instance into_subst_lift {T A} `{Inst T A, SubstLift T A}
+      [w0 w1] (θ : Θ w0 w1) (a : A) : IntoSubst θ (lift a) (lift a) | 0.
+    Proof. unfold IntoSubst. now rewrite subst_lift. Qed.
 
     #[export] Instance into_subst_insert
       [w0 w1] (θ : Θ w0 w1) (G0 : OEnv w0) x (τ0 : OTy w0) G1 τ1
       (HG : IntoSubst θ G0 G1) (Hτ : IntoSubst θ τ0 τ1) :
       IntoSubst θ (G0 ,, x ∷ τ0) (G1 ,, x ∷ τ1) | 0.
     Proof.
-      intros ι1. specialize (HG ι1). specialize (Hτ ι1).
-      change_no_check (@gmap.gmap string _ _ (OTy ?w)) with (OEnv w).
-      rewrite subst_insert !inst_insert. now f_equal.
+      unfold IntoSubst in *. rewrite subst_insert.
+      iApply oeq_insert. now iSplit.
     Qed.
 
   End IntoSubst.
+  #[global] Hint Mode IntoSubst + + + + + + + + - - : typeclass_instances.
+
+  Section IntoSubstPred.
+
+    Context {Θ : SUB} [w1 w2] (θ : Θ w1 w2).
+
+    (* We use the [IntoSubstPred] type class to perform logic programming that
+       will automatically push substitutions down into predicates. The idea is
+       that the substitution [θ] applied to [P] is stronger than [Q]. [P] should
+       be chosen as weak as possible though. *)
+    Class IntoSubstPred (P : Pred w1) (Q : Pred w2) : Prop :=
+      into_substpred : P[θ] ⊢ Q.
+
+    (* The default instance (with lower priority) simply applies [θ] to [t]. *)
+    #[export] Instance into_substpred_default (P : Pred w1) :
+      IntoSubstPred P P[θ] | 10.
+    Proof. easy. Qed.
+
+    #[export] Instance into_substpred_substpred `{LkTrans Θ} [w0] (θ' : Θ w0 w1)
+      (P : Pred w0) : IntoSubstPred P[θ'] P[θ' ⊙ θ] | 0.
+    Proof. unfold IntoSubstPred. now rewrite subst_pred_trans. Qed.
+
+    #[export] Instance into_substpred_typing (G1 : OEnv w1) (e : Exp)
+      (τ1 : OTy w1) (ee1 : OExp w1) G2 τ2 ee2 (HG : IntoSubst θ G1 G2)
+      (Hτ : IntoSubst θ τ1 τ2) (Hee : IntoSubst θ ee1 ee2) :
+      IntoSubstPred (G1 |--ₚ e; τ1 ~> ee1)%I (G2 |--ₚ e; τ2 ~> ee2)%I.
+    Proof.
+      unfold IntoSubst, IntoSubstPred in *. rewrite subst_typing.
+      destruct HG as [HG], Hτ as [Hτ], Hee as [Hee]. constructor.
+      intros ι. cbn. now rewrite ?HG ?Hτ ?Hee.
+    Qed.
+
+    #[export] Instance into_substpred_eq `{InstSubst T A} (x1 x2 : T w1)
+      (y1 y2 : T w2) (Hxy1 : IntoSubst θ x1 y1) (Hxy2 : IntoSubst θ x2 y2) :
+      IntoSubstPred (x1 ≈ x2)%I (y1 ≈ y2)%I | 0.
+    Proof.
+      unfold IntoSubst, IntoSubstPred in *. rewrite subst_eq.
+      destruct Hxy1 as [Hxy1], Hxy2 as [Hxy2]. constructor.
+      intros ι. cbn. now rewrite ?Hxy1 ?Hxy2.
+    Qed.
+
+    #[export] Instance into_substpred_wlp (P : Pred w2) :
+      IntoSubstPred (Sub.wlp θ P) P.
+    Proof. apply Sub.subst_wlp. Qed.
+
+  End IntoSubstPred.
+  #[global] Hint Mode IntoSubstPred + + + + - - : typeclass_instances.
 
   Section WlpModality.
-
-    Import iris.proofmode.tactics.
 
     Context {Θ : SUB} [w0 w1] (θ : Θ w0 w1).
 
@@ -737,9 +783,9 @@ Module Pred.
     Class IntoWlp (P : Pred w0) (Q : Pred w1) :=
       into_wlp : P ⊢ Sub.wlp θ Q.
 
-    #[export] Instance into_wlp_default (P : Pred w0) :
-      IntoWlp P (subst P θ) | 10.
-    Proof. unfold IntoWlp. now apply Sub.entails_wlp. Qed.
+    #[export] Instance into_wlp_default (P : Pred w0) Q
+      (H : IntoSubstPred θ P Q) : IntoWlp P Q | 10.
+    Proof. apply Sub.entails_wlp, H. Qed.
 
     Definition modality_wlp_mixin :
       modality_mixin (Sub.wlp θ)
@@ -753,33 +799,6 @@ Module Pred.
     #[export] Instance from_modal_wlp P :
       FromModal True modality_wlp (Sub.wlp θ P) (Sub.wlp θ P) P.
     Proof. firstorder. Qed.
-
-    #[export] Instance into_wlp_pbox `{LkTrans Θ} (P : ◻Pred w0) :
-      IntoWlp ◼P ◼(fun _ θ2 => P _ (θ ⊙ θ2)) | 0.
-    Proof. unfold IntoWlp. iIntros "H !>". now rewrite subst_pbox. Qed.
-
-    #[export] Instance into_wlp_typing (G1 : OEnv w0) (e : Exp) (τ1 : OTy w0)
-      (ee1 : OExp w0) G2 τ2 ee2 (HG : IntoSubst θ G1 G2)
-      (Hτ : IntoSubst θ τ1 τ2) (Hee : IntoSubst θ ee1 ee2) :
-      IntoWlp (G1 |--ₚ e; τ1 ~> ee1) (G2 |--ₚ e; τ2 ~> ee2) | 0.
-    Proof.
-      constructor. intros ι0 HT ι1 <-. pred_unfold.
-      specialize (HG ι1). specialize (Hτ ι1). specialize (Hee ι1).
-      rewrite !inst_subst in HG, Hτ, Hee. congruence.
-    Qed.
-
-    #[export] Instance into_wlp_eqp `{InstSubst T A} (x1 x2 : T w0)
-      (y1 y2 : T w1) (Hxy1 : IntoSubst θ x1 y1) (Hxy2 : IntoSubst θ x2 y2) :
-      IntoWlp (x1 ≈ x2) (y1 ≈ y2) | 0.
-    Proof.
-      constructor. pred_unfold. intros ι0 Heq ι1 ?Heq; cbn.
-      specialize (Hxy1 ι1). specialize (Hxy2 ι1).
-      rewrite !inst_subst in Hxy1, Hxy2. congruence.
-    Qed.
-
-    #[export] Instance into_wlp_wlp (P : Pred w1) :
-      IntoWlp (Sub.wlp θ P) P | 0.
-    Proof. unfold IntoWlp. reflexivity. Qed.
 
   End WlpModality.
 

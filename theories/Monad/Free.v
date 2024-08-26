@@ -93,7 +93,7 @@ Proof.
   - easy.
   - iIntros "[#Heq HP]". iSplit; [auto|]. iRevert "HP". now iApply IHm.
   - iApply Sub.wp_mono. iModIntro. iApply IHm. iIntros "%w1 %θ1 !> %a1".
-    iMod "PQ". iSpecialize ("PQ" $! a1). now rewrite trans_refl_r.
+    iMod "PQ". iApply "PQ".
 Qed.
 
 Lemma wlp_free_mono [A w0] (m : Free A w0) (P Q : ◻(A ↠ Pred) w0) :
@@ -105,7 +105,7 @@ Proof.
   - iIntros "HP #Heq". rewrite <- wand_is_impl.
     iSpecialize ("HP" with "Heq"). iRevert "HP". now iApply IHm.
   - iApply Sub.wlp_mono. iModIntro. iApply IHm. iIntros "%w1 %θ1 !> %a1".
-    iMod "PQ". iSpecialize ("PQ" $! a1). now rewrite trans_refl_r.
+    iMod "PQ". iApply "PQ".
 Qed.
 
 #[local] Notation "∀ x .. y , P" :=
