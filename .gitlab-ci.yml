@@ -20,4 +20,4 @@ stages:
 "8.17.1-iris41":   {<<: *build, image: "ghcr.io/katamaran-project/coq:8.17.1_iris-4.1.0_equations-1.3"}
 "8.18.0-iris41":   {<<: *build, image: "ghcr.io/katamaran-project/coq:8.18.0_iris-4.1.0_equations-1.3"}
 "8.18.0-iris42":   {<<: *build, image: "ghcr.io/katamaran-project/coq:8.18.0_iris-4.2.0_equations-1.3"}
-"8.19.0-iris42":   {<<: *build, image: "ghcr.io/katamaran-project/coq:8.19.2_iris-4.2.0_equations-1.3"}
+"8.19.2-iris42":   {<<: *build, image: "ghcr.io/katamaran-project/coq:8.19.2_iris-4.2.0_equations-1.3"}
