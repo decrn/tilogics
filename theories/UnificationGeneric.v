@@ -39,10 +39,6 @@ Set Implicit Arguments.
     (at level 7, left associativity,
       format "s [ ζ ]").
 
-#[local] Notation "▹ A" :=
-  (fun (w : World) => ∀ α (αIn : α ∈ w), A%W (w - α))
-    (at level 9, right associativity).
-
 (* In this section we define a generic Bove-Capretta style accessibility
    predicate for functions that recurse on smaller contexts by removing an
    element.

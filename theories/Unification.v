@@ -39,10 +39,6 @@ Set Implicit Arguments.
     (at level 7, left associativity,
       format "s [ ζ ]").
 
-#[local] Notation "▹ A" :=
-  (fun (w : World) => ∀ α (αIn : α ∈ w), A%W (w - α))
-    (at level 9, right associativity).
-
 Section OccursCheck.
   Import option.notations.
   Import (hints) Par.

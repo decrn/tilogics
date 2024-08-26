@@ -336,6 +336,9 @@ Notation "◻ A" := (Box _ A%W)
   (at level 9, right associativity, format "◻ A").
 (* Notation "◇ A" := (Diamond _ A) *)
 (*   (at level 9, right associativity, format "◇ A") : indexed_scope. *)
+Notation "▹ A" :=
+  (fun (w : World) => ∀ α (αIn : α ∈ w), A%W (w - α))
+    (at level 9, right associativity).
 
 Definition _4 {Θ} {transΘ : Trans Θ} {A} : ⊧ Box Θ A ↠ Box Θ (Box Θ A) :=
   fun w0 a w1 θ1 w2 θ2 => a w2 (trans θ1 θ2).
