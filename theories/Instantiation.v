@@ -36,147 +36,96 @@ Import world.notations.
 
 Notation Assignment := (env.Env Ty).
 
-Section Inst.
+(* The default assignment we use, grounds all evars to the boolean type. *)
+Fixpoint grounding (w : World) : Assignment w :=
+  match w with
+  | world.nil      => env.nil
+  | world.snoc Γ b => env.snoc (grounding Γ) b ty.bool
+  end%world.
 
-  Class Inst (A : OType) (a : Type) : Type :=
-    inst : forall {w}, A w -> Assignment w -> a.
+(* For a pair of a closed type A and open type AT, lift converts a value 
+   from the closed to the open type. *)
+Class Lift (AT : OType) (A : Type) : Type :=
+  lift : A → ⊧ AT.
+#[global] Arguments lift {_ _ _} _ {_}.
 
-  #[export] Instance inst_list {A : OType} {a : Type} `{Inst A a} :
-    Inst (List A) (list a) :=
-    fun w xs ass => List.map (fun x => inst x ass) xs.
+#[export] Instance lift_prod {AT BT A B} `{Lift AT A, Lift BT B} :
+  Lift (Prod AT BT) (A * B) :=
+  fun '(a , b) w => (lift a, lift b).
 
-  #[export] Instance inst_const {A} : Inst (Const A) A | 10 :=
-    fun Σ x ι => x.
+(* Inst for instantiation applies a given assignment to a value of an open type
+   to get a corresponding value of the closed type. *)
+Class Inst (A : OType) (a : Type) : Type :=
+  inst : ∀ {w}, A w → Assignment w → a.
 
-  #[export] Instance inst_unit : Inst Unit unit :=
-    fun _ x ass => x.
+#[export] Instance inst_list {A : OType} {a : Type} `{Inst A a} :
+  Inst (List A) (list a) :=
+  fun w xs ass => List.map (fun x => inst x ass) xs.
+#[export] Instance inst_const {A} : Inst (Const A) A | 10 :=
+  fun Σ x ι => x.
+#[export] Instance inst_unit : Inst Unit unit :=
+  fun _ x ass => x.
+#[export] Instance inst_prod {AT BT A B} `{Inst AT A, Inst BT B} :
+  Inst (Prod AT BT) (A * B) :=
+  fun ass '(a , b) ι => (inst a ι, inst b ι).
+#[export] Instance inst_option {AT A} `{Inst AT A} :
+  Inst (Option AT) (option A) :=
+  fun w ma ass => option_map (fun a => inst a ass) ma.
 
-  #[export] Instance inst_prod {AT BT A B} `{Inst AT A, Inst BT B} :
-    Inst (Prod AT BT) (A * B) :=
-    fun ass '(a , b) ι => (inst a ι, inst b ι).
+(* Instances for Ty and Env are in a separate file for the sole purpose
+   of counting SLoC for the generic and specific categories. *)
+Load InstantiationStlcInstances.
 
-  #[export] Instance inst_option {AT A} `{Inst AT A} :
-    Inst (Option AT) (option A) :=
-    fun w ma ass => option_map (fun a => inst a ass) ma.
+(* One special instance is that anything of a substitution type can be
+   instantiated to an assignment. This is a kind of composition of the
+   substituition with the given assignment: An evar is first subtituted for an
+   open type, and then that open type is instantiated to a closed type.
+   Effectively we get a mapping from evars to closed types, which is just
+   assignment. *)
+#[export] Instance inst_sub {Θ : SUB} : ∀ w, Inst (Θ w) (Assignment w) :=
+  fun w0 w1 θ ι => env.tabulate (fun α αIn => inst (lk θ αIn) ι).
 
-  #[export] Instance inst_ty : Inst OTy Ty :=
-    fix inst_ty {w} t ι :=
-      match t with
-      | oty.evar αIn   => env.lookup ι αIn
-      | oty.bool       => ty.bool
-      | oty.func t1 t2 => ty.func (inst_ty t1 ι) (inst_ty t2 ι)
-      end.
+(* The inst and lift operations interact with each other and also
+   with the substitution operator. The following type classes encapsulate
+   these interactions. *)
+Class InstLift AT A `{Inst AT A, Lift AT A} : Prop :=
+  inst_lift (w : World) (a : A) (ι : Assignment w) :
+    inst (lift a) ι = a.
+#[global] Arguments InstLift _ _ {_ _}.
+Class SubstLift AT A {liftA : Lift AT A} {subA: Subst AT} : Prop :=
+  subst_lift [Θ : SUB] {w0 w1} (a : A) (θ : Θ w0 w1) :
+    subst (lift a) θ = lift a.
+#[global] Arguments SubstLift _ _ {_ _}.
+Class InstSubst AT A `{Subst AT, Inst AT A} : Prop :=
+  inst_subst [Θ : SUB] {w0 w1} (θ : Θ w0 w1) (t : AT w0) (ι : Assignment w1) :
+    inst (subst t θ) ι = inst t (inst θ ι).
+#[global] Arguments InstSubst _ _ {_ _}.
 
-  #[export] Instance inst_env : Inst OEnv Env :=
-    fun w Γ ι => base.fmap (fun t : OTy w => inst t ι) Γ.
+#[export] Instance inst_lift_prod {AT A BT B}
+  `{InstLift AT A, InstLift BT B} : InstLift (Prod AT BT) (A * B).
+Proof. intros w [a b] ι. cbn. f_equal; apply inst_lift. Qed.
+#[export] Instance inst_subst_prod {AT A BT B}
+  `{InstSubst AT A, InstSubst BT B} : InstSubst (Prod AT BT) (A * B).
+Proof. intros Θ w0 w1 θ [a b] ι. cbn. f_equal; apply inst_subst. Qed.
 
-  #[export] Instance inst_sub {Θ : SUB} :
-    forall w, Inst (Θ w) (Assignment w) :=
-    fun w0 w1 θ ι => env.tabulate (fun α αIn => inst (lk θ αIn) ι).
-End Inst.
+(* Just like before load the instances for the interaction proofs from
+   another file. *)
+Load InstantiationStlcProofs.
 
-Section Lift.
-
-  Class Lift (AT : OType) (A : Type) : Type :=
-    lift : A -> ⊧ AT.
-  #[global] Arguments lift {_ _ _} _ {_}.
-
-  (* Indexes a given ty by a world Σ *)
-  #[export] Instance lift_ty : Lift OTy Ty :=
-    fix lift_ty (t : Ty) w : OTy w :=
-      match t with
-      | ty.bool       => oty.bool
-      | ty.func t1 t2 => oty.func (lift_ty t1 w) (lift_ty t2 w)
-      end.
-
-  #[export] Instance lift_env : Lift OEnv Env :=
-    fun E w => fmap (fun t => lift t) E.
-
-  #[export] Instance lift_prod {AT BT A B} `{Lift AT A, Lift BT B} :
-    Lift (Prod AT BT) (A * B) :=
-    fun '(a , b) w => (lift a, lift b).
-
-End Lift.
-
-Section InstLift.
-
-  Class InstLift AT A `{Inst AT A, Lift AT A} : Prop :=
-    inst_lift (w : World) (a : A) (ι : Assignment w) :
-      inst (lift a) ι = a.
-  #[global] Arguments InstLift _ _ {_ _}.
-
-  #[export] Instance inst_lift_ty : InstLift OTy Ty.
-  Proof. intros w t ι. induction t; cbn; f_equal; auto. Qed.
-
-  #[export] Instance inst_lift_env : InstLift OEnv Env.
-  Proof.
-    intros w E ι. unfold inst, inst_env, lift, lift_env.
-    rewrite <- map_fmap_id, <- map_fmap_compose.
-    apply map_fmap_ext. intros x t Hlk. apply inst_lift.
-  Qed.
-
-  #[export] Instance inst_lift_prod {AT A BT B}
-    `{InstLift AT A, InstLift BT B} : InstLift (Prod AT BT) (A * B).
-  Proof. intros w [a b] ι. cbn. f_equal; apply inst_lift. Qed.
-
-End InstLift.
-
-Section InstSubst.
-
-  Class InstSubst AT A `{Subst AT, Inst AT A} : Prop :=
-    inst_subst [Θ : SUB] {w0 w1} (θ : Θ w0 w1) (t : AT w0) (ι : Assignment w1) :
-      inst (subst t θ) ι = inst t (inst θ ι).
-  #[global] Arguments InstSubst _ _ {_ _}.
-
-  #[export] Instance inst_subst_ty : InstSubst OTy Ty.
-  Proof.
-    intros Θ w0 w1 θ t ι. induction t; cbn; f_equal; auto.
-    unfold inst at 2, inst_sub. now rewrite env.lookup_tabulate.
-  Qed.
-
-  #[export] Instance inst_subst_env : InstSubst OEnv Env.
-  Proof.
-    intros Θ w0 w1 θ E ι. unfold subst, subst_env, inst at 1 2, inst_env.
-    rewrite <- map_fmap_compose. apply map_fmap_ext.
-    intros x t Hlk. apply inst_subst.
-  Qed.
-
-  #[export] Instance inst_subst_prod {AT A BT B}
-    `{InstSubst AT A, InstSubst BT B} : InstSubst (Prod AT BT) (A * B).
-  Proof. intros Θ w0 w1 θ [a b] ι. cbn. f_equal; apply inst_subst. Qed.
-
-End InstSubst.
-
-Section SubstLift.
-  Class SubstLift AT A {liftA : Lift AT A} {subA: Subst AT} : Prop :=
-    subst_lift [Θ : SUB] {w0 w1} (a : A) (θ : Θ w0 w1) :
-      subst (lift a) θ = lift a.
-  #[global] Arguments SubstLift _ _ {_ _}.
-
-  #[export] Instance subst_lift_ty : SubstLift OTy Ty.
-  Proof. intros Θ w0 w1 t θ. induction t; cbn; f_equal; auto. Qed.
-
-  #[export] Instance subst_lift_env : SubstLift OEnv Env.
-  Proof.
-    intros Θ w0 w1 E θ. unfold subst, lift, subst_env, lift_env, OEnv.
-    rewrite <- map_fmap_compose. apply map_fmap_ext.
-    intros x t Hlk. apply subst_lift.
-  Qed.
-
-End SubstLift.
-
-Lemma inst_refl {Θ} {reflΘ : Refl Θ} {lkreflΘ : LkRefl Θ} :
-  forall w (ι : Assignment w), inst (refl (Θ := Θ)) ι = ι.
+(* The instantiation of substitutions also interacts with the different
+   operations on substitutions. The following lemmas witness some of these. *)
+Lemma inst_refl {Θ} {reflΘ : Refl Θ} {lkreflΘ : LkRefl Θ} w (ι : Assignment w) :
+  inst (refl (Θ := Θ)) ι = ι.
 Proof.
-  intros. apply env.lookup_extensional. intros α αIn. unfold inst, inst_sub.
+  apply env.lookup_extensional. intros α αIn. unfold inst, inst_sub.
   now rewrite env.lookup_tabulate, lk_refl.
 Qed.
 
-Lemma inst_trans {Θ} {transΘ : Trans Θ} {lktransΘ : LkTrans Θ} :
-  forall w0 w1 w2 (θ1 : Θ w0 w1) (θ2 : Θ w1 w2) (ι : Assignment w2),
-    inst (trans θ1 θ2) ι = inst θ1 (inst θ2 ι).
+Lemma inst_trans {Θ} {transΘ : Trans Θ} {lktransΘ : LkTrans Θ} w0 w1 w2
+  (θ1 : Θ w0 w1) (θ2 : Θ w1 w2) (ι : Assignment w2) :
+  inst (θ1 ⊙ θ2) ι = inst θ1 (inst θ2 ι).
 Proof.
-  intros. apply env.lookup_extensional. intros α αIn. unfold inst, inst_sub.
+  apply env.lookup_extensional. intros α αIn. unfold inst, inst_sub.
   now rewrite ?env.lookup_tabulate, lk_trans, inst_subst.
 Qed.
 
@@ -202,11 +151,11 @@ Proof.
   now rewrite env.lookup_thin.
 Qed.
 
-Lemma inst_thick {Θ} {thickΘ : Thick Θ} {lkthickΘ : LkThick Θ} :
-  forall {w} {x} (xIn : x ∈ w) (t : OTy (w - x)) (ι : Assignment (w - x)),
-    inst (thick (Θ := Θ) x t) ι = env.insert xIn ι (inst t ι).
+Lemma inst_thick {Θ} {thickΘ : Thick Θ} {lkthickΘ : LkThick Θ} {w x}
+  (xIn : x ∈ w) (t : OTy (w - x)) (ι : Assignment (w - x)) :
+  inst (thick (Θ := Θ) x t) ι = env.insert xIn ι (inst t ι).
 Proof.
-  intros. apply env.lookup_extensional. intros β βIn. unfold inst, inst_sub.
+  apply env.lookup_extensional. intros β βIn. unfold inst, inst_sub.
   rewrite env.lookup_tabulate, lk_thick. unfold thickIn.
   destruct world.occurs_check_view; cbn.
   - now rewrite env.lookup_insert.
@@ -216,44 +165,6 @@ Qed.
 Lemma inst_hmap `{LkHMap Θ1 Θ2} {w1 w2} (θ : Θ1 w1 w2) (ι : Assignment w2) :
   inst (hmap θ) ι = inst θ ι.
 Proof.
-  intros. apply env.lookup_extensional. intros β βIn. unfold inst, inst_sub.
+  apply env.lookup_extensional. intros β βIn. unfold inst, inst_sub.
   now rewrite !env.lookup_tabulate, lk_hmap.
 Qed.
-
-Lemma inst_direct_subterm {w} (t1 t2 : OTy w) (ι : Assignment w) :
-  oty.OTy_direct_subterm t1 t2 ->
-  ty.Ty_direct_subterm (inst t1 ι) (inst t2 ι).
-Proof. intros []; constructor. Qed.
-
-Lemma inst_subterm {w} (ι : Assignment w) (t1 t2 : OTy w) :
-  oty.OTy_subterm t1 t2 -> ty.Ty_subterm (inst t1 ι) (inst t2 ι).
-Proof.
-  induction 1.
-  - constructor 1. now apply inst_direct_subterm.
-  - eapply t_trans; eauto.
-Qed.
-
-Lemma lookup_lift (Γ : Env) (x : string) (w : World) :
-  lookup x (lift (w:=w) Γ) = option.map (fun t => lift t) (lookup x Γ).
-Proof. unfold lift, lift_env. now rewrite <- lookup_fmap. Qed.
-
-Lemma lookup_inst (w : World) (Γ : OEnv w) (x : string) (ι : Assignment w) :
-  lookup x (inst Γ ι) = inst (lookup x Γ) ι.
-Proof. unfold inst at 1, inst_env. now rewrite lookup_fmap. Qed.
-
-Lemma inst_insert {w} (Γ : OEnv w) (x : string) (t : OTy w) (ι : Assignment w) :
-  inst (insert (M := OEnv w) x t Γ) ι = inst Γ ι ,, x ∷ inst t ι.
-Proof. cbv [inst inst_env OEnv]. now rewrite fmap_insert. Qed.
-
-Lemma inst_empty {w} (ι : Assignment w) : inst (A := OEnv) empty ι = empty.
-Proof. cbv [inst inst_env OEnv]. now rewrite fmap_empty. Qed.
-
-Lemma lift_insert {w x t Γ} :
-  lift (insert (M := Env) x t Γ) = insert (M := OEnv w) x (lift t) (lift Γ).
-Proof. unfold lift, lift_env. now rewrite fmap_insert. Qed.
-
-Fixpoint grounding (w : World) : Assignment w :=
-  match w with
-  | world.nil      => env.nil
-  | world.snoc Γ b => env.snoc (grounding Γ) b ty.bool
-  end%world.
