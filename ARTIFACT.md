@@ -16,9 +16,9 @@ The different parts can be found in the following directories
 
 | Part                            | Directory                                  |
 |---------------------------------|--------------------------------------------|
-| Coq Formalization               | `em/theories`                              |
-| Haskell implementation          | `em/src`                                   |
-| Example programs                | `em/examples`                              |
+| Coq Formalization               | `tilogics/theories`                              |
+| Haskell implementation          | `tilogics/src`                                   |
+| Example programs                | `tilogics/examples`                              |
 
 We take special care to document source code using comments and use an extensible project layout that favours reusability whenever possible.
 
@@ -53,7 +53,7 @@ Proceed by creating a fresh opam switch,
 pinning the Coq and Iris versions and installing `equations`, then, `stdpp` will be installed as a dependency of Iris:
 
 ```bash
-opam switch create em ocaml-base-compiler.4.14.1
+opam switch create tilogics ocaml-base-compiler.4.14.1
 opam repo add coq-released https://coq.inria.fr/opam/released
 opam pin add coq 8.17.1
 opam pin add coq-iris 4.1.0
