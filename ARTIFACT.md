@@ -218,3 +218,7 @@ The result of the benchmark can then be found in the `bench/` directory. Each ru
 
 For reference, the total running time of `make bench` is around 20 minutes on an M2 Macbook Air.
 
+## Counting lines of code
+
+The util/sloc.sh script is used to calculate the Source Lines of Code (SLOC) for different parts of the development project.
+The script generates the table presented in Section 5 of the paper, providing a detailed breakdown of both the generic and specific categories.
