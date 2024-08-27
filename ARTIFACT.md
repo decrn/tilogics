@@ -134,6 +134,14 @@ Assumptions of end-to-end correctness:
 Closed under the global context
 Assumptions of decidability of typing :
 Closed under the global context
+Assumptions of check generator logical relatedness:
+Closed under the global context
+Assumptions of synth generator logical relatedness:
+Closed under the global context
+Assumptions of bidirectional generator logical relatedness:
+Closed under the global context
+Assumptions of monad operation logical relatedness:
+Closed under the global context
 ```
 
 ## Mechanized formalization (Coq)
