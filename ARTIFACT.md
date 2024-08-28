@@ -166,10 +166,10 @@ The following tables relate concepts discussed in the paper to specific code in 
 
 | Concept   | Description                                 | Location in code        |
 |-----------|---------------------------------------------|-------------------------|
-| Figure 9  | World-indexed types                         | `Worlds.v:217`          |
+| Figure 9  | World-indexed types                         | `Worlds.v:223`          |
 | Figure 10 | Definition of the Free monad                | `Monad/Free.v:37`       |
 | Figure 11 | Parellel substitutions                      | `Sub/Parallel.v`        |
-| Figure 12 | Notations                                   | `Worlds.v:320`          |
+| Figure 12 | Notations                                   | `Worlds.v:299-319`      |
 | Figure 13 | Free monad bind                             | `Monad/Free.v:49`       |
 | Figure 14 | Monadic interface for constraint generation | `Monad/Interface.v:65`  |
 | Figure 15 | The Open modality and applicative interface | `Open.v`                |
@@ -177,8 +177,8 @@ The following tables relate concepts discussed in the paper to specific code in 
 | Figure 16 | Constraint generator for synth + elab       | `Gen/Synthesise:47`     |
 | N/A       | Smart constructors for STLCB                | `Open.v:118`            |
 | N/A       | prenex function                             | `PrenexConversion.v:34` |
-| N/A       | solve function                              | `Unification.v:180`     |
-| N/A       | run function                                | `Composition.v:38`      |
+| N/A       | solve function                              | `Unification.v:236`     |
+| N/A       | run function                                | `Composition.v:47`      |
 | N/A       | reconstruct function                        | `Composition.v:65`      |
 
 
@@ -187,8 +187,8 @@ The following tables relate concepts discussed in the paper to specific code in 
 | Concept             | Description                        | Location in code               |
 |---------------------|------------------------------------|--------------------------------|
 | Figure 17           | Closed alg. typing relation        | `Composition.v:94`             |
-| Figure 18           | Assignment predicates              | `BaseLogic.v:51`               |
-| Figure 19           | Substitution wp/wlp                | `BaseLogic.v:589`              |
+| Figure 18           | Assignment predicates              | `BaseLogic.v:50`               |
+| Figure 19           | Substitution wp/wlp                | `BaseLogic.v:395`              |
 | Figure 20           | Free WP/WLP                        | `Monad/Free.v:68`              |
 | Figure 21           | Program logic interface for CstrM  | `Monad/Interface.v:77`         |
 | Theorem 4.1         | End-to-end correctness             | `Composition.v:104`            |
@@ -197,7 +197,7 @@ The following tables relate concepts discussed in the paper to specific code in 
 | Lemma 4.3           | Generator soundness                | `Gen/Synthesise.v:196`         |
 | Lemma 4.4           | Generator completeness             | `Gen/Synthesise.v:215`         |
 | Lemma 4.5           | Prenex conversion correctness      | `PrenexConversion.v:50`        |
-| Lemma 4.6           | Constraint solver correctness      | `Unification.v:258`            |
+| Lemma 4.6           | Constraint solver correctness      | `Unification.v:303`            |
 | Corollary 4.7       | Decidability of typing             | `Composition.v:146`            |
 | Figure 22           | Logical Relation                   | `Related/Monad/Interface.v:44` |
 | Figure 23           | Logical Relation for Free          | `Related/Monad/Free.v:47`      |
