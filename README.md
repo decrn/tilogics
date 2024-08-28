@@ -1,7 +1,9 @@
 # Type Inference Logics
 
 Paper: Type Inference Logics
+
 Authors: Denis Carnier, François Pottier, and Steven Keuchel
+
 https://doi.org/10.1145/3689786
 
 ## Introduction
@@ -222,5 +224,5 @@ For reference, the total running time of `make bench` is around 20 minutes on an
 
 ## Counting lines of code
 
-The util/sloc.sh script is used to calculate the Source Lines of Code (SLOC) for different parts of the development project.
+The `util/sloc.sh` script is used to calculate the Source Lines of Code (SLoC) for different parts of the development project.
 The script generates the table presented in Section 5 of the paper, providing a detailed breakdown of both the generic and specific categories.
