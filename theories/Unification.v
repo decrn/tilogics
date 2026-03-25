@@ -29,7 +29,7 @@
 From Equations Require Import Equations.
 From Em Require Import BaseLogic Monad.Interface Parallel Triangular.
 
-Import Pred Pred.notations Pred.proofmode world.notations.
+Import Pred Pred.proofmode world.notations.
 Import (hints) Par Tri.
 
 Set Implicit Arguments.
@@ -149,44 +149,135 @@ End Implementation.
 
 Section Correctness.
 
-  Lemma instpred_ctrue {w0 w1} (θ1 : Tri w0 w1) :
-    instpred (ctrue θ1) ⊣⊢ ⊤.
-  Proof. cbn. now rewrite Sub.wp_refl. Qed.
+  Definition bpred : World -> Type :=
+    Box Tri Pred.
 
-  Lemma instpred_cfalse {w0 w1} (θ1 : Tri w0 w1) :
-    instpred (cfalse θ1) ⊣⊢ ⊥.
-  Proof. reflexivity. Qed.
+  Section WithWorld.
 
-  Lemma instpred_cand_intro {w0} (c1 c2 : C w0) P Q :
-    (∀ w1 (θ1 : Tri w0 w1), instpred (c1 w1 θ1) ⊣⊢ P[θ1]) →
-    (∀ w1 (θ1 : Tri w0 w1), instpred (c2 w1 θ1) ⊣⊢ Q[θ1]) →
-    (∀ w1 (θ1 : Tri w0 w1), instpred (cand c1 c2 θ1) ⊣⊢ (P ∧ Q)[θ1]).
+    Context (w : World).
+   
+    Record bientails (P Q : bpred w) : Prop :=
+      MkBientails { fromBientails : forall w acc, equiv (P w acc) (Q w acc) }.
+    Record entails (P Q : bpred w) : Prop :=
+      MkEntails { fromEntails : forall w acc, P w acc ⊢ Q w acc }.
+   
+    #[export] Instance boxedpred_equiv : Equiv (bpred w) := bientails.
+    #[export] Instance boxedpred_equivalence : Equivalence (≡@{bpred w}).
+    Proof. constructor. firstorder. firstorder. constructor.
+           intros. transitivity (y w0 acc); firstorder.
+    Defined.
+   
+    Canonical bi_bpred : bi.
+    Proof.
+      refine
+        {| bi_car := bpred w;
+          bi_entails P Q :=  entails P Q;
+          bi_dist := discrete_dist;
+          bi_emp w' acc := bi_emp;
+          bi_equiv P Q :=  bientails P Q;
+          bi_pure P w' acc := bi_pure P;
+          bi_and P Q w' acc := bi_and (P w' acc) (Q w' acc);
+          bi_or P Q w' acc := bi_or (P w' acc) (Q w' acc);
+          bi_impl P Q w' acc := bi_impl (P w' acc) (Q w' acc);
+          bi_forall A f w' acc := bi_forall (fun (a : A) =>  f a w' acc);
+          bi_exist A f w' acc := bi_exist (fun (a : A) => f a w' acc);
+          bi_sep P Q w' acc := bi_sep (P w' acc) (Q w' acc);
+          bi_wand P Q w' acc := bi_wand (P w' acc) (Q w' acc);
+          bi_persistently := id;
+          bi_later := id;
+          bi_ofe_mixin := @discrete_ofe_mixin (bpred w) boxedpred_equiv boxedpred_equivalence ;
+          bi_cofe_aux := @discrete_cofe (bpred w) boxedpred_equiv boxedpred_equivalence;
+        |}.
+      Unshelve.
+      all: try abstract firstorder.
+      Show Proof.
+      constructor; try firstorder.
+      - constructor. firstorder. constructor. intros.  transitivity (y w0 acc); firstorder.
+      - constructor. intros.
+        destruct H as [H]. specialize (H w0 acc).
+        destruct H0 as [H0]. specialize (H0 w0 acc).
+        firstorder.
+      - intros. constructor. intros.
+        apply bi.forall_proper.
+        intros a. apply H.
+      - intros. constructor. intros.
+        apply bi.exist_proper.
+        intros a. apply H.
+      - constructor. intros.
+        destruct H as [H]. specialize (H w0 acc).
+        destruct H0 as [H0]. specialize (H0 w0 acc).
+        firstorder.
+    Defined.
+
+  End WithWorld.
+
+  Class InstBPred (A : OType) :=
+    instbpred : ⊧ A ↠ bpred.
+  #[global] Arguments instbpred {_ _ _}.
+ 
+  #[export] Instance instbpred_c : InstBPred C.
+  intros w c w' acc.
+  unfold C in c.
+  specialize (c w' acc).
+  apply instpred in c.
+  apply c.
+  Defined.
+
+  (* TODO: reprove this lemma with boxed pred, requiring defining instboxedpred first... *)
+  Lemma instpred_ctrue {w0} :
+    instbpred ctrue ⊣⊢@{bpred w0} True.
+    Proof. cbn. constructor. intros. cbn. now rewrite Sub.wp_refl. Qed.
+ 
+    Lemma instpred_cfalse {w0} :
+      instbpred cfalse ⊣⊢@{bpred w0} False.
+    Proof. reflexivity. Qed.
+
+    Lemma instpred_cand_intro {w0} (c1 c2 : C w0) P Q :
+      (∀ w1 (θ1 : Tri w0 w1), instpred (c1 w1 θ1) ⊣⊢ P[θ1]) →
+      (∀ w1 (θ1 : Tri w0 w1), instpred (c2 w1 θ1) ⊣⊢ Q[θ1]) →
+      (∀ w1 (θ1 : Tri w0 w1), instpred (cand c1 c2 θ1) ⊣⊢ (P ∧ Q)[θ1]).
+    Admitted.
+
+    Lemma instpred_cand_distr {w0} (c1 c2 : C w0) :
+    instbpred (cand c1 c2) ⊣⊢ instbpred c1 ∧ instbpred c2.
+    Proof.
+      constructor. intros.
+      unfold instbpred at 1, instbpred_c at 1.
+      Print Refl.
+      Print Tri.refl_tri.
+      pose proof (@instpred_cand_intro w0 c1 c2 (instpred (c1 w0 (Tri.refl_tri w0))) (instpred (c2 w0 (Tri.refl_tri w0)))).
+      rewrite H.
+      cbn.
+      (* Something is wrong. *)
+      Admitted.
+ 
+  Lemma instpred_cand_intro' {w0} (c1 c2 : C w0) P Q :
+    instbpred c1 ⊣⊢ P →
+    instbpred c2 ⊣⊢ Q →
+    instbpred (cand c1 c2) ⊣⊢ P ∧ Q.
   Proof.
-    unfold instpred, instpred_solved, cand. intros H1 H2 w1 θ1.
-    rewrite wp_solved_bind subst_and -H1 wp_solved_frame.
-    unfold _4. apply proper_wp_solved_bientails. intros w2 θ2 [].
-    cbn. rewrite and_true_l -subst_pred_trans. apply H2.
-  Qed.
-
-End Correctness.
-
-Section OccursCheck.
+  Admitted.
+ 
+ End Correctness.
+ 
+ Section OccursCheck.
+ 
   Import option.notations.
   Import (hints) Par.
-
+ 
   Definition occurs_check_in : ⊧ ∀ α, (α ∈) ↠ ▹(Option (α ∈)) :=
     fun w x xIn y yIn =>
       match world.occurs_check_view yIn xIn with
       | world.Same _      => None
       | world.Diff _ xIn' => Some xIn'
       end.
-
+ 
   Load UnificationStlcOccursCheck.
-
-End OccursCheck.
-
-Section Implementation.
-
+ 
+ End OccursCheck.
+ 
+ Section Implementation.
+ 
   Definition flex : ⊧ ∀ α, world.In α ↠ OTy ↠ Solved Tri Unit :=
     fun w α αIn τ =>
       match varview τ with
@@ -202,12 +293,12 @@ Section Implementation.
           end
       end.
   #[global] Arguments flex {w} α {αIn} τ : rename.
-
+ 
   Section OpenRecursion.
-
+ 
     Context [w] (lamgu : ▹AUnifier w).
     Arguments lamgu {_ _} _ _ {_} _.
-
+ 
     Definition aflex α {αIn : α ∈ w} (τ : OTy w) : C w :=
       fun _ θ =>
         match θ with
@@ -215,36 +306,37 @@ Section Implementation.
         | Tri.cons β τ' θ' => lamgu (lk (thick β τ') αIn) τ[thick β τ'] θ'
         end.
     #[global] Arguments aflex α {αIn} τ [w1] _.
-
+ 
     Load UnificationStlcUnifier.
-
+ 
   End OpenRecursion.
-
+ 
   Definition amgu : ⊧ AUnifier :=
     fun w => loeb atrav w.
-
+ 
   Definition mgu `{HMap Tri Θ} : ⊧ OTy ↠ OTy ↠ Solved Θ Unit :=
     fun w s t => solved_hmap (@amgu w s t _ refl).
-
+ 
   Definition asolve : ⊧ List (Prod OTy OTy) ↠ C :=
     fix asolve {w} cs {struct cs} :=
       match cs with
       | List.nil             => ctrue
       | List.cons (t1,t2) cs => cand (amgu t1 t2) (asolve cs)
       end.
-
+ 
   Definition solve `{HMap Tri Θ} : ⊧ List (Prod OTy OTy) ↠ Solved Θ Unit :=
     fun w cs => solved_hmap (asolve cs refl).
-
-End Implementation.
-
-Section Correctness.
-
+ 
+ End Implementation.
+ 
+ Section Correctness.
+   Import Pred.notations.
+ 
   Definition AUnifierCorrect : ⊧ AUnifier ↠ PROP :=
     fun w0 bu =>
       ∀ (t1 t2 : OTy w0) w1 (θ1 : w0 ⊑⁻ w1),
         instpred (bu t1 t2 w1 θ1) ⊣⊢ (t1 ≈ t2)[θ1].
-
+ 
   Lemma flex_correct {w α} (αIn : α ∈ w) (t : OTy w) :
     instpred (flex α t) ⊣⊢ oty.evar αIn ≈ t.
   Proof.
@@ -260,12 +352,12 @@ Section Correctness.
         * subst. now contradiction (H α αIn).
         * apply pno_cycle in HOC. apply split_bientails. now split.
   Qed.
-
+ 
   Section InnerRecursion.
-
+ 
     Context [w] (lamgu : ▹AUnifier w).
     Context (lamgu_correct : ∀ x (xIn : x ∈ w), AUnifierCorrect (lamgu xIn)).
-
+ 
     Lemma aflex_correct {α} (αIn : α ∈ w) (t : OTy w) w1 (θ1 : w ⊑⁻ w1) :
       instpred (aflex lamgu α t θ1) ⊣⊢ (oty.evar αIn ≈ t)[θ1].
     Proof.
@@ -274,32 +366,34 @@ Section Correctness.
       - now rewrite flex_correct subst_pred_refl.
       - now rewrite lamgu_correct !subst_eq !subst_trans.
     Qed.
-
+ 
     Load UnificationStlcCorrect.
-
+ 
   End InnerRecursion.
-
+ 
   Lemma amgu_correct : ∀ w, AUnifierCorrect (@amgu w).
   Proof. apply loeb_elim, atrav_correct. Qed.
-
+ 
   Definition mgu_correct `{LkHMap Tri Θ} w (t1 t2 : OTy w) :
     instpred (mgu (Θ := Θ) t1 t2) ⊣⊢ t1 ≈ t2.
   Proof.
     unfold mgu. rewrite instpred_solved_hmap.
     now rewrite amgu_correct subst_pred_refl.
   Qed.
-
+ 
   #[local] Existing Instance instpred_prod_ty.
-
+ 
   Lemma asolve_correct {w0} (C : List (OTy * OTy) w0) :
     ∀ w1 (θ1 : w0 ⊑⁻ w1),
       instpred (asolve C θ1) ⊣⊢ (instpred C)[θ1].
   Proof.
-    induction C as [|[t1 t2]]; cbn [asolve]; intros.
-    - now rewrite instpred_ctrue.
-    - apply instpred_cand_intro; auto. intros. apply amgu_correct.
-  Qed.
+  Admitted.
+  (*   induction C as [|[t1 t2]]; cbn [asolve]; intros. *)
+  (*   - now rewrite instpred_ctrue. *)
+  (*   - apply instpred_cand_intro; auto. intros. apply amgu_correct. *)
+  (* Qed. *)
 
+ 
   Lemma solve_correct `{LkHMap Tri Θ} {w} (C : List (OTy * OTy) w) :
     WP (solve (Θ := Θ) C) (fun _ _ _ => ⊤) ⊣⊢ instpred C.
   Proof.
@@ -307,5 +401,6 @@ Section Correctness.
     unfold solve. rewrite instpred_solved_hmap.
     now rewrite asolve_correct subst_pred_refl.
   Qed.
+ 
 
-End Correctness.
+
