@@ -27,6 +27,7 @@
 (******************************************************************************)
 
 From Equations Require Import Equations.
+From iris Require Import proofmode.tactics.
 From Em Require Import BaseLogic Monad.Interface Parallel Triangular.
 
 Import Pred Pred.notations Pred.proofmode world.notations.
@@ -149,13 +150,40 @@ End Implementation.
 
 Section Correctness.
 
+  Open Scope bi_scope.
+
+  Notation "◼ Q" := (PBox Q%B) (at level 6, right associativity, format "◼ Q").
+
+  Definition brel : ⊧ C ↠ Pred ↠ Pred.
+    refine (
+    fun w c P => PBox _).
+    intros w' θ.
+    refine (instpred (c w' θ) ↔ P[θ]).
+  Defined.
+
+  Notation "c ~ P" := (brel c P) (at level 20).
+
+  Import Pred.proofmode.
+
   Lemma instpred_ctrue {w0 w1} (θ1 : Tri w0 w1) :
     instpred (ctrue θ1) ⊣⊢ ⊤.
   Proof. cbn. now rewrite Sub.wp_refl. Qed.
 
+  Lemma instpred_ctrue' {w0 : World} :
+    ⊢ (@ctrue w0 ~ True).
+  Proof.
+    iIntros (w1 θ). iModIntro. now rewrite instpred_ctrue subst_true.
+  Qed.
+
   Lemma instpred_cfalse {w0 w1} (θ1 : Tri w0 w1) :
     instpred (cfalse θ1) ⊣⊢ ⊥.
   Proof. reflexivity. Qed.
+
+  Lemma instpred_cfalse' {w0} :
+    ⊢ (@cfalse w0 ~ False).
+  Proof.
+    iIntros (w1 θ). iModIntro. now rewrite instpred_cfalse subst_false.
+  Qed.
 
   Lemma instpred_cand_intro {w0} (c1 c2 : C w0) P Q :
     (∀ w1 (θ1 : Tri w0 w1), instpred (c1 w1 θ1) ⊣⊢ P[θ1]) →
@@ -167,6 +195,36 @@ Section Correctness.
     unfold _4. apply proper_wp_solved_bientails. intros w2 θ2 [].
     cbn. rewrite and_true_l -subst_pred_trans. apply H2.
   Qed.
+
+  Lemma instpred_cand_intro' {w0} (c1 c2 : C w0) P Q :
+    ⊢ c1 ~ P →
+    c2 ~ Q →
+    (cand c1 c2) ~ (P ∧ Q).
+  Proof.
+    iIntros "H1 H2".
+    unfold brel.
+    iIntros (w1 θ).
+    iModIntro.
+    iMod "H1" as "H1".
+    unfold cand.
+
+    unfold instpred, instpred_solved, cand.
+    rewrite wp_solved_bind subst_and.
+    rewrite bi.iff_sym.
+    (* Replace P with WP c1 in the conclusion *)
+    iRewrite "H1".
+    (* Pull Q into the post condition by using the frame rule *)
+    (* rewrite wp_solved_frame. *)
+    (* Use proper instance or whatever else to eliminate WP from both sides
+       of the conclusion *)
+    (* Introduce the PBox. *)
+    (* iIntros (w2 θ2) "!>". *)
+    (* Run the H2 computation. *)
+    (* iMod "H2" *)
+    (* Finish with propositional reasoning. *)
+    unfold _4. apply proper_wp_solved_bientails. intros w2 θ2 [].
+    cbn. rewrite and_true_l -subst_pred_trans. apply H2.
+
 
 End Correctness.
 
